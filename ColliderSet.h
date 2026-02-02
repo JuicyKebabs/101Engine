@@ -10,7 +10,7 @@ class ColliderSet
 {
 public:
 	ColliderSet(
-		ObjectBase* owner,
+		Actor* owner,
 		OBJECT_TAG ownerTag,
 		DirectX::XMFLOAT3 basePosition,
 		DirectX::XMFLOAT3 baseScale,
@@ -35,7 +35,7 @@ public:
 	);
 
 	//ゲッター
-	ObjectBase* GetOwner() const { return m_owner; } //所有者オブジェクト取得
+	Actor* GetOwner() const { return m_owner; } //所有者オブジェクト取得
 	const std::vector<Collider*>& GetColliders() const;	//コライダー配列取得
 	std::vector<CollisionData::ObjectCollisionInfo>& GetCollisionInfos() { return m_collisionInfos; } //衝突情報配列取得
 	const DirectX::XMFLOAT3& GetBasePosition() const { return m_basePosition; }	//基準位置取得
@@ -51,7 +51,7 @@ public:
 	void SetBaseScale(DirectX::XMFLOAT3 baseScale);	//基準スケール設定
 
 private:
-	ObjectBase* m_owner;
+	Actor* m_owner;
 	OBJECT_TAG m_ownerTag; //所有者オブジェクトのタグ
 	std::vector<Collider*> m_colliders;
 	std::vector<CollisionData::ObjectCollisionInfo> m_collisionInfos; //衝突情報配列

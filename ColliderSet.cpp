@@ -1,13 +1,13 @@
 #include "ColliderSet.h"
 #include "CollisionManager.h"
-#include "ObjectBase.h"
+#include "Actor.h"
 
 using namespace DirectX;
 using namespace CollisionData;
 
 //コンストラクタ
 ColliderSet::ColliderSet(
-	ObjectBase* m_owner, 
+	Actor* m_owner, 
 	OBJECT_TAG ownerTag,
 	DirectX::XMFLOAT3 basePosition, DirectX::XMFLOAT3 baseScale, DirectX::XMFLOAT3 baseRotation,
 	CollisionData::COLLISION_LAYER layer,
@@ -127,7 +127,7 @@ const std::vector<Collider*>& ColliderSet::GetColliders() const
 //衝突情報を収集
 void ColliderSet::BuildObjectCollisionInfos()
 {
-	std::unordered_map<ObjectBase*, ObjectCollisionInfo> collisionMap;	//オブジェクトごとの衝突情報を格納するマップ
+	std::unordered_map<Actor*, ObjectCollisionInfo> collisionMap;	//オブジェクトごとの衝突情報を格納するマップ
 
 	//各コライダーの衝突情報を収集
 	for (auto& collider : m_colliders)
@@ -141,7 +141,7 @@ void ColliderSet::BuildObjectCollisionInfos()
 			ColliderSet* opponentSet = opponentCollider->GetParentSet();
 			if (!opponentSet) continue; //相手コライダーセットがnullptrの場合スキップ
 
-			ObjectBase* opponentObject = opponentSet->GetOwner();
+			Actor* opponentObject = opponentSet->GetOwner();
 			if (!opponentObject) continue; //相手オブジェクトがnullptrの場合スキップ
 
 			//オブジェクトごとの衝突情報をマップに格納

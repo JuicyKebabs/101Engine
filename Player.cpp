@@ -20,7 +20,7 @@ Player::Player(
 	XMFLOAT3 colliderSetOffsetPosition, 
 	XMFLOAT3 colliderSetOffsetRotation
 )
-	: ObjectBase(
+	: Actor(
 		meshType,
 		position,
 		rotation,

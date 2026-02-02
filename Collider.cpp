@@ -1,6 +1,6 @@
 #include "Collider.h"
 #include "ColliderSet.h"
-#include "ObjectBase.h"
+#include "Actor.h"
 
 using namespace DirectX;
 using namespace CollisionData;

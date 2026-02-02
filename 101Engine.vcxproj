@@ -161,7 +161,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MeshGPU.cpp" />
     <ClCompile Include="MeshManager.cpp" />
-    <ClCompile Include="ObjectBase.cpp" />
+    <ClCompile Include="Actor.cpp" />
     <ClCompile Include="PipelineState.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="RenderData.cpp" />
@@ -209,7 +209,7 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="MeshGPU.h" />
     <ClInclude Include="MeshManager.h" />
-    <ClInclude Include="ObjectBase.h" />
+    <ClInclude Include="Actor.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Random.h" />

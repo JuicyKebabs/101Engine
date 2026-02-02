@@ -167,7 +167,7 @@ CameraInfo* SceneBase::GetCameraInfo() const
 }
 
 //Å@Add object to scene
-void SceneBase::AddObject(std::unique_ptr<ObjectBase> object)
+void SceneBase::AddObject(std::unique_ptr<Actor> object)
 {
 	m_objectList.push_back(std::move(object));
 }

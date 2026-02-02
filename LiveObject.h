@@ -1,5 +1,5 @@
 #pragma once
-#include "ObjectBase.h"
+#include "Actor.h"
 
 class LiveObject
 {

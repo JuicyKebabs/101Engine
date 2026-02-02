@@ -1,6 +1,6 @@
 #include "SharedStruct.h"
 #include <algorithm>
-#include "ObjectBase.h"
+#include "Actor.h"
 
 using namespace DirectX;
 

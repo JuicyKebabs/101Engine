@@ -8,7 +8,7 @@
 #include "MeshManager.h"
 #include "SharedStruct.h"
 #include "Collider.h"
-#include "ObjectBase.h"
+#include "Actor.h"
 #include "SharedStruct.h"
 
 using namespace DirectX;

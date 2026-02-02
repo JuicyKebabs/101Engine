@@ -4,7 +4,7 @@
 #include "SharedStruct.h"
 
 //前方宣言
-class ObjectBase;
+class Actor;
 class ColliderSet;
 
 //コライダータイプ列挙型

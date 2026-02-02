@@ -5,7 +5,7 @@
 #include "RenderData.h"
 #include "EffectManager.h"
 #include "EventType.h"
-#include "ObjectBase.h"
+#include "Actor.h"
 #include "Canvas.h"
 #include "CollisionManager.h"
 #include "Context.h"
@@ -44,14 +44,14 @@ protected:
 	virtual void UpdateOverride() = 0;								// Scene-specific update
 	virtual void FinalizeOverride() = 0;							// Scene-specific finalize
 
-	void AddObject(std::unique_ptr<ObjectBase> object); // Add object to scene
+	void AddObject(std::unique_ptr<Actor> object); // Add object to scene
 	void AddEvent() {};									// Add event subscription
 
 private:
-	std::vector<std::unique_ptr<ObjectBase>> m_objectList;			// Object list in the scene
+	std::vector<std::unique_ptr<Actor>> m_objectList;			// Object list in the scene
 	std::vector<std::unique_ptr<Canvas>> m_canvasList;				// Canvas list in the scene
 
-	std::vector<std::unique_ptr<ObjectBase>> m_pendingObjects;		// Pending objects to be added
+	std::vector<std::unique_ptr<Actor>> m_pendingObjects;		// Pending objects to be added
 
 	std::vector<EventData> m_eventDataList;							// Subscribed event data list
 

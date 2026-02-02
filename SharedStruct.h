@@ -146,7 +146,7 @@ struct SceneContext
 
 //前方宣言
 class Collider;
-class ObjectBase;
+class Actor;
 
 //衝突データ用名前空間
 namespace CollisionData
@@ -190,7 +190,7 @@ namespace CollisionData
 	//Object collision information structure
 	struct ObjectCollisionInfo
 	{
-		ObjectBase* opponent = nullptr;								//opponent object
+		Actor* opponent = nullptr;								//opponent object
 		DirectX::XMFLOAT3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
 		DirectX::XMFLOAT3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
 		DirectX::XMFLOAT3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth

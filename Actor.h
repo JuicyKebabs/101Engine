@@ -12,20 +12,12 @@ class Renderer;
 class TextureManager;
 class MeshManager;
 
-// Node Animator Set Structure
-struct NodeAnimatorSet
-{
-	bool isAnimLoaded = false;				// Animation loaded flag
-	bool isAnimPlaying = false;				// Animation playing flag
-	NodeAnimator* pNodeAnimator = nullptr;	// Pointer to node animator
-};
-
-// Game Object Base Class
-// This class serves as a base for all game objects, providing common functionality
-class ObjectBase
+// Actor Class
+// This defines the all elements that exist in the game world
+class Actor
 {
 public:
-	ObjectBase(	// Constructor
+	Actor(	// Constructor
 		MESH_TYPE meshType,								// Mesh type
 		DirectX::XMFLOAT3 position,						// Position
 		DirectX::XMFLOAT3 rotation,						// Rotation
@@ -42,7 +34,7 @@ public:
 		DirectX::XMFLOAT3 colliderSetOffsetRotation =
 			{ 0.0f, 0.0f, 0.0f }						// Collider set offset rotation
 	);
-	~ObjectBase();	// Destructor
+	~Actor();	// Destructor
 
 	void Update();														// Update
 	void SubmitDraws(Renderer& renderer);							// Render information submission

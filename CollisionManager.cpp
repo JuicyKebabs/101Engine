@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <cfloat>
-#include "ObjectBase.h"
+#include "Actor.h"
 #include "Renderer.h"
 #include "TextureManager.h"
 #include "MeshManager.h"

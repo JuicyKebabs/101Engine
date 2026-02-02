@@ -1,9 +1,9 @@
 #pragma once
-#include "ObjectBase.h"
+#include "Actor.h"
 #include "AssimpNodeTransformAnim.h"
 
 // Player class
-class Player : public ObjectBase
+class Player : public Actor
 {
 public:	// Public functions
 	Player(	// Constructor

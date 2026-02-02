@@ -1,4 +1,4 @@
-#include "ObjectBase.h"
+#include "Actor.h"
 #include "d3dx12.h"
 #include <DirectXMath.h>
 #include "Engine.h"
@@ -10,7 +10,7 @@ using namespace DirectX;
 using namespace CollisionData;
 
 //コンストラクタ
-ObjectBase::ObjectBase(
+Actor::Actor(
 	MESH_TYPE meshType,
 	XMFLOAT3 position,
 	XMFLOAT3 rotation,
@@ -47,7 +47,7 @@ ObjectBase::ObjectBase(
 }
 
 //デストラクタ
-ObjectBase::~ObjectBase()
+Actor::~Actor()
 {
 	//コライダーの破棄
 	if (m_pColliderSet)
@@ -57,7 +57,7 @@ ObjectBase::~ObjectBase()
 	}
 }
 
-void ObjectBase::Update()
+void Actor::Update()
 {
 	m_passedFrames++;
 	UpdateOverride();
@@ -65,7 +65,7 @@ void ObjectBase::Update()
 	UpdateAnimation();
 }
 
-void ObjectBase::SubmitDraws(Renderer& renderer)
+void Actor::SubmitDraws(Renderer& renderer)
 {
 	//アクティブなオブジェクトの描画要求をシーンに提出
 	if (IsActive() && IsDrawn())
@@ -138,7 +138,7 @@ void ObjectBase::SubmitDraws(Renderer& renderer)
 }
 
 //衝突解決
-void ObjectBase::ResolveCollisions()
+void Actor::ResolveCollisions()
 {
 	m_pColliderSet->BuildObjectCollisionInfos();	//衝突情報を収集
 	ResolveCollisionsOverride();					//衝突解決(固有処理用、派生クラスでオーバーライド)
@@ -159,13 +159,13 @@ void Collider::ClearInfos()
 }
 
 //衝突情報のクリア
-void ObjectBase::ClearCollisionInfos()
+void Actor::ClearCollisionInfos()
 {
 	m_pColliderSet->ClearCollisionInfos();
 }
 
 //ワールド行列の取得
-const DirectX::XMMATRIX ObjectBase::GetWorldMatrix() const
+const DirectX::XMMATRIX Actor::GetWorldMatrix() const
 {
 	XMMATRIX T = XMMatrixTranslation(m_position.x, m_position.y, m_position.z);
 	XMMATRIX R = XMMatrixRotationRollPitchYaw(
@@ -177,116 +177,116 @@ const DirectX::XMMATRIX ObjectBase::GetWorldMatrix() const
 }
 
 //位置の取得
-const DirectX::XMFLOAT3 ObjectBase::GetPosition() const
+const DirectX::XMFLOAT3 Actor::GetPosition() const
 {
 	return m_position;
 }
 
 //回転の取得
-const DirectX::XMFLOAT3 ObjectBase::GetRotation() const
+const DirectX::XMFLOAT3 Actor::GetRotation() const
 {
 	return m_rotation;
 }
 
 //スケールの取得
-const DirectX::XMFLOAT3 ObjectBase::GetScale() const
+const DirectX::XMFLOAT3 Actor::GetScale() const
 {
 	return m_scale;
 }
 
 //色RGBAの取得
-const DirectX::XMFLOAT4 ObjectBase::GetColor() const
+const DirectX::XMFLOAT4 Actor::GetColor() const
 {
 	return m_color;
 }
 
 //getting velocity
-const DirectX::XMFLOAT3 ObjectBase::GetVelocity() const
+const DirectX::XMFLOAT3 Actor::GetVelocity() const
 {
 	return m_velocity;
 }
 
 //アクティブかどうかを取得
-const bool ObjectBase::IsActive() const
+const bool Actor::IsActive() const
 {
 	return m_isActive;
 }
 
 //描画フラグの取得
-const bool ObjectBase::IsDrawn() const
+const bool Actor::IsDrawn() const
 {
 	return m_isDrawn;
 }
 
 //位置の設定
-void ObjectBase::SetPosition(DirectX::XMFLOAT3 position)
+void Actor::SetPosition(DirectX::XMFLOAT3 position)
 {
 	m_position = position;
 }
 
 //回転の設定
-void ObjectBase::SetRotation(DirectX::XMFLOAT3 rotation)
+void Actor::SetRotation(DirectX::XMFLOAT3 rotation)
 {
 	m_rotation = rotation;
 }
 
 //スケールの設定
-void ObjectBase::SetScale(DirectX::XMFLOAT3 scale)
+void Actor::SetScale(DirectX::XMFLOAT3 scale)
 {
 	m_scale = scale;
 }
 
 //色RGBAの設定
-void ObjectBase::SetColor(DirectX::XMFLOAT4 color)
+void Actor::SetColor(DirectX::XMFLOAT4 color)
 {
 	m_color = color;
 }
 
 //setting velocity
-void ObjectBase::SetVelocity(DirectX::XMFLOAT3 velocity)
+void Actor::SetVelocity(DirectX::XMFLOAT3 velocity)
 {
 	m_velocity = velocity;
 }
 
 //アクティブフラグの設定
-void ObjectBase::SetActive(bool isActive)
+void Actor::SetActive(bool isActive)
 {
 	m_isActive = isActive;
 	m_pColliderSet->SetActive(isActive);
 }
 
 //描画フラグの設定
-void ObjectBase::SetDrawn(bool isDrawn)
+void Actor::SetDrawn(bool isDrawn)
 {
 	m_isDrawn = isDrawn;
 }
 
 //テクスチャ分割情報構造体の設定
-void ObjectBase::SetTexSplitInfo(TexSplitInfo info)
+void Actor::SetTexSplitInfo(TexSplitInfo info)
 {
 	m_texSplitInfo = info;
 }
 
 // Get mesh type
-MESH_TYPE ObjectBase::GetMeshType() const
+MESH_TYPE Actor::GetMeshType() const
 {
 	return m_meshType;
 }
 
 // Set render model
-void ObjectBase::SetRenderModel(const WorldRenderModel& renderModel)
+void Actor::SetRenderModel(const WorldRenderModel& renderModel)
 {
 	m_renderModel = renderModel;
 }
 
 //ノードアニメーションセットの設定
-void ObjectBase::SetNodeAnimatorSet(const NodeAnimatorSet& nodeAnimatorSet)
+void Actor::SetNodeAnimatorSet(const NodeAnimatorSet& nodeAnimatorSet)
 {
 	m_nodeAnimatorSet = nodeAnimatorSet;
 }
 
 //アニメーション更新
-void ObjectBase::UpdateAnimation()
+void Actor::UpdateAnimation()
 {
 	if (m_texSplitInfo.total <= 1 || m_texSplitInfo.updateRate <= 0) return;
 
@@ -307,31 +307,31 @@ void ObjectBase::UpdateAnimation()
 }
 
 //コライダーの取得
-ColliderSet* ObjectBase::GetColliderSet() const
+ColliderSet* Actor::GetColliderSet() const
 {
 	return m_pColliderSet;
 }
 
 //オブジェクトタグの取得
-OBJECT_TAG ObjectBase::GetTag() const
+OBJECT_TAG Actor::GetTag() const
 {
 	return m_tag;
 }
 
 //テクスチャ分割情報構造体取得関数
-const TexSplitInfo& ObjectBase::GetTexSplitInfo() const
+const TexSplitInfo& Actor::GetTexSplitInfo() const
 {
 	return m_texSplitInfo;
 }
 
 // Get render model
-WorldRenderModel ObjectBase::GetRenderModel()
+WorldRenderModel Actor::GetRenderModel()
 {
 	return m_renderModel;
 }
 
 //ノードアニメーションセットの取得
-NodeAnimatorSet* ObjectBase::GetNodeAnimatorSet()
+NodeAnimatorSet* Actor::GetNodeAnimatorSet()
 {
 	return &m_nodeAnimatorSet;
 }

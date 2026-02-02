@@ -307,3 +307,11 @@ static DirectX::XMMATRIX AiMatrix4x4ToXMMatrix(const aiMatrix4x4& mat)
 		mat.a4, mat.b4, mat.c4, mat.d4
 	);
 }
+
+// Node Animator Set Structure
+struct NodeAnimatorSet
+{
+	bool isAnimLoaded = false;				// Animation loaded flag
+	bool isAnimPlaying = false;				// Animation playing flag
+	NodeAnimator* pNodeAnimator = nullptr;	// Pointer to node animator
+};
