@@ -1,6 +1,7 @@
 #pragma once
 #include "Collider.h"
 #include "SharedStruct.h"
+#include "CollisionData.h"
 #include <vector>
 #include <DirectXMath.h>
 
@@ -15,7 +16,7 @@ public:
 		DirectX::XMFLOAT3 basePosition,
 		DirectX::XMFLOAT3 baseScale,
 		DirectX::XMFLOAT3 baseRotation,
-		CollisionData::COLLISION_LAYER layer,
+		COLLISION_LAYER layer,
 		bool enabled = true,
 		DirectX::XMFLOAT3 offsetPosition = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f),
 		DirectX::XMFLOAT3 offsetRotation = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f),
@@ -37,11 +38,11 @@ public:
 	//ゲッター
 	Actor* GetOwner() const { return m_owner; } //所有者オブジェクト取得
 	const std::vector<Collider*>& GetColliders() const;	//コライダー配列取得
-	std::vector<CollisionData::ObjectCollisionInfo>& GetCollisionInfos() { return m_collisionInfos; } //衝突情報配列取得
+	std::vector<ObjectCollisionInfo>& GetCollisionInfos() { return m_collisionInfos; } //衝突情報配列取得
 	const DirectX::XMFLOAT3& GetBasePosition() const { return m_basePosition; }	//基準位置取得
 	const DirectX::XMFLOAT3& GetBaseScale() const { return m_baseScale; }		//基準スケール取得
 	const DirectX::XMFLOAT3& GetBaseRotation() const { return m_baseRotation; }	//基準回転取得
-	CollisionData::COLLISION_LAYER GetLayer() const { return m_layer; }	//衝突レイヤー取得
+	COLLISION_LAYER GetLayer() const { return m_layer; }	//衝突レイヤー取得
 	const bool IsActive() const { return m_isActive; }	//有効フラグ取得
 
 	//セッター
@@ -54,8 +55,8 @@ private:
 	Actor* m_owner;
 	OBJECT_TAG m_ownerTag; //所有者オブジェクトのタグ
 	std::vector<Collider*> m_colliders;
-	std::vector<CollisionData::ObjectCollisionInfo> m_collisionInfos; //衝突情報配列
-	CollisionData::COLLISION_LAYER m_layer;
+	std::vector<ObjectCollisionInfo> m_collisionInfos; //衝突情報配列
+	COLLISION_LAYER m_layer;
 	bool m_isActive = true;
 	bool m_isTrigger = false;
 

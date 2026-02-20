@@ -1,51 +1,45 @@
 #include "App.h"
 #include "Controller.h"
-#include <cmath>	//デッドゾーン処理などで使用する
+#include <cmath>
 #include <cassert>
 #include "InputManager.h"
 
 using namespace DirectX;
 
-//コンストラクタ
-Controller::Controller() {}		
-//デスコンストラクタ
-Controller::~Controller() {}	
-
+// Initialization
 void Controller::Initialize()
 {
-	// 特になし
+	// Clear controller states
+	ZeroMemory(m_controllers.data(), sizeof(ControllerState) * CONTROLLERS_MAX);
 }
 
-// 更新
+// Update controller states
 void Controller::Update(ControllerInputInfo* inputInfo)
 {
-	//最大４つのこんとろーらーを順に確認する（０～３）
+	// Process each of the four controllers
 	for (int i = 0; i < CONTROLLERS_MAX; ++i)
 	{
-		ControllerState& cs = m_controllers[i];	//０～３の状態を取得
-
-		// コントローラーの状態を取得
-		DWORD dwResult = XInputGetState(i, &cs.state);
+		ControllerState& cs = m_controllers[i];			// Get the state of controller 0-3
+		DWORD dwResult = XInputGetState(i, &cs.state);	// Get the state of the controller
 
 		if (dwResult == ERROR_SUCCESS)
 		{
-			// 接続されている
-			cs.isConnected = true;
+			cs.isConnected = true;	// Connected
 
-			// トリガー情報の更新
-			UpdateTriggerState(cs, inputInfo[i]);	//現在の状態と前回の状態を比較してトリガー判定をする
-			// 押下情報の更新
-			UpdateDownState(cs, inputInfo[i]);		//現在の状態と前回の状態を比較して押下判定をする
-			// 離下情報の更新
-			UpdateUpState(cs, inputInfo[i]);		//現在の状態と前回の状態を比較して離下判定をする
-			// スティック情報の更新
-			UpdateStickState(cs, inputInfo[i]);	//スティックの状態を更新
+			// Update trigger information
+			UpdateTriggerState(cs, inputInfo[i]);	// Compare current and previous states to determine trigger state
+			// Update button down information
+			UpdateDownState(cs, inputInfo[i]);		// Compare current and previous states to determine button down state
+			// Update button up information
+			UpdateUpState(cs, inputInfo[i]);		// Compare current and previous states to determine button up state
+			// Update stick information
+			UpdateStickState(cs, inputInfo[i]);	// Update stick state
 		}
 		else
 		{
-			// 接続されていない
+			// Not connected
 			cs.isConnected = false;
-			// 状態をクリア　（古い状態が残らないよう初期化）
+			// Clear state (initialize to prevent old state from lingering)
 			cs.state = {};
 			cs.prevState = {};
 			inputInfo[i] = ControllerInputInfo{};
@@ -53,18 +47,17 @@ void Controller::Update(ControllerInputInfo* inputInfo)
 	}
 }
 
-// 状態コピー
+// Copy previous state to current state
 void Controller::CopyState()
-{//４つのコントローラーを順に処理する
+{
 	for (int i = 0; i < CONTROLLERS_MAX; ++i)
 	{
 		ControllerState& cs = m_controllers[i];
-		if (cs.isConnected)	//接続されているコントローラーのみ
-		{
-			// 現在の状態を前回の状態として保存
-			cs.prevState = cs.state;
+
+		if (cs.isConnected)
+		{// If connected
+			cs.prevState = cs.state;	// Copy current state to previous state
 		}
-		// 接続されていない場合はUpdateでクリアされているため処理は不要
 	}
 }
 
@@ -104,25 +97,19 @@ void Controller::StopAllVibrations()
 	}
 }
 
-// 指定したインデックスのコントローラー状態を取得
+// Get controller state by index
 const ControllerState& Controller::GetState(int index) const
 {
-	// 範囲チェックは省略するが、通常はここでアサートなどを行うべき（だそうです）
-	// indexで指定されたこんとろーらー状態を返す
 	assert(index >= 0 && index < CONTROLLERS_MAX);
 	return m_controllers[index];	
 }
 
-// ボタンのトリガー状態を更新
+// Update Button Trigger State
 void Controller::UpdateTriggerState(ControllerState& cs, ControllerInputInfo& inputInfo)
 {
 	const XINPUT_GAMEPAD& current = cs.state.Gamepad;
 	const XINPUT_GAMEPAD& previous = cs.prevState.Gamepad;
 
-	// トリガー状態の計算
-	// IsButtonTriggered(ボタンのフラグ, 現在のGamepad, 前回のGamepad)
-
-	// ボタン　ABXYor〇×△□
 	inputInfo.A.trigger = IsButtonTriggered(XINPUT_GAMEPAD_A, current, previous);
 	inputInfo.B.trigger = IsButtonTriggered(XINPUT_GAMEPAD_B, current, previous);
 	inputInfo.X.trigger = IsButtonTriggered(XINPUT_GAMEPAD_X, current, previous);
@@ -135,13 +122,11 @@ void Controller::UpdateTriggerState(ControllerState& cs, ControllerInputInfo& in
 	inputInfo.LTHUMB.trigger = IsButtonTriggered(XINPUT_GAMEPAD_LEFT_THUMB, current, previous);
 	inputInfo.RTHUMB.trigger = IsButtonTriggered(XINPUT_GAMEPAD_RIGHT_THUMB, current, previous);
 
-	// 方向キーのトリガー判定
 	inputInfo.UP.trigger= IsButtonTriggered(XINPUT_GAMEPAD_DPAD_UP, current, previous);
 	inputInfo.DOWN.trigger= IsButtonTriggered(XINPUT_GAMEPAD_DPAD_DOWN, current, previous);
 	inputInfo.LEFT.trigger= IsButtonTriggered(XINPUT_GAMEPAD_DPAD_LEFT, current, previous);
 	inputInfo.RIGHT.trigger = IsButtonTriggered(XINPUT_GAMEPAD_DPAD_RIGHT, current, previous);
 
-	// 任意のボタンが押されたかどうかを判定
 	inputInfo.anyButton.trigger =
 		inputInfo.A.trigger || inputInfo.B.trigger || inputInfo.X.trigger || inputInfo.Y.trigger ||
 		inputInfo.START.trigger || inputInfo.BACK.trigger ||
@@ -149,19 +134,14 @@ void Controller::UpdateTriggerState(ControllerState& cs, ControllerInputInfo& in
 		inputInfo.LTHUMB.trigger || inputInfo.RTHUMB.trigger ||
 		inputInfo.UP.trigger || inputInfo.DOWN.trigger ||
 		inputInfo.LEFT.trigger || inputInfo.RIGHT.trigger;
-
-	// Note: スティックとトリガーはアナログ入力のため、
-	// `trigger` (押された瞬間) の概念を適用するのは一般的ではありません。
-	// 必要であれば、デッドゾーンを超えた瞬間をトリガーとみなすなどのカスタムロジックをここに追加できます。
 }
 
-// ボタンの押下状態を更新
+// Update Button Down State
 void Controller::UpdateDownState(ControllerState& contState, ControllerInputInfo& inputInfo)
 {
 	const XINPUT_GAMEPAD& current = contState.state.Gamepad;
 	const XINPUT_GAMEPAD& previous = contState.prevState.Gamepad;
 
-	// ボタンの押下状態を更新
 	inputInfo.A.down = IsButtonDown(XINPUT_GAMEPAD_A, current, previous);
 	inputInfo.B.down = IsButtonDown(XINPUT_GAMEPAD_B, current, previous);
 	inputInfo.X.down = IsButtonDown(XINPUT_GAMEPAD_X, current, previous);
@@ -174,7 +154,6 @@ void Controller::UpdateDownState(ControllerState& contState, ControllerInputInfo
 	inputInfo.LTHUMB.down = IsButtonDown(XINPUT_GAMEPAD_LEFT_THUMB, current, previous);
 	inputInfo.RTHUMB.down = IsButtonDown(XINPUT_GAMEPAD_RIGHT_THUMB, current, previous);
 
-	// 方向キーの押下判定
 	inputInfo.UP.down = IsButtonDown(XINPUT_GAMEPAD_DPAD_UP, current, previous);
 	inputInfo.DOWN.down = IsButtonDown(XINPUT_GAMEPAD_DPAD_DOWN, current, previous);
 	inputInfo.LEFT.down = IsButtonDown(XINPUT_GAMEPAD_DPAD_LEFT, current, previous);
@@ -195,7 +174,6 @@ void Controller::UpdateUpState(ControllerState& contState, ControllerInputInfo& 
 	const XINPUT_GAMEPAD& current = contState.state.Gamepad;
 	const XINPUT_GAMEPAD& previous = contState.prevState.Gamepad;
 
-	// ボタンの離下状態を更新
 	inputInfo.A.up = IsButtonUp(XINPUT_GAMEPAD_A, current, previous);
 	inputInfo.B.up = IsButtonUp(XINPUT_GAMEPAD_B, current, previous);
 	inputInfo.X.up = IsButtonUp(XINPUT_GAMEPAD_X, current, previous);
@@ -207,7 +185,6 @@ void Controller::UpdateUpState(ControllerState& contState, ControllerInputInfo& 
 	inputInfo.LTHUMB.up = IsButtonUp(XINPUT_GAMEPAD_LEFT_THUMB, current, previous);
 	inputInfo.RTHUMB.up = IsButtonUp(XINPUT_GAMEPAD_RIGHT_THUMB, current, previous);
 
-	// 方向キーの離下判定
 	inputInfo.UP.up = IsButtonUp(XINPUT_GAMEPAD_DPAD_UP, current, previous);
 	inputInfo.DOWN.up = IsButtonUp(XINPUT_GAMEPAD_DPAD_DOWN, current, previous);
 	inputInfo.LEFT.up = IsButtonUp(XINPUT_GAMEPAD_DPAD_LEFT, current, previous);
@@ -248,13 +225,7 @@ void Controller::UpdateStickState(ControllerState& contState, ControllerInputInf
 // Check if a specific button was triggered
 bool Controller::IsButtonTriggered(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const
 {
-	// 現在押されている **かつ** 前回押されていなかった場合にtrue
 	return (currentState.wButtons & buttonFlag) && !(previousState.wButtons & buttonFlag);
-	// 現在の状態でボタンが押されている (currentState.wButtons & buttonFlag)
-	// かつ
-	// 前回の状態でボタンが押されていなかった (!(previousState.wButtons & buttonFlag))
-	// の両方を満たす場合に、押された瞬間としてtrueを返す
-
 }
 
 // Check if a specific button is held down

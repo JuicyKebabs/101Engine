@@ -3,14 +3,14 @@
 #include "Actor.h"
 
 using namespace DirectX;
-using namespace CollisionData;
+
 
 //コンストラクタ
 ColliderSet::ColliderSet(
 	Actor* m_owner, 
 	OBJECT_TAG ownerTag,
 	DirectX::XMFLOAT3 basePosition, DirectX::XMFLOAT3 baseScale, DirectX::XMFLOAT3 baseRotation,
-	CollisionData::COLLISION_LAYER layer,
+	COLLISION_LAYER layer,
 	bool enabled,
 	DirectX::XMFLOAT3 offsetPosition, DirectX::XMFLOAT3 offsetRotation,
 	bool isTrigger

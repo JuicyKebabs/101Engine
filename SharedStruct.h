@@ -81,9 +81,9 @@ struct DirectionalLight
 //transform structure for 3D objects
 struct Transform3D
 {
-	DirectX::XMFLOAT3 position = { 0.0f, 0.0f, 0.0f };	//position
-	DirectX::XMFLOAT3 scale = { 1.0f, 1.0f, 1.0f };		//scale
-	DirectX::XMFLOAT3 rotation = { 0.0f, 0.0f, 0.0f };	//rotation
+	DirectX::XMFLOAT3 position = { 0.0f, 0.0f, 0.0f };			//position
+	DirectX::XMFLOAT3 scale = { 1.0f, 1.0f, 1.0f };				//scale
+	DirectX::XMFLOAT4 rotation = { 0.0f, 0.0f, 0.0f, 1.0f };	//rotation(Quaternion)
 };
 
 //constant buffer structure for effects
@@ -112,6 +112,7 @@ struct CameraInfo
 	DirectX::XMFLOAT3 target;	//camera target point
 	DirectX::XMFLOAT3 up;		//camera up direction vector
 	DirectX::XMFLOAT3 right;	//camera right direction vector
+	DirectX::XMFLOAT3 forward;	//camera forward direction vector
 	float fov;					//vertical field of view
 	float aspectRatio;			//aspect ratio
 	float nearZ;				//near clip distance
@@ -143,99 +144,6 @@ enum class SCENE_TYPE
 struct SceneContext
 {
 };
-
-//前方宣言
-class Collider;
-class Actor;
-
-//衝突データ用名前空間
-namespace CollisionData
-{
-	//enumlaration for collision states
-	enum COLLISION_STATE
-	{
-		COLLISION_NONE = 0,	//No collision
-		COLLISION_ENTER,	//Collision start
-		COLLISION_STAY,		//Collision stay
-		COLLISION_EXIT,		//Collision exit
-	};
-
-	//enumeration for collision layers
-	enum class COLLISION_LAYER
-	{
-		DEFAULT = 0,	//default
-		PLAYER,			//player
-		ENEMY,			//enemy
-		WALL,			//wall
-		PLAYER_BULLET,	//player bullet
-		PLAYER_RAY,		//player raycast
-		ENEMY_BULLET,	//enemy bullet
-		MAX_LAYER		//max layer
-	};
-
-	//Layer mask type definition
-	using LayerMask = uint32_t;
-
-	//Collider collision information structure
-	struct CollisionInfo
-	{
-		Collider* opponent = nullptr;								//opponent collider
-		DirectX::XMFLOAT3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
-		DirectX::XMFLOAT3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
-		DirectX::XMFLOAT3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth
-		CollisionData::COLLISION_STATE state =
-			CollisionData::COLLISION_STATE::COLLISION_NONE;			//collision state
-	};
-
-	//Object collision information structure
-	struct ObjectCollisionInfo
-	{
-		Actor* opponent = nullptr;								//opponent object
-		DirectX::XMFLOAT3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
-		DirectX::XMFLOAT3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
-		DirectX::XMFLOAT3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth
-		CollisionData::COLLISION_STATE state =
-			CollisionData::COLLISION_STATE::COLLISION_NONE;			//collision state
-	};
-
-	//Raycast hit information structure
-	struct RaycastHitInfo
-	{
-		Collider* opponent = nullptr;						//opponent collider
-		DirectX::XMFLOAT3 hitPoint = { 0.0f, 0.0f, 0.0f };	//collision point
-		DirectX::XMFLOAT3 hitNormal = { 0.0f, 0.0f, 0.0f };	//collision normal
-		float hitDistance = 0.0f;							//collision distance
-		COLLISION_STATE state =
-			COLLISION_STATE::COLLISION_NONE;				//collision state
-	};
-
-	//Raycast segment structure
-	struct RaycastSegment
-	{
-		DirectX::XMFLOAT3 startPoint = { 0.0f, 0.0f, 0.0f };	//start point
-		DirectX::XMFLOAT3 endPoint = { 0.0f, 0.0f, 0.0f };		//end point
-		LayerMask layerMask = 0;								//layer mask
-		COLLISION_LAYER layer = COLLISION_LAYER::DEFAULT;		//layer
-		std::vector<RaycastHitInfo> currHitInfos;					//hit information array
-		std::vector<RaycastHitInfo> prevHitInfos;				//previous hit information array
-	};
-
-	//Layer to bit conversion function
-	LayerMask LayerToBit(COLLISION_LAYER layer);
-
-	//Layer mask retrieval function
-	LayerMask GetLayerMask(COLLISION_LAYER layer);
-
-	//Layer mask creation function from initializer list
-	LayerMask MakeMask(std::initializer_list<COLLISION_LAYER> layers);
-
-	//Get push-out vector from penetration depth
-	DirectX::XMFLOAT3 GetPushOutVector(
-		std::vector<CollisionData::ObjectCollisionInfo>& infos,	//collision information array
-		const std::initializer_list<OBJECT_TAG>& tagList		//target tag list
-	);
-}
-
 
 //=======================
 //Vector operation functions
@@ -407,67 +315,42 @@ inline static float EaseOutBack(float t)
 }
 
 //3D transformation information combination function
-inline static Transform3D CombineTransform3D(const Transform3D& world, const Transform3D& local)
+inline static Transform3D CombineTransform3D(const Transform3D& parent, const Transform3D& local)
 {
-	Transform3D result;
-	//Scale combination
-	result.scale.x = world.scale.x * local.scale.x;
-	result.scale.y = world.scale.y * local.scale.y;
-	result.scale.z = world.scale.z * local.scale.z;
+	using namespace DirectX;
 
-	//Rotation combination
-	result.rotation.x = world.rotation.x + local.rotation.x;
-	result.rotation.y = world.rotation.y + local.rotation.y;
-	result.rotation.z = world.rotation.z + local.rotation.z;
+	Transform3D out{};
 
-	//Position combination (taking scale and rotation into account)
-	DirectX::XMVECTOR childPos = DirectX::XMLoadFloat3(&local.position);	//Child position vector
-	DirectX::XMVECTOR parentScale = DirectX::XMLoadFloat3(&world.scale);	//Parent scale vector
-	childPos = DirectX::XMVectorMultiply(childPos, parentScale);			//Apply scale
+	out.scale = {
+		parent.scale.x * local.scale.x,
+		parent.scale.y * local.scale.y,
+		parent.scale.z * local.scale.z
+	};
 
-	DirectX::XMVECTOR parentRot = DirectX::XMLoadFloat3(&world.rotation);	//Parent rotation vector
-	
-	const float pitch = DirectX::XMConvertToRadians(DirectX::XMVectorGetX(parentRot));
-	const float yaw = DirectX::XMConvertToRadians(DirectX::XMVectorGetY(parentRot));
-	const float roll = DirectX::XMConvertToRadians(DirectX::XMVectorGetZ(parentRot));
-	
-	DirectX::XMMATRIX rotMatrix =											//Parent rotation matrix
-		DirectX::XMMatrixRotationRollPitchYaw(pitch, yaw, roll);
-	childPos = DirectX::XMVector3Transform(childPos, rotMatrix);				//Apply rotation
+	XMVECTOR qP = XMLoadFloat4(&parent.rotation);
+	XMVECTOR qL = XMLoadFloat4(&local.rotation);
+	XMVECTOR qW = XMQuaternionMultiply(qL, qP);
+	qW = XMQuaternionNormalize(qW);
+	XMStoreFloat4(&out.rotation, qW);
 
-	DirectX::XMVECTOR parentPos = DirectX::XMLoadFloat3(&world.position);		//Parent position vector
-	DirectX::XMVECTOR resultPos = DirectX::XMVectorAdd(parentPos, childPos);	//Position combination
-	DirectX::XMStoreFloat3(&result.position, resultPos);						//Store result
+	XMVECTOR p = XMLoadFloat3(&local.position);
+	p = XMVectorMultiply(p, XMLoadFloat3(&parent.scale));
+	p = XMVector3Rotate(p, qP);
+	p = XMVectorAdd(p, XMLoadFloat3(&parent.position));
+	XMStoreFloat3(&out.position, p);
 
-	return result;
+	return out;
 }
 
 //Get transformation matrix from transformation information
 inline static DirectX::XMMATRIX GetMatrixFromTransform3D(const Transform3D& transform)
 {
-	//Scale matrix
-	DirectX::XMMATRIX scaleMatrix =
-		DirectX::XMMatrixScaling(
-			transform.scale.x,
-			transform.scale.y,
-			transform.scale.z
-		);
-	//Rotation matrix
-	DirectX::XMMATRIX rotMatrix =
-		DirectX::XMMatrixRotationRollPitchYaw(
-			DirectX::XMConvertToRadians(transform.rotation.x),	//Pitch
-			DirectX::XMConvertToRadians(transform.rotation.y),	//Yaw
-			DirectX::XMConvertToRadians(transform.rotation.z)	//Roll
-		);
-	//Translation matrix
-	DirectX::XMMATRIX transMatrix =
-		DirectX::XMMatrixTranslation(
-			transform.position.x,
-			transform.position.y,
-			transform.position.z
-		);
-	//World matrix composition (Scale → Rotation → Translation)
-	return scaleMatrix * rotMatrix * transMatrix;
+	using namespace DirectX;
+	XMMATRIX S = XMMatrixScaling(transform.scale.x, transform.scale.y, transform.scale.z);
+	XMMATRIX R = XMMatrixRotationQuaternion(XMLoadFloat4(&transform.rotation));
+	XMMATRIX T = XMMatrixTranslation(transform.position.x, transform.position.y, transform.position.z);
+
+	return S * R * T;
 }
 
 //3D transformation matrix combination function

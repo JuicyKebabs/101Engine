@@ -14,8 +14,8 @@ public:	// Public functions
 		DirectX::XMFLOAT3 velocity = { 0.0f, 0.0f, 0.0f },	// Velocity
 		bool isActive = true,								// Active flag
 		OBJECT_TAG tag = OBJECT_TAG::PLAYER,				// Object tag
-		CollisionData::COLLISION_LAYER layer =
-			CollisionData::COLLISION_LAYER::PLAYER,			// Collision layer
+		COLLISION_LAYER layer =
+			COLLISION_LAYER::PLAYER,			// Collision layer
 		DirectX::XMFLOAT3 colliderSetScale =
 			{ 1.0f, 1.0f, 1.0f },							// Collider set scale
 		DirectX::XMFLOAT3 colliderSetOffsetPosition =

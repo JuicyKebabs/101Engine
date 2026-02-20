@@ -6,6 +6,7 @@
 #include "SharedStruct.h"
 #include "RenderData.h"
 #include "Context.h"
+#include "CollisionData.h"
 
 //前方宣言
 class Renderer;
@@ -90,7 +91,7 @@ public:
 
 	//レイキャスト関数
 	void RaycastSegmentQuery(
-		CollisionData::RaycastSegment& ray	//レイ情報
+		RaycastSegment& ray	//レイ情報
 	);
 
 private:
@@ -219,7 +220,7 @@ private:
 	static void SetCollisionState(	//コライダーの衝突ステートを設定
 		Collider* self,							//自分自身のコライダー
 		Collider* opponent,						//衝突相手のコライダー
-		CollisionData::COLLISION_STATE state	//衝突状態
+		COLLISION_STATE state	//衝突状態
 	);
 	static void PushCollisionInfo(	//コライダーに衝突情報を追加
 		Collider* colliderA,	//自分自身のコライダー
@@ -234,26 +235,26 @@ private:
 
 	//レイキャスト補助関数
 	bool CheckLayerRaycast(	//レイキャスト用衝突レイヤーのチェック
-		const CollisionData::RaycastSegment& ray,	//レイ情報
+		const RaycastSegment& ray,	//レイ情報
 		Collider* collider					//コライダー
 	);
 	void UpdateRaycastCollisionState(	//レイキャストの衝突状態チェック
-		CollisionData::RaycastSegment& ray	//レイ情報
+		RaycastSegment& ray	//レイ情報
 	);
 
 	bool RaycastBox(	//AABBコライダーへのレイキャスト
-		const CollisionData::RaycastSegment& ray,	//レイ情報
+		const RaycastSegment& ray,	//レイ情報
 		Collider* collider,						//コライダー
-		CollisionData::RaycastHitInfo& outHitInfo	//ヒット情報
+		RaycastHitInfo& outHitInfo	//ヒット情報
 	);
 	bool RaycastSphere(	//球コライダーへのレイキャスト
-		const CollisionData::RaycastSegment& ray,	//レイ情報
+		const RaycastSegment& ray,	//レイ情報
 		Collider* collider,						//コライダー
-		CollisionData::RaycastHitInfo& outHitInfo	//ヒット情報
+		RaycastHitInfo& outHitInfo	//ヒット情報
 	);
 	bool RaycastCapsule(	//カプセルコライダーへのレイキャスト
-		const CollisionData::RaycastSegment& ray,	//レイ情報
+		const RaycastSegment& ray,	//レイ情報
 		Collider* collider,						//コライダー
-		CollisionData::RaycastHitInfo& outHitInfo	//ヒット情報
+		RaycastHitInfo& outHitInfo	//ヒット情報
 	);
 };

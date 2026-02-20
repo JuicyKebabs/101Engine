@@ -40,7 +40,7 @@ PipelineState::PipelineState(ID3D12Device* pDevice)
 	}
 
 	auto& rt0 = m_desc.BlendState.RenderTarget[0];				//レンダーターゲット0のブレンドステート設定
-	rt0.BlendEnable = TRUE;										//ブレンドを有効にする
+	rt0.BlendEnable = FALSE;									//ブレンドを無効にする
 	rt0.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;	//RGBA全てのチャンネルを書き込む
 	rt0.SrcBlend = D3D12_BLEND_SRC_ALPHA;						//ソースのブレンド係数
 	rt0.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;					//デスティネーションのブレンド係数
@@ -62,92 +62,18 @@ void PipelineState::SetRootSignature(ID3D12RootSignature* pRootSignature)
 	m_desc.pRootSignature = pRootSignature;	//ルートシグネチャを設定
 }
 
-//頂点シェーダーを設定
-void PipelineState::SetVertexShader(const std::wstring& filename)
-{
-	//頂点シェーダーのコンパイル
-	result = D3DCompileFromFile(
-		filename.c_str(),									//シェーダーコードのファイル名
-		nullptr,											//マクロ定義
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,					//インクルード可能にする
-		"BasicVS",											//エントリーポイント関数名
-		"vs_5_0",											//シェーダーモデル指定(今回はバージョン5.0の頂点シェーダー)
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	//デバッグ用設定
-		0,													//追加オプション
-		&m_vsBlob,											//コンパイル後のバイナリ格納先
-		&m_pErrorBlob										//エラーメッセージ格納先
-	);
-
-	if (FAILED(result))
-	{
-		return;
-	}
-
-	//頂点シェーダーの設定
-	m_desc.VS = CD3DX12_SHADER_BYTECODE(m_vsBlob.Get());
-}
-
 //頂点シェーダーを設定（エントリーポイント指定版）
-void PipelineState::SetVertexShader(const std::wstring& filename, const std::string& entryPoint)
+void PipelineState::SetVertexShader(ID3DBlob* blob)
 {
-	//頂点シェーダーのコンパイル
-	result = D3DCompileFromFile(
-		filename.c_str(),									//シェーダーコードのファイル名
-		nullptr,											//マクロ定義
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,					//インクルード可能にする
-		entryPoint.c_str(),									//エントリーポイント関数名
-		"vs_5_0",											//シェーダーモデル指定(今回はバージョン5.0の頂点シェーダー)
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	//デバッグ用設定
-		0,													//追加オプション
-		&m_vsBlob,											//コンパイル後のバイナリ格納先
-		&m_pErrorBlob										//エラーメッセージ格納先
-	);
-
-	if (FAILED(result))
-	{
-		return;
-	}
-
-	//頂点シェーダーの設定
-	m_desc.VS = CD3DX12_SHADER_BYTECODE(m_vsBlob.Get());
-}
-
-//ピクセルシェーダーを設定
-void PipelineState::SetPixelShader(const std::wstring& filename)
-{
-	result = D3DCompileFromFile(
-		filename.c_str(),									//シェーダーコードのファイル名
-		nullptr,											//マクロ定義
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,					//インクルード可能にする
-		"BasicWorldPS",											//エントリーポイント関数名
-		"ps_5_0",											//シェーダーモデル指定(今回はバージョン5.0のピクセルシェーダー)
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	//デバッグ用設定
-		0,													//追加オプション
-		&m_psBlob,											//コンパイル後のバイナリ格納先
-		&m_pErrorBlob										//エラーメッセージ格納先
-	);
-
-	//ピクセルシェーダーの設定
-	m_desc.PS = CD3DX12_SHADER_BYTECODE(m_psBlob.Get());
+	m_vsBlob = blob;
+	m_desc.VS = { blob->GetBufferPointer(), blob->GetBufferSize() };
 }
 
 //ピクセルシェーダーを設定（エントリーポイント指定版）
-void PipelineState::SetPixelShader(const std::wstring& filename, const std::string& entryPoint)
+void PipelineState::SetPixelShader(ID3DBlob* blob)
 {
-	result = D3DCompileFromFile(
-		filename.c_str(),									//シェーダーコードのファイル名
-		nullptr,											//マクロ定義
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,					//インクルード可能にする
-		entryPoint.c_str(),									//エントリーポイント関数名
-		"ps_5_0",											//シェーダーモデル指定(今回はバージョン5.0のピクセルシェーダー)
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	//デバッグ用設定
-		0,													//追加オプション
-		&m_psBlob,											//コンパイル後のバイナリ格納先
-		&m_pErrorBlob										//エラーメッセージ格納先
-	);
-
-	//ピクセルシェーダーの設定
-	m_desc.PS = CD3DX12_SHADER_BYTECODE(m_psBlob.Get());
+	m_psBlob = blob;
+	m_desc.PS = { blob->GetBufferPointer(), blob->GetBufferSize() };
 }
 
 //パイプラインステートの作成
@@ -162,70 +88,102 @@ void PipelineState::Create()
 	if (FAILED(result))
 	{
 		m_isValid = false; //パイプラインステート生成に失敗
-		return;	
+		return;
 	}
 
 	m_isValid = true; //パイプラインステート生成に成功
 
 }
 
-//アルファブレンドを有効化
-void PipelineState::EnableAlphaBlend(
-	bool enable,	//有効化フラグ
-	ALPHA_MODE mode	//アルファモード
-	)
+//ブレンドモードを設定
+void PipelineState::SetBlendMode(BLEND_MODE mode)
 {
-	auto& rt0 = m_desc.BlendState.RenderTarget[0];				//レンダーターゲット0のブレンドステート設定
+	auto& rt0 = m_desc.BlendState.RenderTarget[0];
 
-	if(enable)
-	{
-		switch (mode)
-		{
-		case ALPHA_MODE::STRAIGHT:
-			rt0.SrcBlend = D3D12_BLEND_SRC_ALPHA;
-			break;
-		case ALPHA_MODE::PREMULTIPLIED:
-			rt0.SrcBlend = D3D12_BLEND_ONE;
-			break;
-		default:
-			break;
-		}
+	rt0.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	rt0.SrcBlendAlpha = D3D12_BLEND_ZERO;
+	rt0.DestBlendAlpha = D3D12_BLEND_ONE;
+	rt0.BlendOpAlpha = D3D12_BLEND_OP_ADD;
 
-		rt0.BlendEnable = TRUE;
-		rt0.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-		rt0.BlendOp = D3D12_BLEND_OP_ADD;
-		rt0.SrcBlendAlpha = D3D12_BLEND_ONE;
-		rt0.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-		rt0.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	}
-	else
+	switch (mode)
 	{
+	case BLEND_OPAQUE:
 		rt0.BlendEnable = FALSE;
 		rt0.SrcBlend = D3D12_BLEND_ONE;
 		rt0.DestBlend = D3D12_BLEND_ZERO;
 		rt0.BlendOp = D3D12_BLEND_OP_ADD;
-		rt0.SrcBlendAlpha = D3D12_BLEND_ONE;
-		rt0.DestBlendAlpha = D3D12_BLEND_ZERO;
-		rt0.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		break;
+	case BLEND_ALPHA:
+		rt0.BlendEnable = TRUE;
+		rt0.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		rt0.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		rt0.BlendOp = D3D12_BLEND_OP_ADD;
+		break;
+	case BLEND_ADD_ALPHA:
+		rt0.BlendEnable = TRUE;
+		rt0.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		rt0.DestBlend = D3D12_BLEND_ONE;
+		rt0.BlendOp = D3D12_BLEND_OP_ADD;
+		break;
+	case BLEND_ADD:
+		rt0.BlendEnable = TRUE;
+		rt0.SrcBlend = D3D12_BLEND_ONE;
+		rt0.DestBlend = D3D12_BLEND_ONE;
+		rt0.BlendOp = D3D12_BLEND_OP_ADD;
+		break;
+	case BLEND_MULTIPLY:
+		rt0.BlendEnable = TRUE;
+		rt0.SrcBlend = D3D12_BLEND_DEST_COLOR;
+		rt0.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		rt0.BlendOp = D3D12_BLEND_OP_ADD;
+		break;
+	default:
+		break;
 	}
 }
 
-//深度ステンシルを有効化
-void PipelineState::EnableDepthWrite(bool enable)
+//深度モードを設定
+void PipelineState::SetDepthMode(DEPTH_MODE mode)
 {
-	m_desc.DepthStencilState.DepthWriteMask = enable ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO; //深度書き込みマスクの設定
-}
-
-//深度テストを有効化
-void PipelineState::EnableDepthTest(bool enable)
-{
-	m_desc.DepthStencilState.DepthEnable = enable; //深度テストの有効化設定
+	switch (mode)
+	{
+	case DEPTH_DISABLE:
+		m_desc.DepthStencilState.DepthEnable = FALSE; //深度テスト無効
+		m_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; //深度書き込み無効
+		m_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; //深度関数をLESS_EQUALに設定
+		break;
+	case DEPTH_TEST_WRITE:
+		m_desc.DepthStencilState.DepthEnable = TRUE; //深度テスト有効
+		m_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL; //深度書き込み有効
+		m_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; //深度関数をLESS_EQUALに設定
+		break;
+	case DEPTH_TEST_NO_WRITE:
+		m_desc.DepthStencilState.DepthEnable = TRUE; //深度テスト有効
+		m_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; //深度書き込み無効
+		m_desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; //深度関数をLESS_EQUALに設定
+		break;
+	default:
+		break;
+	}
 }
 
 //カリングモードを設定
-void PipelineState::SetCullMode(D3D12_CULL_MODE mode)
+void PipelineState::SetCullMode(CULL_MODE mode)
 {
-	m_desc.RasterizerState.CullMode = mode; //カリングモードを設定
+	switch (mode)
+	{
+	case CULL_NONE:
+		m_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; //カリングしない
+		break;
+	case CULL_FRONT:
+		m_desc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT; //フロントカリング
+		break;
+	case CULL_BACK:
+		m_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK; //バックカリング
+		break;
+	default:
+		break;
+	}
 }
 
 //パイプラインステートオブジェクトを取得

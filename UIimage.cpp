@@ -7,9 +7,9 @@ UIImage::UIImage(
 	DirectX::XMFLOAT3 rotation,
 	UINT order,
 	const std::wstring& texturePath,
-	BLEND_MODE blendMode
+	PSOKey psoKey
 )
-	: UIBase(position, scale, rotation, order, blendMode),
+	: UIBase(position, scale, rotation, order, psoKey),
 	m_texturePath(texturePath)
 {
 }
@@ -40,7 +40,7 @@ void UIImage::PrepareRenderInfoOverride(TextureManager& textureManager, MeshMana
 		meshManager,			//メッシュマネージャへの参照
 		&m_renderInfos,			//描画情報構造体配列へのポインタ
 		MESH_TYPE::QUAD,		//メッシュタイプ
-		m_blendMode,			//ブレンドモード
+		m_psoKey,				//ブレンドモード
 		m_texturePath.c_str()	//テクスチャのファイル名
 	);
 }

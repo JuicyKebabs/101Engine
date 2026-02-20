@@ -3,7 +3,7 @@
 #include "Actor.h"
 
 using namespace DirectX;
-using namespace CollisionData;
+
 
 //コンストラクタ
 Collider::Collider(
@@ -26,7 +26,7 @@ Collider::Collider(
 	m_isTrigger(isTrigger)
 {
 
-	m_layerMask = CollisionData::GetLayerMask(m_layer); //衝突レイヤーマスク取得
+	m_layerMask = MakeLayerMask(m_layer); //衝突レイヤーマスク取得
 }
 
 //デストラクタ
@@ -134,13 +134,13 @@ ColliderType Collider::GetType() const
 }
 
 //衝突レイヤー取得
-CollisionData::COLLISION_LAYER Collider::GetLayer() const
+COLLISION_LAYER Collider::GetLayer() const
 {
 	return m_layer;
 }
 
 //衝突レイヤーマスク取得
-CollisionData::LayerMask Collider::GetLayerMask() const
+LayerMask Collider::GetLayerMask() const
 {
 	return m_layerMask;
 }

@@ -1,8 +1,8 @@
 #include "EffectBase.h"
 
 //コンストラクタ
-EffectBase::EffectBase(DirectX::XMFLOAT3 center, DirectX::XMFLOAT2 size, DirectX::XMFLOAT4 color, float lifeTime, bool isActive, MESH_TYPE meshType)
-	:m_center(center), m_size(size), m_color(color), m_lifeTime(lifeTime), m_isActive(isActive), m_meshType(meshType)
+EffectBase::EffectBase(EFFECT_TYPE type, DirectX::XMFLOAT3 center, DirectX::XMFLOAT3 size, DirectX::XMFLOAT4 color, float lifeTime, bool isActive, MESH_TYPE meshType)
+	: m_type(type), m_center(center), m_size(size), m_color(color), m_lifeTime(lifeTime), m_isActive(isActive), m_meshType(meshType)
 {
 }
 
@@ -17,9 +17,6 @@ void EffectBase::Update()
 
 	//位置追従更新
 	UpdatePositionChase();
-
-	//更新オーバーライド関数呼び出し
-	UpdateOverride();
 }
 
 //リセット
@@ -41,7 +38,7 @@ void EffectBase::Destroy()
 //寿命更新
 void EffectBase::UpdateLifeTime()
 {
-	if (m_lifeTime <= 0.0f) return; //寿命が0以下なら無限なので処理しない
+	if (m_lifeTime <= -1.0f) return; //無限寿命の場合は処理しない
 
 	if (m_elapsedTime <= m_lifeTime)
 	{
