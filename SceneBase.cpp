@@ -55,7 +55,7 @@ void SceneBase::Initialize(EngineContext& context)
 		*context.pMeshManager,
 		&m_skyboxRenderInfo,
 		MESH_TYPE::IMPORT,
-		BLEND_MODE::BLEND_OPAQUE,
+		PSO_KEY_OPAQUE.WithLighting(),
 		L"asset/fbx/sky_box/sky_box.fbx",
 		false
 	);
@@ -112,13 +112,13 @@ void SceneBase::Draw(
 	pRenderer.SubmitDirectionalLight(m_directionalLight);
 
 	// Submit skybox render info
-	pRenderer.SubmitToWorldList(
-			BuildRenderInfoForSubmit(
-			m_skyboxRenderInfo, 
-			MESH_TYPE::IMPORT, 
-			m_pCamera->GetCameraInfo().position,
-			SKY_BOX_SIZE
-	));
+	//pRenderer.SubmitToWorldList(
+	//		BuildRenderInfoForSubmit(
+	//		m_skyboxRenderInfo, 
+	//		MESH_TYPE::IMPORT, 
+	//		m_pCamera->GetCameraInfo().position,
+	//		SKY_BOX_SIZE
+	//));
 
 	// Submit render info for each object
 	for(auto& object : m_objectList)

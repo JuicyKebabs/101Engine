@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include "SharedStruct.h"
+#include "CollisionData.h"
 
 //前方宣言
 class Actor;
@@ -61,8 +62,8 @@ public:
 		DirectX::XMFLOAT3 localRotation,			//ローカル回転
 		ColliderType type,							//コライダータイプ
 		OBJECT_TAG ownerTag,						//所有者オブジェクトのタグ
-		CollisionData::COLLISION_LAYER layer =
-		CollisionData::COLLISION_LAYER::DEFAULT,	//衝突レイヤー
+		COLLISION_LAYER layer =
+		COLLISION_LAYER::DEFAULT,	//衝突レイヤー
 		bool isTrigger = false						//トリガーフラグ
 	);
 	~Collider();	//デストラクタ
@@ -78,14 +79,14 @@ public:
 	void SetPreviousState();	//前回状態の保存
 
 	//衝突情報操作関数
-	void AddCollisionInfo(const CollisionData::CollisionInfo& info);	//衝突情報追加
+	void AddCollisionInfo(const CollisionInfo& info);	//衝突情報追加
 	void ClearInfos();													//衝突情報配列クリア
 
 	//ゲッター
 	ColliderSet* GetParentSet() const;								//親コライダーセットポインタ取得
 	ColliderType GetType() const;									//コライダータイプ取得
-	CollisionData::COLLISION_LAYER GetLayer() const;				//衝突レイヤー取得
-	CollisionData::LayerMask GetLayerMask() const;					//衝突レイヤーマスク取得
+	COLLISION_LAYER GetLayer() const;				//衝突レイヤー取得
+	LayerMask GetLayerMask() const;					//衝突レイヤーマスク取得
 	const bool IsTrigger() const;									//トリガーフラグ取得
 	const AABB GetSewptAABB();										//SWEPT軸平行境界ボックス取得
 	const BoxCollider GetCurrentBoxCollider();						//現在のボックスコライダー取得
@@ -96,7 +97,7 @@ public:
 	const CapsuleCollider GetPreviousCapsuleCollider();				//前回のカプセルコライダー取得
 	const DirectX::XMMATRIX GetWorldMatrix() const;					//ワールド行列の取得
 	const OBJECT_TAG& GetOwnerTag() const;							//所有者オブジェクトのタグ取得
-	std::vector<CollisionData::CollisionInfo>& GetCollisionInfos();	//衝突情報配列取得
+	std::vector<CollisionInfo>& GetCollisionInfos();	//衝突情報配列取得
 	const bool isDetected() const;									//衝突検知フラグ取得
 	const bool deleteFlag() const;									//デリートフラグ
 	const bool isActive() const;									//アクティブフラグ取得
@@ -114,8 +115,8 @@ public:
 private:
 	ColliderSet* m_parentSet;				//親コライダーセットポインタ
 	ColliderType m_type;					//コライダータイプ
-	CollisionData::COLLISION_LAYER m_layer;	//衝突レイヤー
-	CollisionData::LayerMask m_layerMask;	//衝突レイヤーマスク
+	COLLISION_LAYER m_layer;	//衝突レイヤー
+	LayerMask m_layerMask;	//衝突レイヤーマスク
 	bool m_isTrigger = false;				//トリガーフラグ(物理衝突を無視するかどうか)
 
 	//軸平行境界ボックス
@@ -145,7 +146,7 @@ private:
 	DirectX::XMFLOAT3 m_scaleOffset;	//オブジェクトとのサイズ差
 
 	OBJECT_TAG m_ownerTag;		//所有者オブジェクトのタグ
-	std::vector<CollisionData::CollisionInfo> m_collisionInfos; //衝突情報配列(所有者オブジェクト用)
+	std::vector<CollisionInfo> m_collisionInfos; //衝突情報配列(所有者オブジェクト用)
 
 	bool m_isDetected = false;	//衝突検知フラグ（描画用）
 	bool m_deleteFlag = false;	//デリートフラグ

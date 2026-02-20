@@ -1,6 +1,8 @@
 #include "App.h"
 #include <objbase.h>
 
+//‚¿‚á‚¿‚Ì‚¿‚á‚í‚¢‚¢‚Õ‚ë‚®‚ç‚Ý‚ñ‚®
+
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {

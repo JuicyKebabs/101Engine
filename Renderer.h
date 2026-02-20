@@ -6,9 +6,16 @@
 #include "RootSignature.h"
 #include "PipelineState.h"
 #include "IndexBuffer.h"
-#include "TextureManager.h"
 #include "SharedStruct.h"
 #include "RenderData.h"
+#include "ShaderLibrary.h"
+#include <unordered_map>
+#include <vector>
+#include <tuple>
+#include <cstdint>
+
+// Forward declaration
+class TextureManager;
 
 // Renderer class
 class Renderer
@@ -27,12 +34,13 @@ public:
 	// Main processing functions
 	void Initialize(											// Initialization
 		ID3D12Device* pDevice,
-		CameraInfo* pInfo);
+		CameraInfo* pInfo,
+		TextureManager* textureManager
+	);
 	void Update(UINT currentBackBufferIndex, CameraInfo& info);	// Update
 	void Draw(													// Draw
 		UINT index,
-		ID3D12GraphicsCommandList* commandList,
-		TextureManager& textureManager
+		ID3D12GraphicsCommandList* commandList
 	);
 
 	// Render list management functions
@@ -40,29 +48,25 @@ public:
 
 	// Add render information to the render list
 	void SubmitToWorldList(const WorldRenderModel& info);		// World space
-	void SubmitToEffectList(const  EffectRenderModel& info);	// Effect
 	void SubmitToScreenList(const  WorldRenderModel& info);		// Screen space
 
 	void SubmitDirectionalLight(const DirectionalLight& light);	// Directional light information
 
 private:
-	RootSignature* m_pRootSignature = nullptr;			// Root signature
-	PipelineState* m_pPipelineStateWorldNoLight[BLEND_MAX]{};	// Pipeline state object for world space (without lighting)
-	PipelineState* m_pPipelineStateWorldLight[BLEND_MAX]{};		// Pipeline state object for world space (with lighting)
-	PipelineState* m_pPipelineStateEffect[BLEND_MAX]{};			// Pipeline state object for effect
-	PipelineState* m_pPipelineStateScreen[BLEND_MAX]{};			// Pipeline state object for screen space
+	RootSignature* m_pRootSignature = nullptr;		// Root signature
+	ID3D12Device* m_pDevice = nullptr;				// Device
+	CameraInfo* m_cameraInfo = nullptr;				// Camera information structure
+	TextureManager* m_pTextureManager = nullptr;	// Texture manager
 
-	ID3D12Device* m_pDevice = nullptr;	// Device
-	CameraInfo* m_cameraInfo = nullptr;	// Camera information structure
-
-	std::vector<WorldRenderInfo> m_drawListWorldNoLight[BLEND_MAX]{};	// Draw list (world space without lighting)
-	std::vector<WorldRenderInfo> m_drawListWorldLight[BLEND_MAX]{};		// Draw list (world space with lighting)
-	std::vector<EffectRenderInfo> m_drawListEffect[BLEND_MAX]{};		// Draw list (effect)
-	std::vector<WorldRenderInfo> m_drawListScreen[BLEND_MAX]{};			// Draw list (screen space)
+	// Pipeline State Object related
+	std::unordered_map<PSOKey, PipelineState*, PSOKeyHash> m_psoMap;	// PSO map
+	std::vector<WorldRenderInfo> m_tempWorldRenderList;					// Temporary world render list for sorting
+	std::vector<WorldRenderInfo> m_tempScreenRenderList;				// Temporary world render list for sorting
+	PipelineState* m_pDefaultPSO = nullptr;								// Default PSO
+	ShaderLibrary* m_pShaderLibrary = nullptr;							// Shader library
 
 	// Frame-specific object CBV pool (1 object = 1 constant buffer)
 	std::vector<ConstantBuffer*> m_objectCBWorld[Engine::FRAME_BUFFER_COUNT];	// For world space
-	std::vector<ConstantBuffer*> m_objectCBEffect[Engine::FRAME_BUFFER_COUNT];	// For effect
 	std::vector<ConstantBuffer*> m_objectCBScreen[Engine::FRAME_BUFFER_COUNT];	// For screen space
 	UINT m_currBackIndex = 0;
 
@@ -76,24 +80,91 @@ private:
 	DirectionalLight m_directionalLight{};	// Directional light
 
 private:
-	// Drawing function for the render list
-	void DrawRenderListWorld(	// Draw for world space render list
-		ID3D12GraphicsCommandList* p_commandList,	// Command list
-		TextureManager& textureManager				// Texture manager class
+	void DrawTempRenderListWorld(	// Draw for screen space render list
+		ID3D12GraphicsCommandList* p_commandList	// Command list
 	);
-	void DrawRenderListEffect(	// Draw for effect render list
-		ID3D12GraphicsCommandList* p_commandList,	// Command list
-		TextureManager& textureManager				// Texture manager class
+	void DrawTempRenderListScreen(	// Draw for screen space render list
+		ID3D12GraphicsCommandList* p_commandList	// Command list
 	);
-	void DrawRenderListScreen(	// Draw for screen space render list
-		ID3D12GraphicsCommandList* p_commandList,	// Command list
-		TextureManager& textureManager				// Texture manager class
-	);
-
-	// Render list sorting functions
-	void SortDrawList();			// Sort render list
-	void SortDrawListOpaque();		// Sort opaque object render list
-	void SortDrawListTransparent();	// Sort transparent object render list
 
 	DirectX::XMMATRIX CalcBillBoard(const WorldRenderInfo& info);	// Billboard calculation
+	float CalcSortDepth(const DirectX::XMFLOAT3& position);	// Sort depth calculation
+
+	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
+	PipelineState* CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object
+	void SortRenderListWorldByPSO();								// Sort render list by PSO
+	void SortRenderListScreenByPSO();								// Sort render list by PSO
+	void NormalizeKeyForRenderQueueWorld(WorldRenderInfo& info);	// Normalize PSO key for render queue
+	void NormalizeKeyForRenderQueueScreen(WorldRenderInfo& info);	// Normalize PSO key for render queue
+
+	// Sorting functions
+	// PSOKey comparison
+	static inline bool PSOKeyLess(const PSOKey& a, const PSOKey& b)
+	{
+		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID, a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull)
+			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull);
+	}
+	// Bind sort comparison
+	static inline bool BindLess(const WorldRenderInfo& a, const WorldRenderInfo& b)
+	{
+		// Convert pointer to integer for comparison
+		auto ap = reinterpret_cast<std::uintptr_t>(a.common.pMeshGPU);
+		auto bp = reinterpret_cast<std::uintptr_t>(b.common.pMeshGPU);
+		// Compare by srvIndex, pMeshGPU, startIndex, baseVertex
+		return std::tie(a.common.srvIndex, ap, a.startIndex, a.baseVertex)
+			< std::tie(b.common.srvIndex, bp, b.startIndex, b.baseVertex);
+	}
+	// Opaque objects sorting
+	static inline bool OpaqueLess(const WorldRenderInfo& a, const WorldRenderInfo& b)
+	{
+		//If PSOKey is the same, sort by bind
+		if (a.common.psoKey == b.common.psoKey)
+		{
+			return BindLess(a, b);
+		}
+
+		//Otherwise, sort by PSOKey
+		return PSOKeyLess(a.common.psoKey, b.common.psoKey);
+	}
+	// Transparent objects sorting (back to front)
+	static inline bool TransparentLess(const WorldRenderInfo& a, const WorldRenderInfo& b)
+	{
+		// Determine if the blend mode is order-dependent
+		auto isOrderDependent = [](BLEND_MODE blendMode) {
+			return blendMode == BLEND_ALPHA;
+			};
+
+		// First, sort by whether the blend mode is order-dependent
+		const bool aOrderDependent = isOrderDependent(a.common.psoKey.blend);
+		const bool bOrderDependent = isOrderDependent(b.common.psoKey.blend);
+		if (aOrderDependent != bOrderDependent)
+		{// Order-dependent blends first
+			return aOrderDependent > bOrderDependent;
+		}
+
+		if (aOrderDependent)
+		{// For order-dependent blends, sort by depth (greater depth first)
+			// Quantize depth to avoid precision issues
+			const int64_t bucketA = static_cast<int64_t>(std::floor(a.common.sortDepth * 64.0f));
+			const int64_t bucketB = static_cast<int64_t>(std::floor(b.common.sortDepth * 64.0f));
+
+			//First, sort by bucket (greater bucket first)
+			if (bucketA != bucketB) return bucketA > bucketB;
+
+			//Then, sort by fine depth within the bucket (greater fine depth first)
+			const int64_t fineA = (int64_t)std::llround(a.common.sortDepth * 4096.0f);
+			const int64_t fineB = (int64_t)std::llround(b.common.sortDepth * 4096.0f);
+			if (fineA != fineB) return fineA > fineB;
+
+			return false;	// Ignore same depth
+		}
+
+		if (a.common.psoKey != b.common.psoKey)
+		{// If PSOKey is different, sort by PSOKey
+			return PSOKeyLess(a.common.psoKey, b.common.psoKey);
+		}
+
+		// Finally, sort by bind
+		return BindLess(a, b);
+	}
 };

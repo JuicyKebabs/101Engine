@@ -1,6 +1,7 @@
 #pragma once
 #include "d3dx12.h"
 #include <string>
+#include "RenderData.h"
 #include "ComPtr.h"
 
 //アルファモード
@@ -31,25 +32,13 @@ public:
 
 	void SetInputLayout(const D3D12_INPUT_LAYOUT_DESC& inputLayout);	//入力レイアウトを設定
 	void SetRootSignature(ID3D12RootSignature* pRootSignature);			//ルートシグネチャを設定
-	void SetVertexShader(const std::wstring& filename);					//頂点シェーダーを設定
-	void SetVertexShader(												//頂点シェーダーを設定（エントリーポイント指定版）
-		const std::wstring& filename,	//シェーダーファイル名
-		const std::string& entryPoint	//エントリーポイント名
-	);
-	void SetPixelShader(const std::wstring& filename);					//ピクセルシェーダーを設定
-	void SetPixelShader(												//ピクセルシェーダーを設定（エントリーポイント指定版）
-		const std::wstring& filename,	//シェーダーファイル名
-		const std::string& entryPoint	//エントリーポイント名
-	);
+	void SetVertexShader(ID3DBlob* blob);								//頂点シェーダーを設定
+	void SetPixelShader(ID3DBlob* blob);								//ピクセルシェーダーを設定
 	void Create();														//パイプラインステートオブジェクトを作成
 
-	void EnableAlphaBlend(					//アルファブレンドを有効化
-		bool enable,
-		ALPHA_MODE mode = ALPHA_MODE::STRAIGHT
-	);
-	void EnableDepthWrite(bool enable);		//深度ステンシルを有効化
-	void EnableDepthTest(bool enable);		//深度テストを有効化
-	void SetCullMode(D3D12_CULL_MODE mode);	//カリングモードを設定
+	void SetBlendMode(BLEND_MODE mode);	//ブレンドモードを設定
+	void SetDepthMode(DEPTH_MODE mode);	//深度モードを設定
+	void SetCullMode(CULL_MODE mode);	//カリングモードを設定
 
 	ID3D12PipelineState* GetPipelineState() const; //パイプラインステートオブジェクトを取得
 	bool IsValid() const; //パイプラインステート生成に成功したかを取得

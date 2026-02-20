@@ -1,55 +1,48 @@
 #pragma once
-#include <d3d12.h>  // DirectX12を使用するため
-#include <Xinput.h> // Xboxこんとろーらー入力を可能にする
-#include <array>	// std::arrayを使用するため
-
-// XInput.libをリンク	あるならいらない
+#include <d3d12.h>
+#include <Xinput.h>
+#include <array>
 #pragma comment(lib, "xinput.lib")
 
-//前方宣言
+// Forward declaration
 struct ControllerInputInfo;
 
-// コントローラーが接続できる最大数　
+// Constants
 static constexpr int CONTROLLERS_MAX = 4;
 static constexpr float DEADZONE_L = 0.4f;
 static constexpr float DEADZONE_R = 0.4f;
 
-// 1つのコントローラーの状態を表す構造体
+// Struct to hold the state of a controller
 struct ControllerState
 {
-	bool isConnected = false;		// 接続状態
-	XINPUT_STATE state = {};		// 現在フレームの状態データ
-	XINPUT_STATE prevState = {};	// １フレーム前の状態データ
+	bool isConnected = false;		// Connection status
+	XINPUT_STATE state = {};		// Current frame state data
+	XINPUT_STATE prevState = {};	// Previous frame state data
 };
 
-// コントローラー管理クラス
+// Controller management class
 class Controller
 {
 private:
-	// 4つのコントローラーの状態
+	// Array to hold the state of multiple controllers
 	std::array<ControllerState, CONTROLLERS_MAX> m_controllers{};
 
 public:
-	Controller();	// コンストラクタ
-	~Controller();	// デストラクタ
+	Controller() {};	// Constructor
+	~Controller() {};	// Destructor
 
-	// 初期化
-	void Initialize();
+	void Initialize();								// Initialization
+	void Update(ControllerInputInfo* inputInfo);	// Update controller states
 
-	// 更新処理
-	void Update(ControllerInputInfo* inputInfo);
+	void CopyState();	// Copy previous state to current state
 
-	// 前回の状態を現在の状態にコピー
-	void CopyState();
-
-	// 指定したインデックスのコントローラー状態を取得（0~3）
-	const ControllerState& GetState(int index) const;
+	const ControllerState& GetState(int index) const;	// Get controller state by index
 
 	// Vibration Functions
-	void SetVibration(int index, float leftMotor, float rightMotor);
-	void SetAllVibrations(float leftMotor, float rightMotor);
-	void StopVibration(int index);
-	void StopAllVibrations();
+	void SetVibration(int index, float leftMotor, float rightMotor);	// Set vibration for selected controller
+	void SetAllVibrations(float leftMotor, float rightMotor);			// Set vibration for all controllers
+	void StopVibration(int index);										// Stop vibration for selected controller
+	void StopAllVibrations();											// Stop vibration for all controllers
 
 private:
 	//Update Input State Functions

@@ -12,7 +12,7 @@ public:
 		DirectX::XMFLOAT3 rotation = { 0,0,0 },
 		UINT order = 0,
 		const std::wstring& texturePath = L"",
-		BLEND_MODE blendMode = BLEND_MODE::BLEND_TRANSPARENT
+		PSOKey psoKey = PSO_KEY_TRANSPARENT
 	);
 	~UIImage() {};
 	void InitializeOverride(
@@ -24,12 +24,12 @@ public:
 
 	void SetTexturePath(const std::wstring& texturePath) { m_texturePath = texturePath; }
 
-private:
-	std::wstring m_texturePath;							//テクスチャパス
-
 protected:
 	void PrepareRenderInfoOverride(	//オブジェクトの描画情報生成
 		TextureManager& textureManager,	//テクスチャ管理クラスの参照
 		MeshManager& meshManager		//メッシュ管理クラスの参照
 	) override;
+
+private:
+	std::wstring m_texturePath;							//テクスチャパス
 };

@@ -27,7 +27,7 @@ void Canvas::Initialize(
 		{ 0.0f, 0.0f, 0.0f },	//‰ñ“]
 		1000,					//•`‰æ‡˜
 		L"asset/texture/white.png",
-		BLEND_MODE::BLEND_TRANSPARENT
+		PSOKey{}
 	);
 	m_pFadeImage->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f }); //‰Šú“§–¾
 	m_roots.push_back(std::unique_ptr<UIBase>(m_pFadeImage));
@@ -89,7 +89,7 @@ void Canvas::SubmitDraws(Renderer& renderer)
 	Transform3D identity{};	//’PˆÊ•ÏŠ·î•ñ
 	identity.position = { 0.0f, 0.0f, 0.0f };
 	identity.scale = { 1.0f, 1.0f, 1.0f };
-	identity.rotation = { 0.0f, 0.0f, 0.0f };
+	identity.rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	for (auto& root : m_roots)
 	{

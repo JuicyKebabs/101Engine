@@ -51,6 +51,7 @@ private:	//非公開メンバ変数
 	DirectX::XMFLOAT3 m_target{};	//カメラの注視点
 	DirectX::XMFLOAT3 m_up{};		//カメラの上方向ベクトル
 	DirectX::XMFLOAT3 m_right{};	//カメラの右方向ベクトル
+	DirectX::XMFLOAT3 m_forward{};	//カメラの前方向ベクトル
 
 	float m_fov = 0.0f;			//垂直視野角
 	float m_aspectRatio = 0.0f;	//アスペクト比

@@ -44,8 +44,12 @@ void Camera::Update()
 	viewDir = Normalize(viewDir); //正規化
 
 	m_right = Normalize(Cross(viewDir, m_up));	//右方向ベクトルを計算
+	m_up = Normalize(Cross(m_right, viewDir));	//上方向ベクトルを再計算
+	m_forward = viewDir;						//前方向ベクトルを設定
 
 	UpdateCameraInfo(); //カメラ情報構造体を更新
+
+	UpdateShake();
 }
 
 //カメラの位置を設定
@@ -191,6 +195,7 @@ void Camera::UpdateCameraInfo()
 	m_cameraInfo.target = m_target;				//カメラの注視点
 	m_cameraInfo.up = m_up;						//カメラの上方向ベクトル
 	m_cameraInfo.right = m_right;				//カメラの右方向ベクトル
+	m_cameraInfo.forward = m_forward;			//カメラの前方向ベクトル
 	m_cameraInfo.fov = m_fov;					//垂直視野角
 	m_cameraInfo.aspectRatio = m_aspectRatio;	//アスペクト比
 	m_cameraInfo.nearZ = m_nearZ;				//ニアクリップ距離

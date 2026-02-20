@@ -4,7 +4,7 @@
 #include "SharedStruct.h"
 #include <vector>
 
-//前方宣言
+// Forward declarations
 class Renderer;
 class TextureManager;
 class MeshManager;
@@ -12,18 +12,234 @@ class MeshGPU;
 struct NodeAnimationAsset;
 
 //=======================================================================================================
-//列挙体群
+// Pipeline State Object (PSO) key structure,
+// and related enumerations for shader management and rendering configurations
 //=======================================================================================================
-//ブレンドモード列挙体
-enum BLEND_MODE
+
+//-------------------------------------------------------------------------------------
+// File IDs for shaders (used to identify which shader file to use)
+//-------------------------------------------------------------------------------------
+// Enumeration for vertex shader IDs
+enum class VS_FILE_ID
 {
-	BLEND_OPAQUE,		//不透明
-	BLEND_MASKED,		//マスク
-	BLEND_TRANSPARENT,	//透明
-	BLEND_MAX			//最大数
+	Basic = 0,
+};
+// Enumeration for pixel shader IDs
+enum class PS_FILE_ID
+{
+	Basic = 0,
 };
 
-//ビルボードタイプ
+//-------------------------------------------------------------------------------------
+// Entry point IDs for shaders (used to identify which entry point in the shader file to use)
+//-------------------------------------------------------------------------------------
+// Enumeration for vertex shader entry points
+enum class VS_ENTRY_ID : uint16_t
+{
+	Basic = 0,
+};
+// Enumeration for pixel shader entry points
+enum class PS_ENTRY_ID : uint16_t
+{
+	Basic = 0,
+};
+
+//-------------------------------------------------------------------------------------
+// Defines for shaders (used to specify shader variants based on compile-time options)
+//-------------------------------------------------------------------------------------
+// Vertex shader defines (using bit flags)
+enum class VS_DEFINE : uint64_t
+{
+	NONE = 0,
+	TEST = 1ull << 1,
+};
+// Pixel shader defines (using bit flags)
+enum class PS_DEFINE : uint64_t
+{
+	NONE = 0,
+	USE_MASK = 1ull << 1,
+	MULTIPLY_ALPHA_CONTROL = 1ull << 2,
+	USE_LIGHTING = 1ull << 3,
+};
+// Common shader defines (using bit flags)
+enum class COMMON_SHADER_DEFINE : uint64_t
+{
+	NONE = 0,
+	TEST = 1ull << 1,
+};
+
+//-------------------------------------------------------------------------------------
+// Shader key structure for caching compiled shaders, 
+// combining file ID, entry point, and defines
+//-------------------------------------------------------------------------------------
+struct VS_KEY
+{
+	VS_FILE_ID fileID = VS_FILE_ID::Basic;		//Vertex shader file ID
+	VS_ENTRY_ID entryID = VS_ENTRY_ID::Basic;	//Vertex shader entry point
+	uint64_t defines = 0;						//Vertex shader defines
+
+	bool operator == (const VS_KEY& other) const
+	{
+		return 
+			fileID == other.fileID &&
+			entryID == other.entryID &&
+			defines == other.defines;
+	}
+};
+struct PS_KEY
+{
+	PS_FILE_ID fileID = PS_FILE_ID::Basic;		//Pixel shader file ID
+	PS_ENTRY_ID entryID = PS_ENTRY_ID::Basic;	//Pixel shader entry point
+	uint64_t defines = 0;						//Pixel shader defines
+
+	bool operator == (const PS_KEY& other) const
+	{
+		return 
+			fileID == other.fileID &&
+			entryID == other.entryID &&
+			defines == other.defines;
+	}
+};
+
+//-------------------------------------------------------------------------------------
+// Enumerations for rendering states (blend modes, depth stencil modes, culling modes)
+//-------------------------------------------------------------------------------------
+// Blend modes
+enum BLEND_MODE
+{
+	BLEND_OPAQUE,
+	BLEND_ALPHA,
+	BLEND_ADD_ALPHA,
+	BLEND_ADD,
+	BLEND_MULTIPLY,
+};
+// Depth stencil modes
+enum DEPTH_MODE
+{
+	DEPTH_DISABLE,
+	DEPTH_TEST_WRITE,
+	DEPTH_TEST_NO_WRITE,
+};
+// Culling modes
+enum CULL_MODE
+{
+	CULL_NONE,
+	CULL_FRONT,
+	CULL_BACK,
+};
+
+// Pipeline State Object (PSO) key structure
+struct PSOKey
+{
+	VS_KEY vsKey;							// Vertex shader key
+	PS_KEY psKey;							// Pixel shader key
+	uint64_t commonDefines = 0;			// Common shader defines
+	BLEND_MODE  blend = BLEND_OPAQUE;		// Blend mode
+	DEPTH_MODE  depth = DEPTH_TEST_WRITE;	// Depth stencil mode
+	CULL_MODE  cull = CULL_NONE;			// Culling mode
+
+	// Equality operators for PSOKey
+	bool operator == (const PSOKey& other) const
+	{
+		return 
+			vsKey == other.vsKey &&
+			psKey == other.psKey &&
+			commonDefines == other.commonDefines &&
+			blend == other.blend &&
+			depth == other.depth &&
+			cull == other.cull;
+	}
+	bool operator != (const PSOKey& other) const
+	{
+		return !(*this == other);
+	}
+
+	// Helper functions to create modified PSOKeys with additional defines
+	PSOKey WithLighting() const {
+		PSOKey k = *this;
+		k.psKey.defines |= static_cast<uint64_t>(PS_DEFINE::USE_LIGHTING);
+		return k;
+	}
+
+	// Add multiple vertex shader defines at once
+	PSOKey AddVSDefines(std::initializer_list<VS_DEFINE> defines) const {
+		PSOKey k = *this;
+		for (auto d : defines) {
+			k.vsKey.defines |= static_cast<uint64_t>(d);
+		}
+		return k;
+	}
+	// Add multiple pixel shader defines at once
+	PSOKey AddPSDefines(std::initializer_list<PS_DEFINE> defines) const {
+		PSOKey k = *this;
+		for (auto d : defines) {
+			k.psKey.defines |= static_cast<uint64_t>(d);
+		}
+		return k;
+	}
+	// Add multiple common shader defines at once
+	PSOKey AddCommonDefines(std::initializer_list<COMMON_SHADER_DEFINE> defines) const {
+		PSOKey k = *this;
+		for (auto d : defines) {
+			k.commonDefines |= static_cast<uint64_t>(d);
+		}
+		return k;
+	}
+
+	// Get combined defines for vertex shader (common + specific)
+	uint64_t GetCombinedDefinesVS() const {
+		return vsKey.defines | commonDefines;
+	}
+	// Get combined defines for pixel shader (common + specific)
+	uint64_t GetCombinedDefinesPS() const {
+		return psKey.defines | commonDefines;
+	}
+};
+
+// Predefined PSO keys for common rendering configurations
+inline constexpr PSOKey PSO_KEY_OPAQUE{ VS_KEY{}, PS_KEY{}, 0, BLEND_OPAQUE, DEPTH_TEST_WRITE, CULL_NONE };
+inline constexpr PSOKey PSO_KEY_TRANSPARENT { VS_KEY{}, PS_KEY{}, 0, BLEND_ALPHA, DEPTH_TEST_NO_WRITE, CULL_NONE };
+inline constexpr PSOKey PSO_KEY_MASKED { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::USE_MASK)}, 0, BLEND_OPAQUE, DEPTH_TEST_WRITE, CULL_NONE };
+inline constexpr PSOKey PSO_KEY_ADDITIVE { VS_KEY{}, PS_KEY{}, 0, BLEND_ADD_ALPHA, DEPTH_TEST_NO_WRITE, CULL_NONE };
+inline constexpr PSOKey PSO_KEY_MULTIPLY { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::MULTIPLY_ALPHA_CONTROL)}, 0, BLEND_MULTIPLY, DEPTH_TEST_NO_WRITE, CULL_NONE };
+
+// Hash function for PSOKey to be used in unordered_map
+struct PSOKeyHash
+{
+	size_t operator()(const PSOKey& k) const noexcept
+	{
+		size_t h1 = std::hash<VS_FILE_ID>{}(k.vsKey.fileID);
+		size_t h2 = std::hash<PS_FILE_ID>{}(k.psKey.fileID);
+		size_t h3 = std::hash<VS_ENTRY_ID>{}(k.vsKey.entryID);
+		size_t h4 = std::hash<PS_ENTRY_ID>{}(k.psKey.entryID);
+		size_t h5 = std::hash<int>{}(static_cast<int>(k.blend));
+		size_t h6 = std::hash<int>{}(static_cast<int>(k.depth));
+		size_t h7 = std::hash<int>{}(static_cast<int>(k.cull));
+		size_t h8 = std::hash<uint64_t>{}(k.vsKey.defines);
+		size_t h9 = std::hash<uint64_t>{}(k.psKey.defines);
+		return (((((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5)) ^ (h7 << 6)) ^ (h8 << 7)) ^ (h9 << 8);
+	}
+};
+
+// Render queue enumeration
+enum RENDER_QUEUE
+{
+	RENDER_QUEUE_INVALID = -1,
+	RENDER_QUEUE_OPAQUE = 0,
+	RENDER_QUEUE_TRANSPARENT = 2,
+};
+
+// Helper function to determine render queue based on blend mode
+static inline RENDER_QUEUE GetRenderQueueFromBlendMode(BLEND_MODE blendMode)
+{
+	return (blendMode == BLEND_OPAQUE) ? RENDER_QUEUE_OPAQUE : RENDER_QUEUE_TRANSPARENT;
+}
+
+//=======================================================================================================
+//描画情報構造体群
+//=======================================================================================================
+
+// Type of Billboard
 enum BILLBOARD_TYPE
 {
 	BILLBOARD_NONE,			//ビルボードなし
@@ -33,17 +249,16 @@ enum BILLBOARD_TYPE
 	BILLBOARD_FIX_Z,		//Z軸のみ
 };
 
-//=======================================================================================================
-//描画情報構造体群
-//=======================================================================================================
 //共通描画記述構造体
 struct CommonRenderDesc
 {
-	MeshGPU* pMeshGPU = nullptr;						//メッシュデータ
-	uint32_t srvIndex = UINT32_MAX;						//SRVインデックス(テクスチャ)
-	DirectX::XMFLOAT4 color = { 1,1,1,1 };				//表示色
-	DirectX::XMFLOAT4 uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };	//UV矩形
-	BLEND_MODE blendMode = BLEND_MODE::BLEND_OPAQUE;	//ブレンドモード
+	MeshGPU* pMeshGPU = nullptr;							//メッシュデータ
+	uint32_t srvIndex = UINT32_MAX;							//SRVインデックス(テクスチャ)
+	DirectX::XMFLOAT4 color = { 1,1,1,1 };					//表示色
+	DirectX::XMFLOAT4 uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };		//UV矩形
+	PSOKey psoKey{};										//パイプラインステートオブジェクトキー
+	float sortDepth = 0.0f;									//ソート用深度
+	RENDER_QUEUE renderQueue = RENDER_QUEUE_INVALID;		//レンダリングキュー
 };
 
 // Render information structure for world space
@@ -65,17 +280,6 @@ struct WorldRenderInfo
 //描画情報構造体配列型
 using WorldRenderModel = std::vector<WorldRenderInfo>;
 
-//エフェクト描画情報構造体
-struct EffectRenderInfo
-{
-	CommonRenderDesc common;	//共通描画記述構造体
-	DirectX::XMFLOAT3 center{};	//座標
-	DirectX::XMFLOAT2 size{};	//スケール
-};
-
-//エフェクト描画情報構造体配列型
-using EffectRenderModel = std::vector<EffectRenderInfo>;
-
 //=======================================================================================================
 //メッシュ・モデルデータ構造体
 //=======================================================================================================
@@ -88,7 +292,7 @@ struct Mesh
 	size_t indexCount = 0;				//インデックス数
 	std::wstring texPath;				//テクスチャのファイル名
 	DirectX::XMFLOAT4 materialColor		//材質色(RGBA)
-	{	
+	{
 		1.0f,	//拡散反射色R
 		1.0f,	//拡散反射色G
 		1.0f,	//拡散反射色B
@@ -290,7 +494,7 @@ void CreateRenderInfo(
 	MeshManager& meshManager,				//メッシュマネージャへの参照
 	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
 	MESH_TYPE mType,						//メッシュタイプ
-	BLEND_MODE mode,						//ブレンドモード
+	PSOKey psoKey,							//ブレンドモード
 	const wchar_t* path,					//モデルデータ又はテクスチャファイルのパス
 	bool lightEneble = true,				//ライト有効or無効
 	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
@@ -303,7 +507,7 @@ void CreateRenderInfoFromFBX(
 	TextureManager& textureManager,			//テクスチャマネージャへの参照
 	MeshManager& meshManager,				//メッシュマネージャへの参照
 	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-	BLEND_MODE mode,						//ブレンドモード
+	PSOKey psoKey,							//ブレンドモード
 	const wchar_t* path,					//モデルファイルのパス
 	bool lightEneble,						//ライト有効or無効
 	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
@@ -317,19 +521,10 @@ void CreateRenderInfoFromDefaultMesh(
 	MeshManager& meshManager,				//メッシュマネージャへの参照
 	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
 	MESH_TYPE type,							//メッシュタイプ
-	BLEND_MODE mode,						//ブレンドモード
+	PSOKey psoKey,							//ブレンドモード
 	const wchar_t* path,					//テクスチャのファイル名
 	bool lightEneble,						//ライト有効or無効
 	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
-);
-
-void CreateEffectRenderInfo(
-	TextureManager& textureManager,			//テクスチャマネージャへの参照
-	MeshManager& meshManager,				//メッシュマネージャへの参照
-	std::vector<EffectRenderInfo>* pInfo,	//エフェクト描画情報構造体配列へのポインタ
-	MESH_TYPE type,				//メッシュタイプ
-	BLEND_MODE mode,						//ブレンドモード
-	const wchar_t* path						//テクスチャのファイル名
 );
 
 //メッシュデータから描画情報を構築する関数
@@ -337,7 +532,7 @@ CommonRenderDesc CreateRenderInfoFromMeshData(
 	TextureManager& textureManager,			//テクスチャマネージャへの参照
 	MeshManager& meshManager,				//メッシュマネージャへの参照
 	Mesh& mesh,					//メッシュデータ構造体への参照
-	BLEND_MODE mode,						//ブレンドモード
+	PSOKey psoKey,							//ブレンドモード
 	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
 );
 

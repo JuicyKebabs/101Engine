@@ -218,12 +218,6 @@ void App::InitInstance()
 	// Get device
 	auto pDevice = m_pEngine->GetDevice();
 
-	// Initialize renderer
-	m_pRenderer->Initialize(
-		pDevice,							// Device
-		m_pSceneManager->GetCameraInfo()	// Camera info structure
-	);
-
 	// Initialize texture management class
 	m_pTextureManager->Initialize(
 		pDevice,	// Device
@@ -233,6 +227,13 @@ void App::InitInstance()
 	// Initialize mesh management class
 	m_pMeshManager->Initialize(
 		pDevice	// Device
+	);
+
+	// Initialize renderer
+	m_pRenderer->Initialize(
+		pDevice,							// Device
+		m_pSceneManager->GetCameraInfo(),	// Camera info structure
+		m_pTextureManager					// Texture manager
 	);
 
 	// Initialize rendering
@@ -284,8 +285,7 @@ void App::Draw()
 	// Draw the scene
 	m_pRenderer->Draw(
 		m_pEngine->GetCurrentBufferIndex(),	// Buffer index
-		m_pEngine->GetCommandList(),		// Command list
-		*m_pTextureManager					// Texture management class
+		m_pEngine->GetCommandList()			// Command list
 	);
 
 	// End rendering

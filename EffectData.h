@@ -2,54 +2,53 @@
 #include <DirectXMath.h>
 #include "RenderData.h"
 
-//effect type enumeration
+//エフェクトタイプ列挙体
 enum class EFFECT_TYPE
 {
-	NONE = 0,			// none
-	PARTICLE_POINT,		// particle point
-	EXPLOSION_SMALL,	// small explosion
-	EXPLOSION_MEDIUM,	// medium explosion
-	EXPLOSION_LARGE,	// large explosion
-	SPARK,				// spark
-	MAX					// maximum
+	NONE = 0,		//なし
+	PARTICLE_POINT,	//パーティクルポイント
+	PARTICLE_SPREAD,//パーティクルスプレッド
+	FIRE_FLASH,		//火花
+	EXPLOSION,		//爆発
+	WIND,			//風
+	MAX				//最大数
 };
 
-//effect command structure
+//エフェクト呼び出し構造体
 struct EffectCommand
 {
-	EFFECT_TYPE type = EFFECT_TYPE::NONE;		//effect type
-	DirectX::XMFLOAT3 position{};				//position
-	DirectX::XMFLOAT2 size{};					//size
-	bool isChase = false;						//chase flag
-	DirectX::XMFLOAT3* chaseTarget = nullptr;	//chase target position
+	EFFECT_TYPE type = EFFECT_TYPE::NONE;		//エフェクトタイプ
+	DirectX::XMFLOAT3 position{};				//座標
+	DirectX::XMFLOAT3 size{};					//サイズ
+	bool isChase = false;						//追従フラグ
+	DirectX::XMFLOAT3* chaseTarget = nullptr;	//追従ターゲット座標
 };
 
-//effect template structure
+//エフェクトテンプレート構造体
 struct EffectTemplate
 {
-	//rendering related
-	EFFECT_TYPE type = EFFECT_TYPE::NONE;	//effect type
-	MESH_TYPE meshType{};					//mesh data
-	const wchar_t* texPath = L"";			//texture path
-	TexSplitInfo texSplitInfo{};			//texture split info
-	BLEND_MODE blendMode =
-		BLEND_MODE::BLEND_TRANSPARENT;		//blend mode
+	//描画関連
+	EFFECT_TYPE type = EFFECT_TYPE::NONE;	//エフェクトタイプ
+	MESH_TYPE meshType{};			//メッシュデータ
+	const wchar_t* texPath = L"";			//テクスチャパス
+	TexSplitInfo texSplitInfo{};			//テクスチャ分割情報
+	PSOKey psoKey{};				//ブレンドモード
 
-	//object related
-	DirectX::XMFLOAT2 baseSize{};			//base size
-	DirectX::XMFLOAT4 baseColor{};			//base color RGBA
-	float lifeTime = 0.0f;					//life time
+	//オブジェクト関連
+	DirectX::XMFLOAT3 baseSize{};			//基本サイズ
+	DirectX::XMFLOAT4 baseColor{};			//基本色RGBA
+	float lifeTime = 0.0f;					//寿命
 };
 
-//scene-specific effect template list
+//シーン別エフェクトテンプレートリスト
 extern const EffectTemplate g_effectTemplateListGame[];
 
-//effect template set structure
+//エフェクトテンプレートセット構造体
 struct EffectTemplateSet
 {
-	EffectTemplate* pTemplates = nullptr;	//effect template list pointer
-	int templateCount = 0;					//effect template count
+	EffectTemplate* pTemplates = nullptr;	//エフェクトテンプレートリストポインタ
+	int templateCount = 0;					//エフェクトテンプレート数
 };
 
-//effect template set retrieval function
+//エフェクトテンプレートセット取得関数
 EffectTemplateSet GetEffectTemplate();

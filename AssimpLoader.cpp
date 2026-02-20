@@ -75,6 +75,7 @@ bool AssimpLoader::Load(ImportSettings settings)
 	flag |= aiProcess_ConvertToLeftHanded;		//左手座標系に変換
 
 	auto scene = importer.ReadFile(path, flag); //モデル読み込み
+	auto aiTexture = scene->mNumTextures; //埋め込みテクスチャ数
 
 	if (!scene)
 	{

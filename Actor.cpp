@@ -7,7 +7,7 @@
 #include "CollisionManager.h"
 
 using namespace DirectX;
-using namespace CollisionData;
+
 
 //コンストラクタ
 Actor::Actor(
@@ -127,7 +127,7 @@ void Actor::SubmitDraws(Renderer& renderer)
 		{
 			submitInfos[i].position = GetPosition();
 			submitInfos[i].scale = GetScale();
-			submitInfos[i].common.blendMode = info[i].common.blendMode;
+			submitInfos[i].common.psoKey = info[i].common.psoKey;
 			submitInfos[i].common.uvRect = SplitSprite(GetTexSplitInfo());
 			submitInfos[i].billboardType = info[i].billboardType;
 		}

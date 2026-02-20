@@ -4,6 +4,10 @@
 #include "MeshManager.h"
 #include "Audio.h"
 #include "Debug.h"
+#include "EventManager.h"
+#include "EventType.h"
+#include "EffectData.h"
+#include "RenderData.h"
 
 using namespace DirectX;
 // Constructor
@@ -15,7 +19,7 @@ Player::Player(
 	XMFLOAT3 velocity, 
 	bool isActive, 
 	OBJECT_TAG tag, 
-	CollisionData::COLLISION_LAYER layer,
+	COLLISION_LAYER layer,
 	XMFLOAT3 colliderSetScale, 
 	XMFLOAT3 colliderSetOffsetPosition, 
 	XMFLOAT3 colliderSetOffsetRotation
@@ -60,19 +64,22 @@ void Player::CreateRenderModel(
 	MeshManager& pMeshManager
 )
 {
+	PSOKey key = PSO_KEY_OPAQUE.WithLighting();
+
 	WorldRenderModel info;
 	CreateRenderInfo(
-		pTextureManager,				// Texture manager reference
-		pMeshManager,					// Mesh manager reference
-		&info,							// Pointer to the render info structure array
-		GetMeshType(),					// Mesh type
-		BLEND_OPAQUE,					// Blend mode
-		L"asset/fbx/screw/ST_screw.fbx",	// Model data or texture file path
-		true,							// Whether lighting is enabled
-		BILLBOARD_TYPE::BILLBOARD_NONE,	// Billboard type
-		false,							// Whether to flip U (only valid for model data)
-		false							// Whether to flip V (only valid for model data)
+		pTextureManager,					// Texture manager reference
+		pMeshManager,						// Mesh manager reference
+		&info,								// Pointer to the render info structure array
+		GetMeshType(),						// Mesh type
+		key,								// Pipeline state object key
+		L"asset/fbx/Screw/ST_screw.fbx",	// Model data or texture file path
+		true,								// Whether lighting is enabled
+		BILLBOARD_TYPE::BILLBOARD_NONE,		// Billboard type
+		false,								// Whether to flip U (only valid for model data)
+		false								// Whether to flip V (only valid for model data)
 	);
+
 	SetRenderModel(info);
 	auto animatorSet = GetNodeAnimatorSet();
 	animatorSet->pNodeAnimator->Bind(GetRenderModel()[0].pNodeAnimAsset);
@@ -236,6 +243,18 @@ void Player::UpdateOverride()
 	else
 	{
 		InputManager::GetInstance()->StopAllControllerVibrations();
+	}
+
+	if(InputManager::GetInstance()->GetInputInfo()->key.p.trigger)
+	{
+		EventManager::GetInstance()->TriggerEvent<EffectCommand>(
+			EventType::ADD_EFFECT_COMMAND,
+			{
+				EFFECT_TYPE::WIND,
+				GetPosition(),
+				XMFLOAT3{ 10.0f, 10.0f, 1.0f },
+			}
+			);
 	}
 }
 

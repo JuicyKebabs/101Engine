@@ -86,7 +86,7 @@ void Engine::RenderBegin()
 	);
 
 	//画面クリア
-	float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };	//クリアカラー(RGBA)
+	float clearColor[] = { 0.2f, 0.2f, 1.0f, 1.0f };	//クリアカラー(RGBA)
 	//レンダーターゲットのクリア
 	m_pCommandList->ClearRenderTargetView(
 		rtvHandle,		//クリアするレンダーターゲットビューのハンドル

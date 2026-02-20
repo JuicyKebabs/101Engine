@@ -17,7 +17,7 @@ public:	//公開関数
 		DirectX::XMFLOAT3 scale = { 1,1,1 },
 		DirectX::XMFLOAT3 rotation = { 0,0,0 },
 		UINT order = 0,
-		BLEND_MODE blendMode = BLEND_MODE::BLEND_TRANSPARENT
+		PSOKey key = PSOKey{}
 	);
 	virtual ~UIBase() = default;	//デストラクタ
 	//メイン処理関数
@@ -45,13 +45,26 @@ public:	//公開関数
 	int GetOrder() const;							//描画順の取得
 	UVRect GetUVRect() const;						//UV矩形の取得
 	TexSplitInfo& GetTexSplitInfo();				//テクスチャ分割情報構造体の取得
+	DirectX::XMFLOAT3 GetWorldPosition() const { return m_worldPosition; }	//ワールド位置の取得
+	DirectX::XMFLOAT3 GetWorldScale() const { return m_worldScale; }		//ワールドスケールの取得
+	DirectX::XMFLOAT3 GetWorldRotation() const { return m_worldRotation; }	//ワールド回転の取得
+	DirectX::XMFLOAT3 GetLocalPosition() const { return m_localPosition; }	//ローカル位置の取得
+	DirectX::XMFLOAT3 GetLocalScale() const { return m_localScale; }		//ローカルスケールの取得
+	DirectX::XMFLOAT3 GetLocalRotation() const { return m_localRotation; }	//ローカル回転の取得
 
 	//セッター
 	void SetLocalTransform(const Transform3D& local); //ローカル変換情報の設定
 	void SetColor(DirectX::XMFLOAT4 color);	//色RGBAの設定
 	void SetActive(bool isActive);			//アクティブフラグの設定
+	void SetOrder(int order);				//描画順の設定
 	void SetUVRect(const UVRect& uvRect);	//UV矩形の設定
 	void SetTexSplitInfo(const TexSplitInfo& info);	//テクスチャ分割情報構造体の設定
+	void SetWorldPosition(DirectX::XMFLOAT3 position) { m_worldPosition = position; }	//ワールド位置の設定
+	void SetWorldScale(DirectX::XMFLOAT3 scale) { m_worldScale = scale; }				//ワールドスケールの設定
+	void SetWorldRotation(DirectX::XMFLOAT3 rotation) { m_worldRotation = rotation; }	//ワールド回転の設定
+	void SetLocalPosition(DirectX::XMFLOAT3 position) { m_localPosition = position; }	//ローカル位置の設定
+	void SetLocalScale(DirectX::XMFLOAT3 scale) { m_localScale = scale; }				//ローカルスケールの設定
+	void SetLocalRotation(DirectX::XMFLOAT3 rotation) { m_localRotation = rotation; }	//ローカル回転の設定
 
 	//UI親子関係関数
 	//子UIオブジェクト追加関数(テンプレート)
@@ -79,7 +92,16 @@ protected:
 		MeshManager& meshManager
 	) = 0;
 
+	void SortChildrenByOrder();	//子UIの描画順の更新(昇順)
+
 protected:
+	DirectX::XMFLOAT3 m_localPosition{};
+	DirectX::XMFLOAT3 m_localScale{};	
+	DirectX::XMFLOAT3 m_localRotation{};
+	DirectX::XMFLOAT3 m_worldPosition{};
+	DirectX::XMFLOAT3 m_worldScale{};
+	DirectX::XMFLOAT3 m_worldRotation{};
+
 	Transform3D m_world{};	//ワールド変換情報
 	Transform3D m_local{};	//ローカル変換情報
 
@@ -90,10 +112,14 @@ protected:
 	UIBase* m_parent = nullptr;							//親UIオブジェクトポインタ
 	std::vector<std::unique_ptr<UIBase>> m_children;	//子UIオブジェクト配列
 
-	UINT m_order = 0;										//描画順
-	std::vector<WorldRenderInfo> m_renderInfos;				//描画情報構造体配列
-	BLEND_MODE m_blendMode = BLEND_MODE::BLEND_TRANSPARENT;	//ブレンドモード
+	UINT m_order = 0;									//描画順
+	std::vector<WorldRenderInfo> m_renderInfos;			//描画情報構造体配列
+	PSOKey m_psoKey{};									//パイプラインステートオブジェクトキー
 
 	UVRect m_uvRect{};				//UV矩形
 	TexSplitInfo m_texSplitInfo{};	//テクスチャ分割情報構造体
+
+private:
+	void UpdateTexSplitInfo();	//テクスチャ分割情報構造体の更新
+	void UpdateTransform();	//ローカル変換情報からワールド変換情報を更新
 };

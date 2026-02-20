@@ -25,8 +25,8 @@ public:
 		DirectX::XMFLOAT3 velocity,						// Velocity
 		bool isActive = true,							// Active flag
 		OBJECT_TAG tag = OBJECT_TAG::NONE,				// Object tag
-		CollisionData::COLLISION_LAYER layer =
-			CollisionData::COLLISION_LAYER::DEFAULT,	// Collision layer
+		COLLISION_LAYER layer =
+			COLLISION_LAYER::DEFAULT,	// Collision layer
 		DirectX::XMFLOAT3 colliderSetScale =
 			{1.0f, 1.0f, 1.0f},							// Collider set scale
 		DirectX::XMFLOAT3 colliderSetOffsetPosition =
@@ -39,7 +39,7 @@ public:
 	void Update();														// Update
 	void SubmitDraws(Renderer& renderer);							// Render information submission
 	void ResolveCollisions();											// Collision resolution
-	void AddCollisionInfo(const CollisionData::CollisionInfo& info);	// Add collision information
+	void AddCollisionInfo(const CollisionInfo& info);	// Add collision information
 	void ClearCollisionInfos();											// Clear collision information
 	virtual void CreateRenderModel(										// Create render model
 		TextureManager& textureManager,
