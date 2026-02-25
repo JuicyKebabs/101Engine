@@ -36,9 +36,10 @@ public:
 	void SetPixelShader(ID3DBlob* blob);								//ピクセルシェーダーを設定
 	void Create();														//パイプラインステートオブジェクトを作成
 
-	void SetBlendMode(BLEND_MODE mode);	//ブレンドモードを設定
-	void SetDepthMode(DEPTH_MODE mode);	//深度モードを設定
-	void SetCullMode(CULL_MODE mode);	//カリングモードを設定
+	void SetBlendMode(BLEND_MODE mode);				//ブレンドモードを設定
+	void SetDepthMode(DEPTH_MODE mode);				//深度モードを設定
+	void SetCullMode(CULL_MODE mode);				//カリングモードを設定
+	void SetFormat(RENDER_TARGET_FORMAT format);	//レンダーターゲットのフォーマットを設定
 
 	ID3D12PipelineState* GetPipelineState() const; //パイプラインステートオブジェクトを取得
 	bool IsValid() const; //パイプラインステート生成に成功したかを取得

@@ -7,6 +7,7 @@
 #include "EventType.h"
 #include "Audio.h"
 #include "Player.h"
+#include "Block.h"
 
 using namespace DirectX;
 
@@ -28,6 +29,11 @@ void GameScene::InitializeOverride(EngineContext& engineContext)
 	pPlayer->SetPosition({ 0.0f, 0.0f, 0.0f });
 	pPlayer->SetScale({ 1.0f, 1.0f, 1.0f });
 	AddObject(std::unique_ptr<Player>(pPlayer));
+
+	Block* pBlock = new Block(MESH_TYPE::CUBE);
+	pBlock->SetPosition({ 0.0f, -1.0f, 0.0f });
+	pBlock->SetScale({ 10.0f, 10.0f, 10.0f });
+	AddObject(std::unique_ptr<Block>(pBlock));
 
 	m_pCamera->SetTarget({0.0f, 0.0f, 0.0f});
 }

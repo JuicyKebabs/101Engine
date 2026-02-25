@@ -17,6 +17,26 @@
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
+class TextureManager;
+
+// Render target types
+enum class RENDER_TARGET_TYPE
+{
+	BACK_BUFFER_0 = 0,	// Back buffer render target 0
+	BACK_BUFFER_1,		// Back buffer render target 1
+	POST_PROCESS,		// Post-processing render target
+	TYPE_COUNT,			// Number of types
+};
+
+// Render target slot structure
+struct RenderTargetSlot
+{
+	ComPtr<ID3D12Resource> renderTarget = { nullptr };			// Render targets(Back buffer + post-processing)
+	uint32_t rtvIndex = 0;											// RTV descriptor index (for back buffer, it is the same as the back buffer index; for post-processing, it is a fixed index)
+	D3D12_RESOURCE_STATES m_currenttargetState{};					// Render target states(Back buffer + post-processing)
+	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };				// Clear color (RGBA)
+};
+
 // DirectX12 engine class
 class Engine
 {
@@ -35,17 +55,20 @@ public:
 	}
 
 	// Main processing function
-	bool Initialize(			// Initialization
-		HWND hwnd,					// Window handle
-		UINT m_FrameBufferWidth,	// Frame buffer width
-		UINT m_FrameBufferHeight	// Frame buffer height
+	bool InitCore(			// Initialization
+		HWND hwnd,						// Window handle
+		UINT m_FrameBufferWidth,		// Frame buffer width
+		UINT m_FrameBufferHeight		// Frame buffer height
 	);
+	void InitBindings(TextureManager* pTextureManager);	// Initialize bindings (root signature, descriptor heaps, etc.)
 	void Terminate();			// Termination
 
 	// Rendering related functions
-	void RenderBegin();	// Start rendering
-	void WaitRender();	// Wait for the previous frame to finish
-	void RenderEnd();	// End rendering
+	void BeginPass(RENDER_TARGET_TYPE type);	// Set up render target
+	void EndPass(RENDER_TARGET_TYPE type);		// End render pass
+	void BeginFrame();							// Start rendering
+	void WaitRender();							// Wait for the previous frame to finish
+	void RenderEnd();							// End rendering
 
 	// Various getters
 	ID3D12Device* GetDevice() { return m_pDevice.Get(); }							// Get device
@@ -75,27 +98,33 @@ private:	// Rendering related
 	UINT m_FrameBufferHeight = 0;		// Frame buffer height
 	UINT m_currentBackBufferIndex = 0;	// Current back buffer index
 
-	ComPtr<ID3D12DescriptorHeap> m_pRTVHeap;									// RTV descriptor heap
-	UINT m_rtvDescriptorSize = 0;												// RTV descriptor size
-	ComPtr<ID3D12Resource> m_pRenderTargets[FRAME_BUFFER_COUNT] = { nullptr };	// Render targets (double buffering)
+	// Render target related
+	RenderTargetSlot m_renderTargetSlots[static_cast<int>(RENDER_TARGET_TYPE::TYPE_COUNT)] = {};	// Render target slots (back buffer + post-processing)
+	ComPtr<ID3D12DescriptorHeap> m_pRTVHeap = nullptr;												// Current frame's RTV descriptor heap (temporarily stored)
+	uint32_t m_rtvDescriptorSize = 0;																// RTV descriptor size (temporarily stored)
 
+	// Depth stencil
 	UINT m_dsvDescriptorSize = 0;							// Depth stencil descriptor size
 	ComPtr<ID3D12DescriptorHeap> m_pDsvHeap = nullptr;		// Depth stencil descriptor heap
 	ComPtr<ID3D12Resource> m_pDepthStencilBuffer = nullptr;	// Depth stencil buffer (only one is needed)
 
-	ID3D12Resource* m_currentRenderTarget = nullptr; // Current frame's render target (temporarily stored)
-
+	TextureManager* m_pTextureManager = nullptr;	// Texture manager (for post-processing render target)
 private:	// Result code
 	HRESULT result = S_OK;	// HRESULT (success/failure code)
 
 private:	// Internal functions
 	// Various creation functions
-	void CreateDevice();			// Device creation
-	void CreateCommandObjects();	// Command object creation
-	void CreateSwapChain();			// Swap chain creation
-	void CreateFence();				// Fence creation
-	void CreateViewport();			// Viewport creation
-	void CreateScissorRect();		// Scissor rectangle creation
-	void CreateRenderTarget();		// Render target creation
-	void CreateDepthStencil();		// Depth stencil creation
+	void CreateDevice();					// Device creation
+	void CreateCommandObjects();			// Command object creation
+	void CreateSwapChain();					// Swap chain creation
+	void CreateFence();						// Fence creation
+	void CreateViewport();					// Viewport creation
+	void CreateScissorRect();				// Scissor rectangle creation
+	void CreateRTVHeap();					// RTV descriptor heap creation
+	void CreateRenderTarget();				// Render target creation
+	void CreatePostProcessRenderTarget();	// Post-processing render target creation
+	void CreateDepthStencil();				// Depth stencil creation
+
+	RenderTargetSlot& GetRenderTargetSlot(RENDER_TARGET_TYPE type);
+	D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(uint32_t idx);
 };

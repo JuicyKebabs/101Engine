@@ -2,6 +2,7 @@
 #include "d3dx12.h"
 #include "DirectXTex.h"
 #include <filesystem>
+#include <cstring>
 
 using namespace DirectX;
 
@@ -32,11 +33,11 @@ void TextureManager::Initialize(
 	// Get SRV descriptor increment size
 	m_srvIncrementSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	m_nextFreeIndex = 0;		// Initialize next free index
-	m_loadedTextures.clear();	// Clear loaded texture map
+	m_nextFreeIndex = static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::RESERVED_COUNT);	// Initialize next free index
+	m_loadedTextures.clear();																// Clear loaded texture map
 
 	// Load default white texture
-	m_defaultTextureIndex = LoadSrvFromFile(L"asset/texture/white.png");
+	CreateDefaultTexture();
 }
 
 // Load SRV from file
@@ -129,20 +130,8 @@ uint32_t TextureManager::LoadSrvFromFile(const std::wstring& path)
 		IID_PPV_ARGS(&pUploadBuffer)		// Resource to create
 	);
 
-	// Set subresource data
-	const uint32_t textureIndex = m_nextFreeIndex;		// Get next texture index
-	std::vector<D3D12_SUBRESOURCE_DATA> subresources;	// Subresource array
-	subresources.reserve(img.GetImageCount());			// Reserve array size
-	for (size_t i = 0; i < img.GetImageCount(); ++i)
-	{
-		const Image* imgData = img.GetImages() + i; // Get image data
-
-		D3D12_SUBRESOURCE_DATA subresource = {};	// Subresource data
-		subresource.pData = imgData->pixels;			// Pixel data
-		subresource.RowPitch = imgData->rowPitch;		// Row pitch
-		subresource.SlicePitch = imgData->slicePitch;	// Slice pitch
-		subresources.push_back(subresource);			// Add to array
-	}
+	// Allocate SRV descriptor index
+	const uint32_t textureIndex = AllocateSrv();
 
 	// Create shader resource view
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};	// SRV descriptor
@@ -169,25 +158,108 @@ uint32_t TextureManager::LoadSrvFromFile(const std::wstring& path)
 
 	// Register texture information
 	m_loadedTextures[path] = textureIndex;			// Register path and index
-	m_nextFreeIndex++;								// Update next free index
 
-	// Keep resources and upload buffer alive
+	// Keep resources
 	m_textures.push_back(pTexture);				// Keep texture resource
-	m_uploadKeepAlive.push_back(pUploadBuffer); // Keep upload buffer
 
-	// Copy to keep ScratchImage alive
+	// Get image data from ScratchImage
+	const Image* images = img.GetImages();		// Get image data
+	size_t count = img.GetImageCount();			// Get image count
 
-	auto scratch = std::make_unique<ScratchImage>(std::move(img));
+	if (images == nullptr || count == 0)
+	{
+		OutputDebugStringA("[TextureManager] No image data in ScratchImage\n");
+		return UINT32_MAX; // or some fallback texture index
+	}
 
 	// Register as pending texture upload
 	PendingTextureUpload pending = {};	// Pending texture upload
 	pending.texture = pTexture;						// Texture resource
 	pending.uploadBuffer = pUploadBuffer;			// Upload buffer
-	pending.image = std::move(scratch);				// Scratch image
 	pending.srvIndex = textureIndex;				// SRV descriptor index
+
+	// Calculate total size of pixel and reserve space in owned data vector
+	auto pixels = img.GetImages()->pixels;	// Get pixel data pointer
+	size_t totalSize = 0;					// Total size of pixel data
+	for (size_t i = 0; i < count; i++)
+	{
+		totalSize += img.GetImages()[i].slicePitch; // Accumulate slice pitch for each image
+	}
+	pending.ownedData.resize(totalSize);	// Resize owned data vector to fit pixel data
+
+	// Prepare subresource data for texture upload
+	pending.subresources.resize(count);	// Resize subresource array to match image count
+	size_t offset = 0;					// Offset for copying pixel data
+	for (size_t i = 0; i < count; ++i)
+	{
+		std::memcpy(pending.ownedData.data() + offset, images[i].pixels, img.GetImages()[i].slicePitch); // Copy pixel data to owned data vector
+
+		D3D12_SUBRESOURCE_DATA subresource = {};	// Subresource data
+		subresource.pData = pending.ownedData.data() + offset;	// Pixel data
+		subresource.RowPitch = images[i].rowPitch;				// Row pitch
+		subresource.SlicePitch = images[i].slicePitch;			// Slice pitch
+
+		pending.subresources[i] = subresource;		// Store subresource data
+		offset += img.GetImages()[i].slicePitch;	// Move offset for next image
+	}
+
 	m_pendingUploads.push_back(std::move(pending)); // Add to array
 
 	return textureIndex;	// Return texture index
+}
+
+// Allocate SRV descriptor index (for manually created textures)
+uint32_t TextureManager::AllocateSrv()
+{
+	if(m_nextFreeIndex >= m_pSrvHeap->GetDesc().NumDescriptors)
+	{
+		OutputDebugStringA("[TextureManager] No more SRV descriptors available\n");
+		return UINT32_MAX; // or some fallback texture index
+	}
+
+	return m_nextFreeIndex++;
+}
+
+// Create SRV for a texture resource
+void TextureManager::CreateSrv(
+	ID3D12Resource* pResource,						// Texture resource
+	DXGI_FORMAT format,								// Texture format
+	uint32_t srvIndex								// SRV descriptor index
+)
+{
+	if(!pResource) 	
+	{
+		OutputDebugStringA("[TextureManager] Invalid resource for CreateSrv\n");
+		return;
+	}
+
+	if(srvIndex >= m_pSrvHeap->GetDesc().NumDescriptors)
+	{
+		OutputDebugStringA("[TextureManager] SRV index out of bounds for CreateSrv\n");
+		return;
+	}
+
+	auto cpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(	// CPU descriptor handle
+		m_pSrvHeap->GetCPUDescriptorHandleForHeapStart(),	// Heap start handle
+		srvIndex,											// Offset (SRV index)
+		m_srvIncrementSize									// Increment size
+	);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};	// SRV descriptor
+	srvDesc.Shader4ComponentMapping = 
+		D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;	// Component mapping
+	srvDesc.Format = format;						// Format
+	srvDesc.ViewDimension = 
+		D3D12_SRV_DIMENSION_TEXTURE2D;				// View dimension (2D texture)
+	srvDesc.Texture2D.MipLevels = 1;				// Mip levels (1 for manually created textures)
+	srvDesc.Texture2D.MostDetailedMip = 0;			// Most detailed mip (0 for manually created textures)
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;	// Resource min LOD clamp
+
+	m_pDevice->CreateShaderResourceView(	// Create SRV
+		pResource,		// Texture resource
+		&srvDesc,		// SRV descriptor
+		cpuHandle		// SRV handle
+	);
 }
 
 // Upload pending textures
@@ -202,43 +274,21 @@ void TextureManager::UploadPendingTextures(ID3D12GraphicsCommandList* cmdList)
 	// Upload each pending texture
 	for(auto& pending : m_pendingUploads)
 	{
-		if (!pending.texture || !pending.uploadBuffer || !pending.image)
+		if (!pending.texture || !pending.uploadBuffer || pending.subresources.empty())
 		{
 			OutputDebugStringA("PendingTextureUpload has null member\n");
 			continue;
 		}
 
-		// Get image data from ScratchImage
-		const ScratchImage& img = *pending.image;	// ScratchImage
-		const Image* images = img.GetImages();		// Get image data
-		size_t count = img.GetImageCount();			// Get image count
-
-		if(images == nullptr || count == 0)
-		{
-			continue; // Skip invalid image data
-		}
-
-		// Create temporary array here
-		std::vector<D3D12_SUBRESOURCE_DATA> subresources(count);
-
-		for (size_t i = 0; i < count; ++i)
-		{
-			D3D12_SUBRESOURCE_DATA s{};
-			s.pData = images[i].pixels;
-			s.RowPitch = images[i].rowPitch;
-			s.SlicePitch = images[i].slicePitch;
-			subresources[i] = s;
-		}
-
 		// Upload data to upload buffer
 		UpdateSubresources(
-			cmdList,					// Command list
-			pending.texture.Get(),		// Destination resource
-			pending.uploadBuffer.Get(),	// Source resource
-			0,							// Source offset
-			0,							// First subresource
-			static_cast<UINT>(count),	// Number of subresources
-			subresources.data()			// Subresource array
+			cmdList,										// Command list
+			pending.texture.Get(),							// Destination resource
+			pending.uploadBuffer.Get(),						// Source resource
+			0,												// Source offset
+			0,												// First subresource
+			static_cast<UINT>(pending.subresources.size()),	// Number of subresources
+			pending.subresources.data()						// Subresource array
 		);
 
 		// Change texture state from copy destination to pixel shader resource
@@ -248,6 +298,8 @@ void TextureManager::UploadPendingTextures(ID3D12GraphicsCommandList* cmdList)
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE	// After state
 		);
 		cmdList->ResourceBarrier(1, &barrier);	// Set resource barrier
+
+		m_uploadKeepAlive.push_back(pending.uploadBuffer); // Keep upload buffer alive until GPU is done
 	}
 
 	// Clear pending texture upload array
@@ -266,8 +318,89 @@ UINT TextureManager::GetSrvIncrementSize() const
 	return m_srvIncrementSize;
 }
 
-// Get default white texture index
-uint32_t TextureManager::GetDefaultWhiteTextureIndex() const
+// Get post-processing texture index
+uint32_t TextureManager::GetPostProcessingTextureIndex() const
 {
-	return m_defaultTextureIndex;
+	return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::POST_PROCESSING);
+}
+
+// Get default white texture index
+uint32_t TextureManager::GetDefaultTextureIndex() const
+{
+	return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+}
+
+// Create default texture
+void TextureManager::CreateDefaultTexture()
+{
+	// Create a 1x1 white texture	
+	// Create texture resource
+	ComPtr<ID3D12Resource> pTexture;	// Texture resource
+	CD3DX12_RESOURCE_DESC texDesc = CD3DX12_RESOURCE_DESC::Tex2D(	// Texture resource descriptor
+		DXGI_FORMAT_R8G8B8A8_UNORM,			// Format (RGBA8)
+		1,									// Width
+		1,									// Height
+		1,									// Array size
+		1									// Mip levels
+	);
+
+	auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT); // Heap properties (default)
+	m_pDevice->CreateCommittedResource(	// Create resource
+		&heapProps,						// Heap properties
+		D3D12_HEAP_FLAG_NONE,			// Heap flags
+		&texDesc,						// Resource descriptor
+		D3D12_RESOURCE_STATE_COPY_DEST, // Initial resource state
+		nullptr,						// Optimized clear value
+		IID_PPV_ARGS(&pTexture)			// Resource to create
+	);
+
+	// Create upload buffer for default texture
+	std::vector<uint32_t> defaultPixel = { 0xFFFF00FF }; // Pink pixel data (RGBA)
+	const UINT64 uploadBufferSize = GetRequiredIntermediateSize( // Get upload buffer size
+		pTexture.Get(),				 // Texture resource
+		0,							 // First subresource
+		1							 // Mip levels
+	);
+	auto uploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD); // Heap properties (upload)
+	auto uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize); // Buffer resource descriptor
+	ComPtr<ID3D12Resource> pUploadBuffer;	// Upload buffer
+	m_pDevice->CreateCommittedResource(	// Create resource
+		&uploadHeapProps,					// Heap properties
+		D3D12_HEAP_FLAG_NONE,				// Heap flags
+		&uploadBufferDesc,					// Resource descriptor
+		D3D12_RESOURCE_STATE_GENERIC_READ,	// Initial resource state
+		nullptr,							// Optimized clear value
+		IID_PPV_ARGS(&pUploadBuffer)		// Resource to create
+	);
+
+	// Create shader resource view
+	const uint32_t defaultTextureIndex = static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE); // Default white texture index
+	CreateSrv(
+		pTexture.Get(),					// Texture resource
+		DXGI_FORMAT_R8G8B8A8_UNORM,		// Format
+		defaultTextureIndex				// SRV descriptor index
+	);
+
+	m_textures.push_back(pTexture); // Keep texture resource alive
+
+	// Register as pending texture upload
+	PendingTextureUpload pending = {};	// Pending texture upload
+	pending.texture = pTexture;						// Texture resource
+	pending.uploadBuffer = pUploadBuffer;			// Upload buffer
+	pending.srvIndex = defaultTextureIndex;			// SRV descriptor index
+
+	// Prepare owned data for upload
+	pending.ownedData.resize(sizeof(uint32_t));	// Resize owned data to hold pixel data
+	memcpy(pending.ownedData.data(), defaultPixel.data(), sizeof(uint32_t)); // Copy pixel data to owned data
+
+	// Set subresource data for upload
+	D3D12_SUBRESOURCE_DATA subresource = {};		// Subresource data
+	subresource.pData = pending.ownedData.data();	// Pixel data
+	subresource.RowPitch = sizeof(uint32_t);		// Row pitch
+	subresource.SlicePitch = sizeof(uint32_t);		// Slice pitch
+	pending.subresources.push_back(subresource);	// Subresource data
+
+
+	m_pendingUploads.push_back(std::move(pending)); // Add to array
+
 }
