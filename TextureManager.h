@@ -12,8 +12,17 @@ struct PendingTextureUpload
 {
 	ComPtr<ID3D12Resource> texture;						// Texture resource
 	ComPtr<ID3D12Resource> uploadBuffer;				// Upload buffer
-	std::unique_ptr<DirectX::ScratchImage> image;		// Scratch image
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;	// Subresource data array
+	std::vector<uint8_t> ownedData;						// Owned data to keep alive during upload 
 	uint32_t srvIndex;									// SRV descriptor index
+};
+
+// Reserved SRV indices for special textures
+enum class TEXTURE_SRV_INDEX_RESERVED : uint32_t
+{
+	POST_PROCESSING = 0,	// Reserved index for post-processing texture
+	DEFAULT_TEXTURE,		// Reserved index for default white texture
+	RESERVED_COUNT			// Count of reserved indices
 };
 
 // Texture manager class
@@ -47,19 +56,28 @@ public:
 		const std::wstring& path	// File path
 	);
 
+	uint32_t AllocateSrv();	// Allocate SRV descriptor index (for manually created textures)
+	void CreateSrv(			// Create SRV for a texture resource
+		ID3D12Resource* pResource,	// Texture resource
+		DXGI_FORMAT format,			// Texture format
+		uint32_t srvIndex			// SRV descriptor index
+	);
+
 	void UploadPendingTextures(ID3D12GraphicsCommandList* cmdList);	// Upload pending textures
 
-	ID3D12DescriptorHeap* GetSrvHeap() const;	// Get SRV heap (where SRVs are stored)
-	UINT GetSrvIncrementSize() const;			// Get SRV descriptor increment size
-
-	uint32_t GetDefaultWhiteTextureIndex() const;	// Get default white texture index
+	ID3D12DescriptorHeap* GetSrvHeap() const;		// Get SRV heap (where SRVs are stored)
+	UINT GetSrvIncrementSize() const;				// Get SRV descriptor increment size
+	
+	uint32_t GetPostProcessingTextureIndex() const;	// Get post-processing texture index
+	uint32_t GetDefaultTextureIndex() const;	// Get default texture index
 
 private:
+	// SRV management
 	ComPtr<ID3D12DescriptorHeap> m_pSrvHeap;	// SRV descriptor heap (where texture SRVs are stored)
+	UINT m_srvIncrementSize = 0;															// SRV descriptor increment size
+	UINT m_nextFreeIndex = static_cast<UINT>(TEXTURE_SRV_INDEX_RESERVED::RESERVED_COUNT);	// Next free SRV index
 
-	UINT m_srvIncrementSize = 0;	// SRV descriptor increment size
-	UINT m_nextFreeIndex = 0;		// Next free descriptor index
-
+	// Texture management
 	std::unordered_map<std::wstring, uint32_t> m_loadedTextures;	// Map of loaded textures
 	std::vector<ComPtr<ID3D12Resource>> m_textures;					// Array of texture resources
 	std::vector< ComPtr<ID3D12Resource> > m_uploadKeepAlive;		// Keep-alive array for upload buffers
@@ -67,5 +85,6 @@ private:
 
 	ID3D12Device* m_pDevice = nullptr;	// Device
 
-	uint32_t m_defaultTextureIndex = UINT32_MAX; // Default white texture index
+private:
+	void CreateDefaultTexture();	// Create default texture
 };

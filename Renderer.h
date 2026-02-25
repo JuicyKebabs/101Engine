@@ -16,6 +16,7 @@
 
 // Forward declaration
 class TextureManager;
+enum class RENDER_TARGET_TYPE;
 
 // Renderer class
 class Renderer
@@ -38,17 +39,13 @@ public:
 		TextureManager* textureManager
 	);
 	void Update(UINT currentBackBufferIndex, CameraInfo& info);	// Update
-	void Draw(													// Draw
-		UINT index,
-		ID3D12GraphicsCommandList* commandList
-	);
-
+	void Draw(ID3D12GraphicsCommandList* pCommandList, RENDER_TARGET_TYPE targetType);	// Draw
 	// Render list management functions
 	void BeginFrame(UINT backIndex);
 
 	// Add render information to the render list
-	void SubmitToWorldList(const WorldRenderModel& info);		// World space
-	void SubmitToScreenList(const  WorldRenderModel& info);		// Screen space
+	void SubmitToWorldList(const WorldRenderModel& info);				// World space
+	void SubmitToScreenList(const  WorldRenderModel& info);				// Screen space
 
 	void SubmitDirectionalLight(const DirectionalLight& light);	// Directional light information
 
@@ -60,12 +57,15 @@ private:
 
 	// Pipeline State Object related
 	std::unordered_map<PSOKey, PipelineState*, PSOKeyHash> m_psoMap;	// PSO map
-	std::vector<WorldRenderInfo> m_tempWorldRenderList;					// Temporary world render list for sorting
-	std::vector<WorldRenderInfo> m_tempScreenRenderList;				// Temporary world render list for sorting
 	PipelineState* m_pDefaultPSO = nullptr;								// Default PSO
 	ShaderLibrary* m_pShaderLibrary = nullptr;							// Shader library
 
+	// Temporary render lists for sorting and post-processing
+	std::vector<WorldRenderInfo> m_tempWorldRenderList;					// Temporary world render list for sorting
+	std::vector<WorldRenderInfo> m_tempScreenRenderList;				// Temporary world render list for sorting
+
 	// Frame-specific object CBV pool (1 object = 1 constant buffer)
+	std::vector<ConstantBuffer*> m_objectCBWorldPostProcess;					// For post-processing world space
 	std::vector<ConstantBuffer*> m_objectCBWorld[Engine::FRAME_BUFFER_COUNT];	// For world space
 	std::vector<ConstantBuffer*> m_objectCBScreen[Engine::FRAME_BUFFER_COUNT];	// For screen space
 	UINT m_currBackIndex = 0;
@@ -79,11 +79,17 @@ private:
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light
 
+	// Post-processing related
+	PSOKey m_postProcessKey;	// Post-processing PSO key
+
 private:
 	void DrawTempRenderListWorld(	// Draw for screen space render list
 		ID3D12GraphicsCommandList* p_commandList	// Command list
 	);
 	void DrawTempRenderListScreen(	// Draw for screen space render list
+		ID3D12GraphicsCommandList* p_commandList	// Command list
+	);
+	void DrawPostProcess(	// Post-processing draw
 		ID3D12GraphicsCommandList* p_commandList	// Command list
 	);
 
@@ -92,10 +98,11 @@ private:
 
 	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
 	PipelineState* CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object
-	void SortRenderListWorldByPSO();								// Sort render list by PSO
-	void SortRenderListScreenByPSO();								// Sort render list by PSO
+	void SortRenderListWorldByPSO(std::vector<WorldRenderInfo>& renderList);	// Sort render list by PSO
+	void SortRenderListScreenByPSO(std::vector<WorldRenderInfo>& renderList);	// Sort render list by PSO
 	void NormalizeKeyForRenderQueueWorld(WorldRenderInfo& info);	// Normalize PSO key for render queue
 	void NormalizeKeyForRenderQueueScreen(WorldRenderInfo& info);	// Normalize PSO key for render queue
+	void PreparePostProcessKey();	// Prepare post-processing information
 
 	// Sorting functions
 	// PSOKey comparison

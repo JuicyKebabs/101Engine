@@ -64,7 +64,7 @@ void Player::CreateRenderModel(
 	MeshManager& pMeshManager
 )
 {
-	PSOKey key = PSO_KEY_OPAQUE.WithLighting();
+	PSOKey key = PSO_KEY_TRANSPARENT.WithLighting();
 
 	WorldRenderModel info;
 	CreateRenderInfo(
@@ -75,10 +75,16 @@ void Player::CreateRenderModel(
 		key,								// Pipeline state object key
 		L"asset/fbx/Screw/ST_screw.fbx",	// Model data or texture file path
 		true,								// Whether lighting is enabled
+		true,								// Whether this is for post-effect
 		BILLBOARD_TYPE::BILLBOARD_NONE,		// Billboard type
 		false,								// Whether to flip U (only valid for model data)
 		false								// Whether to flip V (only valid for model data)
 	);
+
+	for(auto& item : info)
+	{
+		item.isPostEffect = true; // Set postEffect to true for all render info items
+	}
 
 	SetRenderModel(info);
 	auto animatorSet = GetNodeAnimatorSet();

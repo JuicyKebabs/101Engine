@@ -37,11 +37,13 @@ enum class PS_FILE_ID
 enum class VS_ENTRY_ID : uint16_t
 {
 	Basic = 0,
+	PostEffect = 1,
 };
 // Enumeration for pixel shader entry points
 enum class PS_ENTRY_ID : uint16_t
 {
 	Basic = 0,
+	PostEffect = 1,
 };
 
 //-------------------------------------------------------------------------------------
@@ -128,15 +130,23 @@ enum CULL_MODE
 	CULL_BACK,
 };
 
+// Render target formats
+enum RENDER_TARGET_FORMAT
+{
+	RTV_FORMAT_LDR = 0,
+	RTV_FORMAT_HDR = 1,
+};
+
 // Pipeline State Object (PSO) key structure
 struct PSOKey
 {
-	VS_KEY vsKey;							// Vertex shader key
-	PS_KEY psKey;							// Pixel shader key
-	uint64_t commonDefines = 0;			// Common shader defines
-	BLEND_MODE  blend = BLEND_OPAQUE;		// Blend mode
-	DEPTH_MODE  depth = DEPTH_TEST_WRITE;	// Depth stencil mode
-	CULL_MODE  cull = CULL_NONE;			// Culling mode
+	VS_KEY vsKey;										// Vertex shader key
+	PS_KEY psKey;										// Pixel shader key
+	uint64_t commonDefines = 0;							// Common shader defines
+	BLEND_MODE  blend = BLEND_OPAQUE;					// Blend mode
+	DEPTH_MODE  depth = DEPTH_TEST_WRITE;				// Depth stencil mode
+	CULL_MODE  cull = CULL_NONE;						// Culling mode
+	RENDER_TARGET_FORMAT rtvFormat = RTV_FORMAT_LDR;	// Render target format
 
 	// Equality operators for PSOKey
 	bool operator == (const PSOKey& other) const
@@ -147,7 +157,8 @@ struct PSOKey
 			commonDefines == other.commonDefines &&
 			blend == other.blend &&
 			depth == other.depth &&
-			cull == other.cull;
+			cull == other.cull &&
+			rtvFormat == other.rtvFormat;
 	}
 	bool operator != (const PSOKey& other) const
 	{
@@ -215,9 +226,11 @@ struct PSOKeyHash
 		size_t h5 = std::hash<int>{}(static_cast<int>(k.blend));
 		size_t h6 = std::hash<int>{}(static_cast<int>(k.depth));
 		size_t h7 = std::hash<int>{}(static_cast<int>(k.cull));
-		size_t h8 = std::hash<uint64_t>{}(k.vsKey.defines);
-		size_t h9 = std::hash<uint64_t>{}(k.psKey.defines);
-		return (((((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5)) ^ (h7 << 6)) ^ (h8 << 7)) ^ (h9 << 8);
+		size_t h8 = std::hash<int>{}(static_cast<int>(k.rtvFormat));
+		size_t h9 = std::hash<uint64_t>{}(k.vsKey.defines);
+		size_t h10 = std::hash<uint64_t>{}(k.psKey.defines);
+		size_t h11 = std::hash<uint64_t>{}(k.commonDefines);
+		return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7) ^ (h9 << 8) ^ (h10 << 9) ^ (h11 << 10);
 	}
 };
 
@@ -275,6 +288,8 @@ struct WorldRenderInfo
 		= BILLBOARD_TYPE::BILLBOARD_NONE;	// Billboard type
 
 	NodeAnimationAsset* pNodeAnimAsset = nullptr;	// Pointer to node animation asset
+
+	bool isPostEffect = false;				// Whether this is a post-effect (used for special handling in rendering)
 };
 
 //描画情報構造体配列型
@@ -497,6 +512,7 @@ void CreateRenderInfo(
 	PSOKey psoKey,							//ブレンドモード
 	const wchar_t* path,					//モデルデータ又はテクスチャファイルのパス
 	bool lightEneble = true,				//ライト有効or無効
+	bool postEffect = false,				//ポストエフェクト用かどうか
 	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
 	bool inverseU = false,					//Uを反転するかどうか(モデルデータの場合のみ有効)
 	bool inverseV = false					//Vを反転するかどうか(モデルデータの場合のみ有効)
@@ -510,6 +526,7 @@ void CreateRenderInfoFromFBX(
 	PSOKey psoKey,							//ブレンドモード
 	const wchar_t* path,					//モデルファイルのパス
 	bool lightEneble,						//ライト有効or無効
+	bool isPostEffect = false,				//ポストエフェクト用かどうか
 	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
 	bool inverseU = false,					//Uを反転するかどうか
 	bool inverseV = false					//Vを反転するかどうか
@@ -524,6 +541,7 @@ void CreateRenderInfoFromDefaultMesh(
 	PSOKey psoKey,							//ブレンドモード
 	const wchar_t* path,					//テクスチャのファイル名
 	bool lightEneble,						//ライト有効or無効
+	bool isPostEffect = false,				//ポストエフェクト用かどうか
 	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
 );
 

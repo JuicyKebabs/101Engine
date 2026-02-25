@@ -22,6 +22,7 @@ void CreateRenderInfo(
 	PSOKey psoKey,							//パイプラインステートオブジェクトキー
 	const wchar_t* path,					//モデルデータ又はテクスチャファイルのパス
 	bool lightEneble,						//ライト有効or無効
+	bool isPostEffect,						//ポストエフェクトかどうか
 	BILLBOARD_TYPE bType,					//ビルボードタイプ
 	bool inverseU,							//Uを反転するかどうか(モデルデータの場合のみ有効)
 	bool inverseV							//Vを反転するかどうか(モデルデータの場合のみ有効
@@ -37,6 +38,7 @@ void CreateRenderInfo(
 			psoKey,			//ブレンドモード
 			path,			//モデルファイルのパス
 			lightEneble,	//ライト有効or無効
+			isPostEffect,	//ポストエフェクト用かどうか
 			bType,			//ビルボードタイプ
 			inverseU,		//Uを反転するかどうか
 			inverseV		//Vを反転するかどうか
@@ -65,6 +67,7 @@ void CreateRenderInfoFromFBX(
 	PSOKey psoKey,							//パイプラインステートオブジェクトキー
 	const wchar_t* path,					//モデルファイルのパス
 	bool lightEneble,						//ライト有効or無効
+	bool isPostEffect,						//ポストエフェクト用かどうか
 	BILLBOARD_TYPE bType,					//ビルボードタイプ
 	bool inverseU,							//Uを反転するかどうか
 	bool inverseV							//Vを反転するかどうか
@@ -102,6 +105,7 @@ void CreateRenderInfoFromFBX(
 		WorldRenderInfo info;												//描画情報構造体
 		info.common = desc;													//共通描画記述構造体の設定
 		info.lightingEnabled = lightEneble;									//ライティング有効フラグの設定
+		info.isPostEffect = isPostEffect;									//ポストエフェクト用かどうかの設定
 		info.billboardType = bType;											//ビルボードタイプの設定
 		info.baseVertex = 0;												//基準インデックスの設定
 		info.startIndex = 0;												//開始インデックスの設定
@@ -120,6 +124,7 @@ void CreateRenderInfoFromDefaultMesh(
 	PSOKey psoKey,							//パイプラインステートオブジェクトキー
 	const wchar_t* path,					//テクスチャのファイル名
 	bool lightEneble,						//ライト有効or無効
+	bool isPostEffect,						//ポストエフェクト用かどうか
 	BILLBOARD_TYPE bType					//ビルボードタイプ
 )
 {
@@ -141,6 +146,7 @@ void CreateRenderInfoFromDefaultMesh(
 		WorldRenderInfo info;				//描画情報構造体
 		info.common = desc;					//共通描画記述構造体の設定
 		info.lightingEnabled = lightEneble;	//ライティング有効フラグの設定
+		info.isPostEffect = isPostEffect;		//ポストエフェクト用かどうかの設定
 		info.billboardType = bType;			//ビルボードタイプの設定
 		info.baseVertex = 0;				//基準インデックスの設定
 		info.startIndex = 0;				//開始インデックスの設定
@@ -280,7 +286,6 @@ Model MakeQuadModel()
 	model.meshes.push_back(mesh);
 
 	return model;	//メッシュデータ構造体を返す
-
 }
 
 //立方体のメッシュデータ作成関数

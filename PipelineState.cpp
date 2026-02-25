@@ -186,6 +186,22 @@ void PipelineState::SetCullMode(CULL_MODE mode)
 	}
 }
 
+//レンダーターゲットのフォーマットを設定
+void PipelineState::SetFormat(RENDER_TARGET_FORMAT format)
+{
+	switch (format)
+	{
+	case RTV_FORMAT_LDR:
+		m_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; //LDRフォーマット
+		break;
+	case RTV_FORMAT_HDR:
+		m_desc.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT; //HDRフォーマット
+		break;
+	default:
+		break;
+	}
+}
+
 //パイプラインステートオブジェクトを取得
 ID3D12PipelineState* PipelineState::GetPipelineState() const
 {
