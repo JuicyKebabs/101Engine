@@ -49,3 +49,12 @@ float4 BasicPS(
     
     return base;
 }
+
+float4 PostEffectPS(
+    VSOutPut input //頂点シェーダーから送られてきたデータ構造体
+) : SV_TARGET //レンダーターゲットへ出力
+{
+    float4 base = gTexture.Sample(gSampler, input.uv);
+    
+    return base;
+}

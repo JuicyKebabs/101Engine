@@ -7,6 +7,7 @@
 #include "EventType.h"
 #include "Audio.h"
 #include "Player.h"
+#include "Block.h"
 
 using namespace DirectX;
 

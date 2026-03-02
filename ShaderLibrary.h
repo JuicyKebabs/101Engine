@@ -54,11 +54,13 @@ static const std::wstring PS_FILE_TABLE[] = {
 };
 //  Vertex shader entry point tables
 static const std::string VS_ENTRY_TABLE[] = {
-    "BasicVS"
+    "BasicVS",
+	"PostEffectVS"
 };
 //  Pixel shader entry point tables
 static const std::string PS_ENTRY_TABLE[] = {
-    "BasicPS"
+    "BasicPS",
+	"PostEffectPS"
 };
 // Shader profiles(Solid shader model 5.0)
 static const std::string VS_PROFILE = "vs_5_0";

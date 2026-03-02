@@ -210,7 +210,7 @@ void App::PrepareInstance()
 void App::InitInstance()
 {
 	// Initialize DirectX12 engine
-	m_pEngine->Initialize(
+	m_pEngine->InitCore(
 		hwnd,			// Window handle
 		WINDOW_WIDTH,	// Framebuffer width
 		WINDOW_HEIGHT	// Framebuffer height
@@ -230,6 +230,9 @@ void App::InitInstance()
 		pDevice	// Device
 	);
 
+	// Initialize engine bindings
+	m_pEngine->InitBindings(m_pTextureManager);
+
 	// Initialize renderer
 	m_pRenderer->Initialize(
 		pDevice,							// Device
@@ -238,7 +241,7 @@ void App::InitInstance()
 	);
 
 	// Initialize rendering
-	m_pEngine->RenderBegin();
+	m_pEngine->BeginFrame();
 
 	// Initialize scene management class
 	m_pSceneManager->Initialize(m_engineContext);
@@ -276,7 +279,7 @@ void App::Update()
 void App::Draw()
 {
 	// Start rendering
-	m_pEngine->RenderBegin();
+	m_pEngine->BeginFrame();
 
 	// Upload pending textures
 	m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
@@ -284,11 +287,16 @@ void App::Draw()
 	// Submit draw requests for the game scene
 	m_pSceneManager->SubmitDraws();
 
-	// Draw the scene
-	m_pRenderer->Draw(
-		m_pEngine->GetCurrentBufferIndex(),	// Buffer index
-		m_pEngine->GetCommandList()			// Command list
-	);
+	// Draw for post-processing
+	m_pEngine->BeginPass(RENDER_TARGET_TYPE::POST_PROCESS);
+	m_pRenderer->Draw(m_pEngine->GetCommandList(), RENDER_TARGET_TYPE::POST_PROCESS);
+	m_pEngine->EndPass(RENDER_TARGET_TYPE::POST_PROCESS);
+
+	// Draw for back buffer
+	auto backBufferType = static_cast<RENDER_TARGET_TYPE>(m_pEngine->GetCurrentBufferIndex());
+	m_pEngine->BeginPass(backBufferType);
+	m_pRenderer->Draw(m_pEngine->GetCommandList(), backBufferType);
+	m_pEngine->EndPass(backBufferType);
 
 	// End rendering
 	m_pEngine->RenderEnd();
