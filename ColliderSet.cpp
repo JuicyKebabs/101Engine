@@ -24,7 +24,7 @@ ColliderSet::ColliderSet(
 	m_offsetPosition(offsetPosition), m_offsetRotation(offsetRotation),
 	m_isTrigger(isTrigger)
 {
-	m_ownerBaseScale = m_owner->GetScale();
+	//m_ownerBaseScale = m_owner->GetScale();
 	Update();
 }
 
@@ -43,47 +43,47 @@ ColliderSet::~ColliderSet()
 //更新
 void ColliderSet::Update()
 {
-	if (!m_isActive) return;
+	//if (!m_isActive) return;
 
-	//オーナーの変換情報取得
-	XMFLOAT3 ownerPosition = m_owner->GetPosition();
-	XMFLOAT3 ownerScale = m_owner->GetScale();
-	XMFLOAT3 ownerRotation = m_owner->GetRotation();
+	////オーナーの変換情報取得
+	//XMFLOAT3 ownerPosition = m_owner->GetPosition();
+	//XMFLOAT3 ownerScale = m_owner->GetScale();
+	//XMFLOAT3 ownerRotation = m_owner->GetRotation();
 
-	//基準変換とオフセット変換を加算
-	m_basePosition.x = ownerPosition.x + m_offsetPosition.x;
-	m_basePosition.y = ownerPosition.y + m_offsetPosition.y;
-	m_basePosition.z = ownerPosition.z + m_offsetPosition.z;
+	////基準変換とオフセット変換を加算
+	//m_basePosition.x = ownerPosition.x + m_offsetPosition.x;
+	//m_basePosition.y = ownerPosition.y + m_offsetPosition.y;
+	//m_basePosition.z = ownerPosition.z + m_offsetPosition.z;
 
-	auto safeDiv = [](float a, float b) { return (fabs(b) < 1e-6f) ? 1.0f : (a / b); };
+	//auto safeDiv = [](float a, float b) { return (fabs(b) < 1e-6f) ? 1.0f : (a / b); };
 
-	XMFLOAT3 scaleRatio =
-	{
-		safeDiv(ownerScale.x, m_ownerBaseScale.x),
-		safeDiv(ownerScale.y, m_ownerBaseScale.y),
-		safeDiv(ownerScale.z, m_ownerBaseScale.z)
-	};
+	//XMFLOAT3 scaleRatio =
+	//{
+	//	safeDiv(ownerScale.x, m_ownerBaseScale.x),
+	//	safeDiv(ownerScale.y, m_ownerBaseScale.y),
+	//	safeDiv(ownerScale.z, m_ownerBaseScale.z)
+	//};
 
-	XMFLOAT3 setScale =
-	{
-		m_baseScale.x * scaleRatio.x,
-		m_baseScale.y * scaleRatio.y,
-		m_baseScale.z * scaleRatio.z,
-	};
+	//XMFLOAT3 setScale =
+	//{
+	//	m_baseScale.x * scaleRatio.x,
+	//	m_baseScale.y * scaleRatio.y,
+	//	m_baseScale.z * scaleRatio.z,
+	//};
 
-	m_baseRotation.x = ownerRotation.x + m_offsetRotation.x;
-	m_baseRotation.y = ownerRotation.y + m_offsetRotation.y;
-	m_baseRotation.z = ownerRotation.z + m_offsetRotation.z;
+	//m_baseRotation.x = ownerRotation.x + m_offsetRotation.x;
+	//m_baseRotation.y = ownerRotation.y + m_offsetRotation.y;
+	//m_baseRotation.z = ownerRotation.z + m_offsetRotation.z;
 
-	//コライダーの変換更新
-	for(auto& collider : m_colliders)
-	{
-		collider->Update(
-			m_basePosition,
-			setScale,
-			m_baseRotation
-		);
-	}
+	////コライダーの変換更新
+	//for(auto& collider : m_colliders)
+	//{
+	//	collider->Update(
+	//		m_basePosition,
+	//		setScale,
+	//		m_baseRotation
+	//	);
+	//}
 }
 
 //コライダー提出

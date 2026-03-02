@@ -196,6 +196,7 @@ void App::PrepareInstance()
 	m_pEventManager = EventManager::GetInstance();		// Get event management class singleton instance
 	m_pAudioManager = AudioManager::GetInstance();		// Get audio management class singleton instance
 	m_pInputManager = InputManager::GetInstance();		// Get input management class singleton instance
+	m_pTime = Time::GetInstance();						// Get time management class singleton instance
 
 	// Set up engine context structure
 	m_engineContext = {
@@ -263,14 +264,15 @@ void App::Update()
 	const UINT backIdx = m_pEngine->GetCurrentBufferIndex();
 
 	// Update various systems
-	m_pRenderer->BeginFrame(backIdx);	// Frame start (clear internal queue)
-	m_pInputManager->Update();			// Update input management class
-	m_pSceneManager->Update();			// Update scene management class
-	m_pRenderer->Update(				// Update renderer
+	m_pRenderer->BeginFrame(backIdx);					// Frame start (clear internal queue)
+	m_pInputManager->Update();							// Update input management class
+	m_pSceneManager->Update(m_pTime->GetDeltaTime());	// Update scene management class
+	m_pRenderer->Update(								// Update renderer
 		backIdx, 
 		*m_pSceneManager->GetCameraInfo()
 	);
 	m_pAudioManager->Update();			// Update audio management class
+	m_pTime->Update();					// Update time management class
 }
 
 // Draw

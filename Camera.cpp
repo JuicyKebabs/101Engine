@@ -5,7 +5,8 @@
 
 using namespace DirectX;
 
-Camera::Camera(float window_width, float window_height)
+CameraComponent::CameraComponent(Actor* owner, float window_width, float window_height)
+	: Component(owner)
 {
 	// デフォルトのカメラ設定
 	m_position = DEFAULT_POSITION;					//カメラ位置
@@ -18,7 +19,7 @@ Camera::Camera(float window_width, float window_height)
 }
 
 //初期化
-void Camera::Initialize()
+void CameraComponent::Initialize()
 {
 	using args = std::pair<int, float>;
 	EventManager::GetInstance()->Subscribe<args>(
@@ -31,7 +32,7 @@ void Camera::Initialize()
 }
 
 //カメラ更新
-void Camera::Update()
+void CameraComponent::Update()
 {
 
 	XMFLOAT3 viewDir =  //カメラの注視点方向ベクトルを計算
@@ -53,13 +54,13 @@ void Camera::Update()
 }
 
 //カメラの位置を設定
-void Camera::SetPosition(const DirectX::XMFLOAT3& position)
+void CameraComponent::SetPosition(const DirectX::XMFLOAT3& position)
 {
 	m_position = position;
 }
 
 //カメラの注視点を設定
-void Camera::SetTarget(const DirectX::XMFLOAT3& target)
+void CameraComponent::SetTarget(const DirectX::XMFLOAT3& target)
 {
 	m_target = target;
 
@@ -73,37 +74,37 @@ void Camera::SetTarget(const DirectX::XMFLOAT3& target)
 }
 
 //カメラの上方向ベクトルを設定
-void Camera::SetUp(const DirectX::XMFLOAT3& up)
+void CameraComponent::SetUp(const DirectX::XMFLOAT3& up)
 {
 	m_up = up;
 }
 
 //垂直視野角を設定
-void Camera::SetFov(float fov)
+void CameraComponent::SetFov(float fov)
 {
 	m_fov = fov;
 }
 
 //アスペクト比を設定
-void Camera::SetAspectRatio(float aspectRatio)
+void CameraComponent::SetAspectRatio(float aspectRatio)
 {
 	m_aspectRatio = aspectRatio;
 }
 
 //ニアクリップ距離を設定
-void Camera::SetNearZ(float nearZ)
+void CameraComponent::SetNearZ(float nearZ)
 {
 	m_nearZ = nearZ;
 }
 
 //ファークリップ距離を設定
-void Camera::SetFarZ(float farZ)
+void CameraComponent::SetFarZ(float farZ)
 {
 	m_farZ = farZ;
 }
 
 //カメラ情報構造体を取得
-CameraInfo& Camera::GetCameraInfo()
+CameraInfo& CameraComponent::GetCameraInfo()
 {
 	UpdateCameraInfo(); //カメラ情報構造体を更新
 
@@ -111,7 +112,7 @@ CameraInfo& Camera::GetCameraInfo()
 }
 
 //ワールド座標をスクリーン座標に変換
-bool Camera::WorldToScreen(
+bool CameraComponent::WorldToScreen(
 	const CameraInfo& cameraInfo,
 	const DirectX::XMFLOAT3& worldPos,
 	DirectX::XMFLOAT2& screenPos,
@@ -179,7 +180,7 @@ bool Camera::WorldToScreen(
 	return true;
 }
 
-void Camera::CallShakeCamera(int time, float strength)
+void CameraComponent::CallShakeCamera(int time, float strength)
 {
 	m_isShakeActive = true;
 	m_originPosition = m_position;
@@ -189,7 +190,7 @@ void Camera::CallShakeCamera(int time, float strength)
 }
 
 //カメラ情報構造体を更新
-void Camera::UpdateCameraInfo()
+void CameraComponent::UpdateCameraInfo()
 {
 	m_cameraInfo.position = m_position;			//カメラの位置
 	m_cameraInfo.target = m_target;				//カメラの注視点
@@ -202,7 +203,7 @@ void Camera::UpdateCameraInfo()
 	m_cameraInfo.farZ = m_farZ;					//ファークリップ距離
 }
 
-void Camera::UpdateShake()
+void CameraComponent::UpdateShake()
 {
 	if (!m_isShakeActive) return;
 

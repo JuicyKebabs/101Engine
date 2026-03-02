@@ -9,7 +9,7 @@
 // Constructor
 SceneBase::SceneBase(float window_width, float window_height)
 {
-	m_pCamera = new Camera(window_width, window_height);	// Generate camera
+	m_pCamera = new CameraComponent(nullptr, window_width, window_height);	// Generate camera component
 	m_pCollisionManager = new CollisionManager();			// Generate collision manager
 	m_pEffectManager = new EffectManager();					// Generate effect manager
 }
@@ -20,7 +20,7 @@ SceneBase::~SceneBase()
 	delete m_pCamera;
 	delete m_pCollisionManager;
 	delete m_pEffectManager;
-	m_objectList.clear();
+	m_actorList.clear();
 }
 
 // Initialization
@@ -40,29 +40,10 @@ void SceneBase::Initialize(EngineContext& context)
 
 	// Scene specific initialization call
 	InitializeOverride(context);
-
-	for(auto& object : m_objectList)
-	{
-		object->CreateRenderModel(
-			*context.pTextureManager,
-			*context.pMeshManager
-		);
-	}
-
-	// Create render info for skybox
-	CreateRenderInfo(
-		*context.pTextureManager,
-		*context.pMeshManager,
-		&m_skyboxRenderInfo,
-		MESH_TYPE::IMPORT,
-		PSO_KEY_OPAQUE.WithLighting(),
-		L"asset/fbx/sky_box/sky_box.fbx",
-		false
-	);
 }
 
 // Update
-void SceneBase::Update()
+void SceneBase::Update(float deltaTime)
 {
 #ifdef _DEBUG
 	// Toggle collider drawing with P key
@@ -74,13 +55,13 @@ void SceneBase::Update()
 	UpdateOverride();
 
 	// Update every object in scene
-	for (auto& object : m_objectList)
+	for (auto& actor : m_actorList)
 	{
-		object->Update();
+		actor->Update(deltaTime);
 	}
 
 	// Update scene specific
-	m_pCamera->Update();
+	//m_pCamera->Update();
 
 	// Check colliders
 	m_pCollisionManager->CheckColliders();
@@ -92,9 +73,9 @@ void SceneBase::Update()
 	ResolveCollisions();
 
 	// Resolve collisions for each object
-	for(auto& object : m_objectList)
+	for(auto& object : m_actorList)
 	{
-		object->ResolveCollisions();
+		object->LateUpdate();
 	}
 
 	// Update effect manager
@@ -106,42 +87,6 @@ void SceneBase::Draw(
 	EngineContext& context
 )
 {
-	Renderer& pRenderer = *context.pRenderer;
-
-	// Submit directional light
-	pRenderer.SubmitDirectionalLight(m_directionalLight);
-
-	// Submit skybox render info
-	//pRenderer.SubmitToWorldList(
-	//		BuildRenderInfoForSubmit(
-	//		m_skyboxRenderInfo, 
-	//		MESH_TYPE::IMPORT, 
-	//		m_pCamera->GetCameraInfo().position,
-	//		SKY_BOX_SIZE
-	//));
-
-	// Submit render info for each object
-	for(auto& object : m_objectList)
-	{
-		object->SubmitDraws(pRenderer);
-	}
-
-	// Submit effect draws
-	m_pEffectManager->SubmitDraws(pRenderer);
-
-	// Submit canvas draws
-	for (auto& canvas : m_canvasList)
-	{
-		canvas->SubmitDraws(pRenderer);
-	}
-
-#ifdef _DEBUG
-	if (m_drawColliders)
-	{
-		// Draw colliders
-		m_pCollisionManager->Draw(pRenderer);
-	}
-#endif // _DEBUG
 }
 
 // Finalization
@@ -169,5 +114,5 @@ CameraInfo* SceneBase::GetCameraInfo() const
 //Å@Add object to scene
 void SceneBase::AddObject(std::unique_ptr<Actor> object)
 {
-	m_objectList.push_back(std::move(object));
+	m_actorList.push_back(std::move(object));
 }
