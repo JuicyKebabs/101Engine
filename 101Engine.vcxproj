@@ -142,7 +142,6 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="AssimpLoader.cpp" />
     <ClCompile Include="Audio.cpp" />
-    <ClCompile Include="Block.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Collider.cpp" />
     <ClCompile Include="ColliderSet.cpp" />
