@@ -1,15 +1,14 @@
 #pragma once
-#include <d3d12.h>
-#include "d3dx12.h"
 #include <DirectXMath.h>
-#include "ComPtr.h"
+#include "Component.h"
 #include "SharedStruct.h"
-#include "InputManager.h"
 
-// カメラクラス
-class Camera
+class Actor;
+
+// Camera component Class
+class CameraComponent : public Component
 {
-public:	//公開定数
+public:
 	static constexpr  DirectX::XMFLOAT3 DEFAULT_POSITION = DirectX::XMFLOAT3(0.0f, 14.0f, -14.0f);		//デフォルトのカメラ位置
 	static constexpr  DirectX::XMFLOAT3 DEFAULT_TARGET = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);		//デフォルトの注視点
 	static constexpr  DirectX::XMFLOAT3 DEFAULT_UP = DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f);			//デフォルトの上方向ベクトル
@@ -19,9 +18,8 @@ public:	//公開定数
 	static constexpr float DEFAULT_FAR_Z = 150.0f;				//デフォルトのファークリップ距離
 
 public:	//公開メンバ関数
-	Camera() {};	//デフォルトコンストラクタ
-	Camera(float window_width, float window_height);	//コンストラクタ
-	~Camera() {};	// デストラクタ
+	CameraComponent(Actor* owner, float window_width, float window_height);	//コンストラクタ
+	~CameraComponent() {};	// デストラクタ
 
 	void Initialize();	//初期化
 	void Update();		//カメラ更新
@@ -59,8 +57,6 @@ private:	//非公開メンバ変数
 	float m_farZ = 0.0f;		//ファークリップ距離
 
 	CameraInfo m_cameraInfo{}; // カメラ情報構造体
-
-	InputInfo* m_pInputInfo = nullptr; // 入力管理クラスのポインタ
 
 	// Parameters for shaking camera
 	bool m_isShakeActive = false;			// Active flag of shake

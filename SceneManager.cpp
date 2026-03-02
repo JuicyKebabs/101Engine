@@ -54,9 +54,9 @@ void SceneManager::Initialize(EngineContext& context)
 }
 
 // Update
-void SceneManager::Update()
+void SceneManager::Update(float deltaTime)
 {
-	m_pCurrentScene->Update();	// Update current scene
+	m_pCurrentScene->Update(deltaTime);	// Update current scene
 
 	// If there is a scene change reservation, change the scene
 	if (m_sceneChangeReserved)

@@ -21,18 +21,18 @@ public:
 	~SceneBase();										// Destructor
 
 	// Main processing functions
-	void Initialize(EngineContext& context);
-	void Update();										// Update
-	void Draw(EngineContext& context);					// Draw
-	void Finalize();									// Finalize
-	virtual void ResolveCollisions() = 0;				// Resolve collisions
+	void Initialize(EngineContext& context);	// Initialization
+	void Update(float deltaTime);				// Update
+	void Draw(EngineContext& context);			// Draw
+	void Finalize();							// Finalize
+	virtual void ResolveCollisions() = 0;		// Resolve collisions
 
 	// Getter
 	CameraInfo* GetCameraInfo() const;			// Get camera information
 
 protected:
 	// Subsystems
-	Camera* m_pCamera = nullptr;						// Camera
+	CameraComponent* m_pCamera = nullptr;						// Camera
 	CollisionManager* m_pCollisionManager = nullptr;	// Collision manager
 	EffectManager* m_pEffectManager = nullptr;			// Effect manager
 	DirectionalLight m_directionalLight;				// Directional light
@@ -45,10 +45,10 @@ protected:
 	virtual void FinalizeOverride() = 0;							// Scene-specific finalize
 
 	void AddObject(std::unique_ptr<Actor> object); // Add object to scene
-	void AddEvent() {};									// Add event subscription
+	void AddEvent() {};								// Add event subscription
 
 private:
-	std::vector<std::unique_ptr<Actor>> m_objectList;			// Object list in the scene
+	std::vector<std::unique_ptr<Actor>> m_actorList;			// Object list in the scene
 	std::vector<std::unique_ptr<Canvas>> m_canvasList;				// Canvas list in the scene
 
 	std::vector<std::unique_ptr<Actor>> m_pendingObjects;		// Pending objects to be added

@@ -147,6 +147,7 @@
     <ClCompile Include="ColliderSet.cpp" />
     <ClCompile Include="CollisionData.cpp" />
     <ClCompile Include="CollisionManager.cpp" />
+    <ClCompile Include="Component.cpp" />
     <ClCompile Include="ConstantBuffer.cpp" />
     <ClCompile Include="Controller.cpp" />
     <ClCompile Include="EffectBase.cpp" />
@@ -173,7 +174,9 @@
     <ClCompile Include="ShaderLibrary.cpp" />
     <ClCompile Include="SharedStruct.cpp" />
     <ClCompile Include="TextureManager.cpp" />
+    <ClCompile Include="Time.cpp" />
     <ClCompile Include="TitleScene.cpp" />
+    <ClCompile Include="TransformComponent.cpp" />
     <ClCompile Include="UIBase.cpp" />
     <ClCompile Include="UIimage.cpp" />
     <ClCompile Include="Canvas.cpp" />
@@ -185,11 +188,14 @@
     <ClInclude Include="AssimpNodeTransformAnim.h" />
     <ClInclude Include="Audio.h" />
     <ClInclude Include="AudioData.h" />
+    <ClInclude Include="BehaviorComponent.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Collider.h" />
     <ClInclude Include="ColliderSet.h" />
     <ClInclude Include="CollisionData.h" />
     <ClInclude Include="CollisionManager.h" />
+    <ClInclude Include="Component.h" />
+    <ClInclude Include="ComponentsContainer.h" />
     <ClInclude Include="ComPtr.h" />
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="Context.h" />
@@ -212,6 +218,7 @@
     <ClInclude Include="MeshGPU.h" />
     <ClInclude Include="MeshManager.h" />
     <ClInclude Include="Actor.h" />
+    <ClInclude Include="MeshRendererComponenth.h" />
     <ClInclude Include="PipelineState.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Random.h" />
@@ -222,6 +229,8 @@
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="ShaderLibrary.h" />
     <ClInclude Include="SharedStruct.h" />
+    <ClInclude Include="Time.h" />
+    <ClInclude Include="TransformComponent.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="TitleScene.h" />
     <ClInclude Include="UIBase.h" />

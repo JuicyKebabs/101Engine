@@ -32,7 +32,7 @@ public:
 
 	// Main processing function
 	void Initialize(EngineContext& context);
-	void Update();
+	void Update(float deltaTime);
 	void Finalize();
 
 	void SubmitDraws();	// Draw request submission

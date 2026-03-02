@@ -6,6 +6,7 @@
 #include "Renderer.h"
 #include "TextureManager.h"
 #include "MeshManager.h"
+#include "ColliderSet.h"
 #include "SharedStruct.h"
 
 using namespace DirectX;

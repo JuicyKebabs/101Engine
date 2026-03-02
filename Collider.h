@@ -79,8 +79,8 @@ public:
 	void SetPreviousState();	//前回状態の保存
 
 	//衝突情報操作関数
-	void AddCollisionInfo(const CollisionInfo& info);	//衝突情報追加
-	void ClearInfos();													//衝突情報配列クリア
+	void AddCollisionInfo(const CollisionInfo& info) {};	//衝突情報追加
+	void ClearInfos() {};									//衝突情報配列クリア
 
 	//ゲッター
 	ColliderSet* GetParentSet() const;								//親コライダーセットポインタ取得

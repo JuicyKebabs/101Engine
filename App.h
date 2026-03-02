@@ -9,6 +9,7 @@
 #include "MeshManager.h"
 #include "EventManager.h"
 #include "Audio.h"
+#include "Time.h"
 #include "Context.h"
 
 // Application class
@@ -36,6 +37,7 @@ private:
 	MeshManager* m_pMeshManager = nullptr;			// Mesh manager pointer
 	EventManager* m_pEventManager = nullptr;		// Event manager pointer
 	AudioManager* m_pAudioManager = nullptr;		// Audio manager pointer
+	Time* m_pTime = nullptr;						// Time manager pointer
 
 	EngineContext m_engineContext{};	// Engine context structure
 
