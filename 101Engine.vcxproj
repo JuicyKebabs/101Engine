@@ -103,16 +103,17 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;NOMINMAX; WIN32_LEAN_AND_MEAN;_ENABLE_EXTENDED_ALIGNED_STORAGE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;NOMINMAX; WIN32_LEAN_AND_MEAN;_ENABLE_EXTENDED_ALIGNED_STORAGE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)third_party\DirectX\DirectXTex\include;$(ProjectDir)src;$(ProjectDir)third_party\DirectX\d3dx12</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;DirectXTex_Debug.lib;%(AdditionalDependencies);</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)third_party\DirectX\DirectXTex\lib\DirectXTex_Debug;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -121,144 +122,135 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;NOMINMAX; WIN32_LEAN_AND_MEAN;_ENABLE_EXTENDED_ALIGNED_STORAGE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>$(ProjectDir)third_party\DirectX\DirectXTex\include;$(ProjectDir)src;$(ProjectDir)third_party\DirectX\d3d12</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;DirectXTex_Release.lib;%(AdditionalDependencies);</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)third_party\DirectX\DirectXTex\lib\DirectXTex_Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="App.cpp" />
-    <ClCompile Include="AssimpLoader.cpp" />
-    <ClCompile Include="Audio.cpp" />
-    <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="Collider.cpp" />
-    <ClCompile Include="ColliderSet.cpp" />
-    <ClCompile Include="CollisionData.cpp" />
-    <ClCompile Include="CollisionManager.cpp" />
-    <ClCompile Include="Component.cpp" />
-    <ClCompile Include="ConstantBuffer.cpp" />
-    <ClCompile Include="Controller.cpp" />
-    <ClCompile Include="EffectBase.cpp" />
-    <ClCompile Include="EffectData.cpp" />
-    <ClCompile Include="EffectManager.cpp" />
-    <ClCompile Include="LiveObject.cpp" />
-    <ClCompile Include="Engine.cpp" />
-    <ClCompile Include="EventManager.cpp" />
-    <ClCompile Include="GameScene.cpp" />
-    <ClCompile Include="IndexBuffer.cpp" />
-    <ClCompile Include="InputManager.cpp" />
-    <ClCompile Include="keyboard.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="MeshGPU.cpp" />
-    <ClCompile Include="MeshManager.cpp" />
-    <ClCompile Include="Actor.cpp" />
-    <ClCompile Include="PipelineState.cpp" />
-    <ClCompile Include="Player.cpp" />
-    <ClCompile Include="RenderData.cpp" />
-    <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="RootSignature.cpp" />
-    <ClCompile Include="SceneBase.cpp" />
-    <ClCompile Include="SceneManager.cpp" />
-    <ClCompile Include="ShaderLibrary.cpp" />
-    <ClCompile Include="SharedStruct.cpp" />
-    <ClCompile Include="TextureManager.cpp" />
-    <ClCompile Include="Time.cpp" />
-    <ClCompile Include="TitleScene.cpp" />
-    <ClCompile Include="TransformComponent.cpp" />
-    <ClCompile Include="UIBase.cpp" />
-    <ClCompile Include="UIimage.cpp" />
-    <ClCompile Include="Canvas.cpp" />
-    <ClCompile Include="VertexBuffer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="App.h" />
-    <ClInclude Include="AssimpLoader.h" />
-    <ClInclude Include="AssimpNodeTransformAnim.h" />
-    <ClInclude Include="Audio.h" />
-    <ClInclude Include="AudioData.h" />
-    <ClInclude Include="BehaviorComponent.h" />
-    <ClInclude Include="Camera.h" />
-    <ClInclude Include="Collider.h" />
-    <ClInclude Include="ColliderSet.h" />
-    <ClInclude Include="CollisionData.h" />
-    <ClInclude Include="CollisionManager.h" />
-    <ClInclude Include="Component.h" />
-    <ClInclude Include="ComponentsContainer.h" />
-    <ClInclude Include="ComPtr.h" />
-    <ClInclude Include="ConstantBuffer.h" />
-    <ClInclude Include="Context.h" />
-    <ClInclude Include="Controller.h" />
-    <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="Debug.h" />
-    <ClInclude Include="DirectXTex.h" />
-    <ClInclude Include="EffectBase.h" />
-    <ClInclude Include="EffectData.h" />
-    <ClInclude Include="EffectManager.h" />
-    <ClInclude Include="LiveObject.h" />
-    <ClInclude Include="Engine.h" />
-    <ClInclude Include="EventManager.h" />
-    <ClInclude Include="EventType.h" />
-    <ClInclude Include="GameScene.h" />
-    <ClInclude Include="IndexBuffer.h" />
-    <ClInclude Include="InputManager.h" />
-    <ClInclude Include="keyboard.h" />
-    <ClInclude Include="main.h" />
-    <ClInclude Include="MeshGPU.h" />
-    <ClInclude Include="MeshManager.h" />
-    <ClInclude Include="Actor.h" />
-    <ClInclude Include="MeshRendererComponenth.h" />
-    <ClInclude Include="PipelineState.h" />
-    <ClInclude Include="Player.h" />
-    <ClInclude Include="Random.h" />
-    <ClInclude Include="RenderData.h" />
-    <ClInclude Include="Renderer.h" />
-    <ClInclude Include="RootSignature.h" />
-    <ClInclude Include="SceneBase.h" />
-    <ClInclude Include="SceneManager.h" />
-    <ClInclude Include="ShaderLibrary.h" />
-    <ClInclude Include="SharedStruct.h" />
-    <ClInclude Include="Time.h" />
-    <ClInclude Include="TransformComponent.h" />
-    <ClInclude Include="TextureManager.h" />
-    <ClInclude Include="TitleScene.h" />
-    <ClInclude Include="UIBase.h" />
-    <ClInclude Include="UIimage.h" />
-    <ClInclude Include="Canvas.h" />
-    <ClInclude Include="VertexBuffer.h" />
-    <ClInclude Include="WinInclude.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="BasicShader.hlsli" />
     <None Include="packages.config" />
+    <None Include="shader\BasicShader.hlsli" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="PixelShader.hlsl">
+    <ClCompile Include="src\App\App.cpp" />
+    <ClCompile Include="src\Engine\Actor\Actor.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)third_party\DirectX\d3dx12;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Audio\Audio.cpp" />
+    <ClCompile Include="src\Engine\Component\Camera.cpp" />
+    <ClCompile Include="src\Engine\Component\Component.cpp" />
+    <ClCompile Include="src\Engine\Component\MeshRenderer.cpp" />
+    <ClCompile Include="src\Engine\Component\Transform.cpp" />
+    <ClCompile Include="src\Engine\Core\Math\Math.cpp" />
+    <ClCompile Include="src\Engine\Core\Time\Time.cpp" />
+    <ClCompile Include="src\Engine\Core\Utility\SharedStruct.cpp" />
+    <ClCompile Include="src\Engine\Engine.cpp" />
+    <ClCompile Include="src\Engine\Graphics\CameraSystem.cpp" />
+    <ClCompile Include="src\Engine\Graphics\ConstantBuffer.cpp" />
+    <ClCompile Include="src\Engine\Graphics\IndexBuffer.cpp" />
+    <ClCompile Include="src\Engine\Graphics\PipelineState.cpp" />
+    <ClCompile Include="src\Engine\Graphics\RenderData.cpp" />
+    <ClCompile Include="src\Engine\Graphics\Renderer.cpp" />
+    <ClCompile Include="src\Engine\Graphics\RenderSystem.cpp" />
+    <ClCompile Include="src\Engine\Graphics\RenderTemplateFactory.cpp" />
+    <ClCompile Include="src\Engine\Graphics\RootSignature.cpp" />
+    <ClCompile Include="src\Engine\Graphics\ShaderLibrary.cpp" />
+    <ClCompile Include="src\Engine\Graphics\VertexBuffer.cpp" />
+    <ClCompile Include="src\Engine\Input\Controller.cpp" />
+    <ClCompile Include="src\Engine\Input\InputManager.cpp" />
+    <ClCompile Include="src\Engine\Input\keyboard.cpp" />
+    <ClCompile Include="src\Engine\Model\AssimpLoader.cpp" />
+    <ClCompile Include="src\Engine\Physics\Collider.cpp" />
+    <ClCompile Include="src\Engine\Physics\ColliderSet.cpp" />
+    <ClCompile Include="src\Engine\Physics\CollisionData.cpp" />
+    <ClCompile Include="src\Engine\Physics\CollisionManager.cpp" />
+    <ClCompile Include="src\Engine\Resource\MeshGPU.cpp" />
+    <ClCompile Include="src\Engine\Resource\MeshManager.cpp" />
+    <ClCompile Include="src\Engine\Resource\TextureManager.cpp" />
+    <ClCompile Include="src\Engine\Scene\SceneBase.cpp" />
+    <ClCompile Include="src\Engine\Scene\SceneManager.cpp" />
+    <ClCompile Include="src\Engine\UI\Canvas.cpp" />
+    <ClCompile Include="src\Engine\UI\UIBase.cpp" />
+    <ClCompile Include="src\Engine\UI\UIimage.cpp" />
+    <ClCompile Include="src\Game\GameScene.cpp" />
+    <ClCompile Include="src\Game\Player.cpp" />
+    <ClCompile Include="src\Game\TitleScene.cpp" />
+    <ClCompile Include="src\Main\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CameraSystem.h" />
+    <ClInclude Include="src\App\App.h" />
+    <ClInclude Include="src\Engine\Actor\Actor.h" />
+    <ClInclude Include="src\Engine\Audio\Audio.h" />
+    <ClInclude Include="src\Engine\Audio\AudioData.h" />
+    <ClInclude Include="src\Engine\Component\AssimpNodeTransformAnim.h" />
+    <ClInclude Include="src\Engine\Component\Behavior.h" />
+    <ClInclude Include="src\Engine\Component\Camera.h" />
+    <ClInclude Include="src\Engine\Component\Component.h" />
+    <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
+    <ClInclude Include="src\Engine\Component\Transform.h" />
+    <ClInclude Include="src\Engine\Core\ComPtr\ComPtr.h" />
+    <ClInclude Include="src\Engine\Core\Context\Context.h" />
+    <ClInclude Include="src\Engine\Core\Debug\Debug.h" />
+    <ClInclude Include="src\Engine\Core\Math\Math.h" />
+    <ClInclude Include="src\Engine\Core\Random\Random.h" />
+    <ClInclude Include="src\Engine\Core\Time\Time.h" />
+    <ClInclude Include="src\Engine\Core\Utility\SharedStruct.h" />
+    <ClInclude Include="src\Engine\Engine.h" />
+    <ClInclude Include="src\Engine\Graphics\ConstantBuffer.h" />
+    <ClInclude Include="src\Engine\Graphics\IndexBuffer.h" />
+    <ClInclude Include="src\Engine\Graphics\PipelineState.h" />
+    <ClInclude Include="src\Engine\Graphics\RenderData.h" />
+    <ClInclude Include="src\Engine\Graphics\Renderer.h" />
+    <ClInclude Include="src\Engine\Graphics\RenderSystem.h" />
+    <ClInclude Include="src\Engine\Graphics\RenderTemplateFactory.h" />
+    <ClInclude Include="src\Engine\Graphics\RootSignature.h" />
+    <ClInclude Include="src\Engine\Graphics\ShaderLibrary.h" />
+    <ClInclude Include="src\Engine\Graphics\VertexBuffer.h" />
+    <ClInclude Include="src\Engine\Input\Controller.h" />
+    <ClInclude Include="src\Engine\Input\InputManager.h" />
+    <ClInclude Include="src\Engine\Input\keyboard.h" />
+    <ClInclude Include="src\Engine\Model\AssimpLoader.h" />
+    <ClInclude Include="src\Engine\Physics\Collider.h" />
+    <ClInclude Include="src\Engine\Physics\ColliderSet.h" />
+    <ClInclude Include="src\Engine\Physics\CollisionData.h" />
+    <ClInclude Include="src\Engine\Physics\CollisionManager.h" />
+    <ClInclude Include="src\Engine\Resource\MeshGPU.h" />
+    <ClInclude Include="src\Engine\Resource\MeshManager.h" />
+    <ClInclude Include="src\Engine\Resource\TextureManager.h" />
+    <ClInclude Include="src\Engine\Scene\SceneBase.h" />
+    <ClInclude Include="src\Engine\Scene\SceneManager.h" />
+    <ClInclude Include="src\Engine\UI\Canvas.h" />
+    <ClInclude Include="src\Engine\UI\UIBase.h" />
+    <ClInclude Include="src\Engine\UI\UIimage.h" />
+    <ClInclude Include="src\Game\GameScene.h" />
+    <ClInclude Include="src\Game\Player.h" />
+    <ClInclude Include="src\Game\TitleScene.h" />
+    <ClInclude Include="src\Main\main.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="shader\PixelShader\PixelShader.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">BasicPS</EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">BasicPS</EntryPointName>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="VertexShader.hlsl">
+    <FxCompile Include="shader\VertexShader\VertexShader.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">BasicVS</EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">BasicVS</EntryPointName>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
