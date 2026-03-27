@@ -1,0 +1,82 @@
+#pragma once
+#include <DirectXMath.h>
+#include "Component.h"
+#include "Engine/Core/Math/Math.h"
+
+// TransformComponent Class
+class Transform : public Component
+{
+public:
+	Transform(Vector3 localPosition, Vector3 localEulerDeg, Vector3 localScale, const std::string& name = "Transform");
+	virtual ~Transform() = default;
+
+	// Overrides
+	void OnStart() override;
+	void PreUpdate(float deltaTime) override;
+	void Update(float deltaTime) override {};
+	void LateUpdate(float deltaTime) override;
+	void OnDestroy() override;
+
+	// Dirty flag
+	void MarkDirty();	// Mark the local transform as dirty (has been modified since last world transform update)
+
+	// Rotation methods
+	void RotateLocalQuat(Quaternion quaternion);	// Rotate local transform by a quaternion
+	void RotateLocalEulerDeg(Vector3 eulerDeg);	// Rotate local transform by Euler angles in degrees
+	void RotateLocalEulerRad(Vector3 eulerRad);	// Rotate local transform by Euler angles in radians
+	
+	// Axis-specific rotation methods
+	void RotateLocalXDeg(float angleDeg);	// Rotate local transform around X axis by an angle in degrees
+	void RotateLocalYDeg(float angleDeg);	// Rotate local transform around Y axis by an angle in degrees
+	void RotateLocalZDeg(float angleDeg);	// Rotate local transform around Z axis by an angle in degrees
+
+	// Setters (all for local transform)
+	void SetLocalPosition(Vector3 position);			// Set local position
+	void SetLocalScale(Vector3 scale);					// Set local scale
+	void SetLocalRotationQuat(Quaternion quaternion);	// Set local rotation using quaternion
+	void SetLocalRotationEulerDeg(Vector3 eulerDeg);	// Set local rotation using Euler angles in degrees
+	void SetLocalRotationEulerRad(Vector3 eulerRad);	// Set local rotation using Euler angles in radians
+	void SetLocalTransform(const Transform3D& localTransform);	// Set local transform
+
+	// Local Getters 
+	Vector3 GetLocalPosition() const;				// Get local position
+	Quaternion GetLocalRotationQuat() const;		// Get local rotation as quaternion
+	Vector3 GetLocalRotationEulerDeg() const;		// Get local rotation as Euler angles in degrees(It should not be used in game logic. This is for editor or debugging)
+	Vector3 GetLocalRotationEulerRad() const;		// Get local rotation as Euler angles in radians(It should not be used in game logic. This is for editor or debugging)
+	Vector3 GetLocalScale() const;					// Get local scale
+	const Transform3D& GetLocalTransform() const;	// Get local transform
+	Matrix4x4 GetLocalMatrix() const;				// Get local matrix
+
+	// World Getters
+	Vector3 GetWorldPosition() const;				// Get world position
+	Quaternion GetWorldRotationQuat() const;		// Get world rotation as quaternion
+	Vector3 GetWorldRotationEulerDeg() const;		// Get world rotation as Euler angles in degrees(It should not be used in game logic. This is for editor or debugging)
+	Vector3 GetWorldRotationEulerRad() const;		// Get world rotation as Euler angles in radians(It should not be used in game logic. This is for editor or debugging)
+	Vector3 GetWorldScale() const;					// Get world scale
+	const Transform3D& GetWorldTransform() const;	// Get world transform
+	Matrix4x4 GetWorldMatrix() const;				// Get world matrix
+
+	// Basis
+	Vector3 GetWorldForward() const;	// Get world forward direction
+	Vector3 GetWorldRight() const;		// Get world right direction
+	Vector3 GetWorldUp() const;			// Get world up direction
+
+	// Conversions
+	Vector3 TransformPoint(Vector3 localPoint) const;					// Transform a point from local space to world space
+	Vector3 TransformDirection(Vector3 localDirection) const;			// Transform a direction from local space to world space (ignoring position)
+	Vector3 InverseTransformPoint(Vector3 worldPoint) const;			// Transform a point from world space to local space
+	Vector3 InverseTransformDirection(Vector3 worldDirection) const;	// Transform a direction from world space to local space (ignoring position)
+
+	void UpdateGeometry();					// Update world transform based on local transform and parent's world transform
+	uint64_t GetWorldGeneration() const;	// Get world transform generation counter (incremented every time world transform is updated)
+
+private:
+	Transform3D m_localTransform{};	// Local transform data (position, rotation, scale)
+	Transform3D m_worldTransform{};	// World transform data (position, rotation, scale)
+	Matrix4x4 m_localMatrix{};		// Local transformation matrix
+	Matrix4x4 m_worldMatrix{};		// World transformation matrix
+
+	bool m_isDirty = true;	// Flag to indicate if the local transform has been modified since last world transform update
+
+	uint64_t m_worldGeneration = 0;	// World transform generation counter (incremented every time world transform is updated)
+};
