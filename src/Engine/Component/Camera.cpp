@@ -77,13 +77,10 @@ CameraInfo Camera::RebuildCameraInfo()
 {
 	CameraInfo info;
 
-	// Build view matrix
-	Matrix4x4 view = Matrix4x4::Identity;
-	// Apply rotation (note the inverse order for view matrix)
-	Matrix4x4 rotationMatrix = m_cameraPose.rotation.ToRotationMatrix();
-	view *= rotationMatrix;
-	view *= Matrix4x4::CreateTranslation(-m_cameraPose.position); // Apply inverse translation for view matrix
-	info.viewMatrix = view.Inverse();
+	Matrix4x4 world = Matrix4x4::Identity;
+	world *= m_cameraPose.rotation.ToRotationMatrix();
+	world *= Matrix4x4::CreateTranslation(m_cameraPose.position); // Apply inverse translation for view matrix
+	info.viewMatrix = world.Inverse();
 
 	// Build projection matrix
 	if (m_cameraLens.projectionType == PROJECTION_TYPE::PROJECTION_TYPE_PERSPECTIVE)
@@ -97,6 +94,10 @@ CameraInfo Camera::RebuildCameraInfo()
 		float orthoHeight = m_cameraLens.height;
 		info.projMatrix = Matrix4x4::CreateOrthographic(orthoWidth, orthoHeight, m_cameraLens.nearZ, m_cameraLens.farZ);
 	}
+
+	info.position = m_cameraPose.position;
+	info.forward = m_cameraPose.rotation.RotateVector3(Vector3::Forward());
+	info.up = m_cameraPose.rotation.RotateVector3(Vector3::Up());
 
 	m_cameraInfo = info; // Cache the camera information
 

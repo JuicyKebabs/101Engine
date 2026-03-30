@@ -185,6 +185,7 @@
     <ClCompile Include="src\Engine\UI\Canvas.cpp" />
     <ClCompile Include="src\Engine\UI\UIBase.cpp" />
     <ClCompile Include="src\Engine\UI\UIimage.cpp" />
+    <ClCompile Include="src\Game\CameraTest.cpp" />
     <ClCompile Include="src\Game\GameScene.cpp" />
     <ClCompile Include="src\Game\Player.cpp" />
     <ClCompile Include="src\Game\TitleScene.cpp" />
@@ -200,6 +201,7 @@
     <ClInclude Include="src\Engine\Component\Behavior.h" />
     <ClInclude Include="src\Engine\Component\Camera.h" />
     <ClInclude Include="src\Engine\Component\Component.h" />
+    <ClInclude Include="src\Engine\Component\ComponentPolicy.h" />
     <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
     <ClInclude Include="src\Engine\Component\Transform.h" />
     <ClInclude Include="src\Engine\Core\ComPtr\ComPtr.h" />
@@ -236,6 +238,7 @@
     <ClInclude Include="src\Engine\UI\Canvas.h" />
     <ClInclude Include="src\Engine\UI\UIBase.h" />
     <ClInclude Include="src\Engine\UI\UIimage.h" />
+    <ClInclude Include="src\Game\CameraTest.h" />
     <ClInclude Include="src\Game\GameScene.h" />
     <ClInclude Include="src\Game\Player.h" />
     <ClInclude Include="src\Game\TitleScene.h" />

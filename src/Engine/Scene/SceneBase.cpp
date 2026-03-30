@@ -5,6 +5,7 @@
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Physics/CollisionManager.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Game/CameraTest.h"
 
 // Constructor
 SceneBase::SceneBase(float window_width, float window_height)

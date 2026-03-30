@@ -24,25 +24,21 @@ Actor::Actor(Vector3 position, Vector3 rotation, Vector3 scale, bool isActive,  
 // Destructor
 Actor::~Actor()
 {
-	for (auto& component : m_components){
+	for (auto& component : m_componentPtrs){
 		component->OnDestroy();
 	}
-	for (auto& component : m_pendingComponents){
-		component->OnDestroy();
+	for (auto& pending : m_pendingComponents){
+		pending.instance->OnDestroy();
 	}
 }
 
 // Post-update (for late update)
 void Actor::PreUpdate(float deltaTime)
 {
-	// Add pending components to the main component list
-	for (auto& pendingComponent : m_pendingComponents) {
-		m_components.push_back(std::move(pendingComponent));
-	}
-	m_pendingComponents.clear();
+	AddPendingComponents();
 
 	// Post-update all components
-	for (const auto& component : m_components) {
+	for (const auto& component : m_componentPtrs) {
 		// if component is destoryed, skip to next
 		if (component->IsDestroyed()) continue;
 
@@ -61,13 +57,9 @@ void Actor::PreUpdate(float deltaTime)
 void Actor::Update(float deltaTime)
 {
 	// Update all components
-	for (const auto& component : m_components) {
+	for (const auto& component : m_componentPtrs) {
+		if (component->IsDestroyed()) continue;
 		component->Update(deltaTime);
-	}
-
-	// Update all child actors
-	for(auto& child : m_children) {
-		child->Update(deltaTime);
 	}
 }
 
@@ -76,12 +68,13 @@ void Actor::LateUpdate(float deltaTime)
 {
 	// Late update all components
 	std::vector<Component*> destroyedComponents;
-	for (const auto& component : m_components) {
-		component->LateUpdate(deltaTime);
+	for (const auto& component : m_componentPtrs) {
 		if (component->IsDestroyed()) 
 		{
-			destroyedComponents.push_back(component.get());
+			destroyedComponents.push_back(component);
+			continue;
 		}
+		component->LateUpdate(deltaTime);
 	}
 
 	// Remove components marked for destruction
@@ -110,13 +103,39 @@ void Actor::FlushTransform()
 	}
 }
 
+// Add pending components to the main component container
+void Actor::AddPendingComponents()
+{
+	for(auto& pending : m_pendingComponents) {
+		auto& instance = pending.instance;
+		m_componentPtrs.push_back(instance.get());
+		auto& bucket = m_components[pending.typeId];
+		bucket.instances.push_back(std::move(instance));
+	}
+
+	m_pendingComponents.clear();
+}
+
 // Remove components marked for destruction
 void Actor::RemoveDestroyedComponents(Component* component)
 {
 	component->OnDestroy();
-	m_components.erase(std::remove_if(m_components.begin(), m_components.end(),
-		[component](const std::unique_ptr<Component>& c) { return c.get() == component; }),
-		m_components.end());
+
+	auto mapIt = m_components.find(std::type_index(typeid(*component)));
+	if (mapIt != m_components.end()) {
+		auto& instances = mapIt->second.instances;
+		auto instance = std::find_if(instances.begin(), instances.end(), [component](const std::unique_ptr<Component>& instance) {
+			return instance.get() == component;
+			});
+		if (instance != instances.end()) {
+			instances.erase(instance);
+		}
+	}
+
+	auto ptrIt = std::find(m_componentPtrs.begin(), m_componentPtrs.end(), component);
+	if (ptrIt != m_componentPtrs.end()) {
+		m_componentPtrs.erase(ptrIt);
+	}
 }
 
 // Add a child actor to the scene
