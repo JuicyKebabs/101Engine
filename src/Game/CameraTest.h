@@ -1,18 +1,17 @@
 #pragma once
 #include "Engine/Component/Behavior.h"
 
-// Player class
-class PlayerBehavior : public Behavior
+class CameraTest : public Behavior
 {
-public:	// Public functions
-	PlayerBehavior() : Behavior() {}
-	~PlayerBehavior() = default;
-
-private:
-	// Overridden functions
-	void OnStartBehavior() override {}
+public:
+	CameraTest(const std::string& name = "CameraTest") : Behavior(name) {}
+	virtual ~CameraTest() = default;
+	void OnStartBehavior() override;
 	void PreUpdateBehavior(float deltaTime) override {}
 	void UpdateBehavior(float deltaTime) override;
 	void LateUpdateBehavior(float deltaTime) override {}
 	void OnDestroyBehavior() override {}
+
+private:
+	bool m_isMainCamera = false;
 };

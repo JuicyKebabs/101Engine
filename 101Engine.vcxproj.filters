@@ -213,6 +213,9 @@
     <ClCompile Include="src\Engine\Graphics\CameraSystem.cpp">
       <Filter>src\Engine\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\CameraTest.cpp">
+      <Filter>src\Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -361,6 +364,12 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Graphics\RenderTemplateFactory.h">
       <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\CameraTest.h">
+      <Filter>src\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\ComponentPolicy.h">
+      <Filter>src\Engine\Component</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

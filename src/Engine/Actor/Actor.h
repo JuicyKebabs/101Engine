@@ -1,7 +1,9 @@
 #pragma once
-#include <DirectXMath.h>
 #include <vector>
+#include <typeindex>
+#include <unordered_map>
 #include "Engine/Component/Component.h"
+#include "Engine/Component/ComponentPolicy.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/Utility/SharedStruct.h"
 
@@ -15,6 +17,16 @@ class SceneBase;
 // This defines the all elements that exist in the game world
 class Actor
 {
+public:
+	struct ComponentBucket {
+		std::vector<std::unique_ptr<Component>> instances;
+	};
+
+	struct PendingComponent {
+		std::unique_ptr<Component> instance;
+		std::type_index typeId;
+	};
+
 public:
 	Actor(	// Constructor
 		Vector3 position = Vector3{ 0.0f, 0.0f, 0.0f },	// Position
@@ -49,25 +61,102 @@ public:
 	template<class T, class... Args>
 	T* AddComponent(Args&&... args){
 		static_assert(std::is_base_of_v<Component, T>, "AddComponent<T>: T must derive from Component");
+
+		using Policy = ComponentPolicy<T>;
+		Policy policy;
+		if (policy.cardinality != ComponentCardinality::Multiple) {
+			if (HasComponent<T>()) {
+				//static_assert(HasComponent<T>(), "AddComponent<T>: A component of this type already exists and multiple instances are not allowed");
+				return GetComponentByClass<T>();
+			}
+		}
+
 		auto component = std::make_unique<T>(std::forward<Args>(args)...);
 		T* ptr = component.get();
 		component->SetOwner(this);
-		m_pendingComponents.push_back(std::move(component));
+		PendingComponent pending{ std::move(component), std::type_index(typeid(T)) };
+		m_pendingComponents.push_back(std::move(pending));
 		return ptr;
 	}
 
-	// Remove a component from the container
-	void RemoveComponent(Component* component){
-		component->MarkForDestruction();
+	template<class T>
+	bool HasComponent() const {
+		static_assert(std::is_base_of_v<Component, T>, "HasComponent<T>: T must derive from Component");
+
+		bool result = false;
+
+		auto it = m_components.find(GetComponentTypeId<T>());
+		 if (it != m_components.end() && !it->second.instances.empty()) {
+			 for (const auto& instance : it->second.instances) {
+				 if (static_cast<T*>(instance.get())) {
+					 result = true;
+				 }
+			 }
+		 }
+
+		 for(auto& pending : m_pendingComponents) {
+			 if (pending.typeId == GetComponentTypeId<T>()) {
+				 if (static_cast<T*>(pending.instance.get())) {
+					 result = true;
+				 }
+			 }
+		 }
+
+		return result;
+	}
+
+	template <class T>
+	std::type_index GetComponentTypeId() const {
+		static_assert(std::is_base_of_v<Component, T>, "GetComponentTypeId<T>: T must derive from Component");
+		return std::type_index(typeid(T));
+	}
+
+	template<class T>
+	void RemoveComponentByClass() {
+		static_assert(std::is_base_of_v<Component, T>, "RemoveComponentByClass<T>: T must derive from Component");
+		using Policy = ComponentPolicy<T>;
+		Policy policy;
+		if(policy.cardinality == ComponentCardinality::UniqueRequired) {
+			static_assert(policy.cardinality != ComponentCardinality::UniqueRequired, "RemoveComponentByClass<T>: Components of this type cannot be removed");
+			return;
+		}
+		
+		auto typeId = GetComponentTypeId<T>();
+		auto bucket = m_components.find(typeId);
+		if (bucket != m_components.end() && !bucket->second.instances.empty()) {
+			for (const auto& instance : bucket->second.instances) {
+				if (auto casted = static_cast<T*>(instance.get())) {
+					casted->MarkForDestruction();
+				}
+			}
+		}
+		for (auto& pending : m_pendingComponents) {
+			if (pending.typeId == typeId) {
+				if (auto casted = static_cast<T*>(pending.instance.get())) {
+					casted->MarkForDestruction();
+				}
+			}
+		}
 	}
 
 	// Get a component of type T from the container by class type
 	template<class T>
 	T* GetComponentByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
-		for (const auto& component : m_components) {
-			if (auto casted = dynamic_cast<T*>(component.get())) {
-				return casted;
+		auto typeId = GetComponentTypeId<T>();
+		auto it = m_components.find(typeId);
+		if (it != m_components.end() && !it->second.instances.empty()) {
+			for (const auto& instance : it->second.instances) {
+				if (auto casted = static_cast<T*>(instance.get())) {
+					return casted;
+				}
+			}
+		}
+		for (auto& pending : m_pendingComponents) {
+			if (pending.typeId == typeId) {
+				if (auto casted = static_cast<T*>(pending.instance.get())) {
+					return casted;
+				}
 			}
 		}
 		return nullptr;
@@ -77,11 +166,21 @@ public:
 	template<class T>
 	std::vector<T*> GetComponentsByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
+		auto it = m_components.find(GetComponentTypeId<T>());
 		std::vector<T*> result;
-		for (const auto& component : m_components) {
-			if (auto casted = dynamic_cast<T*>(component.get())) {
-				result.push_back(casted);
+		if(it != m_components.end() && !it->second.instances.empty()) {
+			for (const auto& instance : it->second.instances) {
+				if (auto casted = static_cast<T*>(instance.get())) {
+					result.push_back(casted);
+				}
 			}
+		}
+		for(auto& pending : m_pendingComponents) {
+			 if (pending.typeId == GetComponentTypeId<T>()) {
+				 if (auto casted = static_cast<T*>(pending.instance.get())) {
+					 result.push_back(casted);
+				 }
+			 }
 		}
 		return result;
 	}
@@ -90,6 +189,7 @@ public:
 	template<class T, class... Args>
 	T* AddChild(Args&&... args) {
 		static_assert(std::is_base_of_v<Actor, T>, "AddChild<T>: T must derive from Actor");
+		if (!m_pOwner) return nullptr;
 		auto child = std::make_unique<T>(std::forward<Args>(args)...);
 		T* ptr = child.get();
 		ptr->SetParent(this);
@@ -108,16 +208,18 @@ private:
 
 	ACTOR_TAG m_tag = ACTOR_TAG::NONE; // Object tag
 
-	std::vector<std::unique_ptr<Component>> m_components;			// Component container
-	std::vector<std::unique_ptr<Component>> m_pendingComponents;	// Pending component container
+	std::unordered_map<std::type_index, ComponentBucket> m_components;	// Component container organized by type
+	std::vector<Component*> m_componentPtrs;							// Component pointer container for easy iteration
+	std::vector<PendingComponent> m_pendingComponents;					// Pending component container
 
-	SceneBase* m_pOwner;	// Pointer to the owning scene
-	Transform* m_pTransform;	// Pointer to the Transform component
+	SceneBase* m_pOwner = nullptr;		// Pointer to the owning scene
+	Transform* m_pTransform = nullptr;	// Pointer to the Transform component
 
 	Actor* m_pParent = nullptr;		// Pointer to the parent actor (nullptr if no parent)
 	std::vector<Actor*> m_children;	// Child actors
 
 private:
+	void AddPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
 	void AddChildActorToScene(std::unique_ptr<Actor> child);
 };

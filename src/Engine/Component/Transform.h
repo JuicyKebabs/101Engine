@@ -21,14 +21,14 @@ public:
 	void MarkDirty();	// Mark the local transform as dirty (has been modified since last world transform update)
 
 	// Rotation methods
-	void RotateLocalQuat(Quaternion quaternion);	// Rotate local transform by a quaternion
-	void RotateLocalEulerDeg(Vector3 eulerDeg);	// Rotate local transform by Euler angles in degrees
-	void RotateLocalEulerRad(Vector3 eulerRad);	// Rotate local transform by Euler angles in radians
+	void RotateLocalByQuat(Quaternion quaternion);	// Rotate local transform by a quaternion
+	void RotateLocalByEulerDeg(Vector3 eulerDeg);	// Rotate local transform by Euler angles in degrees
+	void RotateLocalByEulerRad(Vector3 eulerRad);	// Rotate local transform by Euler angles in radians
 	
 	// Axis-specific rotation methods
-	void RotateLocalXDeg(float angleDeg);	// Rotate local transform around X axis by an angle in degrees
-	void RotateLocalYDeg(float angleDeg);	// Rotate local transform around Y axis by an angle in degrees
-	void RotateLocalZDeg(float angleDeg);	// Rotate local transform around Z axis by an angle in degrees
+	void RotateLocalByXDeg(float angleDeg);	// Rotate local transform around X axis by an angle in degrees
+	void RotateLocalByYDeg(float angleDeg);	// Rotate local transform around Y axis by an angle in degrees
+	void RotateLocalByZDeg(float angleDeg);	// Rotate local transform around Z axis by an angle in degrees
 
 	// Setters (all for local transform)
 	void SetLocalPosition(Vector3 position);			// Set local position
@@ -57,9 +57,18 @@ public:
 	Matrix4x4 GetWorldMatrix() const;				// Get world matrix
 
 	// Basis
+	Vector3 GetLocalForward() const;	// Get local forward direction
+	Vector3 GetLocalBack() const;		// Get local back direction
+	Vector3 GetLocalRight() const;		// Get local right direction
+	Vector3 GetLocalLeft() const;		// Get local left direction
+	Vector3 GetLocalUp() const;			// Get local up direction
+	Vector3 GetLocalDown() const;		// Get local down direction
 	Vector3 GetWorldForward() const;	// Get world forward direction
+	Vector3 GetWorldBack() const;		// Get world back direction
 	Vector3 GetWorldRight() const;		// Get world right direction
+	Vector3 GetWorldLeft() const;		// Get world left direction
 	Vector3 GetWorldUp() const;			// Get world up direction
+	Vector3 GetWorldDown() const;		// Get world down direction
 
 	// Conversions
 	Vector3 TransformPoint(Vector3 localPoint) const;					// Transform a point from local space to world space

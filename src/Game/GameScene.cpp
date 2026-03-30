@@ -5,7 +5,8 @@
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Audio/Audio.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
-#include "Player.h"
+#include "Game/Player.h"
+#include "Game/CameraTest.h"
 
 using namespace DirectX;
 
@@ -54,4 +55,10 @@ void GameScene::InitializeOverride(EngineContext& context)
 			MaterialInput{.texturePath = L"asset/fbx/sourceimages/T_Spray01.png"}
 		)
 	);
+
+	auto cameraTestActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, -5.0f });
+	cameraTestActor->AddComponent<CameraTest>();
+	auto camera = cameraTestActor->AddComponent<Camera>(1980.0f, 1080.0f);
+	//camera->SetRotationMode(CAMERA_ROTATION_MODE::ROTATION_MODE_LOOK_AT_TARGET);
+	//camera->SetTargetActor(playerActor);
 }
