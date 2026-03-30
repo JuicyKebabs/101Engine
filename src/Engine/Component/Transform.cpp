@@ -48,44 +48,49 @@ void Transform::MarkDirty()
 }
 
 // Rotate local transform by a quaternion
-void Transform::RotateLocalQuat(Quaternion quaternion)
+void Transform::RotateLocalByQuat(Quaternion quaternion)
 {
 	m_localTransform.rotation = quaternion * m_localTransform.rotation;
 	MarkDirty();
 }
 
 // Rotate local transform by Euler angles in degrees
-void Transform::RotateLocalEulerDeg(Vector3 eulerDeg)
+void Transform::RotateLocalByEulerDeg(Vector3 eulerDeg)
 {
-	m_localTransform.rotation.RotateVector3(DegToRad(eulerDeg));
+	Quaternion rotationQuat = Quaternion::CreateFromEulerDeg(eulerDeg);
+	m_localTransform.rotation = m_localTransform.rotation * rotationQuat;
 	MarkDirty();
 }
 
 // Rotate local transform by Euler angles in radians
-void Transform::RotateLocalEulerRad(Vector3 eulerRad)
+void Transform::RotateLocalByEulerRad(Vector3 eulerRad)
 {
-	m_localTransform.rotation.RotateVector3(eulerRad);
+	Quaternion rotationQuat = Quaternion::CreateFromEulerRad(eulerRad);
+	m_localTransform.rotation = m_localTransform.rotation * rotationQuat;
 	MarkDirty();
 }
 
 // Rotate local transform around X axis by an angle in degrees
-void Transform::RotateLocalXDeg(float angleDeg)
+void Transform::RotateLocalByXDeg(float angleDeg)
 {
-	m_localTransform.rotation.RotateVector3(DegToRad(Vector3(angleDeg, 0.0f, 0.0f)));
+	Quaternion rotationQuat = Quaternion::CreateFromEulerDeg(Vector3(angleDeg, 0.0f, 0.0f));
+	m_localTransform.rotation = m_localTransform.rotation * rotationQuat;
 	MarkDirty();
 }
 
 // Rotate local transform around Y axis by an angle in degrees
-void Transform::RotateLocalYDeg(float angleDeg)
+void Transform::RotateLocalByYDeg(float angleDeg)
 {
-	m_localTransform.rotation.RotateVector3(DegToRad(Vector3(0.0f, angleDeg, 0.0f)));
+	Quaternion rotationQuat = Quaternion::CreateFromEulerDeg(Vector3(0.0f, angleDeg, 0.0f));
+	m_localTransform.rotation = m_localTransform.rotation * rotationQuat;
 	MarkDirty();
 }
 
 // Rotate local transform around Z axis by an angle in degrees
-void Transform::RotateLocalZDeg(float angleDeg)
+void Transform::RotateLocalByZDeg(float angleDeg)
 {
-	m_localTransform.rotation.RotateVector3(DegToRad(Vector3(0.0f, 0.0f, angleDeg)));
+	Quaternion rotationQuat = Quaternion::CreateFromEulerDeg(Vector3(0.0f, 0.0f, angleDeg));
+	m_localTransform.rotation = m_localTransform.rotation * rotationQuat;
 	MarkDirty();
 }
 
@@ -216,9 +221,51 @@ Matrix4x4 Transform::GetWorldMatrix() const
 }
 
 // Get forward direction
+Vector3 Transform::GetLocalForward() const
+{
+	return m_localMatrix.TransformDirection(Vector3::Forward());
+}
+
+// Get backward direction
+Vector3 Transform::GetLocalBack() const
+{
+	return m_localMatrix.TransformDirection(Vector3::Backward());
+}
+
+// Get right direction
+Vector3 Transform::GetLocalRight() const
+{
+	return m_localMatrix.TransformDirection(Vector3::Right());
+}
+
+// Get left direction
+Vector3 Transform::GetLocalLeft() const
+{
+	return m_localMatrix.TransformDirection(Vector3::Left());
+}
+
+// Get up direction
+Vector3 Transform::GetLocalUp() const
+{
+	return m_localMatrix.TransformDirection(Vector3::Up());
+}
+
+// Get down direction
+Vector3 Transform::GetLocalDown() const
+{
+	return m_localMatrix.TransformDirection(Vector3::Down());
+}
+
+// Get forward direction
 Vector3 Transform::GetWorldForward() const
 {
 	return m_worldMatrix.TransformDirection(Vector3::Forward());
+}
+
+// Get backward direction
+Vector3 Transform::GetWorldBack() const
+{
+	return m_worldMatrix.TransformDirection(Vector3::Backward());
 }
 
 // Get right direction
@@ -227,10 +274,22 @@ Vector3 Transform::GetWorldRight() const
 	return m_worldMatrix.TransformDirection(Vector3::Right());
 }
 
+// Get left direction
+Vector3 Transform::GetWorldLeft() const
+{
+	return m_worldMatrix.TransformDirection(Vector3::Left());
+}
+
 // Get up direction
 Vector3 Transform::GetWorldUp() const
 {
 	return m_worldMatrix.TransformDirection(Vector3::Up());
+}
+
+// Get down direction
+Vector3 Transform::GetWorldDown() const
+{
+	return m_worldMatrix.TransformDirection(Vector3::Down());
 }
 
 // Transform a point from local space to world space

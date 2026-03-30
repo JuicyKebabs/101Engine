@@ -29,7 +29,7 @@ void PlayerBehavior::UpdateBehavior(float deltaTime)
 	if (fabs(controllerRightStick.y) < 0.1f) controllerRightStick.y = 0.0f;
 	Quaternion currentRotation = transform->GetLocalRotationQuat();
 	Vector3 rotationInput = { controllerRightStick.y, -controllerRightStick.x, 0.0f };
-	transform->RotateLocalEulerDeg(rotationInput);
+	transform->RotateLocalByEulerDeg(rotationInput);
 
 	auto controllerRdown = InputManager::GetInstance()->GetInputInfo()->controller->RSHOULDER.down;
 	if (controllerRdown)
@@ -55,52 +55,59 @@ void PlayerBehavior::UpdateBehavior(float deltaTime)
 	auto downA = keyInput.a.down;
 	auto downS = keyInput.s.down;
 	auto downD = keyInput.d.down;
+
+	const float ROTATION_SPEED = 1.0f; // degrees per second
+
 	if (downW)
 	{
-		Vector3 currentPosition = transform->GetLocalPosition();
-		currentPosition.y += MOVE_SPEED;
-		transform->SetLocalPosition(currentPosition);
+		//Vector3 currentPosition = transform->GetLocalPosition();
+		//currentPosition.y += MOVE_SPEED;
+		//transform->SetLocalPosition(currentPosition);
+		transform->RotateLocalByEulerDeg({ -ROTATION_SPEED, 0.0f, 0.0f });
 	}
 	if (downA)
 	{
-		Vector3 currentPosition = transform->GetLocalPosition();
-		currentPosition.x -= MOVE_SPEED;
-		transform->SetLocalPosition(currentPosition);
+		//Vector3 currentPosition = transform->GetLocalPosition();
+		//currentPosition.x -= MOVE_SPEED;
+		//transform->SetLocalPosition(currentPosition);
+		transform->RotateLocalByEulerDeg({ 0.0f, -ROTATION_SPEED, 0.0f });
 	}
 	if (downS)
 	{
-		Vector3 currentPosition = transform->GetLocalPosition();
-		currentPosition.y -= MOVE_SPEED;
-		transform->SetLocalPosition(currentPosition);
+		//Vector3 currentPosition = transform->GetLocalPosition();
+		//currentPosition.y -= MOVE_SPEED;
+		//transform->SetLocalPosition(currentPosition);
+		transform->RotateLocalByEulerDeg({ ROTATION_SPEED, 0.0f, 0.0f });
 	}
 	if (downD)
 	{
-		Vector3 currentPosition = transform->GetLocalPosition();
-		currentPosition.x += MOVE_SPEED;
-		transform->SetLocalPosition(currentPosition);
+		//Vector3 currentPosition = transform->GetLocalPosition();
+		//currentPosition.x += MOVE_SPEED;
+		//transform->SetLocalPosition(currentPosition);
+		transform->RotateLocalByEulerDeg({ 0.0f, ROTATION_SPEED, 0.0f });
 	}
 
-	auto downUp = keyInput.up.down;
-	auto downLeft = keyInput.left.down;
-	auto downDown = keyInput.down.down;
-	auto downRight = keyInput.right.down;
+	//auto downUp = keyInput.up.down;
+	//auto downLeft = keyInput.left.down;
+	//auto downDown = keyInput.down.down;
+	//auto downRight = keyInput.right.down;
 
-	if (downUp)
-	{
-		transform->RotateLocalXDeg(-1.0f);
-	}
-	if (downLeft)
-	{
-		transform->RotateLocalYDeg(-1.0f);
-	}
-	if (downDown)
-	{
-		transform->RotateLocalXDeg(1.0f);
-	}
-	if (downRight)
-	{
-		transform->RotateLocalYDeg(1.0f);
-	}
+	//if (downUp)
+	//{
+	//	transform->RotateLocalByXDeg(-1.0f);
+	//}
+	//if (downLeft)
+	//{
+	//	transform->RotateLocalByYDeg(-1.0f);
+	//}
+	//if (downDown)
+	//{
+	//	transform->RotateLocalByXDeg(1.0f);
+	//}
+	//if (downRight)
+	//{
+	//	transform->RotateLocalByYDeg(1.0f);
+	//}
 
 	auto downQ = keyInput.q.down;
 	auto downE = keyInput.e.down;
