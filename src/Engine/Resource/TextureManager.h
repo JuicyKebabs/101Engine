@@ -6,7 +6,9 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "Texture.h"
 #include "Engine/Core/ComPtr/ComPtr.h"
+
 
 // Pending texture upload structure
 struct PendingTextureUpload
@@ -53,15 +55,15 @@ public:
 		uint32_t maxDescriptors	// Maximum descriptor count
 	);
 
-	uint32_t LoadSrvFromFile(	// Load SRV from file
+	TextureHandle LoadTexture(	// Load SRV from file
 		const std::wstring& path	// File path
 	);
 
-	uint32_t AllocateSrv();	// Allocate SRV descriptor index (for manually created textures)
+	TextureHandle AllocateSrv();	// Allocate SRV descriptor index (for manually created textures)
 	void CreateSrv(			// Create SRV for a texture resource
 		ID3D12Resource* pResource,	// Texture resource
 		DXGI_FORMAT format,			// Texture format
-		uint32_t srvIndex			// SRV descriptor index
+		TextureHandle srvIndex		// SRV descriptor index
 	);
 
 	void UploadPendingTextures(ID3D12GraphicsCommandList* cmdList);	// Upload pending textures
@@ -69,8 +71,8 @@ public:
 	ID3D12DescriptorHeap* GetSrvHeap() const;		// Get SRV heap (where SRVs are stored)
 	UINT GetSrvIncrementSize() const;				// Get SRV descriptor increment size
 	
-	uint32_t GetPostProcessingTextureIndex() const;	// Get post-processing texture index
-	uint32_t GetDefaultTextureIndex() const;	// Get default texture index
+	TextureHandle GetPostProcessingTextureIndex() const;	// Get post-processing texture index
+	TextureHandle GetDefaultTextureIndex() const;	// Get default texture index
 
 private:
 	// SRV management

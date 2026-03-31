@@ -203,6 +203,7 @@
     <ClInclude Include="src\Engine\Component\Component.h" />
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h" />
     <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
+    <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
     <ClInclude Include="src\Engine\Component\Transform.h" />
     <ClInclude Include="src\Engine\Core\ComPtr\ComPtr.h" />
     <ClInclude Include="src\Engine\Core\Context\Context.h" />
@@ -232,6 +233,7 @@
     <ClInclude Include="src\Engine\Physics\CollisionManager.h" />
     <ClInclude Include="src\Engine\Resource\MeshGPU.h" />
     <ClInclude Include="src\Engine\Resource\MeshManager.h" />
+    <ClInclude Include="src\Engine\Resource\Texture.h" />
     <ClInclude Include="src\Engine\Resource\TextureManager.h" />
     <ClInclude Include="src\Engine\Scene\SceneBase.h" />
     <ClInclude Include="src\Engine\Scene\SceneManager.h" />

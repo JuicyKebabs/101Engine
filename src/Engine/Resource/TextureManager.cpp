@@ -39,7 +39,7 @@ void TextureManager::Initialize(
 }
 
 // Load SRV from file
-uint32_t TextureManager::LoadSrvFromFile(const std::wstring& path)
+TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 {
 	// If already loaded, return the index
 	if (auto it = m_loadedTextures.find(path); it != m_loadedTextures.end())
@@ -54,7 +54,7 @@ uint32_t TextureManager::LoadSrvFromFile(const std::wstring& path)
 	if(path.empty())
 	{
 		OutputDebugStringW(L"[TextureManager] Empty path provided.\n");
-		return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+		return static_cast<TextureHandle>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
 	}
 
 	auto ext = FileExtension(path);	// Get file extension
@@ -228,7 +228,7 @@ uint32_t TextureManager::AllocateSrv()
 void TextureManager::CreateSrv(
 	ID3D12Resource* pResource,						// Texture resource
 	DXGI_FORMAT format,								// Texture format
-	uint32_t srvIndex								// SRV descriptor index
+	TextureHandle srvIndex							// SRV descriptor index
 )
 {
 	if(!pResource) 	
