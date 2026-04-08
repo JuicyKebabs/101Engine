@@ -28,14 +28,15 @@ private:
 	void operator=(const App&) = delete;	// Assignment operator disabled
 
 private:
-	Engine* m_pEngine = nullptr;					// DirectX12 engine pointer
-	Renderer* m_pRenderer = nullptr;				// Renderer pointer
-	SceneManager* m_pSceneManager = nullptr;		// Scene manager pointer
+	std::unique_ptr<Engine> m_pEngine = nullptr;					// DirectX12 engine pointer
+	std::unique_ptr<Renderer> m_pRenderer = nullptr;				// Renderer pointer
+	std::unique_ptr<SceneManager> m_pSceneManager = nullptr;		// Scene manager pointer
+	std::unique_ptr<TextureManager> m_pTextureManager = nullptr;	// Texture manager pointer
+	std::unique_ptr<MeshManager> m_pMeshManager = nullptr;			// Mesh manager pointer
+	std::unique_ptr<Time> m_pTime = nullptr;						// Time manager pointer
+
 	InputManager* m_pInputManager = nullptr;		// Input manager pointer
-	TextureManager* m_pTextureManager = nullptr;	// Texture manager pointer
-	MeshManager* m_pMeshManager = nullptr;			// Mesh manager pointer
 	AudioManager* m_pAudioManager = nullptr;		// Audio manager pointer
-	Time* m_pTime = nullptr;						// Time manager pointer
 
 	EngineContext m_engineContext{};	// Engine context structure
 

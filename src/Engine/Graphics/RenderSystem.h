@@ -2,6 +2,7 @@
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Graphics/RenderData.h"
+#include "Engine/Resource/Texture.h"
 #include "Engine/Component/Camera.h"
 
 struct DrawPacket
@@ -18,13 +19,13 @@ class RenderSystem
 public:
 	struct SortData
 	{
-		MeshGPU* gpuHandle;			// GPU handle for the mesh (used for sorting)
-		UINT startIndex;			// Start index for drawing (used for sorting)
-		UINT baseVertex;			// Base vertex for drawing (used for sorting)
-		uint32_t srvIndex;			// SRV index for the material (used for sorting)
-		PSOKey psoKey;				// Pipeline State Object key for sorting
-		float sortDepth = 0.0f;		// Depth value for sorting (used for transparent objects)
-		RenderQueue renderQueue;	// Render queue for this draw packet (opaque or transparent)
+		MeshGPU* gpuHandle;				// GPU handle for the mesh (used for sorting)
+		UINT startIndex;				// Start index for drawing (used for sorting)
+		UINT baseVertex;				// Base vertex for drawing (used for sorting)
+		TextureHandle textureHandle;	// Texture handle for this material (used for sorting)
+		PSOKey psoKey;					// Pipeline State Object key for sorting
+		float sortDepth = 0.0f;			// Depth value for sorting (used for transparent objects)
+		RenderQueue renderQueue;		// Render queue for this draw packet (opaque or transparent)
 	};
 
 	struct SortEntry
@@ -75,9 +76,9 @@ private:
 		// Convert pointer to integer for comparison
 		auto ap = reinterpret_cast<std::uintptr_t>(a.gpuHandle);
 		auto bp = reinterpret_cast<std::uintptr_t>(b.gpuHandle);
-		// Compare by srvIndex, pMeshGPU, startIndex, baseVertex
-		return std::tie(a.srvIndex, ap, a.startIndex, a.baseVertex)
-			< std::tie(b.srvIndex, bp, b.startIndex, b.baseVertex);
+		// Compare by textureHandle, pMeshGPU, startIndex, baseVertex
+		return std::tie(a.textureHandle, ap, a.startIndex, a.baseVertex)
+			< std::tie(b.textureHandle, bp, b.startIndex, b.baseVertex);
 	}
 	// Opaque objects sorting
 	static inline bool OpaqueLess(const SortData& a, const SortData& b)

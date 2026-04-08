@@ -24,6 +24,4 @@ private:
 
 private:	//結果コード
 	HRESULT result = S_OK;	// HRESULT(成功/失敗コード)
-
-
 };

@@ -216,6 +216,12 @@
     <ClCompile Include="src\Game\CameraTest.cpp">
       <Filter>src\Game</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Graphics\DescriptorHeap.cpp">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Graphics\DescriptorHeapAllocator.cpp">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -370,6 +376,19 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h">
       <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
+    <ClInclude Include="src\Engine\Graphics\DescriptorHeap.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\DescriptorHeapAllocator.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Resource\Texture.h">
+      <Filter>src\Engine\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Resource\RenderTargetTexture.h">
+      <Filter>src\Engine\Resource</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

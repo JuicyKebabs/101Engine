@@ -16,15 +16,16 @@ Renderer::~Renderer()
 }
 
 //初期化
-void Renderer::Initialize(ID3D12Device* pDevice, TextureManager* textureManager)
+void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager)
 {
-	m_pDevice = pDevice;					//デバイスの保存
-	m_pTextureManager = textureManager;		//テクスチャ管理クラスの保存
+	m_pDevice = pDevice;
+	m_pDescriptorHeapAllocator = pDescriptorHeapAllocator;
+	m_pTextureManager = pTextureManager;
 
 	m_directionalLight = {}; //初期化
 
 	//ルートシグネチャの生成
-	m_pRootSignature = new RootSignature(m_pDevice);
+	m_pRootSignature = std::make_unique<RootSignature>(m_pDevice);
 
 	//シェーダーライブラリの生成
 	m_pShaderLibrary = std::make_unique<ShaderLibrary>();
@@ -42,31 +43,16 @@ void Renderer::Update(UINT currentBackBufferIndex, const CameraInfo& info)
 {
 }
 
-// Draw
-void Renderer::Render(ID3D12GraphicsCommandList* p_commandList, RENDER_TARGET_TYPE targetType)
+//フレーム開始
+void Renderer::BeginFrame(ID3D12GraphicsCommandList* p_commandList)
 {
 	// Set descriptor heaps
-	ID3D12DescriptorHeap* heaps[] = { m_pTextureManager->GetSrvHeap() };	// Set SRV heap (for textures)
+	ID3D12DescriptorHeap* heaps[] = { m_pDescriptorHeapAllocator->GetCbvSrvUavHeap().GetHeap() };
 	p_commandList->SetDescriptorHeaps(_countof(heaps), heaps);				// Set descriptor heaps
 
 	// Set root signature
 	p_commandList->SetGraphicsRootSignature(m_pRootSignature->GetRootSignature());
 
-	// Sort and draw render lists based on the target type
-	if (targetType == RENDER_TARGET_TYPE::POST_PROCESS)
-	{
-		RenderTempPackets(p_commandList);	// Draw world render list
-	}
-	else
-	{
-		RenderPostProcess(p_commandList);	// Draw post-process effects
-	}
-}
-
-//フレーム開始
-void Renderer::BeginFrame(UINT backIndex)
-{
-	m_currBackIndex = backIndex;	//現在のバックバッファインデックスを保存
 }
 
 void Renderer::SubmitDrawPacket(const std::vector<DrawPacket>& drawPackets)
@@ -87,7 +73,7 @@ void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 }
 
 //一時描画リストの描画(ワールド座標用)
-void Renderer::RenderTempPackets(ID3D12GraphicsCommandList* p_commandList)
+void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 {
 	PSOKey compare{};
 
@@ -109,7 +95,7 @@ void Renderer::RenderTempPackets(ID3D12GraphicsCommandList* p_commandList)
 		compare = m_drawPacketsThisFrame[i].materialDesc.psoKey;
 
 		// フレームごとのCBVプールを必要数まで確保
-		if (i >= m_objectCBWorld[m_currBackIndex].size())
+		if (i >= m_objectCBWorld.size())
 		{
 			//新しい定数バッファを作成
 			auto newCb = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(PerObjectConstants));
@@ -121,11 +107,11 @@ void Renderer::RenderTempPackets(ID3D12GraphicsCommandList* p_commandList)
 			}
 
 			//プールに追加
-			m_objectCBWorld[m_currBackIndex].push_back(std::move(newCb));
+			m_objectCBWorld.push_back(std::move(newCb));
 		}
 
 		//オブジェクト用定数バッファの取得
-		ConstantBuffer* cb = m_objectCBWorld[m_currBackIndex][i].get();
+		ConstantBuffer* cb = m_objectCBWorld[i].get();
 		auto* ptr = cb->GetPtr<PerObjectConstants>();
 
 		//定数バッファに transform を書く（各オブジェクト専用のメモリ）
@@ -163,10 +149,8 @@ void Renderer::RenderTempPackets(ID3D12GraphicsCommandList* p_commandList)
 		p_commandList->IASetIndexBuffer(&ibv);									//インデックスバッファの設定
 
 		//SRVの設定
-		auto heapHandle = m_pTextureManager->GetSrvHeap()->GetGPUDescriptorHandleForHeapStart();						//SRVヒープのGPUハンドルを取得
-		uint32_t idx = m_drawPacketsThisFrame[i].materialDesc.srvIndex;
-		auto gpuHandle = heapHandle;
-		gpuHandle.ptr += static_cast<UINT64>(idx) * m_pTextureManager->GetSrvIncrementSize();
+		uint32_t idx = m_pTextureManager->GetTextureSrvIndex(m_drawPacketsThisFrame[i].materialDesc.textureHandle);
+		auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
 		p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 
 		//描画コマンドの発行
@@ -181,16 +165,15 @@ void Renderer::RenderTempPackets(ID3D12GraphicsCommandList* p_commandList)
 }
 
 // Draw post-process effects
-void Renderer::RenderPostProcess(ID3D12GraphicsCommandList* p_commandList)
+void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, RenderTargetTexture* input)
 {
 	// Set the pipeline state object for post-processing
 	auto pso = GetPipelineStateObject(m_postProcessKey);		// Get the pipeline state object for post-processing
 	p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for post-processing
 
 	// Set SRV for post-processing
-	auto gpuHandle = m_pTextureManager->GetSrvHeap()->GetGPUDescriptorHandleForHeapStart();	// Get the GPU handle for the SRV heap
-	uint32_t idx = static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::POST_PROCESSING);
-	gpuHandle.ptr += static_cast<UINT64>(idx) * m_pTextureManager->GetSrvIncrementSize();
+	auto srvIndex = input->GetSrvIndex();	// Get the SRV index for the input render target
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(srvIndex);
 	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 
 	// Reset vertex/index buffers
@@ -209,15 +192,15 @@ PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 	auto it = m_psoMap.find(key);	//PSOマップから検索
 	if (it != m_psoMap.end())
 	{//見つかった場合はそれを返す
-		return it->second;
+		return it->second.get();
 	}
 	else
 	{//見つからなかった場合は新規作成
-		PipelineState* pso = CreatePipelineStateObject(key);
+		PipelineState* pso = CreatePipelineStateObject(key).get();
 
 		if (!pso)
 		{//作成失敗時はデフォルトPSOを返す
-			return m_pDefaultPSO;
+			return m_pDefaultPSO.get();
 		}
 
 		return pso;
@@ -225,9 +208,9 @@ PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 }
 
 //PSO生成
-PipelineState* Renderer::CreatePipelineStateObject(const PSOKey& key)
+std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey& key)
 {
-	PipelineState* pso = nullptr;
+	std::shared_ptr<PipelineState> pso = nullptr;
 
 	// Get shaders
 	auto vs = m_pShaderLibrary->GetVS(key.vsKey.fileID, key.vsKey.entryID, key.vsKey.defines, key.commonDefines);
@@ -235,12 +218,11 @@ PipelineState* Renderer::CreatePipelineStateObject(const PSOKey& key)
 	if (!vs || !ps)
 	{
 		OutputDebugStringA("Shader blob missing\n");
-		delete pso;
 		return nullptr;
 	}
 
 	// Create a new pipeline state object
-	pso = new PipelineState(m_pDevice);
+	pso = std::make_shared<PipelineState>(m_pDevice);
 	pso->SetInputLayout(Vertex::InputLayout);
 	pso->SetRootSignature(m_pRootSignature->GetRootSignature());
 	pso->SetVertexShader(vs.Get());
@@ -254,7 +236,6 @@ PipelineState* Renderer::CreatePipelineStateObject(const PSOKey& key)
 	if (!pso->IsValid())
 	{
 		OutputDebugStringA("PipelineState creation failed\n");
-		delete pso;
 		return nullptr;
 	}
 

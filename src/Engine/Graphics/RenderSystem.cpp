@@ -123,7 +123,7 @@ RenderSystem::SortData RenderSystem::CreateSortData(const SubmeshRenderTemplate&
 	sortData.gpuHandle = submeshTemplate.meshDesc.gpuHandle;
 	sortData.startIndex = submeshTemplate.meshDesc.startIndex;
 	sortData.baseVertex = submeshTemplate.meshDesc.baseVertex;
-	sortData.srvIndex = submeshTemplate.materialDesc.srvIndex;
+	sortData.textureHandle = submeshTemplate.materialDesc.textureHandle;
 	sortData.psoKey = submeshTemplate.materialDesc.psoKey;
 	sortData.sortDepth = CalculateDepth(renderProxy.position, cameraInfo);
 	sortData.renderQueue = GetRenderQueue(sortData.psoKey);
