@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include "Engine/Graphics/RenderData.h"
+#include "Engine/Resource/Texture.h"
 
 class TextureManager;
 class MeshManager;
@@ -16,10 +17,10 @@ struct MeshDesc
 // Material description structure
 struct MaterialDesc
 {
-	uint32_t srvIndex = UINT32_MAX;	// SRV index (for textures)
-	PSOKey psoKey{};				// Pipeline State Object key
-	Vector4 baseColor{ 1,1,1,1 };	// Base color for rendering (can be used to tint the mesh)
-	bool lightingEnabled = true;	// Lighting enabled flag
+	TextureHandle textureHandle = InvalidTextureHandle;	// Texture handle for the material
+	PSOKey psoKey{};									// Pipeline State Object key
+	Vector4 baseColor{ 1,1,1,1 };						// Base color for rendering (can be used to tint the mesh)
+	bool lightingEnabled = true;						// Lighting enabled flag
 };
 
 // Render template structure for a single mesh

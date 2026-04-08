@@ -152,7 +152,7 @@ void App::CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc)
 	wc.hCursor = LoadCursor(hInstance, IDC_ARROW);			// Set cursor
 	wc.hbrBackground = GetSysColorBrush(COLOR_BACKGROUND);	// Set background color
 	wc.lpszMenuName = nullptr;								// Set menu
-	wc.lpszClassName = _T("101_engine");					// Set class name
+	wc.lpszClassName = _T("101_Engine");					// Set class name
 	wc.hInstance = GetModuleHandle(NULL);					// Set instance handle
 
 	// Register window class
@@ -184,23 +184,21 @@ void App::CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc)
 void App::PrepareInstance()
 {
 	// Get singleton instances of various classes
-	m_pEngine = Engine::GetInstance();					// Get DirectX12 engine singleton instance
-	m_pRenderer = Renderer::GetInstance();				// Get renderer singleton instance
-	m_pSceneManager = SceneManager::GetInstance(		// Create scene management class
-		static_cast<float>(WINDOW_WIDTH),
-		static_cast<float>(WINDOW_HEIGHT)
-	);
-	m_pTextureManager = TextureManager::GetInstance();	// Create texture management class
-	m_pMeshManager = MeshManager::GetInstance();		// Get mesh management class singleton instance
-	m_pAudioManager = AudioManager::GetInstance();		// Get audio management class singleton instance
-	m_pInputManager = InputManager::GetInstance();		// Get input management class singleton instance
-	m_pTime = Time::GetInstance();						// Get time management class singleton instance
+	m_pEngine = std::make_unique<Engine>();
+	m_pRenderer = std::make_unique<Renderer>();
+	m_pSceneManager = std::make_unique<SceneManager>(static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT));
+	m_pTextureManager = std::make_unique<TextureManager>();
+	m_pMeshManager = std::make_unique<MeshManager>();	
+	m_pTime = std::make_unique<Time>();					
+
+	m_pAudioManager = AudioManager::GetInstance();
+	m_pInputManager = InputManager::GetInstance();
 
 	// Set up engine context structure
 	m_engineContext = {
-		Renderer::GetInstance(),
-		TextureManager::GetInstance(),
-		MeshManager::GetInstance()
+		m_pRenderer.get(),
+		m_pTextureManager.get(),
+		m_pMeshManager.get()
 	};
 }
 
@@ -219,8 +217,8 @@ void App::InitInstance()
 
 	// Initialize texture management class
 	m_pTextureManager->Initialize(
-		pDevice,	// Device
-		512			// Max descriptor count
+		pDevice,								// Device
+		m_pEngine->GetDescriptorHeapAllocator()	// Descriptor heap allocator
 	);
 
 	// Initialize mesh management class
@@ -229,12 +227,13 @@ void App::InitInstance()
 	);
 
 	// Initialize engine bindings
-	m_pEngine->InitBindings(m_pTextureManager);
+	m_pEngine->InitBindings(m_pTextureManager.get());
 
 	// Initialize renderer
 	m_pRenderer->Initialize(
-		pDevice,							// Device
-		m_pTextureManager					// Texture manager
+		pDevice,									// Device
+		m_pEngine->GetDescriptorHeapAllocator(),	// Descriptor heap allocator
+		m_pTextureManager.get()						// Texture manager
 	);
 
 	// Initialize rendering
@@ -257,17 +256,13 @@ void App::InitInstance()
 // Update
 void App::Update()
 {
-	// Get current back buffer index
-	const UINT backIdx = m_pEngine->GetCurrentBufferIndex();
-
 	// Update various systems
-	m_pRenderer->BeginFrame(backIdx);					// Frame start (clear internal queue)
-	m_pInputManager->Update();							// Update input management class
+	m_pInputManager->Update();								// Update input management class
 	m_pSceneManager->PreUpdate(m_pTime->GetDeltaTime());	// Pre-update scene management class (for late update)
 	m_pSceneManager->Update(m_pTime->GetDeltaTime());		// Update scene management class
 	m_pSceneManager->LateUpdate(m_pTime->GetDeltaTime());	// Post-update scene management class (for late update)
-	m_pRenderer->Update(								// Update renderer
-		backIdx, 
+	m_pRenderer->Update(									// Update renderer
+		m_pEngine->GetCurrentBufferIndex(),
 		*m_pSceneManager->GetCameraInfo()
 	);
 	m_pAudioManager->Update();			// Update audio management class
@@ -279,6 +274,7 @@ void App::Render()
 {
 	// Start rendering
 	m_pEngine->BeginFrame();
+	m_pRenderer->BeginFrame(m_pEngine->GetCommandList());
 
 	// Upload pending textures
 	m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
@@ -286,16 +282,17 @@ void App::Render()
 	// Submit draw requests for the game scene
 	m_pSceneManager->OnRender();
 
-	// Draw for post-processing
-	m_pEngine->BeginPass(RENDER_TARGET_TYPE::POST_PROCESS);
-	m_pRenderer->Render(m_pEngine->GetCommandList(), RENDER_TARGET_TYPE::POST_PROCESS);
-	m_pEngine->EndPass(RENDER_TARGET_TYPE::POST_PROCESS);
+	// Render the scene to the main render target
+	RenderPassTarget target{ RenderPassTargetType::Builtin, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
+	m_pEngine->BeginPass(target);
+	m_pRenderer->RenderScene(m_pEngine->GetCommandList());
+	m_pEngine->EndPass(target);
 
 	// Draw for back buffer
-	auto backBufferType = static_cast<RENDER_TARGET_TYPE>(m_pEngine->GetCurrentBufferIndex());
-	m_pEngine->BeginPass(backBufferType);
-	m_pRenderer->Render(m_pEngine->GetCommandList(), backBufferType);
-	m_pEngine->EndPass(backBufferType);
+	RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };
+	m_pEngine->BeginPass(backBufferTarget);
+	m_pRenderer->RenderFullScreenPass(m_pEngine->GetCommandList(), m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor));
+	m_pEngine->EndPass(backBufferTarget);
 
 	// End rendering
 	m_pEngine->RenderEnd();

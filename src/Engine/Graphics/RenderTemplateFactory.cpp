@@ -24,7 +24,7 @@ RenderTemplate RenderTemplateFactory::CreateRenderTemplateFromDefaultMesh(MeshMa
 MaterialDesc RenderTemplateFactory::BuildMaterialDesc(TextureManager& textureManager, const MaterialInput& input)
 {
 	MaterialDesc desc;
-	desc.srvIndex = textureManager.LoadTexture(input.texturePath);
+	desc.textureHandle = textureManager.LoadTexture(input.texturePath);
 	desc.baseColor = input.baseColor;
 	desc.psoKey = input.psoKey;
 	desc.lightingEnabled = input.lightingEnabled;

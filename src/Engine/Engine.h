@@ -3,15 +3,18 @@
 #define NOMINMAX
 #endif
 #include <tchar.h>
-//#include <d3d12.h>
-#include "d3dx12.h"
+#include <d3d12.h>
+#include <d3dx12.h>
 #include <dxgi1_6.h>
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 #include <DirectXTex.h>
 #include <vector>
 #include <string>
+#include <array>
 #include "Engine/Core/ComPtr/ComPtr.h"
+#include "Engine/Graphics/DescriptorHeapAllocator.h"
+#include "Engine/Resource/RenderTargetTexture.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -19,22 +22,30 @@
 
 class TextureManager;
 
-// Render target types
-enum class RENDER_TARGET_TYPE
+using RenderTargetHandle = uint32_t;
+static constexpr RenderTargetHandle InvalidRenderTargetHandle = UINT32_MAX;
+
+// Render pass target types (Built-in render target or back buffer)
+enum class RenderPassTargetType
 {
-	BACK_BUFFER_0 = 0,	// Back buffer render target 0
-	BACK_BUFFER_1,		// Back buffer render target 1
-	POST_PROCESS,		// Post-processing render target
-	TYPE_COUNT,			// Number of types
+	BackBuffer,
+	Builtin,
 };
 
-// Render target slot structure
-struct RenderTargetSlot
+// Render pass target structure (used to specify the render target for rendering)
+struct RenderPassTarget
 {
-	ComPtr<ID3D12Resource> renderTarget = { nullptr };			// Render targets(Back buffer + post-processing)
-	uint32_t rtvIndex = 0;											// RTV descriptor index (for back buffer, it is the same as the back buffer index; for post-processing, it is a fixed index)
-	D3D12_RESOURCE_STATES m_currenttargetState{};					// Render target states(Back buffer + post-processing)
-	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };				// Clear color (RGBA)
+	RenderPassTargetType type;
+	uint32_t index;	// For BackBuffer, this is the buffer index; for Builtin, this is the built-in render target index
+};
+
+// Back buffer render target structure
+struct BackBufferRenderTarget
+{
+	ComPtr<ID3D12Resource> resource;									// Back buffer resource
+	uint32_t rtvIndex;													// RTV index for the back buffer
+	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;	// Current resource state of the back buffer
+	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };					// Clear color for the back buffer
 };
 
 // DirectX12 engine class
@@ -43,16 +54,18 @@ class Engine
 public:
 	static constexpr int FRAME_BUFFER_COUNT = 2; // Number of frame buffers for double buffering
 
-public:
-	Engine();	// Constructor
-	~Engine();	// Destructor
-
-	// Get singleton instance
-	static Engine* GetInstance()
+	enum class BuiltinRenderTarget
 	{
-		static Engine instance;
-		return &instance;
-	}
+		SceneColor = 0,	// Main render target for the scene
+		//BloomA,
+		//BloomB,
+		//MotionBlur,
+		Count
+	};
+
+public:
+	Engine() = default;
+	~Engine() = default;
 
 	// Main processing function
 	bool InitCore(			// Initialization
@@ -64,16 +77,18 @@ public:
 	void Terminate();			// Termination
 
 	// Rendering related functions
-	void BeginPass(RENDER_TARGET_TYPE type);	// Set up render target
-	void EndPass(RENDER_TARGET_TYPE type);		// End render pass
+	void BeginPass(RenderPassTarget target);	// Set up render target
+	void EndPass(RenderPassTarget target);		// End render pass
 	void BeginFrame();							// Start rendering
 	void WaitRender();							// Wait for the previous frame to finish
 	void RenderEnd();							// End rendering
 
 	// Various getters
-	ID3D12Device* GetDevice() { return m_pDevice.Get(); }							// Get device
-	ID3D12GraphicsCommandList* GetCommandList() { return m_pCommandList.Get(); }	// Get command list
-	UINT GetCurrentBufferIndex() const { return m_currentBackBufferIndex; }			// Get frame buffer index
+	ID3D12Device* GetDevice() { return m_pDevice.Get(); }												// Get device
+	ID3D12GraphicsCommandList* GetCommandList() { return m_pCommandList.Get(); }						// Get command list
+	UINT GetCurrentBufferIndex() const { return m_currentBackBufferIndex; }								// Get frame buffer index
+	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return m_pDescriptorHeapAllocator.get(); }	// Get descriptor heap allocator
+	RenderTargetTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
 
 private:
 	// Window related
@@ -98,33 +113,31 @@ private:	// Rendering related
 	UINT m_FrameBufferHeight = 0;		// Frame buffer height
 	UINT m_currentBackBufferIndex = 0;	// Current back buffer index
 
-	// Render target related
-	RenderTargetSlot m_renderTargetSlots[static_cast<int>(RENDER_TARGET_TYPE::TYPE_COUNT)] = {};	// Render target slots (back buffer + post-processing)
-	ComPtr<ID3D12DescriptorHeap> m_pRTVHeap = nullptr;												// Current frame's RTV descriptor heap (temporarily stored)
-	uint32_t m_rtvDescriptorSize = 0;																// RTV descriptor size (temporarily stored)
-
-	// Depth stencil
-	UINT m_dsvDescriptorSize = 0;							// Depth stencil descriptor size
-	ComPtr<ID3D12DescriptorHeap> m_pDsvHeap = nullptr;		// Depth stencil descriptor heap
-	ComPtr<ID3D12Resource> m_pDepthStencilBuffer = nullptr;	// Depth stencil buffer (only one is needed)
-
+	// Resource management
+	BackBufferRenderTarget m_backBuffers[FRAME_BUFFER_COUNT];																		// Back buffers
+	ComPtr<ID3D12Resource> m_pDepthStencilBuffer = nullptr;																			// Depth stencil buffer (only one is needed)
+	std::array< std::unique_ptr<RenderTargetTexture>, static_cast<size_t>(BuiltinRenderTarget::Count)> m_builtinRenderTargets{};	// Built-in render target handles (post-processing, bloom, motion blur, etc.)
+	std::unique_ptr<DescriptorHeapAllocator> m_pDescriptorHeapAllocator;															// Descriptor heap allocator (for CBV/SRV/UAV, RTV, DSV)	
+	RenderTargetHandle m_nextRenderTargetHandle = static_cast<RenderTargetHandle>(BuiltinRenderTarget::Count);						// Next render target handle to assign
 	TextureManager* m_pTextureManager = nullptr;	// Texture manager (for post-processing render target)
+
 private:	// Result code
 	HRESULT result = S_OK;	// HRESULT (success/failure code)
 
 private:	// Internal functions
 	// Various creation functions
 	void CreateDevice();					// Device creation
+	void CreateDescriptorHeapAllocator();	// Descriptor heap allocator creation
 	void CreateCommandObjects();			// Command object creation
 	void CreateSwapChain();					// Swap chain creation
 	void CreateFence();						// Fence creation
 	void CreateViewport();					// Viewport creation
 	void CreateScissorRect();				// Scissor rectangle creation
-	void CreateRTVHeap();					// RTV descriptor heap creation
-	void CreateRenderTarget();				// Render target creation
-	void CreatePostProcessRenderTarget();	// Post-processing render target creation
+	void CreateBackBuffers();				// Back buffer creation
+	void CreateBuiltinRenderTargets();		// Built-in render target creation (post-processing, bloom, motion blur, etc.)
 	void CreateDepthStencil();				// Depth stencil creation
 
-	RenderTargetSlot& GetRenderTargetSlot(RENDER_TARGET_TYPE type);
-	D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(uint32_t idx);
+	// Built-in render target creation functions
+	void CreatePostProcessRenderTarget();	// Post-processing render target creation
+
 };

@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <cstring>
 #include "TextureManager.h"
+#include "Engine/Core/Debug/Debug.h"
 
 using namespace DirectX;
 
@@ -12,27 +13,10 @@ std::wstring FileExtension(const std::wstring& path)
 }
 
 // Initialization
-void TextureManager::Initialize(
-	ID3D12Device* pDevice,	// Device
-	uint32_t maxDescriptors	// Maximum descriptor count
-)
+void TextureManager::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator)
 {
-	m_pDevice = pDevice;	// Save device
-
-	// SRV descriptor heap setup
-	D3D12_DESCRIPTOR_HEAP_DESC desc = {};	// Descriptor heap descriptor
-	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;		// SRV heap
-	desc.NumDescriptors = maxDescriptors;					// Descriptor count
-	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE; // Shader visible
-
-	// Create descriptor heap
-	pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_pSrvHeap));
-
-	// Get SRV descriptor increment size
-	m_srvIncrementSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	m_nextFreeIndex = static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::RESERVED_COUNT);	// Initialize next free index
-	m_loadedTextures.clear();																// Clear loaded texture map
+	m_pDevice = pDevice;									// Save device
+	m_pDescriptorHeapAllocator = pDescriptorHeapAllocator;	// Save descriptor heap allocator
 
 	// Load default white texture
 	CreateDefaultTexture();
@@ -54,7 +38,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if(path.empty())
 	{
 		OutputDebugStringW(L"[TextureManager] Empty path provided.\n");
-		return static_cast<TextureHandle>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+		return m_defaultTextureHandle;
 	}
 
 	auto ext = FileExtension(path);	// Get file extension
@@ -80,7 +64,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if (FAILED(hr))
 	{
 		OutputDebugStringW((L"[TextureManager] Failed to load: " + path + L"\n").c_str());
-		return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+		return m_defaultTextureHandle;
 	}
 
 	// Get image data
@@ -90,7 +74,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if (imageCount == 0)
 	{
 		OutputDebugStringW((L"[TextureManager] No image data: " + path + L"\n").c_str());
-		return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+		return m_defaultTextureHandle;
 	}
 
 	// Create texture resource
@@ -134,9 +118,6 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 		IID_PPV_ARGS(&pUploadBuffer)		// Resource to create
 	);
 
-	// Allocate SRV descriptor index
-	const uint32_t textureIndex = AllocateSrv();
-
 	// Create shader resource view
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};	// SRV descriptor
 	srvDesc.Shader4ComponentMapping = 
@@ -148,11 +129,8 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	srvDesc.Texture2D.MipLevels = 
 		(UINT)meta.mipLevels;						// Mip levels
 
-	auto cpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(	// CPU descriptor handle
-		m_pSrvHeap->GetCPUDescriptorHandleForHeapStart(),	// Heap start handle
-		textureIndex,										// Offset (number of loaded textures)
-		m_srvIncrementSize									// Increment size
-	);
+	auto srvIndex = m_pDescriptorHeapAllocator->AllocateCbvSrvUav();				// Allocate SRV descriptor index
+	auto cpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavCpuHandle(srvIndex);	// Get CPU descriptor handle for SRV
 
 	m_pDevice->CreateShaderResourceView(	// Create SRV
 		pTexture.Get(),	// Texture resource
@@ -160,11 +138,24 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 		cpuHandle		// SRV handle
 	);
 
-	// Register texture information
-	m_loadedTextures[path] = textureIndex;			// Register path and index
+	// Create texture data and store in map
+	std::unique_ptr<Texture> textureData = std::make_unique<Texture>();	// Texture data
+	textureData->Initialize(
+		pTexture,		// Texture resource
+		Texture::InitDesc{
+		m_nextTextureHandle,	// Texture handle (using next free index)
+		srvIndex,				// SRV index
+		path,					// File path
+		meta					// Metadata
+		}
+	);
+	m_loadedTextures[path] = m_nextTextureHandle;	// Store in map (path to texture handle)
+	m_nextTextureHandle++;							// Increment next free index
+	textureData->MarkAsPending();					// Mark as pending upload
 
 	// Keep resources
-	m_textures.push_back(pTexture);				// Keep texture resource
+	TextureHandle textureHandle = textureData->GetHandle();	// Get texture handle for map storage
+	m_textures[textureHandle] = std::move(textureData);		// Store texture data in map (texture handle to texture data)
 
 	// Get image data from ScratchImage
 	const Image* images = img.GetImages();		// Get image data
@@ -172,15 +163,14 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 
 	if (images == nullptr || count == 0)
 	{
-		OutputDebugStringA("[TextureManager] No image data in ScratchImage\n");
-		return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+		DBG("[TextureManager] No image data in ScratchImage\n");
+		return m_defaultTextureHandle;
 	}
 
 	// Register as pending texture upload
 	PendingTextureUpload pending = {};	// Pending texture upload
-	pending.texture = pTexture;						// Texture resource
-	pending.uploadBuffer = pUploadBuffer;			// Upload buffer
-	pending.srvIndex = textureIndex;				// SRV descriptor index
+	pending.textureHandle = textureHandle;	// Texture resource
+	pending.uploadBuffer = pUploadBuffer;	// Upload buffer
 
 	// Calculate total size of pixel and reserve space in owned data vector
 	auto pixels = img.GetImages()->pixels;	// Get pixel data pointer
@@ -209,45 +199,17 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 
 	m_pendingUploads.push_back(std::move(pending)); // Add to array
 
-	return textureIndex;	// Return texture index
-}
-
-// Allocate SRV descriptor index (for manually created textures)
-uint32_t TextureManager::AllocateSrv()
-{
-	if(m_nextFreeIndex >= m_pSrvHeap->GetDesc().NumDescriptors)
-	{
-		OutputDebugStringA("[TextureManager] No more SRV descriptors available\n");
-		return UINT32_MAX; // or some fallback texture index
-	}
-
-	return m_nextFreeIndex++;
+	return textureHandle;	// Return texture index
 }
 
 // Create SRV for a texture resource
-void TextureManager::CreateSrv(
-	ID3D12Resource* pResource,						// Texture resource
-	DXGI_FORMAT format,								// Texture format
-	TextureHandle srvIndex							// SRV descriptor index
+SrvIndex TextureManager::CreateSrv(
+	ID3D12Resource* pResource,	// Texture resource
+	DXGI_FORMAT format			// Texture format
 )
 {
-	if(!pResource) 	
-	{
-		OutputDebugStringA("[TextureManager] Invalid resource for CreateSrv\n");
-		return;
-	}
-
-	if(srvIndex >= m_pSrvHeap->GetDesc().NumDescriptors)
-	{
-		OutputDebugStringA("[TextureManager] SRV index out of bounds for CreateSrv\n");
-		return;
-	}
-
-	auto cpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(	// CPU descriptor handle
-		m_pSrvHeap->GetCPUDescriptorHandleForHeapStart(),	// Heap start handle
-		srvIndex,											// Offset (SRV index)
-		m_srvIncrementSize									// Increment size
-	);
+	auto srvIndex = m_pDescriptorHeapAllocator->AllocateCbvSrvUav();				// Allocate SRV descriptor index
+	auto cpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavCpuHandle(srvIndex);	// Get CPU descriptor handle for SRV
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};	// SRV descriptor
 	srvDesc.Shader4ComponentMapping = 
@@ -264,6 +226,8 @@ void TextureManager::CreateSrv(
 		&srvDesc,		// SRV descriptor
 		cpuHandle		// SRV handle
 	);
+
+	return srvIndex;	// Return SRV index
 }
 
 // Upload pending textures
@@ -278,16 +242,19 @@ void TextureManager::UploadPendingTextures(ID3D12GraphicsCommandList* cmdList)
 	// Upload each pending texture
 	for(auto& pending : m_pendingUploads)
 	{
-		if (!pending.texture || !pending.uploadBuffer || pending.subresources.empty())
+		auto texture = GetTexture(pending.textureHandle); // Get texture resource
+
+		if (!texture || !pending.uploadBuffer || pending.subresources.empty())
 		{
-			OutputDebugStringA("PendingTextureUpload has null member\n");
+			DBG("PendingTextureUpload has null member\n");
+			if (texture) texture->MarkAsFailed(); // Mark texture as failed if it exists
 			continue;
 		}
 
 		// Upload data to upload buffer
 		UpdateSubresources(
 			cmdList,										// Command list
-			pending.texture.Get(),							// Destination resource
+			texture->GetResource(),							// Destination resource
 			pending.uploadBuffer.Get(),						// Source resource
 			0,												// Source offset
 			0,												// First subresource
@@ -297,41 +264,65 @@ void TextureManager::UploadPendingTextures(ID3D12GraphicsCommandList* cmdList)
 
 		// Change texture state from copy destination to pixel shader resource
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			pending.texture.Get(),						// Resource
+			texture->GetResource(),						// Resource
 			D3D12_RESOURCE_STATE_COPY_DEST,				// Before state
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE	// After state
 		);
 		cmdList->ResourceBarrier(1, &barrier);	// Set resource barrier
 
 		m_uploadKeepAlive.push_back(pending.uploadBuffer); // Keep upload buffer alive until GPU is done
+
+		texture->MarkAsReady(); // Mark texture as uploaded
 	}
 
 	// Clear pending texture upload array
 	m_pendingUploads.clear();
 }
 
-// Get SRV heap
-ID3D12DescriptorHeap* TextureManager::GetSrvHeap() const
+// Get texture by handle
+Texture* TextureManager::GetTexture(TextureHandle handle) const
 {
-	return m_pSrvHeap.Get();
+	auto it = m_textures.find(handle);
+	if (it != m_textures.end()) {
+		return it->second.get();
+	}
+	return nullptr;
 }
 
-// Get SRV descriptor increment size
-UINT TextureManager::GetSrvIncrementSize() const
+// Get SRV index for a specific texture
+SrvIndex TextureManager::GetTextureSrvIndex(TextureHandle handle) const
 {
-	return m_srvIncrementSize;
-}
+	if(handle == static_cast<TextureHandle>(InvalidTextureHandle)){
+		DBG("[TextureManager] Invalid texture handle for GetTextureSrvIndex\n");
+		return m_defaultTextureHandle; // Return default texture index for invalid handle
+	}
 
-// Get post-processing texture index
-uint32_t TextureManager::GetPostProcessingTextureIndex() const
-{
-	return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::POST_PROCESSING);
+	auto texture = GetTexture(handle);
+	if (texture) {
+		if(texture->GetState() != Texture::State::Ready){
+			DBG("[TextureManager] Texture handle %u is not ready (state: %u)\n", handle, static_cast<uint32_t>(texture->GetState()));
+		}
+		else {
+			SrvIndex srvIndex = texture->GetSrvIndex();
+			if (srvIndex != InvalidSrvIndex)
+			{
+				return srvIndex;
+			}
+			else
+			{
+				DBG("[TextureManager] Texture handle %u has invalid SRV index\n", handle);
+			}
+		}
+	} else{
+		DBG("[TextureManager] Texture handle not found for GetTextureSrvIndex: %u\n", handle);
+	}
+	return m_defaultTextureHandle; // Return default texture index if not found
 }
 
 // Get default white texture index
-uint32_t TextureManager::GetDefaultTextureIndex() const
+uint32_t TextureManager::GetDefaultTextureSrvIndex() const
 {
-	return static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE);
+	return m_defaultTextureHandle;
 }
 
 // Create default texture
@@ -378,20 +369,37 @@ void TextureManager::CreateDefaultTexture()
 	);
 
 	// Create shader resource view
-	const uint32_t defaultTextureIndex = static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::DEFAULT_TEXTURE); // Default white texture index
-	CreateSrv(
+	auto srvIndex = CreateSrv(
 		pTexture.Get(),					// Texture resource
-		DXGI_FORMAT_R8G8B8A8_UNORM,		// Format
-		defaultTextureIndex				// SRV descriptor index
+		DXGI_FORMAT_R8G8B8A8_UNORM		// Format
 	);
 
-	m_textures.push_back(pTexture); // Keep texture resource alive
+	const uint32_t defaultTextureHandle = m_nextTextureHandle;	// Default texture handle (using next free index)
+	auto textureData = std::make_unique<Texture>();	// Texture data
+	Texture::InitDesc initDesc = {};		// Texture initialization descriptor
+	initDesc.handle = defaultTextureHandle;	// Texture handle (using reserved index)
+	initDesc.srvIndex = srvIndex;			// SRV index (using next free index)
+	initDesc.path = L"DefaultWhite";		// File path (for identification)
+	initDesc.meta = TexMetadata{			// Metadata
+		DXGI_FORMAT_R8G8B8A8_UNORM, // Format
+		1,							// Width
+		1,							// Height
+		1,							// Mip levels
+		TEX_DIMENSION_TEXTURE2D		// Dimension
+	};
+	textureData->Initialize(
+		pTexture,
+		initDesc
+	);
+
+	m_textures[defaultTextureHandle] = std::move(textureData);	// Keep texture resource alive
+	m_defaultTextureHandle = defaultTextureHandle;				// Store default texture handle
+	m_nextTextureHandle++;										// Increment next free index
 
 	// Register as pending texture upload
 	PendingTextureUpload pending = {};	// Pending texture upload
-	pending.texture = pTexture;						// Texture resource
+	pending.textureHandle = defaultTextureHandle;	// Texture resource
 	pending.uploadBuffer = pUploadBuffer;			// Upload buffer
-	pending.srvIndex = defaultTextureIndex;			// SRV descriptor index
 
 	// Prepare owned data for upload
 	pending.ownedData.resize(sizeof(uint32_t));	// Resize owned data to hold pixel data
@@ -403,7 +411,6 @@ void TextureManager::CreateDefaultTexture()
 	subresource.RowPitch = sizeof(uint32_t);		// Row pitch
 	subresource.SlicePitch = sizeof(uint32_t);		// Slice pitch
 	pending.subresources.push_back(subresource);	// Subresource data
-
 
 	m_pendingUploads.push_back(std::move(pending)); // Add to array
 }

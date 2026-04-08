@@ -4,39 +4,28 @@
 using namespace DirectX;
 using namespace std;
 
-//コンストラクタ
-Engine::Engine()
-{
-}
-
-//デストラクタ
-Engine::~Engine()
-{
-}
-
-//初期化
 bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeight)
 {
 	this->hwnd = hwnd;									//ウィンドウハンドルの保存
 	this->m_FrameBufferWidth = m_FrameBufferWidth;		//フレームバッファの幅の保存
 	this->m_FrameBufferHeight = m_FrameBufferHeight;	//フレームバッファの高さの保存
 
-	CreateDevice();			//デバイスの生成
-	CreateCommandObjects();	//コマンドオブジェクトの生成
-	CreateSwapChain();		//スワップチェーンの生成
-	CreateFence();			//フェンスの生成
-	CreateViewport();		//ビューポートの生成
-	CreateScissorRect();	//シザー矩形の生成
-	CreateRTVHeap();		//RTVヒープの生成
-	CreateRenderTarget();	//レンダーターゲットの生成
-	CreateDepthStencil();	//深度ステンシルの生成
+	CreateDevice();						//デバイスの生成
+	CreateDescriptorHeapAllocator();	//ディスクリプタヒープアロケータの生成
+	CreateCommandObjects();				//コマンドオブジェクトの生成
+	CreateSwapChain();					//スワップチェーンの生成
+	CreateFence();						//フェンスの生成
+	CreateViewport();					//ビューポートの生成
+	CreateScissorRect();				//シザー矩形の生成
+	CreateBackBuffers();				//バックバッファの生成
+	CreateBuiltinRenderTargets();		//ビルトインレンダーターゲットの生成（ポストプロセス、ブラー、モーションブラーなど）
+	CreateDepthStencil();				//深度ステンシルの生成
 	return true;
 }
 
 void Engine::InitBindings(TextureManager* pTextureManager)
 {
 	this->m_pTextureManager = pTextureManager;	//テクスチャマネージャの保存
-	CreatePostProcessRenderTarget();			//ポストプロセス用レンダーターゲットの生成
 }
 
 //終了
@@ -51,26 +40,64 @@ void Engine::Terminate()
 }
 
 // Begin rendering to the render target
-void Engine::BeginPass(RENDER_TARGET_TYPE type)
+void Engine::BeginPass(RenderPassTarget target)
 {
-	auto& slot = GetRenderTargetSlot(type);	// Get the render target slot
+	// Check if the target is valid
+	if (target.type != RenderPassTargetType::BackBuffer && target.type != RenderPassTargetType::Builtin)
+	{
+		assert(false && "Invalid render pass target type");
+	}
+	else if (target.index >= (target.type == RenderPassTargetType::BackBuffer ? FRAME_BUFFER_COUNT : static_cast<size_t>(BuiltinRenderTarget::Count)))
+	{
+		assert(false && "Invalid render pass target index");
+	}
 
-	auto rtvHandle = GetRTVHandle(slot.rtvIndex);					// Get the RTV handle for the current render target slot
-	D3D12_RESOURCE_STATES currentState = slot.m_currenttargetState;	// Get the current resource state of the render target slot
+	ID3D12Resource* resource = nullptr;
+	uint32_t rtvIndex = 0;
+	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;
+	D3D12_RESOURCE_STATES nextState = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	if(target.type == RenderPassTargetType::BackBuffer)
+	{
+		auto& rt = m_backBuffers[target.index];				// Get the back buffer render target for the specified index
+		resource = rt.resource.Get();						// Get the resource for the back buffer
+		rtvIndex = m_backBuffers[target.index].rtvIndex;
+		currentState = rt.currentState;						// Get the current resource state of the back buffer
+		clearColor[0] = rt.clearColor[0];
+		clearColor[1] = rt.clearColor[1];
+		clearColor[2] = rt.clearColor[2];
+		clearColor[3] = rt.clearColor[3];
+
+		rt.currentState = RenderTargetTexture::ConvertToD3D12State(RenderTargetTexture::State::Write);	// Update the current state of the back buffer to "Write" for rendering
+	}
+	else if (target.type == RenderPassTargetType::Builtin)
+	{
+		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();	// Get the render target for the specified built-in index
+		resource = rt->GetResource();												// Get the resource for the built-in render target
+		rtvIndex = rt->GetRtvIndex();												// Get the RTV index for the built-in render target
+		currentState = RenderTargetTexture::ConvertToD3D12State(rt->GetState());	// Get the current resource state of the built-in render target
+		clearColor[0] = rt->GetClearColor()[0];
+		clearColor[1] = rt->GetClearColor()[1];
+		clearColor[2] = rt->GetClearColor()[2];
+		clearColor[3] = rt->GetClearColor()[3];
+
+		rt->MarkAsWrite();	// Mark the built-in render target as being written to (rendering)
+	}
 
 	// Set up the resource barrier to render target state
 	auto barrier =
 		CD3DX12_RESOURCE_BARRIER::Transition(
-			slot.renderTarget.Get(),			// Current render target resource
-			currentState,						// Current resource state
-			D3D12_RESOURCE_STATE_RENDER_TARGET	// New resource state for rendering
+			resource,		// Current render target resource
+			currentState,	// Current resource state
+			nextState		// New resource state for rendering
 		);
-	slot.m_currenttargetState = D3D12_RESOURCE_STATE_RENDER_TARGET;	// Update the current state
 
 	// Set the resource barrier command
 	m_pCommandList->ResourceBarrier(1, &barrier);
 
-	auto dsvHandle = m_pDsvHeap->GetCPUDescriptorHandleForHeapStart();	// Get the CPU descriptor handle for the depth stencil view
+	auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(0);		// Get the DSV handle (assuming a single depth stencil view for simplicity)
+	auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the RTV handle for the current render target slot
 
 	// Set the render target and depth stencil view
 	m_pCommandList->OMSetRenderTargets(
@@ -82,60 +109,67 @@ void Engine::BeginPass(RENDER_TARGET_TYPE type)
 
 	// Clear the render target
 	m_pCommandList->ClearRenderTargetView(
-		rtvHandle,			// Handle to the render target view to clear
-		slot.clearColor,	// Clear color
-		0,					// Number of rectangles to clear
-		nullptr				// Clear rectangle (NULL means full screen)
+		rtvHandle,					// Handle to the render target view to clear
+		clearColor,					// Clear color
+		0,							// Number of rectangles to clear
+		nullptr						// Clear rectangle (NULL means full screen)
 	);
 
-	// Clear the depth buffer only for post-processing render target
-	if(type == RENDER_TARGET_TYPE::POST_PROCESS)
-	{
-		// Clear the depth buffer
-		m_pCommandList->ClearDepthStencilView(
-			dsvHandle,				// Handle to the depth stencil view
-			D3D12_CLEAR_FLAG_DEPTH,	// Clear target specification (depth buffer)
-			1.0f,					// Depth clear value (clear to maximum value of view volume)
-			0,						// Stencil clear value not used, so no clear
-			0,						// Size of clear area array (none)
-			nullptr					// Clear area array (none)
-		);
-	}
+	// Clear the depth buffer
+	m_pCommandList->ClearDepthStencilView(
+		dsvHandle,				// Handle to the depth stencil view
+		D3D12_CLEAR_FLAG_DEPTH,	// Clear target specification (depth buffer)
+		1.0f,					// Depth clear value (clear to maximum value of view volume)
+		0,						// Stencil clear value not used, so no clear
+		0,						// Size of clear area array (none)
+		nullptr					// Clear area array (none)
+	);
 }
 
 // End rendering to the render target
-void Engine::EndPass(RENDER_TARGET_TYPE type)
+void Engine::EndPass(RenderPassTarget target)
 {
-	auto& slot = GetRenderTargetSlot(type);
-	D3D12_RESOURCE_STATES next = {};
-	switch (type)
+	// Check if the target is valid
+	if(target.type != RenderPassTargetType::BackBuffer && target.type != RenderPassTargetType::Builtin)
 	{
-	case RENDER_TARGET_TYPE::BACK_BUFFER_0:
-		next = D3D12_RESOURCE_STATE_PRESENT;	// Back buffer state is set to present
-		break;
-	case RENDER_TARGET_TYPE::BACK_BUFFER_1:
-		next = D3D12_RESOURCE_STATE_PRESENT;	// Back buffer state is set to present
-		break;
-	case RENDER_TARGET_TYPE::POST_PROCESS:
-		next = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;	// Post-process render target state is set to pixel shader resource
-		break;
-	default:
-		return;
+		assert(false && "Invalid render pass target type");
+	}
+	else if(target.index >= (target.type == RenderPassTargetType::BackBuffer ? FRAME_BUFFER_COUNT : static_cast<size_t>(BuiltinRenderTarget::Count)))
+	{
+		assert(false && "Invalid render pass target index");
+	}
+
+	ID3D12Resource* resource = nullptr;
+	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;
+	D3D12_RESOURCE_STATES nextState = D3D12_RESOURCE_STATE_COMMON;
+
+	if(target.type == RenderPassTargetType::BackBuffer)
+	{
+		auto& rt = m_backBuffers[target.index];				// Get the back buffer render target for the specified index
+		resource = rt.resource.Get();						// Get the resource for the back buffer
+		currentState = rt.currentState;						// Get the current resource state of the back buffer
+		nextState = D3D12_RESOURCE_STATE_PRESENT;			// Next state for the back buffer is "Present" for presentation to the screen
+		rt.currentState = D3D12_RESOURCE_STATE_PRESENT;		// Update the current state of the back buffer to "Present" for post-processing
+	}
+	else if (target.type == RenderPassTargetType::Builtin)
+	{
+		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();				// Get the render target for the specified built-in index
+		resource = rt->GetResource();															// Get the resource for the built-in render target
+		currentState = RenderTargetTexture::ConvertToD3D12State(rt->GetState());				// Get the current resource state of the built-in render target
+		nextState = RenderTargetTexture::ConvertToD3D12State(RenderTargetTexture::State::Read);	// Next state for the built-in render target is "Read" for post-processing
+		rt->MarkAsRead();																		// Mark the built-in render target as being read from (post-processing)
 	}
 
 	// Set up the resource barrier to transition to the next state
 	auto barrier =
 		CD3DX12_RESOURCE_BARRIER::Transition(
-			slot.renderTarget.Get(),	// Current render target
-			slot.m_currenttargetState,	// Current state
-			next						// Next state
+			resource,		// Current render target
+			currentState,	// Current resource state
+			nextState		// New resource state for post-processing
 		);
 
 	// Set the resource barrier command
 	m_pCommandList->ResourceBarrier(1, &barrier);
-
-	// Update the current state of the render target slot
-	slot.m_currenttargetState = next;
 }
 
 // Begin rendering the frame
@@ -230,6 +264,13 @@ void Engine::CreateDevice()
 			break;
 		}
 	}
+}
+
+// Create the descriptor heap allocator
+void Engine::CreateDescriptorHeapAllocator()
+{
+	m_pDescriptorHeapAllocator = make_unique<DescriptorHeapAllocator>(m_pDevice.Get());
+	m_pDescriptorHeapAllocator->Initialize();
 }
 
 //コマンドオブジェクトの生成
@@ -367,29 +408,8 @@ void Engine::CreateScissorRect()
 	m_scissorRect = scissorRect;	//メンバ変数に保存
 }
 
-//RTVヒープの生成
-void Engine::CreateRTVHeap()
-{
-	//レンダーターゲット用デスクリプタヒープの設定
-	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};				//ディスクリプタヒープの設定構造体
-	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;			//ビューの種類(レンダーターゲットビュー用)
-	heapDesc.NodeMask = 0;									//GPU識別用のノードマスク
-	heapDesc.NumDescriptors = 
-		static_cast<UINT>(RENDER_TARGET_TYPE::TYPE_COUNT);	//ディスクリプタ数(ダブルバッファリングなので2つ)
-	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;		//特に指定なし
-
-	//デスクリプタヒープの生成
-	result = m_pDevice->CreateDescriptorHeap(
-		&heapDesc,						//デスクリプタヒープの設定構造体
-		IID_PPV_ARGS(&m_pRTVHeap)		//デスクリプタヒープのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
-	);
-
-	//RTVデスクリプタサイズの取得
-	m_rtvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);	//RTVデスクリプタサイズの取得
-}
-
 //レンダーターゲットの生成
-void Engine::CreateRenderTarget()
+void Engine::CreateBackBuffers()
 {
 	//スワップチェーンの設定取得
 	DXGI_SWAP_CHAIN_DESC swcDesc = {};	//スワップチェーンの設定構造体
@@ -398,15 +418,12 @@ void Engine::CreateRenderTarget()
 	//バッファの数だけループ
 	for (int idx = 0; idx < swcDesc.BufferCount; idx++)
 	{
-		auto& slot = m_renderTargetSlots[idx];
-		slot.clearColor[0] = 1.0f;
-		slot.clearColor[1] = 1.0f;
-		slot.clearColor[2] = 1.0f;
-		slot.clearColor[3] = 1.0f;
+		auto& buffer = m_backBuffers[idx];
+		float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };	//バックバッファのクリアカラー(黒)
 
 		//レンダーターゲットビューのハンドルを取得
-		slot.rtvIndex = idx;							//スロットのRTVインデックスを保存
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRTVHandle(slot.rtvIndex);
+		auto rtvIndex = m_pDescriptorHeapAllocator->AllocateRtv();				//レンダーターゲットビューのインデックスを割り当て
+		auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	//レンダーターゲットビューのハンドルを取得
 
 		//レンダーターゲットビュー(RTV)の生成
 		//レンダーターゲットビュー設定
@@ -418,101 +435,111 @@ void Engine::CreateRenderTarget()
 		//スワップチェーンからバッファを取得
 		result = m_pSwapChain->GetBuffer(
 			idx,															//取得するバッファのインデックス
-			IID_PPV_ARGS(slot.renderTarget.ReleaseAndGetAddressOf())	//レンダーターゲットのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
+			IID_PPV_ARGS(buffer.resource.ReleaseAndGetAddressOf())	//レンダーターゲットのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
 		);
 
 		//レンダーターゲットビューの生成
 		m_pDevice->CreateRenderTargetView(
-			slot.renderTarget.Get(),		//レンダーターゲットに設定するバッファ
-			&rtvDesc,						//レンダーターゲットビューの設定(sRGB用設定)
-			rtvHandle						//レンダーターゲットビューを格納するディスクリプタヒープのハンドル
+			buffer.resource.Get(),		//レンダーターゲットに設定するバッファ
+			&rtvDesc,		//レンダーターゲットビューの設定(sRGB用設定)
+			rtvHandle		//レンダーターゲットビューを格納するディスクリプタヒープのハンドル
 		);
 
-		slot.m_currenttargetState = D3D12_RESOURCE_STATE_PRESENT;	//現在の状態をプレゼントに設定
+		buffer.rtvIndex = rtvIndex;								//バックバッファのRTVインデックスを保存
+		buffer.currentState = D3D12_RESOURCE_STATE_COMMON;	//バックバッファの現在のリソース状態を保存
+		buffer.clearColor[0] = clearColor[0];				//バックバッファのクリアカラーを保存
+		buffer.clearColor[1] = clearColor[1];
+		buffer.clearColor[2] = clearColor[2];
+		buffer.clearColor[3] = clearColor[3];
 	}
+}
+
+void Engine::CreateBuiltinRenderTargets()
+{
+	for(auto& target : m_builtinRenderTargets) {
+		target = make_unique<RenderTargetTexture>();
+	}
+
+	CreatePostProcessRenderTarget();
 }
 
 // Create post-process render target
 void Engine::CreatePostProcessRenderTarget()
 {
-	// Get the index for the post-process render target slot
-	int idx = static_cast<int>(RENDER_TARGET_TYPE::POST_PROCESS);
-	auto& slot = m_renderTargetSlots[idx];
+	// Clear color
+	float clearColor[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+	D3D12_CLEAR_VALUE clearValue = CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R16G16B16A16_FLOAT, clearColor);
 
-	// Heap properties for render target
+	// Heap properties
 	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-	// Get same resource description as back buffer and change format to HDR format
-	auto resourceDesc = m_renderTargetSlots[static_cast<int>(RENDER_TARGET_TYPE::BACK_BUFFER_0)].renderTarget.Get()->GetDesc();
-	resourceDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;	//HDR format
+	// Resource description
+	auto resourceDesc = m_backBuffers[0].resource->GetDesc();
 
-	// Clear color for the post-process render target (blue in this case)
-	slot.clearColor[0] = 0.4f;
-	slot.clearColor[1] = 0.4f;
-	slot.clearColor[2] = 1.0f;
-	slot.clearColor[3] = 1.0f;
-	D3D12_CLEAR_VALUE clearValue = CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R16G16B16A16_FLOAT, slot.clearColor);
+	// Format 
+	RenderTargetTexture::Format format = RenderTargetTexture::Format::RGBA16F;
+	resourceDesc.Format = RenderTargetTexture::ConvertToDXGIFormat(format);
+
+	// Initial state
+	RenderTargetTexture::State initialState = RenderTargetTexture::State::Read;
+	auto d3dState = RenderTargetTexture::ConvertToD3D12State(initialState);
 
 	// Create the render target resource
+	ComPtr<ID3D12Resource> renderTarget;
 	result = m_pDevice->CreateCommittedResource(
 		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resourceDesc,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		d3dState,
 		&clearValue,
-		IID_PPV_ARGS(slot.renderTarget.ReleaseAndGetAddressOf())
-	);
+		IID_PPV_ARGS(renderTarget.ReleaseAndGetAddressOf())
+		);
 
 	// Create render target view (RTV)
-	slot.rtvIndex = idx;							// Save the RTV index for the slot
-	auto rtvHandle = GetRTVHandle(slot.rtvIndex);	// Get the handle for the render target view
+	auto rtvIndex = m_pDescriptorHeapAllocator->AllocateRtv();				// Allocate an RTV descriptor from the heap allocator
+	auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the CPU handle for the allocated RTV descriptor
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
 	rtvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
 	m_pDevice->CreateRenderTargetView(
-		slot.renderTarget.Get(),
+		renderTarget.Get(),
 		&rtvDesc,
 		rtvHandle
 	);
 
-	// Create shader resource view (SRV) for the post-process render target(saved in the texture manager)
-	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;		// Type: CBV/SRV/UAV
-	srvHeapDesc.NodeMask = 0;										// Node mask (single GPU)
-	srvHeapDesc.NumDescriptors = 1;									// Number of descriptors (1 for the post-process render target)
-	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;	// Shader visible for binding to the pipeline
-
-	// Create shader resource view (SRV) for the post-process render target(saved in the texture manager)
-	m_pTextureManager->CreateSrv(
-		slot.renderTarget.Get(),											// Resource for which to create the SRV
-		DXGI_FORMAT_R16G16B16A16_FLOAT,										// Format (same as the render target)
-		static_cast<uint32_t>(TEXTURE_SRV_INDEX_RESERVED::POST_PROCESSING)	// SRV index reserved for post-processing in the texture manager
+	// Create shader resource view (SRV)
+	auto srvIndex = m_pDescriptorHeapAllocator->AllocateCbvSrvUav();				// Allocate an SRV descriptor from the heap allocator
+	auto srvHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavCpuHandle(srvIndex);	// Get the CPU handle for the allocated SRV descriptor
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Texture2D.MipLevels = 1;
+	m_pDevice->CreateShaderResourceView(
+		renderTarget.Get(),
+		&srvDesc,
+		srvHandle
 	);
 
-	slot.m_currenttargetState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;	// Set current state to pixel shader resource for the post-process render target
+	// Create the RenderTargetTexture object and initialize it
+	RenderTargetTexture::InitDesc desc = {};
+	desc.clearColor[0] = clearColor[0];
+	desc.clearColor[1] = clearColor[1];
+	desc.clearColor[2] = clearColor[2];
+	desc.clearColor[3] = clearColor[3];
+	desc.format = format;
+	desc.height = m_FrameBufferHeight;
+	desc.width = m_FrameBufferWidth;
+	desc.m_rtvIndex = rtvIndex;
+	desc.m_srvIndex = srvIndex;
+	desc.state = initialState;
+	m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)]->Initialize(renderTarget, desc);
 }
 
 //深度ステンシルの生成
 void Engine::CreateDepthStencil()
 {
-	//デスクリプタヒープの生成
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};	//設定構造体
-
-	dsvHeapDesc.NumDescriptors = 1;							//深度ビュー1つ分
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;		//デプスステンシルビューとして使用
-	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;	//特に指定なし
-
-	result = m_pDevice->CreateDescriptorHeap(	//生成
-		&dsvHeapDesc,				//デスクリプタヒープの設定構造体
-		IID_PPV_ARGS(&m_pDsvHeap)	//デスクリプタヒープのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
-	);
-
-	//デスクリプタサイズの取得
-	m_dsvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(
-		D3D12_DESCRIPTOR_HEAP_TYPE_DSV	//デプスステンシルビューを指定
-	);
-
 	//深度用ヒーププロパティ
 	D3D12_HEAP_PROPERTIES depthHeapProp =
 		CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);	//ヒーププロパティ
@@ -556,31 +583,11 @@ void Engine::CreateDepthStencil()
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;	//2Dテクスチャ
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;					//フラグなし
 
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = 
-		m_pDsvHeap->GetCPUDescriptorHandleForHeapStart();	//デスクリプタヒープの先頭ハンドルを取得
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(0);
 
 	m_pDevice->CreateDepthStencilView(	//生成
 		m_pDepthStencilBuffer.Get(),	//深度ステンシルバッファ
 		&dsvDesc,						//デプスステンシルビューの設定構造体
 		dsvHandle						//デスクリプタヒープのハンドル
 	);
-}
-
-//レンダーターゲットスロットの取得
-RenderTargetSlot& Engine::GetRenderTargetSlot(RENDER_TARGET_TYPE type)
-{
-	int idx = 0;
-	if(type >= RENDER_TARGET_TYPE::BACK_BUFFER_0 && type < RENDER_TARGET_TYPE::TYPE_COUNT)
-	{
-		idx = static_cast<int>(type);
-	}
-	return m_renderTargetSlots[idx];
-}
-
-//レンダーターゲットビューのハンドルの取得
-D3D12_CPU_DESCRIPTOR_HANDLE Engine::GetRTVHandle(uint32_t idx)
-{
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_pRTVHeap->GetCPUDescriptorHandleForHeapStart();
-	rtvHandle.ptr += idx * m_rtvDescriptorSize;	//インデックス分だけハンドルを進める
-	return rtvHandle;
 }
