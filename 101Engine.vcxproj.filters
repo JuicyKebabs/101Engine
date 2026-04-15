@@ -390,6 +390,9 @@
     <ClInclude Include="src\Engine\Resource\RenderTargetTexture.h">
       <Filter>src\Engine\Resource</Filter>
     </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\FrameRenderData.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\PixelShader\PixelShader.hlsl">

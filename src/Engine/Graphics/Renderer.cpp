@@ -55,10 +55,9 @@ void Renderer::BeginFrame(ID3D12GraphicsCommandList* p_commandList)
 
 }
 
-void Renderer::SubmitDrawPacket(const std::vector<DrawPacket>& drawPackets)
+void Renderer::SubmitFrameRenderData(const FrameRenderData& frameRenderData)
 {
-	m_drawPacketsThisFrame.clear();
-	m_drawPacketsThisFrame = drawPackets;
+	m_frameRenderData = frameRenderData;
 }
 
 void Renderer::SubmitCameraInfo(const CameraInfo& cameraInfo)
@@ -70,6 +69,25 @@ void Renderer::SubmitCameraInfo(const CameraInfo& cameraInfo)
 void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 {
 	m_directionalLight = light;	//平行光源情報を保存
+}
+
+void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
+{
+	PSOKey compare{};
+
+	for (auto& item : m_frameRenderData.opaque)
+	{
+		switch (item.renderType)
+		{
+		case RenderType::Mesh:
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle));
+			break;
+		case RenderType::Sprite:
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle));
+		default:
+			break;
+		}
+	}
 }
 
 //一時描画リストの描画(ワールド座標用)

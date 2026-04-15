@@ -255,13 +255,13 @@ static inline RenderQueue GetRenderQueueFromBlendMode(BlendMode blendMode)
 //=======================================================================================================
 
 // Type of Billboard
-enum BILLBOARD_TYPE
+enum class BillboardType
 {
-	BILLBOARD_NONE,			//ビルボードなし
-	BILLBOARD_SPHERICAL,	//全軸ビルボード
-	BILLBOARD_FIXED_X,		//X軸固定ビルボード
-	BILLBOARD_FIXED_Y,		//Y軸固定ビルボード
-	BILLBOARD_FIXED_Z,		//Z軸固定ビルボード
+	None,			//ビルボードなし
+	Spherical,	//全軸ビルボード
+	FixedX,		//X軸固定ビルボード
+	FixedY,		//Y軸固定ビルボード
+	FixedZ,		//Z軸固定ビルボード
 };
 
 ////共通描画記述構造体

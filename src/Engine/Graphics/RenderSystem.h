@@ -1,61 +1,84 @@
 #pragma once
+#include "Engine/Graphics/FrameRenderData.h"
 #include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Resource/Texture.h"
 #include "Engine/Component/Camera.h"
 
-struct DrawPacket
-{
-	MeshDesc meshDesc;			// Mesh data and rendering settings
-	MaterialDesc materialDesc;	// Material information and rendering settings
-	Matrix4x4 worldMatrix = {};	// World matrix for this draw packet
-	Vector4 color{ 1,1,1,1 };	// Color for rendering
-};
-
 // Render system class
 class RenderSystem
 {
 public:
-	struct SortData
+	struct SortKeyOpaque
 	{
-		MeshGPU* gpuHandle;				// GPU handle for the mesh (used for sorting)
-		UINT startIndex;				// Start index for drawing (used for sorting)
-		UINT baseVertex;				// Base vertex for drawing (used for sorting)
-		TextureHandle textureHandle;	// Texture handle for this material (used for sorting)
-		PSOKey psoKey;					// Pipeline State Object key for sorting
-		float sortDepth = 0.0f;			// Depth value for sorting (used for transparent objects)
-		RenderQueue renderQueue;		// Render queue for this draw packet (opaque or transparent)
+		PSOKey psoKey = {};
 	};
 
-	struct SortEntry
+	struct SortKeyTransparent
 	{
-		SubmeshRenderTemplate renderTemplate;	// Render template for this material
-		MeshRenderProxy renderProxy;			// Cached render proxy for this material
-		SortData sortData;						// Sort data for this material
+		PSOKey psoKey = {};
+		float depth = 0.0f;	// Depth for sorting transparent objects (greater depth first)
+	};
+
+	struct FrameSortData
+	{
+		std::vector<SortKeyOpaque> opaqueKeys;				// Sort keys for opaque objects
+		std::vector<SortKeyTransparent> transparentKeys;	// Sort keys for transparent objects
+
+		uint64_t AddOpaqueKey(SortKeyOpaque key) {
+			opaqueKeys.push_back(key);
+			return opaqueKeys.size() - 1;
+		}
+
+		SortKeyOpaque GetOpaqueKey(uint64_t index) const {
+			return opaqueKeys[index];
+		}
+
+		uint64_t AddTransparentKey(SortKeyTransparent key) {
+			transparentKeys.push_back(key);
+			return transparentKeys.size() - 1;
+		}
+
+		SortKeyTransparent GetTransparentKey(uint64_t index) const {
+			return transparentKeys[index];
+		}
+
+		void Clear() {
+			opaqueKeys.clear();
+			transparentKeys.clear();
+		}
 	};
 
 public:
 	RenderSystem() = default;	// Constructor
 	~RenderSystem() = default;	// Destructor
 
-	void Register(MeshRenderer* renderer);					// Register a mesh renderer to be rendered
-	void Unregister(MeshRenderer* renderer);				// Unregister a mesh renderer (stop rendering it)
-	void BuildDrawPackets(const CameraInfo& cameraInfo);	// Build draw packets from the registered mesh renderers
+	void Register(MeshRenderer* renderer);						// Register a mesh renderer to be rendered
+	void Register(SpriteRenderer* renderer);					// Register a sprite renderer to be rendered
+	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
+	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
+	void BuildFrameRenderData(const CameraInfo& cameraInfo);	// Build draw packets from the registered mesh renderers
 
-	const std::vector<DrawPacket>& GetDrawPackets() const { return m_drawPackets; }	// Get the list of draw packets to be processed
-
-private:
-	std::vector<MeshRenderer*> m_meshRenderers;	// List of mesh renderers in the scene
-	std::vector<DrawPacket> m_drawPackets;		// List of draw packets to be processed
+	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }	// Get the render data for the current frame (contains draw packets and other rendering information)
 
 private:
-	std::vector<RenderSystem::SortEntry> CreateSortEntriesFromRenderer(MeshRenderer& renderer, const CameraInfo& cameraInfo);			// Create sort entries from a mesh renderer
-	RenderQueue GetRenderQueue(const PSOKey& psoKey);								// Determine the render queue for sort entry 
-	void NormalizeSortEntry(RenderSystem::SortEntry& sortEntry);				// Normalize the draw packet data
-	void SortEntries(std::vector<RenderSystem::SortEntry>& sortEntries);	// Sort draw packets
-	SortData CreateSortData(const SubmeshRenderTemplate& submeshTemplate, const MeshRenderProxy& renderProxy, const CameraInfo& cameraInfo);	// Create sort data from a sort entry
-	void CreateDrawPacketsFromSortEntries(std::vector<RenderSystem::SortEntry>& sortEntries);			// Create the draw packets
+	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
+	std::vector<SpriteRenderer*> m_spriteRenderers;	// List of sprite renderers in the scene
+	FrameRenderData m_frameRenderData;				// Render data for the current frame (contains draw packets and other rendering information)
+	FrameSortData m_frameSortData;					// Sort data for the current frame (contains sort keys for sorting draw packets)
+	CameraInfo m_cameraInfo;						// Cached camera information for the current frame (used for sorting transparent objects)
+
+private:
+	MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
+	SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);	// Create a sprite draw packet from a sort entry
+
+	void SortOpaque();		// Sort opaque draw packets
+	void SortTransparent();	// Sort transparent draw packets
+	
+	RenderQueue GetRenderQueue(const PSOKey& psoKey);			// Determine the render queue for sort entry 
+	void NormalizePSOKey(PSOKey& psoKey, RenderQueue queue);	// Normalize the draw packet data
 
 	// Calculate depth as the distance along the camera's forward vector
 	static inline float CalculateDepth(const Vector3& position, const CameraInfo& cameraInfo)
@@ -71,29 +94,30 @@ private:
 			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull);
 	}
 	// Bind sort comparison
-	static inline bool BindLess(const SortData& a, const SortData& b)
-	{
-		// Convert pointer to integer for comparison
-		auto ap = reinterpret_cast<std::uintptr_t>(a.gpuHandle);
-		auto bp = reinterpret_cast<std::uintptr_t>(b.gpuHandle);
-		// Compare by textureHandle, pMeshGPU, startIndex, baseVertex
-		return std::tie(a.textureHandle, ap, a.startIndex, a.baseVertex)
-			< std::tie(b.textureHandle, bp, b.startIndex, b.baseVertex);
-	}
+	//static inline bool BindLess(const SortData& a, const SortData& b)
+	//{
+	//	// Convert pointer to integer for comparison
+	//	auto ap = reinterpret_cast<std::uintptr_t>(a.gpuHandle);
+	//	auto bp = reinterpret_cast<std::uintptr_t>(b.gpuHandle);
+	//	// Compare by textureHandle, pMeshGPU, startIndex, baseVertex
+	//	return std::tie(a.textureHandle, ap, a.startIndex, a.baseVertex)
+	//		< std::tie(b.textureHandle, bp, b.startIndex, b.baseVertex);
+	//}
 	// Opaque objects sorting
-	static inline bool OpaqueLess(const SortData& a, const SortData& b)
+	static inline bool OpaqueLess(const SortKeyOpaque& a, const SortKeyOpaque& b)
 	{
 		//If PSOKey is the same, sort by bind
 		if (a.psoKey == b.psoKey)
 		{
-			return BindLess(a, b);
+			//return BindLess(a, b);
+			return false;
 		}
 
 		//Otherwise, sort by PSOKey
 		return PSOKeyLess(a.psoKey, b.psoKey);
 	}
 	// Transparent objects sorting (back to front)
-	static inline bool TransparentLess(const SortData& a, const SortData& b)
+	static inline bool TransparentLess(const SortKeyTransparent& a, const SortKeyTransparent& b)
 	{
 		// Determine if the blend mode is order-dependent
 		auto isOrderDependent = [](BlendMode blendMode) {
@@ -111,15 +135,15 @@ private:
 		if (aOrderDependent)
 		{// For order-dependent blends, sort by depth (greater depth first)
 			// Quantize depth to avoid precision issues
-			const int64_t bucketA = static_cast<int64_t>(std::floor(a.sortDepth * 64.0f));
-			const int64_t bucketB = static_cast<int64_t>(std::floor(b.sortDepth * 64.0f));
+			const int64_t bucketA = static_cast<int64_t>(std::floor(a.depth * 64.0f));
+			const int64_t bucketB = static_cast<int64_t>(std::floor(b.depth * 64.0f));
 
 			//First, sort by bucket (greater bucket first)
 			if (bucketA != bucketB) return bucketA > bucketB;
 
 			//Then, sort by fine depth within the bucket (greater fine depth first)
-			const int64_t fineA = (int64_t)std::llround(a.sortDepth * 4096.0f);
-			const int64_t fineB = (int64_t)std::llround(b.sortDepth * 4096.0f);
+			const int64_t fineA = (int64_t)std::llround(a.depth * 4096.0f);
+			const int64_t fineB = (int64_t)std::llround(b.depth * 4096.0f);
 			if (fineA != fineB) return fineA > fineB;
 
 			return false;	// Ignore same depth
@@ -130,7 +154,9 @@ private:
 			return PSOKeyLess(a.psoKey, b.psoKey);
 		}
 
-		// Finally, sort by bind
-		return BindLess(a, b);
+		//// Finally, sort by bind
+		//return BindLess(a, b);
+
+		return false;
 	}
 };

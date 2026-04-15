@@ -68,7 +68,6 @@ public:
 		const MaterialInput& materialInput
 	);
 
-private:
 	static MaterialDesc BuildMaterialDesc(
 		TextureManager& textureManager,
 		const MaterialInput& input

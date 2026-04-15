@@ -10,7 +10,7 @@ class TextureManager;
 
 // Render proxy structure for a draw packet
 // This structure contains all the necessary dynamic information
-struct MeshRenderProxy
+struct MeshRendererProxy
 {
 	Vector3 position{};			// Position for this draw packet
 	Matrix4x4 worldMatrix = {};	// World matrix for this draw packet
@@ -40,13 +40,13 @@ public:
 	bool IsConfigured() const { return m_isConfigured; }
 
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
-	const MeshRenderProxy& GetRenderProxy();
+	const MeshRendererProxy& GetRenderProxy();
 
 	void Initialize(std::vector<SubmeshRenderTemplate> templates);	// Initialize the render templates
 
 private:
 	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn (contains mesh data, texture info, and rendering settings)
-	MeshRenderProxy m_proxy;						// Cached render proxy for this component (used for rendering)
+	MeshRendererProxy m_proxy;						// Cached render proxy for this component (used for rendering)
 	Vector4 m_color{ 1,1,1,1 };						// Color for rendering (can be used to tint the mesh)
 	bool m_isVisible = true;						// Visibility flag for the mesh
 	bool m_isConfigured = false;					// Flag to indicate if the render templates have been configured (used to prevent rendering before initialization)

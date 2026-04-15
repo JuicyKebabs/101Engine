@@ -50,7 +50,7 @@ void MeshRenderer::Flush()
 	CheckIfTransformChanged();
 }
 
-const MeshRenderProxy& MeshRenderer::GetRenderProxy()
+const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 {
 	if (m_isProxyDirty)
 	{
