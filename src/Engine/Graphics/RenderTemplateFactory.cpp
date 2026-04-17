@@ -65,6 +65,8 @@ RenderTemplate RenderTemplateFactory::BuildRenderTemplate(MeshManager& meshManag
 		sub.meshDesc.gpuHandle = meshManager.CreateMesh(mesh);
 		sub.meshDesc.baseVertex = 0;
 		sub.meshDesc.startIndex = 0;
+		sub.meshDesc.boundsCenter = mesh.boundsCenter;
+		sub.meshDesc.boundsRadius = mesh.boundsRadius;
 		sub.materialDesc = materialDesc;
 		temp.push_back(sub);
 	}

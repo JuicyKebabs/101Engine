@@ -14,10 +14,10 @@ struct aiMaterial;	//Assimpのマテリアル構造体
 //インポート設定構造体
 struct ImportSettings
 {
-	const wchar_t* fileName{};			//ファイルパス
+	const wchar_t* fileName{};	//ファイルパス
 	std::vector<Mesh>& meshs;	//メッシュデータ配列への参照
-	bool inverseU = false;				//UVを反転するかどうか
-	bool inverseV = false;				//UVを反転するかどうか
+	bool inverseU = false;		//UVを反転するかどうか
+	bool inverseV = false;		//UVを反転するかどうか
 };
 
 //Assimpを使ったモデルローダークラス

@@ -6,6 +6,7 @@
 #include "Engine/Graphics/ShaderLibrary.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Core/Debug/Debug.h"
 
 using namespace DirectX;
 
@@ -71,114 +72,56 @@ void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 	m_directionalLight = light;	//平行光源情報を保存
 }
 
+// Render all items in this frame's render data
 void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 {
+	// Allocate constant buffers for this frame
+	size_t totalItems = m_frameRenderData.GetOpaqueCount() + m_frameRenderData.GetTransparentCount();
+	if (m_objectCBWorld.size() < totalItems) 
+	{
+		size_t difference = totalItems - m_objectCBWorld.size();
+		for (size_t i = 0; i < difference; i++)
+		{
+			auto newCb = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(PerObjectConstants));
+			m_objectCBWorld.push_back(std::move(newCb));
+		}
+	}
+
 	PSOKey compare{};
+	int itemIndex = 0; // Index to track constant buffer usage
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle));
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), itemIndex, compare);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle));
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), itemIndex, compare);
+			break;
 		default:
 			break;
 		}
+
+		itemIndex++;
 	}
-}
 
-//一時描画リストの描画(ワールド座標用)
-void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
-{
-	PSOKey compare{};
-
-	for (size_t i = 0; i < m_drawPacketsThisFrame.size(); i++)
+	for (auto& item : m_frameRenderData.transparent)
 	{
-		//パイプラインステートオブジェクトの設定
-		if (i == 0)
+		switch (item.renderType)
 		{
-			auto pso = GetPipelineStateObject(m_drawPacketsThisFrame[i].materialDesc.psoKey);	//パイプラインステートを取得
-			p_commandList->SetPipelineState(pso->GetPipelineState());					//パイプラインステートをセット
-			compare = m_drawPacketsThisFrame[i].materialDesc.psoKey;
-		}
-		else if (compare != m_drawPacketsThisFrame[i].materialDesc.psoKey)
-		{
-			auto pso = GetPipelineStateObject(m_drawPacketsThisFrame[i].materialDesc.psoKey);	//パイプラインステートを取得
-			p_commandList->SetPipelineState(pso->GetPipelineState());					//パイプラインステートをセット
-		}
-
-		compare = m_drawPacketsThisFrame[i].materialDesc.psoKey;
-
-		// フレームごとのCBVプールを必要数まで確保
-		if (i >= m_objectCBWorld.size())
-		{
-			//新しい定数バッファを作成
-			auto newCb = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(PerObjectConstants));
-
-			if (!newCb->GetIsValid())
-			{//作成失敗時
-				OutputDebugStringA("ConstantBuffer creation failed\n");
-				break;
-			}
-
-			//プールに追加
-			m_objectCBWorld.push_back(std::move(newCb));
+		case RenderType::Mesh:
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), itemIndex, compare);
+			break;
+		case RenderType::Sprite:
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), itemIndex, compare);
+			break;
+		default:
+			break;
 		}
 
-		//オブジェクト用定数バッファの取得
-		ConstantBuffer* cb = m_objectCBWorld[i].get();
-		auto* ptr = cb->GetPtr<PerObjectConstants>();
-
-		//定数バッファに transform を書く（各オブジェクト専用のメモリ）
-		ptr->worldMatrix = m_drawPacketsThisFrame[i].worldMatrix;	//ワールド行列
-		ptr->worldInvTranspose = XMMatrixTranspose(XMMatrixInverse(nullptr, ptr->worldMatrix)); //ワールド逆転置行列
-		ptr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;					//ビュー行列
-		ptr->projMatrix = m_cameraInfoThisFrame.projMatrix;					//プロジェクション行列
-		ptr->objectColor = m_drawPacketsThisFrame[i].color;	//オブジェクトの色
-		ptr->uvRect = XMFLOAT4(0, 0, 1, 1);		//UV矩形
-		XMFLOAT4 direction_intensity =
-		{
-			m_directionalLight.direction.x,
-			m_directionalLight.direction.y,
-			m_directionalLight.direction.z,
-			m_directionalLight.intensity
-		};
-		XMFLOAT4 color_amobient = XMFLOAT4(
-			m_directionalLight.color.x,
-			m_directionalLight.color.y,
-			m_directionalLight.color.z,
-			m_directionalLight.ambient
-		);
-		ptr->lightDir_Intensity = direction_intensity;
-		ptr->lightColor_Ambient = color_amobient;
-
-		//メッシュGPUデータの取得
-		auto meshGPU = m_drawPacketsThisFrame[i].meshDesc.gpuHandle;
-
-		//セットアップ
-		auto vbv = meshGPU->GetVertexBuffer()->GetView();						//頂点バッファビューの取得
-		auto ibv = meshGPU->GetIndexBuffer()->GetView();						//インデックスバッファビューの取得
-		p_commandList->SetGraphicsRootConstantBufferView(0, cb->GetAddress());	//ルートパラメータ0に定数バッファをセット
-		p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());			//プリミティブトポロジの設定
-		p_commandList->IASetVertexBuffers(0, 1, &vbv);							//頂点バッファの設定
-		p_commandList->IASetIndexBuffer(&ibv);									//インデックスバッファの設定
-
-		//SRVの設定
-		uint32_t idx = m_pTextureManager->GetTextureSrvIndex(m_drawPacketsThisFrame[i].materialDesc.textureHandle);
-		auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
-		p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
-
-		//描画コマンドの発行
-		p_commandList->DrawIndexedInstanced(	//描画コマンド
-			meshGPU->GetIndexCount(),						//インデックス数
-			1,												//インスタンス数
-			m_drawPacketsThisFrame[i].meshDesc.startIndex,	//スタートインデックス位置
-			m_drawPacketsThisFrame[i].meshDesc.baseVertex,	//ベース頂点位置
-			0												//スタートインスタンス位置
-		);
+		itemIndex++;
 	}
 }
 
@@ -202,6 +145,134 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 	// Draw a full-screen triangle for post-processing
 	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);	// Set the primitive topology
 	p_commandList->DrawInstanced(3, 1, 0, 0);									// Issue draw command (full-screen triangle)
+}
+
+void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
+{
+	// Check if the Constant buffer is valid
+	if (itemIndex >= m_objectCBWorld.size())
+	{
+		DBG("Not enough constant buffers allocated\n");
+		return;
+	}
+	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid\n");
+		return;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
+	PSOKey currentKey = item.materialDesc.psoKey;
+	if (currentKey != compare)
+	{
+		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
+		compare = currentKey;										// Update the compare key
+	}
+
+
+	// Set up the constant buffer for this mesh
+	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<PerObjectConstants>();
+	ptr->worldMatrix = item.worldMatrix;
+	ptr->worldInvTranspose = item.worldMatrix.Transpose();
+	ptr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;
+	ptr->projMatrix = m_cameraInfoThisFrame.projMatrix;
+	ptr->objectColor = item.color;
+	ptr->uvRect = XMFLOAT4(0, 0, 1, 1);
+	ptr->lightDir_Intensity = Vector4(
+		m_directionalLight.direction.x,
+		m_directionalLight.direction.y,
+		m_directionalLight.direction.z,
+		m_directionalLight.intensity
+	);
+	ptr->lightColor_Ambient = Vector4(
+		m_directionalLight.color.x,
+		m_directionalLight.color.y,
+		m_directionalLight.color.z,
+		m_directionalLight.ambient
+	);
+
+	// Set mesh data
+	auto meshGPU = item.meshDesc.gpuHandle;
+	auto vbv = meshGPU->GetVertexBuffer()->GetView();
+	auto ibv = meshGPU->GetIndexBuffer()->GetView();
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_objectCBWorld[itemIndex]->GetAddress());
+	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
+	p_commandList->IASetVertexBuffers(0, 1, &vbv);
+	p_commandList->IASetIndexBuffer(&ibv);
+
+	// Set SRV for the texture
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+
+	// Draw command
+	p_commandList->DrawIndexedInstanced(
+		meshGPU->GetIndexCount(),
+		1,
+		item.meshDesc.startIndex,
+		item.meshDesc.baseVertex,
+		0
+	);
+}
+
+void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
+{
+	// Check if the Constant buffer is valid
+	if (itemIndex >= m_objectCBWorld.size())
+	{
+		DBG("Not enough constant buffers allocated\n");
+		return;
+	}
+	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid\n");
+		return;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
+	PSOKey currentKey = item.materialDesc.psoKey;
+	if (currentKey != compare)
+	{
+		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
+		compare = currentKey;										// Update the compare key
+	}
+
+	// Set up the constant buffer for this mesh
+	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<PerObjectConstants>();
+	ptr->worldMatrix = item.worldMatrix;
+	ptr->worldInvTranspose = item.worldMatrix.Transpose();
+	ptr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;
+	ptr->projMatrix = m_cameraInfoThisFrame.projMatrix;
+	ptr->objectColor = item.color;
+	ptr->uvRect = Vector4(
+		item.uvOffset.x,
+		item.uvOffset.y,
+		item.uvOffset.x + item.uvScale.x,
+		item.uvOffset.y + item.uvScale.y
+	);
+	ptr->lightDir_Intensity = Vector4(
+		m_directionalLight.direction.x,
+		m_directionalLight.direction.y,
+		m_directionalLight.direction.z,
+		m_directionalLight.intensity
+		);
+	ptr->lightColor_Ambient = Vector4(
+		m_directionalLight.color.x,
+		m_directionalLight.color.y,
+		m_directionalLight.color.z,
+		m_directionalLight.ambient
+	);
+
+	// Set SRV for the texture
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+
+	// Draw command (assuming a full-screen quad for sprites)
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	p_commandList->DrawInstanced(6, 1, 0, 0); // Draw a quad (2 triangles)
 }
 
 //PSO取得

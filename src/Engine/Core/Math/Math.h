@@ -115,6 +115,7 @@ struct Vector3 : public DirectX::XMFLOAT3
 	static Vector3 Min(const Vector3& a, const Vector3& b);
 	static Vector3 Max(const Vector3& a, const Vector3& b);
 	static Vector3 Clamp(const Vector3& value, const Vector3& min, const Vector3& max);
+	static Vector3 Transform(const Vector3& v, const Matrix4x4& m);
 
 	// Operators
 	Vector3& operator= (const Vector3& rhs);

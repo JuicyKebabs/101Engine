@@ -71,6 +71,14 @@ struct FrameRenderData {
 		transparent.push_back(std::move(item));
 	}
 
+	size_t GetOpaqueCount() const {
+		return opaque.size();
+	}
+
+	size_t GetTransparentCount() const {
+		return transparent.size();
+	}
+
 	void Clear() {
 		meshs.clear();
 		sprites.clear();

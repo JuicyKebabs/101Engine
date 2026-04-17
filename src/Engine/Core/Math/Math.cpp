@@ -412,6 +412,23 @@ Vector3 Vector3::Clamp(const Vector3& value, const Vector3& min, const Vector3& 
     return value.Clamp(min, max);
 }
 
+Vector3 Vector3::Transform(const Vector3& v, const Matrix4x4& m)
+{
+	float x = v.x * m._11 + v.y * m._21 + v.z * m._31 + m._41;
+	float y = v.x * m._12 + v.y * m._22 + v.z * m._32 + m._42;
+	float z = v.x * m._13 + v.y * m._23 + v.z * m._33 + m._43;
+	float w = v.x * m._14 + v.y * m._24 + v.z * m._34 + m._44;
+
+	if (w != 0.0f)
+	{
+		return Vector3(x / w, y / w, z / w);
+	}
+	else
+	{
+		return Vector3(x, y, z); // If w is zero, return the unnormalized result
+	}
+}
+
 Vector3& Vector3::operator=(const Vector3& rhs)
 {
     if (this != &rhs)

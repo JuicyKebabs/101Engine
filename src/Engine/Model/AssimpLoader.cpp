@@ -121,6 +121,9 @@ void AssimpLoader::LoadMesh(
 
 	dst.vertices.resize(src->mNumVertices);	//頂点データ配列のリサイズ
 
+	Vector3 minPos(FLT_MAX, FLT_MAX, FLT_MAX);		//最小座標
+	Vector3 maxPos(-FLT_MAX, -FLT_MAX, -FLT_MAX);	//最大座標
+
 	//頂点データの格納
 	for (auto i = 0u; i < src->mNumVertices; ++i)
 	{
@@ -151,7 +154,26 @@ void AssimpLoader::LoadMesh(
 
 		//頂点データ配列に格納
 		dst.vertices[i] = vertex;
+
+		//バウンディングボックスの更新
+		minPos.x = std::min(minPos.x, vertex.position.x);
+		minPos.y = std::min(minPos.y, vertex.position.y);
+		minPos.z = std::min(minPos.z, vertex.position.z);
+		maxPos.x = std::max(maxPos.x, vertex.position.x);
+		maxPos.y = std::max(maxPos.y, vertex.position.y);
+		maxPos.z = std::max(maxPos.z, vertex.position.z);
 	}
+
+	dst.boundsCenter = Vector3(
+		(minPos.x + maxPos.x) / 2.0f,
+		(minPos.y + maxPos.y) / 2.0f,
+		(minPos.z + maxPos.z) / 2.0f
+	);
+	dst.boundsRadius = sqrtf(
+		(maxPos.x - minPos.x) * (maxPos.x - minPos.x) +
+		(maxPos.y - minPos.y) * (maxPos.y - minPos.y) +
+		(maxPos.z - minPos.z) * (maxPos.z - minPos.z)
+	) / 2.0f;
 
 	//頂点数の設定
 	dst.vertexCount = src->mNumVertices;

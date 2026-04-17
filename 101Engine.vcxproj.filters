@@ -222,6 +222,9 @@
     <ClCompile Include="src\Engine\Graphics\DescriptorHeapAllocator.cpp">
       <Filter>src\Engine\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp">
+      <Filter>src\Engine\Component</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -377,7 +380,6 @@
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h">
       <Filter>src\Engine\Component</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
     <ClInclude Include="src\Engine\Graphics\DescriptorHeap.h">
       <Filter>src\Engine\Graphics</Filter>
     </ClInclude>
@@ -392,6 +394,9 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Graphics\FrameRenderData.h">
       <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\SpriteRenderer.h">
+      <Filter>src\Engine\Component</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

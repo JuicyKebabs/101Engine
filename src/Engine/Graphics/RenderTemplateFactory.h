@@ -12,6 +12,8 @@ struct MeshDesc
 	MeshGPU* gpuHandle = nullptr;	// Mesh data
 	UINT startIndex = 0;			// Start index
 	UINT baseVertex = 0;			// Base vertex
+	Vector3 boundsCenter{ 0,0,0 };	// Bounding sphere center for sorting
+	float boundsRadius = 0.0f;		// Bounding sphere radius for sorting
 };
 
 // Material description structure
@@ -38,7 +40,7 @@ struct MaterialInput
 {
 	std::wstring texturePath;		// Path to the texture to use for this material
 	Vector4 baseColor{ 1,1,1,1 };	// Base color for rendering (can be used to tint the mesh)
-	PSOKey psoKey{};				// Pipeline State Object key for this material
+	PSOKey psoKey = PSO_KEY_OPAQUE;	// Pipeline State Object key for this material
 	bool lightingEnabled = true;	// Lighting enabled flag
 };
 

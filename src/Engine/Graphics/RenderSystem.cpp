@@ -1,4 +1,5 @@
 #include "Engine/Graphics/RenderSystem.h"
+#include "Engine/Resource/MeshGPU.h"
 
 void RenderSystem::Register(MeshRenderer* renderer)
 {
@@ -41,10 +42,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 
 			for (const auto& renderTemplate : renderTemplates) 
 			{
-				auto handle = m_frameRenderData.AddMeshs(CreateMeshRenderItem(renderTemplate, renderProxy));
-
-				RenderQueue queue = GetRenderQueue(renderTemplate.materialDesc.psoKey);
-				NormalizePSOKey(m_frameRenderData.GetMesh(handle).materialDesc.psoKey, queue);
+				auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
+				RenderQueue queue = GetRenderQueue(item.materialDesc.psoKey);
+				NormalizePSOKey(item.materialDesc.psoKey, queue);
+				auto handle = m_frameRenderData.AddMeshs(std::move(item));
 
 				RenderItemRef ref;
 				ref.renderType = RenderType::Mesh;
@@ -53,15 +54,16 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 				if (queue == RenderQueue::Opaque)
 				{
 					SortKeyOpaque opaqueKey;
-					opaqueKey.psoKey = renderTemplate.materialDesc.psoKey;
+					opaqueKey.psoKey = item.materialDesc.psoKey;
 					ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
 					m_frameRenderData.AddOpaque(ref);
 				}
 				else
 				{
 					SortKeyTransparent transparentKey;
-					transparentKey.psoKey = renderTemplate.materialDesc.psoKey;
-					transparentKey.depth = CalculateDepth(renderProxy.position, m_cameraInfo);
+					transparentKey.psoKey = item.materialDesc.psoKey;
+					Vector3 meshPos = Vector3::Transform(renderTemplate.meshDesc.boundsCenter, renderProxy.worldMatrix);
+					transparentKey.depth = CalculateDepth(meshPos, m_cameraInfo);
 					ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
 					m_frameRenderData.AddTransparent(ref);
 				}
@@ -75,10 +77,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 		{
 			const auto& renderTemplate = renderer->GetRenderTemplate();
 			const auto& renderProxy = renderer->GetRenderProxy();
-			auto handle = m_frameRenderData.AddSprites(CreateSpriteRenderItem(renderTemplate, renderProxy));
-
+			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
 			RenderQueue queue = GetRenderQueue(renderTemplate.materialDesc.psoKey);
-			NormalizePSOKey(m_frameRenderData.GetSprite(handle).materialDesc.psoKey, queue);
+			NormalizePSOKey(item.materialDesc.psoKey, queue);
+			auto handle = m_frameRenderData.AddSprites(std::move(item));
 
 			RenderItemRef ref;
 			ref.renderType = RenderType::Sprite;
@@ -87,14 +89,14 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 			if (queue == RenderQueue::Opaque)
 			{
 				SortKeyOpaque opaqueKey;
-				opaqueKey.psoKey = renderTemplate.materialDesc.psoKey;
+				opaqueKey.psoKey = item.materialDesc.psoKey;
 				ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
 				m_frameRenderData.AddOpaque(ref);
 			}
 			else
 			{
 				SortKeyTransparent transparentKey;
-				transparentKey.psoKey = renderTemplate.materialDesc.psoKey;
+				transparentKey.psoKey = item.materialDesc.psoKey;
 				transparentKey.depth = CalculateDepth(renderProxy.position, m_cameraInfo);
 				ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
 				m_frameRenderData.AddTransparent(ref);
@@ -169,48 +171,6 @@ void RenderSystem::NormalizePSOKey(PSOKey& psoKey, RenderQueue queue)
 	if (queue == RenderQueue::Transparent
 		&& psoKey.depth != DepthMode::Disable)
 	{
-		psoKey.depth = DepthMode::TestNoWrite;
+		psoKey.depth = DepthMode::TestWrite;
 	}
 }
-
-//void RenderSystem::SortEntries(std::vector<RenderSystem::SortEntry>& entries)
-//{
-//	// Separate opaque and transparent materials
-//	std::vector<RenderSystem::SortEntry> opaque;
-//	std::vector<RenderSystem::SortEntry> transparent;
-//
-//	for (auto& entry : entries)
-//	{
-//		switch (entry.sortData.renderQueue)
-//		{
-//		case RenderQueue::Opaque:
-//			opaque.push_back(entry);
-//			break;
-//		case RenderQueue::Transparent:
-//			transparent.push_back(entry);
-//			break;
-//		default:
-//			break;
-//		}
-//	}
-//
-//	// Sort opaque objects
-//	std::stable_sort(opaque.begin(), opaque.end(),
-//		[](const RenderSystem::SortEntry& a, const RenderSystem::SortEntry& b)
-//		{
-//			return OpaqueLess(a.sortData, b.sortData);
-//		});
-//
-//	// Sort transparent objects
-//	std::stable_sort(transparent.begin(), transparent.end(),
-//		[](const RenderSystem::SortEntry& a, const RenderSystem::SortEntry& b)
-//		{
-//			return TransparentLess(a.sortData, b.sortData);
-//		});
-//
-//
-//	// Combine opaque and transparent materials back into the original list
-//	entries.clear();
-//	entries.insert(entries.end(), opaque.begin(), opaque.end());
-//	entries.insert(entries.end(), transparent.begin(), transparent.end());
-//}

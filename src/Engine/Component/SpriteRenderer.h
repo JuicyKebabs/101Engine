@@ -32,6 +32,9 @@ public:
 	void Update(float deltaTime) override;
 	void LateUpdate(float deltaTime) override;
 	void OnDestroy() override;
+	void Flush();
+
+	void Initialize(const SpriteRenderTemplate& renderTemplate) { m_template = renderTemplate; m_isConfigured = true; m_isProxyDirty = true; }
 
 	void SetColor(const Vector4& color) { m_color = color; m_isProxyDirty = true; }
 	void SetUVScale(const Vector2& uvScale) { m_uvScale = uvScale; m_isProxyDirty = true; }

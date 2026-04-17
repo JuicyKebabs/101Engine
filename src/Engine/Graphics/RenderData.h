@@ -110,6 +110,7 @@ struct PS_KEY
 // Blend modes
 enum class BlendMode
 {
+	None,
 	Opaque,
 	Alpha,
 	AddAlpha,
@@ -119,6 +120,7 @@ enum class BlendMode
 // Depth stencil modes
 enum class DepthMode
 {
+	None,
 	Disable,
 	TestWrite,
 	TestNoWrite,
@@ -134,6 +136,7 @@ enum class CullMode
 // Render target formats
 enum class RenderTargetFormat
 {
+	None,
 	LDR = 0,
 	HDR = 1,
 };
@@ -141,13 +144,13 @@ enum class RenderTargetFormat
 // Pipeline State Object (PSO) key structure
 struct PSOKey
 {
-	VS_KEY vsKey;											// Vertex shader key
-	PS_KEY psKey;											// Pixel shader key
-	uint64_t commonDefines = 0;								// Common shader defines
-	BlendMode  blend = BlendMode::Opaque;						// Blend mode
-	DepthMode  depth = DepthMode::TestWrite;					// Depth stencil mode
+	VS_KEY vsKey;												// Vertex shader key
+	PS_KEY psKey;												// Pixel shader key
+	uint64_t commonDefines = 0;									// Common shader defines
+	BlendMode  blend = BlendMode::None;							// Blend mode
+	DepthMode  depth = DepthMode::None;							// Depth stencil mode
 	CullMode  cull = CullMode::None;							// Culling mode
-	RenderTargetFormat rtvFormat = RenderTargetFormat::LDR;	// Render target format
+	RenderTargetFormat rtvFormat = RenderTargetFormat::None;	// Render target format
 
 	// Equality operators for PSOKey
 	bool operator == (const PSOKey& other) const
@@ -264,39 +267,6 @@ enum class BillboardType
 	FixedZ,		//Z軸固定ビルボード
 };
 
-////共通描画記述構造体
-//struct CommonRenderDesc
-//{
-//	MeshGPU* pMeshGPU = nullptr;							//メッシュデータ
-//	uint32_t srvIndex = UINT32_MAX;							//SRVインデックス(テクスチャ)
-//	Vector4 color = { 1,1,1,1 };					//表示色
-//	Vector4 uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };		//UV矩形
-//	PSOKey psoKey{};										//パイプラインステートオブジェクトキー
-//	float sortDepth = 0.0f;									//ソート用深度
-//	RenderQueue renderQueue = RenderQueue::Invailed;		//レンダリングキュー
-//};
-//
-//// Render information structure for world space
-//struct WorldRenderInfo
-//{
-//	CommonRenderDesc common{};				// Common render description structure
-//	Matrix4x4 worldMatrix = {};				// World matrix
-//	UINT startIndex = 0;					// Start index
-//	UINT baseVertex = 0;					// Base vertex
-//	Vector3 position{};						// Position
-//	Vector3 scale{};						// Scale
-//	bool lightingEnabled = true;			// Lighting enabled flag
-//	BILLBOARD_TYPE billboardType
-//		= BILLBOARD_TYPE::BILLBOARD_NONE;	// Billboard type
-//
-//	NodeAnimationAsset* pNodeAnimAsset = nullptr;	// Pointer to node animation asset
-//
-//	bool isPostEffect = false;				// Whether this is a post-effect (used for special handling in rendering)
-//};
-
-//描画情報構造体配列型
-//using WorldRenderModel = std::vector<WorldRenderInfo>;
-
 //=======================================================================================================
 //メッシュ・モデルデータ構造体
 //=======================================================================================================
@@ -315,6 +285,8 @@ struct Mesh
 		1.0f,	//拡散反射色B
 		1.0f	//拡散反射色A
 	};
+	Vector3 boundsCenter{};				//バウンディングスフィアの中心座標(ソート用)
+	float boundsRadius = 0.0f;			//バウンディングスフィアの半径(ソート用)
 	NodeAnimationAsset nodeAnimAsset{};	// ノードアニメーション資産
 };
 
@@ -496,68 +468,3 @@ inline Model GetDefaultModel(DEFAULT_MESH type)
 	default:   return {};						//その他
 	}
 }
-
-////=======================================================================================================
-////描画情報作成関数群
-////=======================================================================================================
-////モデルデータ又はテクスチャファイルから描画情報を作成する関数
-//void CreateRenderInfo(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	DEFAULT_MESH mType,						//メッシュタイプ
-//	PSOKey psoKey,							//ブレンドモード
-//	const wchar_t* path,					//モデルデータ又はテクスチャファイルのパス
-//	bool lightEneble = true,				//ライト有効or無効
-//	bool postEffect = false,				//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
-//	bool inverseU = false,					//Uを反転するかどうか(モデルデータの場合のみ有効)
-//	bool inverseV = false					//Vを反転するかどうか(モデルデータの場合のみ有効)
-//);
-//
-////FBXファイルから描画情報を作成する関数
-//void CreateRenderInfoFromFBX(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	PSOKey psoKey,							//ブレンドモード
-//	const wchar_t* path,					//モデルファイルのパス
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect = false,				//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
-//	bool inverseU = false,					//Uを反転するかどうか
-//	bool inverseV = false					//Vを反転するかどうか
-//);
-//
-////デフォルトのメッシュデータから描画情報を作成する関数
-//void CreateRenderInfoFromDefaultMesh(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	DEFAULT_MESH type,							//メッシュタイプ
-//	PSOKey psoKey,							//ブレンドモード
-//	const wchar_t* path,					//テクスチャのファイル名
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect = false,				//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
-//);
-//
-////メッシュデータから描画情報を構築する関数
-//CommonRenderDesc CreateRenderInfoFromMeshData(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	Mesh& mesh,					//メッシュデータ構造体への参照
-//	PSOKey psoKey,							//ブレンドモード
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
-//);
-//
-////描画情報配列とジオメトリ情報から提出用描画情報配列を構築する関数
-//WorldRenderModel BuildRenderInfoForSubmit(
-//	const WorldRenderModel& input,
-//	DEFAULT_MESH meshType = DEFAULT_MESH::QUAD,
-//	const DirectX::XMFLOAT3& position = { 0.0f, 0.0f, 0.0f },
-//	const DirectX::XMFLOAT3& scale = { 1.0f, 1.0f, 1.0f },
-//	const DirectX::XMFLOAT3& rotation = { 0.0f, 0.0f, 0.0f },
-//	const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f },
-//	const TexSplitInfo& texSplitInfo = {}
-//);

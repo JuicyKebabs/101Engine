@@ -73,8 +73,8 @@ private:
 	PSOKey m_postProcessKey;	// Post-processing PSO key
 
 private:
-	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item);	// Render a mesh
-	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item);	// Render a sprite
+	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare);		// Render a mesh
+	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemINdex, PSOKey& compare);	// Render a sprite
 
 
 	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)

@@ -153,6 +153,7 @@
     <ClCompile Include="src\Engine\Component\Camera.cpp" />
     <ClCompile Include="src\Engine\Component\Component.cpp" />
     <ClCompile Include="src\Engine\Component\MeshRenderer.cpp" />
+    <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp" />
     <ClCompile Include="src\Engine\Component\Transform.cpp" />
     <ClCompile Include="src\Engine\Core\Math\Math.cpp" />
     <ClCompile Include="src\Engine\Core\Time\Time.cpp" />

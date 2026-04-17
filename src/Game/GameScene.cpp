@@ -23,7 +23,7 @@ GameScene::~GameScene()
 
 void GameScene::InitializeOverride(EngineContext& context)
 {
-	// Create player actor and add it to the scene
+	//Create player actor and add it to the scene
 	auto playerActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, 5.0f });
 	playerActor->AddComponent<PlayerBehavior>();
 	playerActor->AddComponent<MeshRenderer>()->Initialize(
@@ -31,7 +31,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 			*context.pMeshManager,
 			*context.pTextureManager,
 			DEFAULT_MESH::CUBE,
-			MaterialInput{.texturePath = L""}
+			MaterialInput{.texturePath = L"" }
 		)
 	);
 
@@ -52,7 +52,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 			*context.pMeshManager,
 			*context.pTextureManager,
 			MeshInput{ .modelPath = L"asset/fbx/spray/Spray_01.fbx" },
-			MaterialInput{.texturePath = L"asset/fbx/sourceimages/T_Spray01.png"}
+			MaterialInput{.texturePath = L"asset/fbx/sourceimages/T_Spray01.png", .baseColor = Vector4(1.0f,1.0f,1.0f,0.3f), .psoKey = PSO_KEY_TRANSPARENT}
 		)
 	);
 
