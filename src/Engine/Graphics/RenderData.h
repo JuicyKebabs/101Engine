@@ -137,8 +137,8 @@ enum class CullMode
 enum class RenderTargetFormat
 {
 	None,
-	LDR = 0,
-	HDR = 1,
+	LDR,
+	HDR,
 };
 
 // Pipeline State Object (PSO) key structure
@@ -212,11 +212,11 @@ struct PSOKey
 };
 
 // Predefined PSO keys for common rendering configurations
-inline constexpr PSOKey PSO_KEY_OPAQUE{ VS_KEY{}, PS_KEY{}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_TRANSPARENT { VS_KEY{}, PS_KEY{}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_MASKED { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_ADDITIVE { VS_KEY{}, PS_KEY{}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_MULTIPLY { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None };
+inline constexpr PSOKey PSO_KEY_OPAQUE{ VS_KEY{}, PS_KEY{}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
+inline constexpr PSOKey PSO_KEY_TRANSPARENT { VS_KEY{}, PS_KEY{}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+inline constexpr PSOKey PSO_KEY_MASKED { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
+inline constexpr PSOKey PSO_KEY_ADDITIVE { VS_KEY{}, PS_KEY{}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+inline constexpr PSOKey PSO_KEY_MULTIPLY { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
 
 // Hash function for PSOKey to be used in unordered_map
 struct PSOKeyHash

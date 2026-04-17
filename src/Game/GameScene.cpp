@@ -30,31 +30,31 @@ void GameScene::InitializeOverride(EngineContext& context)
 		RenderTemplateFactory::CreateRenderTemplateFromDefaultMesh(
 			*context.pMeshManager,
 			*context.pTextureManager,
-			DEFAULT_MESH::CUBE,
-			MaterialInput{.texturePath = L"" }
-		)
-	);
-
-	auto playerChild = playerActor->AddChild<Actor>(Vector3{ 0.0f, 0.0f, -1.0f });
-	playerChild->AddComponent<MeshRenderer>()->Initialize(
-		RenderTemplateFactory::CreateRenderTemplateFromDefaultMesh(
-			*context.pMeshManager,
-			*context.pTextureManager,
 			DEFAULT_MESH::SPHERE,
-			MaterialInput{.texturePath = L"asset/texture/skin.png",.baseColor = Vector4(1.0f, 1.0f, 1.0f, 0.3f), .psoKey = PSO_KEY_TRANSPARENT,}
+			MaterialInput{ .texturePath = L"asset/texture/skin.png",.baseColor = Vector4(1.0f, 1.0f, 1.0f, 0.3f), .psoKey = PSO_KEY_TRANSPARENT, }
 		)
 	);
 
-	auto modelActor = AddActor<Actor>(Vector3{ 2.0f, 0.0f, 5.0f });
-	modelActor->AddComponent<PlayerBehavior>();
-	modelActor->AddComponent<MeshRenderer>()->Initialize(
-		RenderTemplateFactory::CreateRenderTemplate(
-			*context.pMeshManager,
-			*context.pTextureManager,
-			MeshInput{ .modelPath = L"asset/fbx/spray/Spray_01.fbx" },
-			MaterialInput{.texturePath = L"asset/fbx/sourceimages/T_Spray01.png", .baseColor = Vector4(1.0f,1.0f,1.0f,0.3f), .psoKey = PSO_KEY_TRANSPARENT}
-		)
-	);
+	//auto playerChild = playerActor->AddChild<Actor>(Vector3{ 0.0f, 0.0f, -1.0f });
+	//playerChild->AddComponent<MeshRenderer>()->Initialize(
+	//	RenderTemplateFactory::CreateRenderTemplateFromDefaultMesh(
+	//		*context.pMeshManager,
+	//		*context.pTextureManager,
+	//		DEFAULT_MESH::SPHERE,
+	//		MaterialInput{.texturePath = L"asset/texture/skin.png",.baseColor = Vector4(1.0f, 1.0f, 1.0f, 0.3f), .psoKey = PSO_KEY_TRANSPARENT,}
+	//	)
+	//);
+
+	//auto modelActor = AddActor<Actor>(Vector3{ 2.0f, 0.0f, 5.0f });
+	//modelActor->AddComponent<PlayerBehavior>();
+	//modelActor->AddComponent<MeshRenderer>()->Initialize(
+	//	RenderTemplateFactory::CreateRenderTemplate(
+	//		*context.pMeshManager,
+	//		*context.pTextureManager,
+	//		MeshInput{ .modelPath = L"asset/fbx/spray/Spray_01.fbx" },
+	//		MaterialInput{.texturePath = L"asset/fbx/sourceimages/T_Spray01.png", .baseColor = Vector4(1.0f,1.0f,1.0f,0.3f), .psoKey = PSO_KEY_TRANSPARENT}
+	//	)
+	//);
 
 	auto cameraTestActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, -5.0f });
 	cameraTestActor->AddComponent<CameraTest>();

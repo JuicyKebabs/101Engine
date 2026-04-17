@@ -171,6 +171,6 @@ void RenderSystem::NormalizePSOKey(PSOKey& psoKey, RenderQueue queue)
 	if (queue == RenderQueue::Transparent
 		&& psoKey.depth != DepthMode::Disable)
 	{
-		psoKey.depth = DepthMode::TestWrite;
+		psoKey.depth = DepthMode::TestNoWrite;
 	}
 }
