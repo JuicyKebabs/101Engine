@@ -114,7 +114,7 @@ MeshRenderItem RenderSystem::CreateMeshRenderItem(const SubmeshRenderTemplate& r
 	item.meshDesc = renderTemplate.meshDesc;
 	item.materialDesc = renderTemplate.materialDesc;
 	item.worldMatrix = renderProxy.worldMatrix;
-	item.color = renderProxy.color;
+	item.color = renderProxy.color * renderTemplate.materialDesc.baseColor;
 	return item;
 }
 
@@ -123,9 +123,11 @@ SpriteRenderItem RenderSystem::CreateSpriteRenderItem(const SpriteRenderTemplate
 	SpriteRenderItem item;
 	item.materialDesc = renderTemplate.materialDesc;
 	item.worldMatrix = renderProxy.worldMatrix;
-	item.color = renderProxy.color;
+	item.color = renderProxy.color * renderTemplate.materialDesc.baseColor;
 	item.uvScale = renderProxy.uvScale;
 	item.uvOffset = renderProxy.uvOffset;
+	item.pivot = renderProxy.pivot;
+	item.flip = renderProxy.flip;
 	return item;
 }
 

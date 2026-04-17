@@ -1383,6 +1383,11 @@ Matrix4x4 Matrix4x4::CreateCylindricalBillboard(const Vector3& objectPos, const 
     return billboardMatrix;
 }
 
+Matrix4x4 Matrix4x4::Transpose(const Matrix4x4& m)
+{
+	return Matrix4x4(XMMatrixTranspose(m));
+}
+
 Matrix4x4& Matrix4x4::operator=(const Matrix4x4& rhs)
 {
     if (this != &rhs)

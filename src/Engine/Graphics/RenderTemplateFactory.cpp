@@ -6,7 +6,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-RenderTemplate RenderTemplateFactory::CreateRenderTemplate(MeshManager& meshManager, TextureManager& textureManager, const MeshInput& meshInput, const MaterialInput& materialInput)
+MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplate(MeshManager& meshManager, TextureManager& textureManager, const MeshInput& meshInput, const MaterialInput& materialInput)
 {
 	Model model = LoadModelFromFile(meshInput.modelPath, meshInput.inverseU, meshInput.inverseV);
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
@@ -14,11 +14,20 @@ RenderTemplate RenderTemplateFactory::CreateRenderTemplate(MeshManager& meshMana
 
 }
 
-RenderTemplate RenderTemplateFactory::CreateRenderTemplateFromDefaultMesh(MeshManager& meshManager, TextureManager& textureManager, DEFAULT_MESH mesh, const MaterialInput& materialInput)
+MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(MeshManager& meshManager, TextureManager& textureManager, DEFAULT_MESH mesh, const MaterialInput& materialInput)
 {
 	Model model = LoadDefaultModel(mesh);
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
 	return BuildRenderTemplate(meshManager, model, materialDesc);
+}
+
+SpriteRenderTemplate RenderTemplateFactory::CreateSpriteRenderTemplate(TextureManager& textureManager, const MaterialInput& materialInput, BillboardType billboardType)
+{
+	SpriteRenderTemplate temp;
+	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
+	temp.materialDesc = materialDesc;
+	temp.billboardType = billboardType;
+	return temp;
 }
 
 MaterialDesc RenderTemplateFactory::BuildMaterialDesc(TextureManager& textureManager, const MaterialInput& input)
@@ -55,9 +64,9 @@ Model RenderTemplateFactory::LoadDefaultModel(DEFAULT_MESH type)
 	return model;
 }
 
-RenderTemplate RenderTemplateFactory::BuildRenderTemplate(MeshManager& meshManager, Model& model, MaterialDesc& materialDesc)
+MeshRenderTemplate RenderTemplateFactory::BuildRenderTemplate(MeshManager& meshManager, Model& model, MaterialDesc& materialDesc)
 {
-	RenderTemplate temp;
+	MeshRenderTemplate temp;
 
 	// Create a render template for each mesh in the model
 	for (auto& mesh : model) {

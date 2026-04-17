@@ -1,11 +1,8 @@
-//===========================================================
-//頂点シェーダー、ピクセルシェーダー共通の定義
-//============================================================
-//頂点シェーダー出力データ構造体
+// Vertex output structure
 struct VSOutPut
 {
-    float4 svpos : SV_POSITION; //システム用頂点座標
-    float4 color : COLOR;       //頂点カラー
-    float2 uv : TEXCOORD;       //uv座標
-    float3 normal : NORMAL;     //法線ベクトル
+    float4 svpos : SV_POSITION; // Vertex position after transformation
+    float4 color : COLOR;       // Vertex color
+    float2 uv : TEXCOORD;       // Texture coordinates
+    float3 normal : NORMAL;     // Normal vector
 };

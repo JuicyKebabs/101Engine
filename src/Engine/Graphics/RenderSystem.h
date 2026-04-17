@@ -90,8 +90,8 @@ private:
 	// PSOKey comparison
 	static inline bool PSOKeyLess(const PSOKey& a, const PSOKey& b)
 	{
-		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID, a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat)
-			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, a.rtvFormat);
+		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID, a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat, a.indexFree)
+			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, b.rtvFormat, b.indexFree);
 	}
 	// Bind sort comparison
 	//static inline bool BindLess(const SortData& a, const SortData& b)

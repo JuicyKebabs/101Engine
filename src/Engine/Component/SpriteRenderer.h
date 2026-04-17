@@ -4,21 +4,18 @@
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Resource/Texture.h"
 #include "Engine/Core/Math/Math.h"
-
-struct SpriteRenderTemplate
-{
-	MaterialDesc materialDesc;							// Material description for the sprite
-	BillboardType billboardType = BillboardType::None;	// Billboard type for the sprite
-};
+#include "Engine/Graphics/RenderTemplateFactory.h"
 
 struct SpriteRendererProxy
 {
-    Vector3 position{};			// Position for this draw packet
-    Matrix4x4 worldMatrix = {};	// World matrix for this draw packet
-    Vector4 color{ 1,1,1,1 };	// Color for rendering
-	Vector2 uvScale{ 1,1 };		// UV scale for texture mapping
-	Vector2 uvOffset{ 0,0 };	// UV offset for texture mapping
-    bool visible = true;		// Visibility flag for this draw packet
+    Vector3 position{};				// Position for this draw packet
+    Matrix4x4 worldMatrix = {};		// World matrix for this draw packet
+    Vector4 color{ 1,1,1,1 };		// Color for rendering
+	Vector2 uvScale{ 1,1 };			// UV scale for texture mapping
+	Vector2 uvOffset{ 0,0 };		// UV offset for texture mapping
+	Vector2 pivot{ 0.5f, 0.5f };	// Pivot point for the sprite
+	Vector2 flip{ 1,1 };			// Flip flags for X and Y axes (1 for normal, -1 for flipped)
+    bool visible = true;			// Visibility flag for this draw packet
 };
 
 class SpriteRenderer : public Component

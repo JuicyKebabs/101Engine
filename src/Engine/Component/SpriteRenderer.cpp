@@ -68,7 +68,12 @@ void SpriteRenderer::RebuildRenderProxy()
 			m_proxy.position = transform->GetWorldPosition();
 			m_proxy.worldMatrix = transform->GetWorldMatrix();
 			m_proxy.color = m_color;
+			m_proxy.uvScale = m_uvScale;
+			m_proxy.uvOffset = m_uvOffset;
+			m_proxy.pivot = m_pivot;
 			m_proxy.visible = m_isVisible;
+			m_proxy.flip.x = m_flipX ? -1.0f : 1.0f;
+			m_proxy.flip.y = m_flipY ? -1.0f : 1.0f;
 		}
 	}
 }

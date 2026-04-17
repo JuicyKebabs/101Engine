@@ -33,15 +33,22 @@ struct SubmeshRenderTemplate
 	MaterialDesc materialDesc;	// Material information and rendering settings
 };
 
-using RenderTemplate = std::vector<SubmeshRenderTemplate>;	// Alias for a render template consisting of multiple submesh templates
+using MeshRenderTemplate = std::vector<SubmeshRenderTemplate>;	// Alias for a render template consisting of multiple submesh templates
+
+// Render template structure for a sprite
+struct SpriteRenderTemplate
+{
+	MaterialDesc materialDesc;							// Material description for the sprite
+	BillboardType billboardType = BillboardType::None;	// Billboard type for the sprite
+};
 
 // Material input structure for creating material descriptions
 struct MaterialInput
 {
-	std::wstring texturePath;		// Path to the texture to use for this material
-	Vector4 baseColor{ 1,1,1,1 };	// Base color for rendering (can be used to tint the mesh)
-	PSOKey psoKey = PSO_KEY_OPAQUE;	// Pipeline State Object key for this material
-	bool lightingEnabled = true;	// Lighting enabled flag
+	std::wstring texturePath;						// Path to the texture to use for this material
+	Vector4 baseColor{ 1,1,1,1 };					// Base color for rendering (can be used to tint the mesh)
+	PSOKey psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;	// Pipeline State Object key for this material
+	bool lightingEnabled = true;					// Lighting enabled flag
 };
 
 // Mesh input structure for creating render templates
@@ -56,18 +63,24 @@ struct MeshInput
 class RenderTemplateFactory
 {
 public:
-	static RenderTemplate CreateRenderTemplate(
+	static MeshRenderTemplate CreateMeshRenderTemplate(
 		MeshManager& meshManager,
 		TextureManager& textureManager,
 		const MeshInput& meshInput,
 		const MaterialInput& materialInput
 	);
 
-	static RenderTemplate CreateRenderTemplateFromDefaultMesh(
+	static MeshRenderTemplate CreateMeshRenderTemplateFromDefaultMesh(
 		MeshManager& meshManager,
 		TextureManager& textureManager,
 		DEFAULT_MESH desc,
 		const MaterialInput& materialInput
+	);
+
+	static SpriteRenderTemplate CreateSpriteRenderTemplate(
+		TextureManager& textureManager,
+		const MaterialInput& materialInput,
+		BillboardType billboardType
 	);
 
 	static MaterialDesc BuildMaterialDesc(
@@ -83,7 +96,7 @@ public:
 
 	static Model LoadDefaultModel(DEFAULT_MESH type);
 
-	static RenderTemplate BuildRenderTemplate(
+	static MeshRenderTemplate BuildRenderTemplate(
 		MeshManager& meshManager,
 		Model& model,
 		MaterialDesc& materialDesc

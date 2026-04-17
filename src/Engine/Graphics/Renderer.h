@@ -63,8 +63,11 @@ private:
 	FrameRenderData m_frameRenderData;	// Render data for this frame (contains draw packets and other rendering information)
 	CameraInfo m_cameraInfoThisFrame;	// Camera information for this frame (for post-processing)
 
-	// Frame-specific object CBV pool (1 object = 1 constant buffer)
-	std::vector<std::unique_ptr<ConstantBuffer>> m_objectCBWorld;	// For world space
+	// Constant buffers for per-frame and per-draw data
+	std::unique_ptr<ConstantBuffer> m_frameCB;
+	std::unique_ptr<ConstantBuffer> m_lightCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCBWorld;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCBWorld;
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light

@@ -11,7 +11,7 @@ public:
 		Vector3 rotation = { 0,0,0 },
 		UINT order = 0,
 		const std::wstring& texturePath = L"",
-		PSOKey psoKey = PSO_KEY_TRANSPARENT
+		PSOKey psoKey = PSO_KEY_DEFAULT::SPRITE_TRANSPARENT
 	);
 	~UIImage() {};
 	void InitializeOverride(

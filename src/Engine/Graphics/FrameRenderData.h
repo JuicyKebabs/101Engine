@@ -26,6 +26,8 @@ struct SpriteRenderItem {
 	Vector4 color{ 1,1,1,1 };
 	Vector2 uvScale{ 1,1 };
 	Vector2 uvOffset{ 0,0 };
+	Vector2 pivot{ 0.5f, 0.5f };
+	Vector2 flip{ 1,1 };
 };
 
 using ItemHandle = uint32_t;	// Unique identifier for render item in queue
@@ -71,13 +73,8 @@ struct FrameRenderData {
 		transparent.push_back(std::move(item));
 	}
 
-	size_t GetOpaqueCount() const {
-		return opaque.size();
-	}
-
-	size_t GetTransparentCount() const {
-		return transparent.size();
-	}
+	size_t GetMeshCount() const { return meshs.size(); }
+	size_t GetSpriteCount() const { return sprites.size(); }
 
 	void Clear() {
 		meshs.clear();

@@ -35,6 +35,9 @@ void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescr
 	PSOKey defaultKey{};
 	m_pDefaultPSO = CreatePipelineStateObject(defaultKey);
 
+	m_frameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
+	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
+
 	//ポストプロセス用PSOキーの設定
 	PreparePostProcessKey();
 }
@@ -75,15 +78,46 @@ void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 // Render all items in this frame's render data
 void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 {
+	// Set frame-level constants
+	auto framePtr = m_frameCB->GetPtr<FrameConstants>();
+	framePtr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;
+	framePtr->projMatrix = m_cameraInfoThisFrame.projMatrix;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_frameCB->GetAddress());
+
+	// Set lighting constants ( Currently, one directional light is only supported for simplicity)
+	auto lightPtr = m_lightCB->GetPtr<LightConstants>();
+	lightPtr->lightDir_Intensity = Vector4(
+		m_directionalLight.direction.x,
+		m_directionalLight.direction.y,
+		m_directionalLight.direction.z,
+		m_directionalLight.intensity
+	);
+	lightPtr->lightColor_Ambient = Vector4(
+		m_directionalLight.color.x,
+		m_directionalLight.color.y,
+		m_directionalLight.color.z,
+		m_directionalLight.ambient
+	);
+	p_commandList->SetGraphicsRootConstantBufferView(2, m_lightCB->GetAddress());
+
 	// Allocate constant buffers for this frame
-	size_t totalItems = m_frameRenderData.GetOpaqueCount() + m_frameRenderData.GetTransparentCount();
-	if (m_objectCBWorld.size() < totalItems) 
+	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
+	if (m_meshCBWorld.size() < totalMeshCount)
 	{
-		size_t difference = totalItems - m_objectCBWorld.size();
-		for (size_t i = 0; i < difference; i++)
+		size_t toAllocate = totalMeshCount - m_meshCBWorld.size();
+		for (size_t i = 0; i < toAllocate; i++)
 		{
-			auto newCb = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(PerObjectConstants));
-			m_objectCBWorld.push_back(std::move(newCb));
+			m_meshCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+		}
+	}
+
+	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
+	if (m_spriteCBWorld.size() < totalSpriteCount)
+	{
+		size_t toAllocate = totalSpriteCount - m_spriteCBWorld.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_spriteCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
 		}
 	}
 
@@ -150,53 +184,45 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_objectCBWorld.size())
+	if (itemIndex >= m_meshCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	if (!m_meshCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
 	}
 
-	// Compare PSO keys to minimize state changes (optional optimization)
+	// Check if the PSO key's vertex shader file ID is correct
 	PSOKey currentKey = item.materialDesc.psoKey;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Mesh) {
+		currentKey.vsKey.fileID = VS_FILE_ID::Mesh;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
 	if (currentKey != compare)
 	{
 		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+
 		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
 		compare = currentKey;										// Update the compare key
 	}
 
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<PerObjectConstants>();
+	auto ptr = m_meshCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
-	ptr->worldInvTranspose = item.worldMatrix.Transpose();
-	ptr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;
-	ptr->projMatrix = m_cameraInfoThisFrame.projMatrix;
+	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
 	ptr->objectColor = item.color;
-	ptr->uvRect = XMFLOAT4(0, 0, 1, 1);
-	ptr->lightDir_Intensity = Vector4(
-		m_directionalLight.direction.x,
-		m_directionalLight.direction.y,
-		m_directionalLight.direction.z,
-		m_directionalLight.intensity
-	);
-	ptr->lightColor_Ambient = Vector4(
-		m_directionalLight.color.x,
-		m_directionalLight.color.y,
-		m_directionalLight.color.z,
-		m_directionalLight.ambient
-	);
+	ptr->uvRect = Vector4(0, 0, 1, 1);
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCBWorld[itemIndex]->GetAddress());
 
 	// Set mesh data
 	auto meshGPU = item.meshDesc.gpuHandle;
 	auto vbv = meshGPU->GetVertexBuffer()->GetView();
 	auto ibv = meshGPU->GetIndexBuffer()->GetView();
-	p_commandList->SetGraphicsRootConstantBufferView(0, m_objectCBWorld[itemIndex]->GetAddress());
 	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
 	p_commandList->IASetVertexBuffers(0, 1, &vbv);
 	p_commandList->IASetIndexBuffer(&ibv);
@@ -219,12 +245,12 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_objectCBWorld.size())
+	if (itemIndex >= m_meshCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	if (!m_meshCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -232,6 +258,11 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 
 	// Compare PSO keys to minimize state changes (optional optimization)
 	PSOKey currentKey = item.materialDesc.psoKey;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) {
+		currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
+	}
+	if (!currentKey.indexFree) currentKey.indexFree = true;
+
 	if (currentKey != compare)
 	{
 		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
@@ -240,30 +271,18 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	}
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<PerObjectConstants>();
+	auto ptr = m_spriteCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
-	ptr->worldInvTranspose = item.worldMatrix.Transpose();
-	ptr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;
-	ptr->projMatrix = m_cameraInfoThisFrame.projMatrix;
-	ptr->objectColor = item.color;
+	ptr->color = item.color;
 	ptr->uvRect = Vector4(
 		item.uvOffset.x,
 		item.uvOffset.y,
 		item.uvOffset.x + item.uvScale.x,
 		item.uvOffset.y + item.uvScale.y
 	);
-	ptr->lightDir_Intensity = Vector4(
-		m_directionalLight.direction.x,
-		m_directionalLight.direction.y,
-		m_directionalLight.direction.z,
-		m_directionalLight.intensity
-		);
-	ptr->lightColor_Ambient = Vector4(
-		m_directionalLight.color.x,
-		m_directionalLight.color.y,
-		m_directionalLight.color.z,
-		m_directionalLight.ambient
-	);
+	ptr->pivot = item.pivot;
+	ptr->flip = item.flip;
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCBWorld[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
@@ -319,6 +338,7 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 	pso->SetBlendMode(key.blend);
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
+	pso->FreeIndex(key.indexFree);
 	pso->Create();
 
 	// Check if creation was successful
@@ -336,11 +356,11 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 void Renderer::PreparePostProcessKey()
 {
 	PSOKey key{};
-	key.vsKey.fileID = VS_FILE_ID::Basic;
-	key.vsKey.entryID = VS_ENTRY_ID::PostEffect;
+	key.vsKey.fileID = VS_FILE_ID::PostEffect;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
 	key.vsKey.defines = {};
-	key.psKey.fileID = PS_FILE_ID::Basic;
-	key.psKey.entryID = PS_ENTRY_ID::PostEffect;
+	key.psKey.fileID = PS_FILE_ID::PostEffect;
+	key.psKey.entryID = PS_ENTRY_ID::Main;
 	key.psKey.defines = {};
 	key.blend = BlendMode::Opaque;
 	key.depth = DepthMode::Disable;

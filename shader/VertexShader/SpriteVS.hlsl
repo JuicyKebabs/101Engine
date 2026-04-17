@@ -1,0 +1,51 @@
+#include "../BasicShader.hlsli"
+#include "../FrameConstants.hlsli"
+#include "../SpriteObjectConstants.hlsli"
+//頂点シェーダー入力データ構造体
+struct VSInput
+{
+    float3 position : POSITION; //頂点座標
+    float3 normal : NORMAL; //法線ベクトル
+    float2 uv : TEXCOORD0; //テクスチャ座標
+    float3 tangent : TANGENT; //接空間
+    float4 color : COLOR; //頂点カラー
+};
+
+VSOutPut main(
+    uint vertexID : SV_VertexID
+)
+{
+    static const float2 quadVertices[6] =
+    {
+        float2(-0.5, +0.5),
+        float2(-0.5, -0.5),
+        float2(+0.5, +0.5),
+        float2(+0.5, +0.5),
+        float2(-0.5, -0.5),
+        float2(+0.5, -0.5)
+    };
+    
+    static const float2 quadUVs[6] =
+    {
+        float2(0.0, 0.0),
+        float2(0.0, 1.0),
+        float2(1.0, 0.0),
+        float2(1.0, 0.0),
+        float2(0.0, 1.0),
+        float2(1.0, 1.0)
+    };
+    
+    float2 localPos = quadVertices[vertexID];
+    localPos -= pivot;
+    localPos *= flip;
+    float2 uv01 = quadUVs[vertexID];
+    
+    VSOutPut output = (VSOutPut) 0;
+    float4 worldPos = mul(world, float4(localPos, 0.0f, 1.0f));
+    float4 viewPos = mul(view, worldPos);
+    output.svpos = mul(proj, viewPos);
+    
+    output.uv = lerp(uvRect.xy, uvRect.zw, uv01);
+    output.color = objColor;
+    return output;
+}

@@ -1,73 +1,51 @@
 #include "RootSignature.h"
 #include "Engine/Engine.h"
 
-//デフォルトコンストラクタ
 RootSignature::RootSignature(ID3D12Device* pDevice)
 {
-	//ルートシグネチャフラグの設定
-	auto flag = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; // アプリケーションの入力アセンブラを使用する
-	flag |= D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS; // ドメインシェーダーのルートシグネチャへんアクセスを拒否する
-	flag |= D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS; // ハルシェーダーのルートシグネチャへんアクセスを拒否する
-	flag |= D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS; // ジオメトリシェーダーのルートシグネチャへんアクセスを拒否する
+	// Setting the root signature flags
+	auto flag = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	flag |= D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
+	flag |= D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+	flag |= D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
-	//b0の定数バッファを設定
-	CD3DX12_ROOT_PARAMETER rootParam[3] = {};	//ルートパラメータ
-	rootParam[0].InitAsConstantBufferView(
-		0,							//シェーダーレジスタb0
-		0,							//レジスタスペース0
-		D3D12_SHADER_VISIBILITY_ALL	//全てのシェーダーステージから見える
-	);
+	CD3DX12_ROOT_PARAMETER rootParam[4] = {}; // Root parameters
 
-	//t0のシェーダーリソースビューを設定
-	CD3DX12_DESCRIPTOR_RANGE tableRange[1] = {}; //ディスクリプタテーブル
+	// b0 : Frame constants
+	rootParam[0].InitAsConstantBufferView(0);
 
-	//ディスクリプタレンジの設定
-	tableRange[0].Init(
-		D3D12_DESCRIPTOR_RANGE_TYPE_SRV,	//シェーダーリソースビュー
-		1,									//ディスクリプタ数1
-		0									//シェーダーレジスタt0
-	);
+	// b1 : Mesh and Sprite render constants
+	rootParam[1].InitAsConstantBufferView(1);
 
-	//ディスクリプタテーブルを設定
-	rootParam[1].InitAsDescriptorTable(
-		std::size(tableRange),		//ディスクリプタレンジの数
-		tableRange,					//ディスクリプタレンジ
-		D3D12_SHADER_VISIBILITY_ALL	//全てのシェーダーステージから見える
-	);
+	// b2 : Liting constants
+	rootParam[2].InitAsConstantBufferView(2);
 
-	//b1の定数バッファを設定
-	rootParam[2].InitAsConstantBufferView(
-		1							//シェーダーレジスタb1
-	);
+	// t0 : Textures
+	CD3DX12_DESCRIPTOR_RANGE srvRange;
 
-	//スタティックサンプラーの設定
-	auto sampler = CD3DX12_STATIC_SAMPLER_DESC(
-		0,								//シェーダーレジスタs0
-		D3D12_FILTER_MIN_MAG_MIP_LINEAR	//フィルタリング方法(バイリニアフィルタリング)
-	);
+	// Setting up the descriptor range for shader resource views (SRV)
+	srvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1 ,0);
+	rootParam[3].InitAsDescriptorTable(1, &srvRange);
 
-	//ルートシグネチャの設定
-	CD3DX12_ROOT_SIGNATURE_DESC desc = {};	//設定構造体
-	desc.NumParameters = _countof(rootParam);	//ルートパラメータの数
-	desc.NumStaticSamplers = 1;					//スタティックサンプラーの数
-	desc.pParameters = rootParam;				//ルートパラメータ
-	desc.pStaticSamplers = &sampler;			//スタティックサンプラー
-	desc.Flags = flag;							//ルートシグネチャフラグ
+	// Setting up a static sampler for linear filtering
+	auto sampler = CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
-	//シリアライズ
-	ComPtr<ID3DBlob> pBlob;		//シグネチャ
-	ComPtr<ID3DBlob> pError;	//エラー
+	// Descriptoion structure for the root signature
+	CD3DX12_ROOT_SIGNATURE_DESC desc = {};
+	desc.NumParameters = _countof(rootParam);	// Number of root parameters
+	desc.NumStaticSamplers = 1;					// Number of static samplers
+	desc.pParameters = rootParam;				// Pointer to the array of root parameters
+	desc.pStaticSamplers = &sampler;			// Pointer to the array of static samplers
+	desc.Flags = flag;							// Root signature flags
 
-	result = D3D12SerializeRootSignature(
-		&desc,							//ルートシグネチャの設定
-		D3D_ROOT_SIGNATURE_VERSION_1,	//ルートシグネチャのバージョン
-		&pBlob,							//シグネチャ
-		&pError							//エラー
-	);
+	// Serialize the root signature
+	ComPtr<ID3DBlob> pBlob;		// Blob for the serialized root signature
+	ComPtr<ID3DBlob> pError;	// Blob for error messages
+	result = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &pBlob, &pError);
 
+	// Check if serialization succeeded
 	if(FAILED(result))
 	{
-		//シリアライズに失敗した場合はエラー内容を表示して終了
 		if (pError)
 		{
 			OutputDebugStringA((char*)pError->GetBufferPointer());
@@ -76,25 +54,24 @@ RootSignature::RootSignature(ID3D12Device* pDevice)
 		return;
 	}
 
-	//ルートシグネチャの生成
+	// Create the root signature
 	result = pDevice->CreateRootSignature(
-		0,								//ノードマスク(シングルGPUなので0)
-		pBlob->GetBufferPointer(),		//シグネチャのバッファポインタ
-		pBlob->GetBufferSize(),			//シグネチャのバッファサイズ
-		IID_PPV_ARGS(&m_rootSignature)	//ルートシグネチャのアドレスを取得
+		0,								// Node mask (for multi-GPU, 0 means all nodes)
+		pBlob->GetBufferPointer(),		// Pointer to the serialized root signature
+		pBlob->GetBufferSize(),			// Size of the serialized root signature
+		IID_PPV_ARGS(&m_rootSignature)	// Output pointer for the created root signature (IID_PPV_ARGS macro to specify the type)
 	);
 
 	if (FAILED(result))
 	{
-		OutputDebugStringA("ルートシグネチャの生成に失敗しました。");
+		OutputDebugStringA("RootSignature : Failed to create root signature.\n");
 		m_isValid = false;
 		return;
 	}
 
-	m_isValid = true;	//ルートシグネチャ生成成功
+	m_isValid = true; // Root signature creation succeeded
 }
 
-//ルートシグネチャを取得
 ID3D12RootSignature* RootSignature::GetRootSignature() const
 {
 	return m_rootSignature.Get();

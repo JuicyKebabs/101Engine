@@ -46,21 +46,23 @@ struct ShaderDesc
 
 // Vertex shader file tables
 static const std::wstring VS_FILE_TABLE[] = {
-    L"shader/VertexShader/VertexShader.hlsl"
+    L"shader/VertexShader/MeshVS.hlsl",
+    L"shader/VertexShader/SpriteVS.hlsl",
+    L"shader/VertexShader/PostEffectVS.hlsl",
 };
 // Pixel shader file tables
 static const std::wstring PS_FILE_TABLE[] = {
-    L"shader/PixelShader/PixelShader.hlsl"
+    L"shader/PixelShader/MeshPS.hlsl",
+    L"shader/PixelShader/SpritePS.hlsl",
+    L"shader/PixelShader/PostEffectPS.hlsl",
 };
 //  Vertex shader entry point tables
 static const std::string VS_ENTRY_TABLE[] = {
-    "BasicVS",
-	"PostEffectVS"
+    "main",
 };
 //  Pixel shader entry point tables
 static const std::string PS_ENTRY_TABLE[] = {
-    "BasicPS",
-	"PostEffectPS"
+    "main",
 };
 // Shader profiles(Solid shader model 5.0)
 static const std::string VS_PROFILE = "vs_5_0";
