@@ -18,7 +18,6 @@ void TextureManager::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* 
 	m_pDevice = pDevice;									// Save device
 	m_pDescriptorHeapAllocator = pDescriptorHeapAllocator;	// Save descriptor heap allocator
 
-	// Load default white texture
 	CreateDefaultTexture();
 }
 
@@ -350,7 +349,7 @@ void TextureManager::CreateDefaultTexture()
 	);
 
 	// Create upload buffer for default texture
-	std::vector<uint32_t> defaultPixel = { 0xFFFF00FF }; // Pink pixel data (RGBA)
+	std::vector<uint32_t> defaultPixel = { 0xFFF000FF }; // Pink pixel data (RGBA)
 	const UINT64 uploadBufferSize = GetRequiredIntermediateSize( // Get upload buffer size
 		pTexture.Get(),				 // Texture resource
 		0,							 // First subresource

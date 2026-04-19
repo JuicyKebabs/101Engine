@@ -6,6 +6,7 @@
 #include "Engine/Graphics/ShaderLibrary.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Core/Debug/Debug.h"
 
 using namespace DirectX;
 
@@ -34,6 +35,9 @@ void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescr
 	PSOKey defaultKey{};
 	m_pDefaultPSO = CreatePipelineStateObject(defaultKey);
 
+	m_frameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
+	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
+
 	//ポストプロセス用PSOキーの設定
 	PreparePostProcessKey();
 }
@@ -55,10 +59,9 @@ void Renderer::BeginFrame(ID3D12GraphicsCommandList* p_commandList)
 
 }
 
-void Renderer::SubmitDrawPacket(const std::vector<DrawPacket>& drawPackets)
+void Renderer::SubmitFrameRenderData(const FrameRenderData& frameRenderData)
 {
-	m_drawPacketsThisFrame.clear();
-	m_drawPacketsThisFrame = drawPackets;
+	m_frameRenderData = frameRenderData;
 }
 
 void Renderer::SubmitCameraInfo(const CameraInfo& cameraInfo)
@@ -72,95 +75,87 @@ void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 	m_directionalLight = light;	//平行光源情報を保存
 }
 
-//一時描画リストの描画(ワールド座標用)
+// Render all items in this frame's render data
 void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 {
-	PSOKey compare{};
+	// Set frame-level constants
+	auto framePtr = m_frameCB->GetPtr<FrameConstants>();
+	framePtr->view = m_cameraInfoThisFrame.viewMatrix;
+	framePtr->proj = m_cameraInfoThisFrame.projMatrix;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_frameCB->GetAddress());
 
-	for (size_t i = 0; i < m_drawPacketsThisFrame.size(); i++)
+	// Set lighting constants ( Currently, one directional light is only supported for simplicity)
+	auto lightPtr = m_lightCB->GetPtr<LightConstants>();
+	lightPtr->lightDir_Intensity = Vector4(
+		m_directionalLight.direction.x,
+		m_directionalLight.direction.y,
+		m_directionalLight.direction.z,
+		m_directionalLight.intensity
+	);
+	lightPtr->lightColor_Ambient = Vector4(
+		m_directionalLight.color.x,
+		m_directionalLight.color.y,
+		m_directionalLight.color.z,
+		m_directionalLight.ambient
+	);
+	p_commandList->SetGraphicsRootConstantBufferView(2, m_lightCB->GetAddress());
+
+	// Allocate constant buffers for this frame
+	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
+	if (m_objectCBWorld.size() < totalMeshCount)
 	{
-		//パイプラインステートオブジェクトの設定
-		if (i == 0)
+		size_t toAllocate = totalMeshCount - m_objectCBWorld.size();
+		for (size_t i = 0; i < toAllocate; i++)
 		{
-			auto pso = GetPipelineStateObject(m_drawPacketsThisFrame[i].materialDesc.psoKey);	//パイプラインステートを取得
-			p_commandList->SetPipelineState(pso->GetPipelineState());					//パイプラインステートをセット
-			compare = m_drawPacketsThisFrame[i].materialDesc.psoKey;
+			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
 		}
-		else if (compare != m_drawPacketsThisFrame[i].materialDesc.psoKey)
+	}
+
+	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
+	if (m_objectCBWorld.size() < totalSpriteCount)
+	{
+		size_t toAllocate = totalSpriteCount - m_objectCBWorld.size();
+		for (size_t i = 0; i < toAllocate; i++)
 		{
-			auto pso = GetPipelineStateObject(m_drawPacketsThisFrame[i].materialDesc.psoKey);	//パイプラインステートを取得
-			p_commandList->SetPipelineState(pso->GetPipelineState());					//パイプラインステートをセット
+			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
 		}
+	}
 
-		compare = m_drawPacketsThisFrame[i].materialDesc.psoKey;
+	PSOKey compare{};
+	int ItemIndex = 0; 
 
-		// フレームごとのCBVプールを必要数まで確保
-		if (i >= m_objectCBWorld.size())
+	for (auto& item : m_frameRenderData.opaque)
+	{
+		switch (item.renderType)
 		{
-			//新しい定数バッファを作成
-			auto newCb = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(PerObjectConstants));
-
-			if (!newCb->GetIsValid())
-			{//作成失敗時
-				OutputDebugStringA("ConstantBuffer creation failed\n");
-				break;
-			}
-
-			//プールに追加
-			m_objectCBWorld.push_back(std::move(newCb));
+		case RenderType::Mesh:
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
+			ItemIndex++;
+			break;
+		case RenderType::Sprite:
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
+			ItemIndex++;
+			break;
+		default:
+			break;
 		}
+	}
 
-		//オブジェクト用定数バッファの取得
-		ConstantBuffer* cb = m_objectCBWorld[i].get();
-		auto* ptr = cb->GetPtr<PerObjectConstants>();
-
-		//定数バッファに transform を書く（各オブジェクト専用のメモリ）
-		ptr->worldMatrix = m_drawPacketsThisFrame[i].worldMatrix;	//ワールド行列
-		ptr->worldInvTranspose = XMMatrixTranspose(XMMatrixInverse(nullptr, ptr->worldMatrix)); //ワールド逆転置行列
-		ptr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;					//ビュー行列
-		ptr->projMatrix = m_cameraInfoThisFrame.projMatrix;					//プロジェクション行列
-		ptr->objectColor = m_drawPacketsThisFrame[i].color;	//オブジェクトの色
-		ptr->uvRect = XMFLOAT4(0, 0, 1, 1);		//UV矩形
-		XMFLOAT4 direction_intensity =
+	for (auto& item : m_frameRenderData.transparent)
+	{
+		switch (item.renderType)
 		{
-			m_directionalLight.direction.x,
-			m_directionalLight.direction.y,
-			m_directionalLight.direction.z,
-			m_directionalLight.intensity
-		};
-		XMFLOAT4 color_amobient = XMFLOAT4(
-			m_directionalLight.color.x,
-			m_directionalLight.color.y,
-			m_directionalLight.color.z,
-			m_directionalLight.ambient
-		);
-		ptr->lightDir_Intensity = direction_intensity;
-		ptr->lightColor_Ambient = color_amobient;
-
-		//メッシュGPUデータの取得
-		auto meshGPU = m_drawPacketsThisFrame[i].meshDesc.gpuHandle;
-
-		//セットアップ
-		auto vbv = meshGPU->GetVertexBuffer()->GetView();						//頂点バッファビューの取得
-		auto ibv = meshGPU->GetIndexBuffer()->GetView();						//インデックスバッファビューの取得
-		p_commandList->SetGraphicsRootConstantBufferView(0, cb->GetAddress());	//ルートパラメータ0に定数バッファをセット
-		p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());			//プリミティブトポロジの設定
-		p_commandList->IASetVertexBuffers(0, 1, &vbv);							//頂点バッファの設定
-		p_commandList->IASetIndexBuffer(&ibv);									//インデックスバッファの設定
-
-		//SRVの設定
-		uint32_t idx = m_pTextureManager->GetTextureSrvIndex(m_drawPacketsThisFrame[i].materialDesc.textureHandle);
-		auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
-		p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
-
-		//描画コマンドの発行
-		p_commandList->DrawIndexedInstanced(	//描画コマンド
-			meshGPU->GetIndexCount(),						//インデックス数
-			1,												//インスタンス数
-			m_drawPacketsThisFrame[i].meshDesc.startIndex,	//スタートインデックス位置
-			m_drawPacketsThisFrame[i].meshDesc.baseVertex,	//ベース頂点位置
-			0												//スタートインスタンス位置
-		);
+		case RenderType::Mesh:
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
+			ItemIndex++;
+			break;
+		case RenderType::Sprite:
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
+			ItemIndex++;
+			break;
+		default:
+			break;
+		}
 	}
 }
 
@@ -174,7 +169,7 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 	// Set SRV for post-processing
 	auto srvIndex = input->GetSrvIndex();	// Get the SRV index for the input render target
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(srvIndex);
-	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 
 	// Reset vertex/index buffers
 	D3D12_VERTEX_BUFFER_VIEW nullVBV{};
@@ -186,25 +181,135 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 	p_commandList->DrawInstanced(3, 1, 0, 0);									// Issue draw command (full-screen triangle)
 }
 
+void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
+{
+	// Check if the Constant buffer is valid
+	if (itemIndex >= m_objectCBWorld.size())
+	{
+		DBG("Not enough constant buffers allocated\n");
+		return;
+	}
+	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid\n");
+		return;
+	}
+
+	// Check if the PSO key's vertex shader file ID is correct
+	PSOKey currentKey = item.materialDesc.psoKey;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Mesh) {
+		currentKey.vsKey.fileID = VS_FILE_ID::Mesh;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
+	if (currentKey != compare || itemIndex == 0)
+	{
+		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+
+		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
+		compare = currentKey;										// Update the compare key
+	}
+
+
+	// Set up the constant buffer for this mesh
+	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
+	ptr->worldMatrix = item.worldMatrix;
+	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
+	ptr->objectColor = item.color;
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
+
+	// Set mesh data
+	auto meshGPU = item.meshDesc.gpuHandle;
+	auto vbv = meshGPU->GetVertexBuffer()->GetView();
+	auto ibv = meshGPU->GetIndexBuffer()->GetView();
+	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
+	p_commandList->IASetVertexBuffers(0, 1, &vbv);
+	p_commandList->IASetIndexBuffer(&ibv);
+
+	// Set SRV for the texture
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+
+	// Draw command
+	p_commandList->DrawIndexedInstanced(
+		meshGPU->GetIndexCount(),
+		1,
+		item.meshDesc.startIndex,
+		item.meshDesc.baseVertex,
+		0
+	);
+}
+
+void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
+{
+	// Check if the Constant buffer is valid
+	if (itemIndex >= m_objectCBWorld.size())
+	{
+		DBG("Not enough constant buffers allocated\n");
+		return;
+	}
+	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid\n");
+		return;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
+	PSOKey currentKey = item.materialDesc.psoKey;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) {
+		currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
+	}
+	if (!currentKey.indexFree) currentKey.indexFree = true;
+
+	if (currentKey != compare || itemIndex == 0)
+	{
+		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
+		compare = currentKey;										// Update the compare key
+	}
+
+	// Set up the constant buffer for this mesh
+	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
+	ptr->worldMatrix = item.worldMatrix;
+	ptr->color = item.color;
+	ptr->uvRect = Vector4(
+		item.uvOffset.x,
+		item.uvOffset.y,
+		item.uvOffset.x + item.uvScale.x,
+		item.uvOffset.y + item.uvScale.y
+	);
+	ptr->pivot = item.pivot;
+	ptr->flip = item.flip;
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
+
+	// Set SRV for the texture
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+
+	// Draw command (assuming a full-screen quad for sprites)
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	p_commandList->DrawInstanced(6, 1, 0, 0); // Draw a quad (2 triangles)
+}
+
 //PSO取得
 PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 {
-	auto it = m_psoMap.find(key);	//PSOマップから検索
+	// Serch for the PSO in the map
+	auto it = m_psoMap.find(key);
 	if (it != m_psoMap.end())
-	{//見つかった場合はそれを返す
-		return it->second.get();
+	{
+		return it->second.get();	// Return
 	}
-	else
-	{//見つからなかった場合は新規作成
-		PipelineState* pso = CreatePipelineStateObject(key).get();
 
-		if (!pso)
-		{//作成失敗時はデフォルトPSOを返す
-			return m_pDefaultPSO.get();
-		}
-
-		return pso;
+	// Create a new PSO if not found
+	if (!CreatePipelineStateObject(key))
+	{
+		return m_pDefaultPSO.get();	// Return default PSO if creation failed
 	}
+
+	return m_psoMap[key].get();
 }
 
 //PSO生成
@@ -230,6 +335,7 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 	pso->SetBlendMode(key.blend);
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
+	pso->FreeIndex(key.indexFree);
 	pso->Create();
 
 	// Check if creation was successful
@@ -247,11 +353,11 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 void Renderer::PreparePostProcessKey()
 {
 	PSOKey key{};
-	key.vsKey.fileID = VS_FILE_ID::Basic;
-	key.vsKey.entryID = VS_ENTRY_ID::PostEffect;
+	key.vsKey.fileID = VS_FILE_ID::PostEffect;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
 	key.vsKey.defines = {};
-	key.psKey.fileID = PS_FILE_ID::Basic;
-	key.psKey.entryID = PS_ENTRY_ID::PostEffect;
+	key.psKey.fileID = PS_FILE_ID::PostEffect;
+	key.psKey.entryID = PS_ENTRY_ID::Main;
 	key.psKey.defines = {};
 	key.blend = BlendMode::Opaque;
 	key.depth = DepthMode::Disable;

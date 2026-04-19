@@ -5,6 +5,7 @@
 #include <vector>
 #include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Graphics/RenderData.h"
+#include "Engine/Core/Math/Math.h"
 
 struct Vertex;	// 頂点データ構造体
 
@@ -14,10 +15,10 @@ struct aiMaterial;	//Assimpのマテリアル構造体
 //インポート設定構造体
 struct ImportSettings
 {
-	const wchar_t* fileName{};			//ファイルパス
+	const wchar_t* fileName{};	//ファイルパス
 	std::vector<Mesh>& meshs;	//メッシュデータ配列への参照
-	bool inverseU = false;				//UVを反転するかどうか
-	bool inverseV = false;				//UVを反転するかどうか
+	bool inverseU = false;		//UVを反転するかどうか
+	bool inverseV = false;		//UVを反転するかどうか
 };
 
 //Assimpを使ったモデルローダークラス
@@ -40,7 +41,7 @@ private:
 		const aiMaterial* src		//Assimpのメッシュ構造体へのポインタ
 	);
 
-	static DirectX::XMFLOAT4 GetMaterialColor( //マテリアルカラー取得関数
+	static Vector4 GetMaterialColor( //マテリアルカラー取得関数
 		const aiMaterial* src	//Assimpのマテリアル構造体へのポインタ
 		);
 };

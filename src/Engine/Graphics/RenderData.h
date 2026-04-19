@@ -23,12 +23,16 @@ struct NodeAnimationAsset;
 // Enumeration for vertex shader IDs
 enum class VS_FILE_ID
 {
-	Basic = 0,
+	Mesh = 0,
+	Sprite = 1,
+	PostEffect = 2,
 };
 // Enumeration for pixel shader IDs
 enum class PS_FILE_ID
 {
-	Basic = 0,
+	Mesh = 0,
+	Sprite = 1,
+	PostEffect = 2,
 };
 
 //-------------------------------------------------------------------------------------
@@ -37,14 +41,12 @@ enum class PS_FILE_ID
 // Enumeration for vertex shader entry points
 enum class VS_ENTRY_ID : uint16_t
 {
-	Basic = 0,
-	PostEffect = 1,
+	Main = 0,
 };
 // Enumeration for pixel shader entry points
 enum class PS_ENTRY_ID : uint16_t
 {
-	Basic = 0,
-	PostEffect = 1,
+	Main = 0,
 };
 
 //-------------------------------------------------------------------------------------
@@ -77,8 +79,8 @@ enum class COMMON_SHADER_DEFINE : uint64_t
 //-------------------------------------------------------------------------------------
 struct VS_KEY
 {
-	VS_FILE_ID fileID = VS_FILE_ID::Basic;		//Vertex shader file ID
-	VS_ENTRY_ID entryID = VS_ENTRY_ID::Basic;	//Vertex shader entry point
+	VS_FILE_ID fileID = VS_FILE_ID::Mesh;		//Vertex shader file ID
+	VS_ENTRY_ID entryID = VS_ENTRY_ID::Main;	//Vertex shader entry point
 	uint64_t defines = 0;						//Vertex shader defines
 
 	bool operator == (const VS_KEY& other) const
@@ -91,8 +93,8 @@ struct VS_KEY
 };
 struct PS_KEY
 {
-	PS_FILE_ID fileID = PS_FILE_ID::Basic;		//Pixel shader file ID
-	PS_ENTRY_ID entryID = PS_ENTRY_ID::Basic;	//Pixel shader entry point
+	PS_FILE_ID fileID = PS_FILE_ID::Mesh;		//Pixel shader file ID
+	PS_ENTRY_ID entryID = PS_ENTRY_ID::Main;	//Pixel shader entry point
 	uint64_t defines = 0;						//Pixel shader defines
 
 	bool operator == (const PS_KEY& other) const
@@ -134,8 +136,8 @@ enum class CullMode
 // Render target formats
 enum class RenderTargetFormat
 {
-	LDR = 0,
-	HDR = 1,
+	LDR,
+	HDR,
 };
 
 // Pipeline State Object (PSO) key structure
@@ -144,10 +146,11 @@ struct PSOKey
 	VS_KEY vsKey;											// Vertex shader key
 	PS_KEY psKey;											// Pixel shader key
 	uint64_t commonDefines = 0;								// Common shader defines
-	BlendMode  blend = BlendMode::Opaque;						// Blend mode
-	DepthMode  depth = DepthMode::TestWrite;					// Depth stencil mode
-	CullMode  cull = CullMode::None;							// Culling mode
+	BlendMode  blend = BlendMode::Opaque;					// Blend mode
+	DepthMode  depth = DepthMode::Disable;					// Depth stencil mode
+	CullMode  cull = CullMode::None;						// Culling mode
 	RenderTargetFormat rtvFormat = RenderTargetFormat::LDR;	// Render target format
+	bool indexFree = false;									// Whether to use index-free drawing (e.g., for sprites)
 
 	// Equality operators for PSOKey
 	bool operator == (const PSOKey& other) const
@@ -159,7 +162,8 @@ struct PSOKey
 			blend == other.blend &&
 			depth == other.depth &&
 			cull == other.cull &&
-			rtvFormat == other.rtvFormat;
+			rtvFormat == other.rtvFormat &&
+			indexFree == other.indexFree;
 	}
 	bool operator != (const PSOKey& other) const
 	{
@@ -208,30 +212,33 @@ struct PSOKey
 	}
 };
 
-// Predefined PSO keys for common rendering configurations
-inline constexpr PSOKey PSO_KEY_OPAQUE{ VS_KEY{}, PS_KEY{}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_TRANSPARENT { VS_KEY{}, PS_KEY{}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_MASKED { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_ADDITIVE { VS_KEY{}, PS_KEY{}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None };
-inline constexpr PSOKey PSO_KEY_MULTIPLY { VS_KEY{}, PS_KEY{.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None };
+namespace PSO_KEY_DEFAULT
+{
+	// Predefined PSO keys for common rendering configurations
+	inline constexpr PSOKey MESH_OPAQUE{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
+	inline constexpr PSOKey MESH_TRANSPARENT{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+	inline constexpr PSOKey MESH_MASKED{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
+	inline constexpr PSOKey MESH_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+	inline constexpr PSOKey MESH_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+
+	inline constexpr PSOKey SPRITE_OPAQUE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true };
+	inline constexpr PSOKey SPRITE_TRANSPARENT{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
+	inline constexpr PSOKey SPRITE_MASKED{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true };
+	inline constexpr PSOKey SPRITE_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
+	inline constexpr PSOKey SPRITE_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
+}
 
 // Hash function for PSOKey to be used in unordered_map
 struct PSOKeyHash
 {
 	size_t operator()(const PSOKey& k) const noexcept
 	{
-		size_t h1 = std::hash<VS_FILE_ID>{}(k.vsKey.fileID);
-		size_t h2 = std::hash<PS_FILE_ID>{}(k.psKey.fileID);
-		size_t h3 = std::hash<VS_ENTRY_ID>{}(k.vsKey.entryID);
-		size_t h4 = std::hash<PS_ENTRY_ID>{}(k.psKey.entryID);
-		size_t h5 = std::hash<int>{}(static_cast<int>(k.blend));
-		size_t h6 = std::hash<int>{}(static_cast<int>(k.depth));
-		size_t h7 = std::hash<int>{}(static_cast<int>(k.cull));
-		size_t h8 = std::hash<int>{}(static_cast<int>(k.rtvFormat));
-		size_t h9 = std::hash<uint64_t>{}(k.vsKey.defines);
-		size_t h10 = std::hash<uint64_t>{}(k.psKey.defines);
-		size_t h11 = std::hash<uint64_t>{}(k.commonDefines);
-		return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7) ^ (h9 << 8) ^ (h10 << 9) ^ (h11 << 10);
+		size_t h1 = std::hash<VS_FILE_ID>{}(k.vsKey.fileID) ^ std::hash<PS_FILE_ID>{}(k.psKey.fileID);
+		size_t h2 = std::hash<VS_ENTRY_ID>{}(k.vsKey.entryID) ^ std::hash<PS_ENTRY_ID>{}(k.psKey.entryID);
+		size_t h3 = std::hash<int>{}(static_cast<int>(k.blend)) ^ std::hash<int>{}(static_cast<int>(k.depth)) ^ std::hash<int>{}(static_cast<int>(k.cull)) ^ std::hash<int>{}(static_cast<int>(k.rtvFormat));
+		size_t h4 = std::hash<bool>{}(k.indexFree);
+		size_t h5 = std::hash<uint64_t>{}(k.commonDefines) ^ std::hash<uint64_t>{}(k.vsKey.defines) ^ std::hash<uint64_t>{}(k.psKey.defines);
+		return (((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4);
 	}
 };
 
@@ -255,47 +262,14 @@ static inline RenderQueue GetRenderQueueFromBlendMode(BlendMode blendMode)
 //=======================================================================================================
 
 // Type of Billboard
-enum BILLBOARD_TYPE
+enum class BillboardType
 {
-	BILLBOARD_NONE,			//ビルボードなし
-	BILLBOARD_SPHERICAL,	//全軸ビルボード
-	BILLBOARD_FIXED_X,		//X軸固定ビルボード
-	BILLBOARD_FIXED_Y,		//Y軸固定ビルボード
-	BILLBOARD_FIXED_Z,		//Z軸固定ビルボード
+	None,			//ビルボードなし
+	Spherical,	//全軸ビルボード
+	FixedX,		//X軸固定ビルボード
+	FixedY,		//Y軸固定ビルボード
+	FixedZ,		//Z軸固定ビルボード
 };
-
-////共通描画記述構造体
-//struct CommonRenderDesc
-//{
-//	MeshGPU* pMeshGPU = nullptr;							//メッシュデータ
-//	uint32_t srvIndex = UINT32_MAX;							//SRVインデックス(テクスチャ)
-//	Vector4 color = { 1,1,1,1 };					//表示色
-//	Vector4 uvRect{ 0.0f, 0.0f, 1.0f, 1.0f };		//UV矩形
-//	PSOKey psoKey{};										//パイプラインステートオブジェクトキー
-//	float sortDepth = 0.0f;									//ソート用深度
-//	RenderQueue renderQueue = RenderQueue::Invailed;		//レンダリングキュー
-//};
-//
-//// Render information structure for world space
-//struct WorldRenderInfo
-//{
-//	CommonRenderDesc common{};				// Common render description structure
-//	Matrix4x4 worldMatrix = {};				// World matrix
-//	UINT startIndex = 0;					// Start index
-//	UINT baseVertex = 0;					// Base vertex
-//	Vector3 position{};						// Position
-//	Vector3 scale{};						// Scale
-//	bool lightingEnabled = true;			// Lighting enabled flag
-//	BILLBOARD_TYPE billboardType
-//		= BILLBOARD_TYPE::BILLBOARD_NONE;	// Billboard type
-//
-//	NodeAnimationAsset* pNodeAnimAsset = nullptr;	// Pointer to node animation asset
-//
-//	bool isPostEffect = false;				// Whether this is a post-effect (used for special handling in rendering)
-//};
-
-//描画情報構造体配列型
-//using WorldRenderModel = std::vector<WorldRenderInfo>;
 
 //=======================================================================================================
 //メッシュ・モデルデータ構造体
@@ -315,6 +289,8 @@ struct Mesh
 		1.0f,	//拡散反射色B
 		1.0f	//拡散反射色A
 	};
+	Vector3 boundsCenter{};				//バウンディングスフィアの中心座標(ソート用)
+	float boundsRadius = 0.0f;			//バウンディングスフィアの半径(ソート用)
 	NodeAnimationAsset nodeAnimAsset{};	// ノードアニメーション資産
 };
 
@@ -358,16 +334,16 @@ enum class DEFAULT_MESH
 //四角平面
 //=======================
 //四角平面の頂点データ
-inline constexpr Vertex QuadVertices[4] =
+static const Vertex QuadVertices[4] =
 {
-	{{-0.5f,  0.5f, 0.f},{0,0,1},{0,0},{1,0,0},{1,1,1,1}},	//頂点0
-	{{ 0.5f,  0.5f, 0.f},{0,0,1},{1,0},{1,0,0},{1,1,1,1}},	//頂点1
-	{{ 0.5f, -0.5f, 0.f},{0,0,1},{1,1},{1,0,0},{1,1,1,1}},	//頂点2
-	{{-0.5f, -0.5f, 0.f},{0,0,1},{0,1},{1,0,0},{1,1,1,1}},	//頂点3
+	{{-0.5f, 0.5f, 0.0f}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//頂点0
+	{{ 0.5f, 0.5f, 0.0f}, {0,0,1}, {1,0}, {1,0,0}, {1,1,1,1}},	//頂点1
+	{{ 0.5f,-0.5f, 0.0f}, {0,0,1}, {1,1}, {1,0,0}, {1,1,1,1}},	//頂点2
+	{{-0.5f,-0.5f, 0.0f}, {0,0,1}, {0,1}, {1,0,0}, {1,1,1,1}},	//頂点3
 };
 
 //四角平面のインデックスデータ
-inline constexpr uint32_t QuadIndices[6] =
+inline uint32_t QuadIndices[6] =
 {
 	0,1,2,	//三角形1
 	0,2,3	//三角形2
@@ -380,7 +356,7 @@ Model MakeQuadModel();
 //立方体
 //=======================
 //立方体の頂点データ(24頂点)
-inline constexpr Vertex CubeVertices[24] =
+static const Vertex CubeVertices[24] =
 {
 	// +Z
 	{{-0.5,  0.5,  0.5}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//頂点0
@@ -496,68 +472,3 @@ inline Model GetDefaultModel(DEFAULT_MESH type)
 	default:   return {};						//その他
 	}
 }
-
-////=======================================================================================================
-////描画情報作成関数群
-////=======================================================================================================
-////モデルデータ又はテクスチャファイルから描画情報を作成する関数
-//void CreateRenderInfo(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	DEFAULT_MESH mType,						//メッシュタイプ
-//	PSOKey psoKey,							//ブレンドモード
-//	const wchar_t* path,					//モデルデータ又はテクスチャファイルのパス
-//	bool lightEneble = true,				//ライト有効or無効
-//	bool postEffect = false,				//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
-//	bool inverseU = false,					//Uを反転するかどうか(モデルデータの場合のみ有効)
-//	bool inverseV = false					//Vを反転するかどうか(モデルデータの場合のみ有効)
-//);
-//
-////FBXファイルから描画情報を作成する関数
-//void CreateRenderInfoFromFBX(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	PSOKey psoKey,							//ブレンドモード
-//	const wchar_t* path,					//モデルファイルのパス
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect = false,				//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE,	//ビルボードタイプ
-//	bool inverseU = false,					//Uを反転するかどうか
-//	bool inverseV = false					//Vを反転するかどうか
-//);
-//
-////デフォルトのメッシュデータから描画情報を作成する関数
-//void CreateRenderInfoFromDefaultMesh(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	DEFAULT_MESH type,							//メッシュタイプ
-//	PSOKey psoKey,							//ブレンドモード
-//	const wchar_t* path,					//テクスチャのファイル名
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect = false,				//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
-//);
-//
-////メッシュデータから描画情報を構築する関数
-//CommonRenderDesc CreateRenderInfoFromMeshData(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	Mesh& mesh,					//メッシュデータ構造体への参照
-//	PSOKey psoKey,							//ブレンドモード
-//	BILLBOARD_TYPE bType = BILLBOARD_NONE	//ビルボードタイプ
-//);
-//
-////描画情報配列とジオメトリ情報から提出用描画情報配列を構築する関数
-//WorldRenderModel BuildRenderInfoForSubmit(
-//	const WorldRenderModel& input,
-//	DEFAULT_MESH meshType = DEFAULT_MESH::QUAD,
-//	const DirectX::XMFLOAT3& position = { 0.0f, 0.0f, 0.0f },
-//	const DirectX::XMFLOAT3& scale = { 1.0f, 1.0f, 1.0f },
-//	const DirectX::XMFLOAT3& rotation = { 0.0f, 0.0f, 0.0f },
-//	const DirectX::XMFLOAT4& color = { 1.0f, 1.0f, 1.0f, 1.0f },
-//	const TexSplitInfo& texSplitInfo = {}
-//);

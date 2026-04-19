@@ -3,7 +3,6 @@
 #include <numbers>
 #include <cmath>
 #include <string>
-#include "Engine/Core/Utility/SharedStruct.h"
 
 // Forward declarations
 struct Vector2;
@@ -115,6 +114,7 @@ struct Vector3 : public DirectX::XMFLOAT3
 	static Vector3 Min(const Vector3& a, const Vector3& b);
 	static Vector3 Max(const Vector3& a, const Vector3& b);
 	static Vector3 Clamp(const Vector3& value, const Vector3& min, const Vector3& max);
+	static Vector3 Transform(const Vector3& v, const Matrix4x4& m);
 
 	// Operators
 	Vector3& operator= (const Vector3& rhs);
@@ -307,7 +307,8 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 	static Matrix4x4 CreateOrthographic(float width, float height, float nearZ, float farZ);
 	static Matrix4x4 CreateBillboard(const Vector3& objectPos, const Vector3& cameraPos, const Vector3& cameraUp);
 	static Matrix4x4 CreateCylindricalBillboard(const Vector3& objectPos, const Vector3& cameraPos, const Vector3& cameraUp, const Vector3& axis);
-	
+	static Matrix4x4 Transpose(const Matrix4x4& m);
+
 	// Operators
 	Matrix4x4& operator= (const Matrix4x4& rhs);
 	Matrix4x4 operator*(const Matrix4x4& rhs) const;
@@ -354,6 +355,10 @@ inline Vector2 RadToDeg(const Vector2& radians) {
 inline Vector3 RadToDeg(const Vector3& radians) {
 	return Vector3(RadToDeg(radians.x), RadToDeg(radians.y), RadToDeg(radians.z));
 }
+
+
+
+
 
 
 

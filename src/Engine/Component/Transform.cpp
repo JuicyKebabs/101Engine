@@ -12,7 +12,7 @@ Transform::Transform(Vector3 localPosition, Vector3 localEulerDeg, Vector3 local
 // Called when the component is initialized
 void Transform::OnStart()
 {
-	UpdateGeometry();
+	
 }
 
 // Called every frame before Update to perform pre-update tasks
@@ -23,6 +23,7 @@ void Transform::PreUpdate(float deltaTime)
 // Called every frame after Update to perform late updates
 void Transform::LateUpdate(float deltaTime)
 {
+	UpdateGeometry();
 }
 
 // Called when the component is destroyed

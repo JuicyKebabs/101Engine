@@ -121,6 +121,9 @@ void AssimpLoader::LoadMesh(
 
 	dst.vertices.resize(src->mNumVertices);	//頂点データ配列のリサイズ
 
+	Vector3 minPos(FLT_MAX, FLT_MAX, FLT_MAX);		//最小座標
+	Vector3 maxPos(-FLT_MAX, -FLT_MAX, -FLT_MAX);	//最大座標
+
 	//頂点データの格納
 	for (auto i = 0u; i < src->mNumVertices; ++i)
 	{
@@ -143,15 +146,34 @@ void AssimpLoader::LoadMesh(
 
 		//頂点データの格納
 		Vertex vertex = {};
-		vertex.position = DirectX::XMFLOAT3(position->x, position->y, position->z);
-		vertex.normal = DirectX::XMFLOAT3(normal->x, normal->y, normal->z);
-		vertex.uv = DirectX::XMFLOAT2(uv->x, uv->y);
-		vertex.tangent = DirectX::XMFLOAT3(tangent->x, tangent->y, tangent->z);
-		vertex.color = DirectX::XMFLOAT4(color->r, color->g, color->b, color->a);
+		vertex.position = Vector3(position->x, position->y, position->z);
+		vertex.normal = Vector3(normal->x, normal->y, normal->z);
+		vertex.uv = Vector2(uv->x, uv->y);
+		vertex.tangent = Vector3(tangent->x, tangent->y, tangent->z);
+		vertex.color = Vector4(color->r, color->g, color->b, color->a);
 
 		//頂点データ配列に格納
 		dst.vertices[i] = vertex;
+
+		//バウンディングボックスの更新
+		minPos.x = std::min(minPos.x, vertex.position.x);
+		minPos.y = std::min(minPos.y, vertex.position.y);
+		minPos.z = std::min(minPos.z, vertex.position.z);
+		maxPos.x = std::max(maxPos.x, vertex.position.x);
+		maxPos.y = std::max(maxPos.y, vertex.position.y);
+		maxPos.z = std::max(maxPos.z, vertex.position.z);
 	}
+
+	dst.boundsCenter = Vector3(
+		(minPos.x + maxPos.x) / 2.0f,
+		(minPos.y + maxPos.y) / 2.0f,
+		(minPos.z + maxPos.z) / 2.0f
+	);
+	dst.boundsRadius = sqrtf(
+		(maxPos.x - minPos.x) * (maxPos.x - minPos.x) +
+		(maxPos.y - minPos.y) * (maxPos.y - minPos.y) +
+		(maxPos.z - minPos.z) * (maxPos.z - minPos.z)
+	) / 2.0f;
 
 	//頂点数の設定
 	dst.vertexCount = src->mNumVertices;
@@ -202,7 +224,7 @@ void AssimpLoader::LoadTexture(
 }
 
 //マテリアルカラー取得関数
-DirectX::XMFLOAT4 AssimpLoader::GetMaterialColor(const aiMaterial* src)
+Vector4 AssimpLoader::GetMaterialColor(const aiMaterial* src)
 {
 	aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);	//マテリアルカラー格納用aiColor4D
 
@@ -215,7 +237,7 @@ DirectX::XMFLOAT4 AssimpLoader::GetMaterialColor(const aiMaterial* src)
 	src->Get(AI_MATKEY_OPACITY, opacity);
 	color.a *= opacity;
 
-	return DirectX::XMFLOAT4(
+	return Vector4(
 		color.r,
 		color.g,
 		color.b,

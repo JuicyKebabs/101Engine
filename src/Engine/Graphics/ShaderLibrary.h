@@ -32,7 +32,7 @@ struct ShaderKeyHash
         size_t h4 = std::hash<uint64_t>{}(std::get<3>(k));     // stage defines
 		size_t h5 = std::hash<uint32_t>{}(std::get<4>(k));     // common defines
 		size_t h6 = std::hash<uint32_t>{}(std::get<5>(k));     // compile flags
-        return (((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4);
+		return ((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5);
 	}
 };
 
@@ -46,21 +46,23 @@ struct ShaderDesc
 
 // Vertex shader file tables
 static const std::wstring VS_FILE_TABLE[] = {
-    L"shader/VertexShader/VertexShader.hlsl"
+    L"shader/VertexShader/MeshVS.hlsl",
+    L"shader/VertexShader/SpriteVS.hlsl",
+    L"shader/VertexShader/PostEffectVS.hlsl",
 };
 // Pixel shader file tables
 static const std::wstring PS_FILE_TABLE[] = {
-    L"shader/PixelShader/PixelShader.hlsl"
+    L"shader/PixelShader/MeshPS.hlsl",
+    L"shader/PixelShader/SpritePS.hlsl",
+    L"shader/PixelShader/PostEffectPS.hlsl",
 };
 //  Vertex shader entry point tables
 static const std::string VS_ENTRY_TABLE[] = {
-    "BasicVS",
-	"PostEffectVS"
+    "main",
 };
 //  Pixel shader entry point tables
 static const std::string PS_ENTRY_TABLE[] = {
-    "BasicPS",
-	"PostEffectPS"
+    "main",
 };
 // Shader profiles(Solid shader model 5.0)
 static const std::string VS_PROFILE = "vs_5_0";

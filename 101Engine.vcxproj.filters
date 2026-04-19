@@ -5,6 +5,18 @@
     <None Include="shader\BasicShader.hlsli">
       <Filter>shader</Filter>
     </None>
+    <None Include="shader\FrameConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\LightConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\MeshObjectConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\SpriteObjectConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -222,6 +234,9 @@
     <ClCompile Include="src\Engine\Graphics\DescriptorHeapAllocator.cpp">
       <Filter>src\Engine\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp">
+      <Filter>src\Engine\Component</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -377,7 +392,6 @@
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h">
       <Filter>src\Engine\Component</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
     <ClInclude Include="src\Engine\Graphics\DescriptorHeap.h">
       <Filter>src\Engine\Graphics</Filter>
     </ClInclude>
@@ -390,12 +404,30 @@
     <ClInclude Include="src\Engine\Resource\RenderTargetTexture.h">
       <Filter>src\Engine\Resource</Filter>
     </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\FrameRenderData.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\SpriteRenderer.h">
+      <Filter>src\Engine\Component</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shader\PixelShader\PixelShader.hlsl">
+    <FxCompile Include="shader\PixelShader\MeshPS.hlsl">
       <Filter>shader\PixelShader</Filter>
     </FxCompile>
-    <FxCompile Include="shader\VertexShader\VertexShader.hlsl">
+    <FxCompile Include="shader\PixelShader\SpritePS.hlsl">
+      <Filter>shader\PixelShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\PixelShader\PostEffectPS.hlsl">
+      <Filter>shader\PixelShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\MeshVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\PostEffectVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\SpriteVS.hlsl">
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
   </ItemGroup>

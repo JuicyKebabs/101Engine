@@ -200,6 +200,14 @@ void PipelineState::SetFormat(RenderTargetFormat format)
 	}
 }
 
+void PipelineState::FreeIndex(bool isFree)
+{
+	if (isFree)
+	{
+		m_desc.InputLayout = { nullptr, 0 };
+	}
+}
+
 //パイプラインステートオブジェクトを取得
 ID3D12PipelineState* PipelineState::GetPipelineState() const
 {
