@@ -55,6 +55,7 @@ const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 	if (m_isProxyDirty)
 	{
 		RebuildRenderProxy();
+		m_isProxyDirty = false;
 	}
 	return m_proxy;
 }
@@ -91,9 +92,6 @@ void MeshRenderer::CheckIfTransformChanged()
 			if(m_transformGeneration != currentGeneration) {
 				m_transformGeneration = currentGeneration;
 				m_isProxyDirty = true;
-			}
-			else {
-				m_isProxyDirty = false;
 			}
 		}
 	}

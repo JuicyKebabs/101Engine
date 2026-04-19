@@ -114,6 +114,7 @@ void SceneBase::OnRender(
 )
 {
 	auto cameraInfo = *m_pCameraSystem->GetCameraInfo();
+	m_pRenderSystem->FlushRegisters();
 	m_pRenderSystem->BuildFrameRenderData(cameraInfo);
 	context.pRenderer->SubmitFrameRenderData(m_pRenderSystem->GetFrameRenderData());
 	context.pRenderer->SubmitCameraInfo(cameraInfo);

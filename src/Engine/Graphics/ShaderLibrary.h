@@ -32,7 +32,7 @@ struct ShaderKeyHash
         size_t h4 = std::hash<uint64_t>{}(std::get<3>(k));     // stage defines
 		size_t h5 = std::hash<uint32_t>{}(std::get<4>(k));     // common defines
 		size_t h6 = std::hash<uint32_t>{}(std::get<5>(k));     // compile flags
-        return (((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4);
+		return ((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5);
 	}
 };
 

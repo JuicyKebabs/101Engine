@@ -9,7 +9,7 @@ float4 main(
     VSOutPut input //頂点シェーダーから送られてきたデータ構造体
 ) : SV_TARGET //レンダーターゲットへ出力
 {
-    float4 base = gTexture.Sample(gSampler, input.uv) * input.color * objColor;
+    float4 base = gTexture.Sample(gSampler, input.uv) * input.color;
     
 #ifdef USE_MASK
      clip(base.a - 0.1f);

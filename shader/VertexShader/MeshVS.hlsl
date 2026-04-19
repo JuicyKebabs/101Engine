@@ -26,7 +26,7 @@ VSOutPut main(
     
     //出力データの設定
     output.svpos = projPos; //変換後の頂点座標を設定
-    output.color = input.color; //頂点カラーを設定
+    output.color = input.color * objColor; //頂点カラーを設定
     output.uv = input.uv; //テクスチャ座標を設定
     output.normal = normalize(mul((float3x3) worldInvTranspose, input.normal)); //法線の設定
 

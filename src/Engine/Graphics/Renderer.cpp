@@ -80,8 +80,8 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 {
 	// Set frame-level constants
 	auto framePtr = m_frameCB->GetPtr<FrameConstants>();
-	framePtr->viewMatrix = m_cameraInfoThisFrame.viewMatrix;
-	framePtr->projMatrix = m_cameraInfoThisFrame.projMatrix;
+	framePtr->view = m_cameraInfoThisFrame.viewMatrix;
+	framePtr->proj = m_cameraInfoThisFrame.projMatrix;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_frameCB->GetAddress());
 
 	// Set lighting constants ( Currently, one directional light is only supported for simplicity)
@@ -102,40 +102,39 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 
 	// Allocate constant buffers for this frame
 	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
-	if (m_meshCBWorld.size() < totalMeshCount)
+	if (m_objectCBWorld.size() < totalMeshCount)
 	{
-		size_t toAllocate = totalMeshCount - m_meshCBWorld.size();
+		size_t toAllocate = totalMeshCount - m_objectCBWorld.size();
 		for (size_t i = 0; i < toAllocate; i++)
 		{
-			m_meshCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
 		}
 	}
 
 	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
-	if (m_spriteCBWorld.size() < totalSpriteCount)
+	if (m_objectCBWorld.size() < totalSpriteCount)
 	{
-		size_t toAllocate = totalSpriteCount - m_spriteCBWorld.size();
+		size_t toAllocate = totalSpriteCount - m_objectCBWorld.size();
 		for (size_t i = 0; i < toAllocate; i++)
 		{
-			m_spriteCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
+			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
 		}
 	}
 
 	PSOKey compare{};
-	int meshItemIndex = 0; 
-	int spriteItemIndex = 0;
+	int ItemIndex = 0; 
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
-			meshItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
+			ItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
-			spriteItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
+			ItemIndex++;
 			break;
 		default:
 			break;
@@ -147,12 +146,12 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
-			meshItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
+			ItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
-			spriteItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
+			ItemIndex++;
 			break;
 		default:
 			break;
@@ -185,12 +184,12 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_meshCBWorld.size())
+	if (itemIndex >= m_objectCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_meshCBWorld[itemIndex]->GetIsValid())
+	if (!m_objectCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -203,7 +202,7 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	}
 
 	// Compare PSO keys to minimize state changes (optional optimization)
-	if (currentKey != compare)
+	if (currentKey != compare || itemIndex == 0)
 	{
 		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
 
@@ -213,12 +212,11 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_meshCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
+	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
 	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
 	ptr->objectColor = item.color;
-	ptr->uvRect = Vector4(0, 0, 1, 1);
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
 
 	// Set mesh data
 	auto meshGPU = item.meshDesc.gpuHandle;
@@ -246,12 +244,12 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_spriteCBWorld.size())
+	if (itemIndex >= m_objectCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_spriteCBWorld[itemIndex]->GetIsValid())
+	if (!m_objectCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -264,7 +262,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	}
 	if (!currentKey.indexFree) currentKey.indexFree = true;
 
-	if (currentKey != compare)
+	if (currentKey != compare || itemIndex == 0)
 	{
 		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
 		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
@@ -272,7 +270,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	}
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_spriteCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
+	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
 	ptr->color = item.color;
 	ptr->uvRect = Vector4(
@@ -283,7 +281,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	);
 	ptr->pivot = item.pivot;
 	ptr->flip = item.flip;
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_spriteCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
@@ -298,22 +296,20 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 //PSO取得
 PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 {
-	auto it = m_psoMap.find(key);	//PSOマップから検索
+	// Serch for the PSO in the map
+	auto it = m_psoMap.find(key);
 	if (it != m_psoMap.end())
-	{//見つかった場合はそれを返す
-		return it->second.get();
+	{
+		return it->second.get();	// Return
 	}
-	else
-	{//見つからなかった場合は新規作成
-		PipelineState* pso = CreatePipelineStateObject(key).get();
 
-		if (!pso)
-		{//作成失敗時はデフォルトPSOを返す
-			return m_pDefaultPSO.get();
-		}
-
-		return pso;
+	// Create a new PSO if not found
+	if (!CreatePipelineStateObject(key))
+	{
+		return m_pDefaultPSO.get();	// Return default PSO if creation failed
 	}
+
+	return m_psoMap[key].get();
 }
 
 //PSO生成

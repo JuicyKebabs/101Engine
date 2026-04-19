@@ -27,6 +27,19 @@ void RenderSystem::Unregister(SpriteRenderer* renderer)
 	m_spriteRenderers.erase(std::remove(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer), m_spriteRenderers.end());
 }
 
+void RenderSystem::FlushRegisters()
+{
+	for(auto& renderer : m_meshRenderers)
+	{
+		renderer->Flush();
+	}
+
+	for(auto& renderer : m_spriteRenderers)
+	{
+		renderer->Flush();
+	}
+}
+
 void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 {
 	m_cameraInfo = cameraInfo;	// Update cached camera info for this frame
@@ -45,7 +58,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 				auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
 				RenderQueue queue = GetRenderQueue(item.materialDesc.psoKey);
 				NormalizePSOKey(item.materialDesc.psoKey, queue);
-				auto handle = m_frameRenderData.AddMeshs(std::move(item));
+				auto handle = m_frameRenderData.AddMeshs(item);
 
 				RenderItemRef ref;
 				ref.renderType = RenderType::Mesh;
@@ -61,9 +74,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 				else
 				{
 					SortKeyTransparent transparentKey;
-					transparentKey.psoKey = item.materialDesc.psoKey;
-					Vector3 meshPos = Vector3::Transform(renderTemplate.meshDesc.boundsCenter, renderProxy.worldMatrix);
-					transparentKey.depth = CalculateDepth(meshPos, m_cameraInfo);
+					transparentKey.depth = CalculateDepth(renderProxy.position, m_cameraInfo);
 					ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
 					m_frameRenderData.AddTransparent(ref);
 				}
@@ -80,7 +91,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
 			RenderQueue queue = GetRenderQueue(renderTemplate.materialDesc.psoKey);
 			NormalizePSOKey(item.materialDesc.psoKey, queue);
-			auto handle = m_frameRenderData.AddSprites(std::move(item));
+			auto handle = m_frameRenderData.AddSprites(item);
 
 			RenderItemRef ref;
 			ref.renderType = RenderType::Sprite;

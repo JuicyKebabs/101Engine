@@ -5,6 +5,18 @@
     <None Include="shader\BasicShader.hlsli">
       <Filter>shader</Filter>
     </None>
+    <None Include="shader\FrameConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\LightConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\MeshObjectConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
+    <None Include="shader\SpriteObjectConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -400,10 +412,22 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shader\PixelShader\PixelShader.hlsl">
+    <FxCompile Include="shader\PixelShader\MeshPS.hlsl">
       <Filter>shader\PixelShader</Filter>
     </FxCompile>
-    <FxCompile Include="shader\VertexShader\VertexShader.hlsl">
+    <FxCompile Include="shader\PixelShader\SpritePS.hlsl">
+      <Filter>shader\PixelShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\PixelShader\PostEffectPS.hlsl">
+      <Filter>shader\PixelShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\MeshVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\PostEffectVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\SpriteVS.hlsl">
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
   </ItemGroup>

@@ -1,14 +1,4 @@
 #include "../BasicShader.hlsli"
-#include "../MeshObjectConstants.hlsli"
-//頂点シェーダー入力データ構造体
-struct VSInput
-{
-    float3 position : POSITION; //頂点座標
-    float3 normal : NORMAL; //法線ベクトル
-    float2 uv : TEXCOORD0; //テクスチャ座標
-    float3 tangent : TANGENT; //接空間
-    float4 color : COLOR; //頂点カラー
-};
 
 VSOutPut main(
     uint vertexID : SV_VertexID //頂点ID

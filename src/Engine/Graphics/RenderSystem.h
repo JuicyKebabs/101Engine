@@ -59,6 +59,7 @@ public:
 	void Register(SpriteRenderer* renderer);					// Register a sprite renderer to be rendered
 	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
+	void FlushRegisters();										// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
 	void BuildFrameRenderData(const CameraInfo& cameraInfo);	// Build draw packets from the registered mesh renderers
 
 	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }	// Get the render data for the current frame (contains draw packets and other rendering information)

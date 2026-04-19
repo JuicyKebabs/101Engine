@@ -52,27 +52,22 @@ struct UVRect
 struct alignas(256) FrameConstants
 {
 	// Camera related data
-	Matrix4x4 viewMatrix;	//view matrix
-	Matrix4x4 projMatrix;	//projection matrix
+	Matrix4x4 view;	//view matrix
+	Matrix4x4 proj;	//projection matrix
 };
 
 // Object constant buffer structure for mesh rendering (b1)
 struct alignas(256) MeshRenderConstants
 {
-	//transformation matrices
 	Matrix4x4 worldMatrix;			//world matrix
 	Matrix4x4 worldInvTranspose;	//world inverse transpose matrix
-
-	//image related data
-	Vector4 objectColor;	//object color (RGBA)
-	Vector4 uvRect;		//UV rectangle
+	Vector4 objectColor;			//object color (RGBA)
 };
 
 // Object constant buffer structure for sprite rendering (b1)
 struct alignas(256) SpriteRenderConstants
 {
 	Matrix4x4 worldMatrix;			//world matrix
-
 	Vector4 color;	//sprite color (RGBA)
 	Vector4 uvRect;	//UV rectangle
 	Vector2 pivot;	//pivot point for the sprite
