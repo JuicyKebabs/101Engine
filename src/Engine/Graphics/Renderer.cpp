@@ -122,23 +122,24 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 	}
 
 	PSOKey compare{};
-	int itemIndex = 0; // Index to track constant buffer usage
+	int meshItemIndex = 0; 
+	int spriteItemIndex = 0;
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), itemIndex, compare);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
+			meshItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), itemIndex, compare);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
+			spriteItemIndex++;
 			break;
 		default:
 			break;
 		}
-
-		itemIndex++;
 	}
 
 	for (auto& item : m_frameRenderData.transparent)
@@ -146,16 +147,16 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), itemIndex, compare);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
+			meshItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), itemIndex, compare);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
+			spriteItemIndex++;
 			break;
 		default:
 			break;
 		}
-
-		itemIndex++;
 	}
 }
 
@@ -169,7 +170,7 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 	// Set SRV for post-processing
 	auto srvIndex = input->GetSrvIndex();	// Get the SRV index for the input render target
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(srvIndex);
-	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 
 	// Reset vertex/index buffers
 	D3D12_VERTEX_BUFFER_VIEW nullVBV{};
@@ -230,7 +231,7 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
-	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 
 	// Draw command
 	p_commandList->DrawIndexedInstanced(
@@ -245,12 +246,12 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_meshCBWorld.size())
+	if (itemIndex >= m_spriteCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_meshCBWorld[itemIndex]->GetIsValid())
+	if (!m_spriteCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -282,12 +283,12 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	);
 	ptr->pivot = item.pivot;
 	ptr->flip = item.flip;
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_spriteCBWorld[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
-	p_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 
 	// Draw command (assuming a full-screen quad for sprites)
 	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

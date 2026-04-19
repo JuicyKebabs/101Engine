@@ -146,11 +146,11 @@ void AssimpLoader::LoadMesh(
 
 		//頂点データの格納
 		Vertex vertex = {};
-		vertex.position = DirectX::XMFLOAT3(position->x, position->y, position->z);
-		vertex.normal = DirectX::XMFLOAT3(normal->x, normal->y, normal->z);
-		vertex.uv = DirectX::XMFLOAT2(uv->x, uv->y);
-		vertex.tangent = DirectX::XMFLOAT3(tangent->x, tangent->y, tangent->z);
-		vertex.color = DirectX::XMFLOAT4(color->r, color->g, color->b, color->a);
+		vertex.position = Vector3(position->x, position->y, position->z);
+		vertex.normal = Vector3(normal->x, normal->y, normal->z);
+		vertex.uv = Vector2(uv->x, uv->y);
+		vertex.tangent = Vector3(tangent->x, tangent->y, tangent->z);
+		vertex.color = Vector4(color->r, color->g, color->b, color->a);
 
 		//頂点データ配列に格納
 		dst.vertices[i] = vertex;
@@ -224,7 +224,7 @@ void AssimpLoader::LoadTexture(
 }
 
 //マテリアルカラー取得関数
-DirectX::XMFLOAT4 AssimpLoader::GetMaterialColor(const aiMaterial* src)
+Vector4 AssimpLoader::GetMaterialColor(const aiMaterial* src)
 {
 	aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);	//マテリアルカラー格納用aiColor4D
 
@@ -237,7 +237,7 @@ DirectX::XMFLOAT4 AssimpLoader::GetMaterialColor(const aiMaterial* src)
 	src->Get(AI_MATKEY_OPACITY, opacity);
 	color.a *= opacity;
 
-	return DirectX::XMFLOAT4(
+	return Vector4(
 		color.r,
 		color.g,
 		color.b,

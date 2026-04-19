@@ -5,6 +5,7 @@
 #include <vector>
 #include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Graphics/RenderData.h"
+#include "Engine/Core/Math/Math.h"
 
 struct Vertex;	// 頂点データ構造体
 
@@ -40,7 +41,7 @@ private:
 		const aiMaterial* src		//Assimpのメッシュ構造体へのポインタ
 	);
 
-	static DirectX::XMFLOAT4 GetMaterialColor( //マテリアルカラー取得関数
+	static Vector4 GetMaterialColor( //マテリアルカラー取得関数
 		const aiMaterial* src	//Assimpのマテリアル構造体へのポインタ
 		);
 };

@@ -36,7 +36,7 @@ VSOutPut main(
     };
     
     float2 localPos = quadVertices[vertexID];
-    localPos -= pivot;
+    localPos -= pivot - 0.5;
     localPos *= flip;
     float2 uv01 = quadUVs[vertexID];
     

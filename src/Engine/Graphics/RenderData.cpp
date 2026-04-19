@@ -11,251 +11,6 @@
 
 using namespace DirectX;
 
-////描画情報構造体を作成する関数
-//void CreateRenderInfo(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	DEFAULT_MESH mType,						//メッシュタイプ
-//	PSOKey psoKey,							//パイプラインステートオブジェクトキー
-//	const wchar_t* path,					//モデルデータ又はテクスチャファイルのパス
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect,						//ポストエフェクトかどうか
-//	BILLBOARD_TYPE bType,					//ビルボードタイプ
-//	bool inverseU,							//Uを反転するかどうか(モデルデータの場合のみ有効)
-//	bool inverseV							//Vを反転するかどうか(モデルデータの場合のみ有効
-//)
-//{
-//	//メッシュタイプに応じて描画情報構造体を作成
-//	if (mType == IMPORT)
-//	{//インポートモデルの場合
-//		CreateRenderInfoFromFBX(	//FBXファイルから描画情報を作成
-//			textureManager,	//テクスチャマネージャへの参照
-//			meshManager,	//メッシュマネージャへの参照
-//			pInfo,			//描画情報構造体配列へのポインタ
-//			psoKey,			//ブレンドモード
-//			path,			//モデルファイルのパス
-//			lightEneble,	//ライト有効or無効
-//			isPostEffect,	//ポストエフェクト用かどうか
-//			bType,			//ビルボードタイプ
-//			inverseU,		//Uを反転するかどうか
-//			inverseV		//Vを反転するかどうか
-//		);
-//	}
-//	else
-//	{//デフォルトのメッシュデータの場合
-//		CreateRenderInfoFromDefaultMesh(	//デフォルトのメッシュデータから描画情報を作成
-//			textureManager,	//テクスチャマネージャへの参照
-//			meshManager,	//メッシュマネージャへの参照
-//			pInfo,			//描画情報構造体配列へのポインタ
-//			mType,			//メッシュタイプ
-//			psoKey,			//ブレンドモード
-//			path,			//テクスチャのファイル名
-//			lightEneble,	//ライト有効or無効
-//			bType			//ビルボードタイプ
-//		);
-//	}
-//}
-//
-////FBXファイルから描画情報を作成する関数
-//void CreateRenderInfoFromFBX(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	PSOKey psoKey,							//パイプラインステートオブジェクトキー
-//	const wchar_t* path,					//モデルファイルのパス
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect,						//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType,					//ビルボードタイプ
-//	bool inverseU,							//Uを反転するかどうか
-//	bool inverseV							//Vを反転するかどうか
-//)
-//{
-//	std::vector<Mesh> meshes;	//メッシュデータ配列
-//
-//	//モデルインポート設定構造体の生成
-//	ImportSettings importSetting =
-//	{
-//		path,		//ファイルパス
-//		meshes,		//メッシュデータ配列への参照
-//		inverseU,	//Uを反転するかどうか
-//		inverseV	//Vを反転するかどうか
-//	};
-//
-//	//Assimpによるモデル読み込み
-//	AssimpLoader loader;	//Assimpローダー生成
-//	if (!loader.Load(importSetting))
-//	{
-//		return;
-//	}
-//
-//	//メッシュごとに描画情報構造体を生成して配列に格納
-//	for (auto& mesh : meshes)
-//	{
-//		CommonRenderDesc desc = CreateRenderInfoFromMeshData(	//描画情報構造体の生成
-//			textureManager,	//テクスチャマネージャへの参照
-//			meshManager,	//メッシュマネージャへの参照
-//			mesh,			//メッシュデータ
-//			psoKey,			//ブレンドモード
-//			bType			//ビルボードタイプ
-//		);
-//
-//		WorldRenderInfo info;												//描画情報構造体
-//		info.common = desc;													//共通描画記述構造体の設定
-//		info.lightingEnabled = lightEneble;									//ライティング有効フラグの設定
-//		info.isPostEffect = isPostEffect;									//ポストエフェクト用かどうかの設定
-//		info.billboardType = bType;											//ビルボードタイプの設定
-//		info.baseVertex = 0;												//基準インデックスの設定
-//		info.startIndex = 0;												//開始インデックスの設定
-//		info.pNodeAnimAsset = new NodeAnimationAsset(mesh.nodeAnimAsset);	//ノードアニメーション資産の生成
-//
-//		pInfo->push_back(info);	//配列に格納
-//	}
-//}
-//
-////デフォルトのメッシュデータから描画情報を作成する関数
-//void CreateRenderInfoFromDefaultMesh(
-//	TextureManager& textureManager,			//テクスチャマネージャへの参照
-//	MeshManager& meshManager,				//メッシュマネージャへの参照
-//	std::vector<WorldRenderInfo>* pInfo,	//描画情報構造体配列へのポインタ
-//	DEFAULT_MESH type,							//メッシュタイプ
-//	PSOKey psoKey,							//パイプラインステートオブジェクトキー
-//	const wchar_t* path,					//テクスチャのファイル名
-//	bool lightEneble,						//ライト有効or無効
-//	bool isPostEffect,						//ポストエフェクト用かどうか
-//	BILLBOARD_TYPE bType					//ビルボードタイプ
-//)
-//{
-//	Model model;	//モデルデータ構造体
-//	model = GetDefaultModel(type);	//メッシュタイプに応じたメッシュデータを取得
-//
-//	//メッシュタイプに応じたメッシュデータを取得して描画情報を作成
-//	for (auto& mesh : model.meshes)
-//	{
-//		mesh.texPath = path;	//テクスチャのファイル名を設定
-//		CommonRenderDesc desc = CreateRenderInfoFromMeshData(	//描画情報構造体の生成
-//			textureManager,		//テクスチャマネージャへの参照
-//			meshManager,		//メッシュマネージャへの参照
-//			mesh,				//メッシュデータ
-//			psoKey,				//ブレンドモード
-//			bType				//ビルボードタイプ
-//		);
-//
-//		WorldRenderInfo info;				//描画情報構造体
-//		info.common = desc;					//共通描画記述構造体の設定
-//		info.lightingEnabled = lightEneble;	//ライティング有効フラグの設定
-//		info.isPostEffect = isPostEffect;		//ポストエフェクト用かどうかの設定
-//		info.billboardType = bType;			//ビルボードタイプの設定
-//		info.baseVertex = 0;				//基準インデックスの設定
-//		info.startIndex = 0;				//開始インデックスの設定
-//
-//		pInfo->push_back(info);	//配列に格納
-//	}
-//}
-//
-////メッシュデータから描画情報を構築する関数
-//CommonRenderDesc CreateRenderInfoFromMeshData(
-//	TextureManager& textureManager,	//テクスチャマネージャへの参照
-//	MeshManager& meshManager,		//メッシュマネージャへの参照
-//	Mesh& mesh,						//メッシュデータ
-//	PSOKey psoKey,					//パイプラインステートオブジェクトキー
-//	BILLBOARD_TYPE bType			//ビルボードタイプ
-//)
-//{
-//	CommonRenderDesc desc{};	//描画情報構造体
-//
-//	//メッシュデータが空の場合は処理を抜ける
-//	if (mesh.vertices.empty() || mesh.indices.empty()) return desc;
-//
-//	//メッシュGPUデータの作成と描画情報構造体への設定
-//	desc.pMeshGPU = meshManager.CreateMesh(mesh);	//メッシュGPUデータの作成とポインタの取得
-//	desc.color = mesh.materialColor;				//オブジェクトの色を白に設定
-//	desc.psoKey = psoKey;							//ブレンドモードを設定
-//
-//	std::wstring texPath = mesh.texPath;	//テクスチャのファイル名を取得
-//
-//	//テクスチャのSRVインデックスを取得
-//	if (!mesh.texPath.empty() && &textureManager)
-//	{//テクスチャのファイル名が設定されていて、テクスチャマネージャが有効な場合
-//		desc.srvIndex = textureManager.LoadSrvFromFile(mesh.texPath);	//テクスチャのSRVインデックスを取得
-//	}
-//	else
-//	{//テクスチャのファイル名が設定されていない場合
-//		desc.srvIndex = UINT32_MAX;	//SRVインデックスを無効に設定
-//	}
-//
-//	return desc;	//描画情報構造体を返す
-//}
-//
-//
-//WorldRenderModel BuildRenderInfoForSubmit(
-//	const WorldRenderModel& input,
-//	DEFAULT_MESH meshType,
-//	const XMFLOAT3& position,
-//	const XMFLOAT3& scale,
-//	const XMFLOAT3& rotation,
-//	const XMFLOAT4& color,
-//	const TexSplitInfo& texSplitInfo
-//)
-//{
-//	WorldRenderModel in = input;
-//	WorldRenderModel out;
-//	out.reserve(in.size());		//容量確保
-//
-//	if (meshType == DEFAULT_MESH::CAPSULE)
-//	{//カプセルメッシュの場合(複数メッシュに分かれているため個別に処理)
-//		CapsuleVisualDesc desc{};	//カプセルメッシュの記述データ
-//		//カプセルメッシュの記述データ設定
-//		AppendCapsuleRenderInfos(
-//			desc,			//カプセル描画情報記述子
-//			position,	//位置
-//			scale,		//スケール
-//			rotation,	//回転Euler角
-//			color,		//色
-//			in,			//入力元描画情報配列
-//			out		//出力先描画情報配列
-//		);
-//	}
-//	else
-//	{//それ以外のメッシュの場合
-//		//描画情報構造体配列をそのまま提出用配列にコピー
-//		for (auto& i : in)
-//		{
-//			out.push_back(i);
-//		}
-//
-//		//ワールド行列と色を設定
-//		for (auto& i : out)
-//		{
-//			i.worldMatrix = GetMatrixFromGeometry(
-//				position,
-//				scale,
-//				rotation
-//			);
-//
-//			i.common.color =
-//			{
-//				color.x * i.common.color.x,
-//				color.y * i.common.color.y,
-//				color.z * i.common.color.z,
-//				color.w * i.common.color.w
-//			};
-//		}
-//	}
-//
-//	//共通要素の設定
-//	for (int i = 0; i < out.size(); i++)
-//	{
-//		out[i].position = position;
-//		out[i].scale = scale;
-//		out[i].common.psoKey = in[i].common.psoKey;
-//		out[i].common.uvRect = SplitSprite(texSplitInfo);
-//		out[i].billboardType = in[i].billboardType;
-//	}
-//
-//	return out;	//提出用描画情報構造体配列を返す
-//}
-
 Model MakeQuadModel()
 {
 	Mesh mesh;		//メッシュデータ構造体
@@ -342,11 +97,11 @@ Model MakeCircleModel(int slice)
 	// ① 中心頂点
 	{
 		Vertex v{};
-		v.position = XMFLOAT3(0.0f, 0.0f, 0.0f);       // 原点
-		v.normal = XMFLOAT3(0.0f, 0.0f, 1.0f);       // +Z 向き
-		v.uv = XMFLOAT2(0.5f, 0.5f);             // テクスチャ中央
-		v.tangent = XMFLOAT3(1.0f, 0.0f, 0.0f);       // +X 方向
-		v.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f); // 白
+		v.position = Vector3(0.0f, 0.0f, 0.0f);       // 原点
+		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z 向き
+		v.uv = Vector2(0.5f, 0.5f);             // テクスチャ中央
+		v.tangent = Vector3(1.0f, 0.0f, 0.0f);       // +X 方向
+		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f); // 白
 
 		mesh.vertices.push_back(v);
 	}
@@ -361,16 +116,16 @@ Model MakeCircleModel(int slice)
 		float y = std::sin(angle) * radius;
 
 		Vertex v{};
-		v.position = XMFLOAT3(x, y, 0.0f);             // XY 平面上
-		v.normal = XMFLOAT3(0.0f, 0.0f, 1.0f);       // +Z 向き
+		v.position = Vector3(x, y, 0.0f);             // XY 平面上
+		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z 向き
 
 		// UV：中心(0.5,0.5) から半径 0.5 の円にマッピング
 		float u = 0.5f + 0.5f * std::cos(angle);
 		float vTex = 0.5f - 0.5f * std::sin(angle);    // テクスチャ座標は上が 0 なので -sin
 
-		v.uv = XMFLOAT2(u, vTex);
-		v.tangent = XMFLOAT3(1.0f, 0.0f, 0.0f);        // 一律 +X
-		v.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);  // 白
+		v.uv = Vector2(u, vTex);
+		v.tangent = Vector3(1.0f, 0.0f, 0.0f);        // 一律 +X
+		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);  // 白
 
 		mesh.vertices.push_back(v);
 	}
@@ -423,11 +178,11 @@ Model MakeSphereModel(int slices, int stacks)
 
 			//頂点データの作成
 			Vertex vertex{};
-			vertex.position = XMFLOAT3(x * 0.5f, y * 0.5f, z * 0.5f);	//位置
-			vertex.normal = XMFLOAT3(x, y, z);							//法線
-			vertex.uv = XMFLOAT2(u, 1.0f - v);							//UV座標
-			vertex.tangent = XMFLOAT3(-sin(theta), 0.0f, cos(theta));	//接空間
-			vertex.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
+			vertex.position = Vector3(x * 0.5f, y * 0.5f, z * 0.5f);	//位置
+			vertex.normal = Vector3(x, y, z);							//法線
+			vertex.uv = Vector2(u, 1.0f - v);							//UV座標
+			vertex.tangent = Vector3(-sin(theta), 0.0f, cos(theta));	//接空間
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
 
 			mesh.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -517,15 +272,15 @@ Model MakeCapsuleModel(int slices, int stacks)
 			float z = radius * sin(theta);	//Z座標
 
 			Vertex vertex{};
-			vertex.position = XMFLOAT3(x, y, z);						//位置
-			vertex.normal = XMFLOAT3(x / radius, 0.0f, z / radius);		//法線
-			vertex.uv = XMFLOAT2(u, t);									//UV座標
+			vertex.position = Vector3(x, y, z);						//位置
+			vertex.normal = Vector3(x / radius, 0.0f, z / radius);		//法線
+			vertex.uv = Vector2(u, t);									//UV座標
 
 			float tx = -radius * sin(theta);	//接空間X
 			float tz = radius * cos(theta);		//接空間Z
-			vertex.tangent = XMFLOAT3(tx, 0.0f, tz);					//接空間
+			vertex.tangent = Vector3(tx, 0.0f, tz);					//接空間
 
-			vertex.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
 
 			cylinder.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -557,15 +312,15 @@ Model MakeCapsuleModel(int slices, int stacks)
 			float nz = cosPhi * sin(theta);	//法線Z
 
 			Vertex vertex{};
-			vertex.position = XMFLOAT3(x, y, z);				//位置
-			vertex.normal = XMFLOAT3(nx, ny, nz);				//法線
-			vertex.uv = XMFLOAT2(u, 1.0f - (v * 0.5f + 0.5f));	//UV座標
+			vertex.position = Vector3(x, y, z);				//位置
+			vertex.normal = Vector3(nx, ny, nz);				//法線
+			vertex.uv = Vector2(u, 1.0f - (v * 0.5f + 0.5f));	//UV座標
 
 			float tx = -ringR * sin(theta);		//接空間X
 			float tz = ringR * cos(theta);		//接空間Z
-			vertex.tangent = XMFLOAT3(tx, 0.0f, tz);			//接空間
+			vertex.tangent = Vector3(tx, 0.0f, tz);			//接空間
 
-			vertex.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);	//頂点色
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//頂点色
 
 			halfSphereTop.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -597,15 +352,15 @@ Model MakeCapsuleModel(int slices, int stacks)
 			float nz = cosPhi * sin(theta);	//法線Z
 
 			Vertex vertex{};
-			vertex.position = XMFLOAT3(x, y, z);				//位置
-			vertex.normal = XMFLOAT3(nx, ny, nz);				//法線
-			vertex.uv = XMFLOAT2(u, (v * 0.5f));				//UV座標
+			vertex.position = Vector3(x, y, z);				//位置
+			vertex.normal = Vector3(nx, ny, nz);				//法線
+			vertex.uv = Vector2(u, (v * 0.5f));				//UV座標
 
 			float tx = -ringR * sin(theta);		//接空間X
 			float tz = ringR * cos(theta);		//接空間Z
-			vertex.tangent = XMFLOAT3(tx, 0.0f, tz);			//接空間
+			vertex.tangent = Vector3(tx, 0.0f, tz);			//接空間
 
-			vertex.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);	//頂点色
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//頂点色
 
 			halfSphereBottom.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -723,15 +478,15 @@ Model MakeCylinderModel(int slices, int stacks)
 			float z = radius * sin(theta);	//Z座標
 
 			Vertex vertex{};
-			vertex.position = XMFLOAT3(x, y, z);						//位置
-			vertex.normal = XMFLOAT3(x / radius, 0.0f, z / radius);		//法線
-			vertex.uv = XMFLOAT2(u, t);									//UV座標
+			vertex.position = Vector3(x, y, z);						//位置
+			vertex.normal = Vector3(x / radius, 0.0f, z / radius);		//法線
+			vertex.uv = Vector2(u, t);									//UV座標
 
 			float tx = -radius * sin(theta);	//接空間X
 			float tz = radius * cos(theta);		//接空間Z
-			vertex.tangent = XMFLOAT3(tx, 0.0f, tz);					//接空間
+			vertex.tangent = Vector3(tx, 0.0f, tz);					//接空間
 
-			vertex.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
 
 			mesh.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -764,68 +519,3 @@ Model MakeCylinderModel(int slices, int stacks)
 
 	return model;	//メッシュデータ構造体を返す
 }
-
-//カプセルの描画情報追加関数
-//void AppendCapsuleRenderInfos(
-//	const CapsuleVisualDesc& desc,				//カプセル描画情報記述子
-//	const DirectX::XMFLOAT3& position,			//位置
-//	const DirectX::XMFLOAT3& scale,				//スケール
-//	const DirectX::XMFLOAT3& rotEuler,			//回転Euler角
-//	const DirectX::XMFLOAT4& color,				//色
-//	std::vector<WorldRenderInfo>& infos,	//カプセルの実体
-//	std::vector<WorldRenderInfo>& out	//出力先描画情報配列
-//)
-//{
-//	using namespace DirectX;
-//
-//	//コライダースケールの取得
-//	const float sx = fabs(scale.x);
-//	const float sy = fabs(scale.y);
-//	const float sz = fabs(scale.z);
-//
-//	//パラメータ計算
-//	const float diamiter = (std::max)(sx, sz);					//直径
-//	const float radius = diamiter * 0.5f;						//半径
-//	const float cylHeight = (std::max)(sy - diamiter, 0.0f);	//円柱部分の高さ
-//	const float halfHeight = cylHeight * 0.5f;					//円柱部分の半分の高さ
-//
-//	//各種行列の計算
-//	//スケーリング行列
-//	const XMMATRIX cylS = XMMatrixScaling(diamiter, cylHeight, diamiter);	//円柱部分のスケーリング行列
-//	const XMMATRIX sphS = XMMatrixScaling(diamiter, diamiter, diamiter);	//半球部分のスケーリング行列
-//
-//	//回転・平行移動行列
-//	const XMMATRIX R = XMMatrixRotationRollPitchYaw(
-//		XMConvertToRadians(rotEuler.x),
-//		XMConvertToRadians(rotEuler.y),
-//		XMConvertToRadians(rotEuler.z)
-//	);
-//	const XMMATRIX T = XMMatrixTranslation(position.x, position.y, position.z);
-//
-//	const XMMATRIX topT = XMMatrixTranslation(0, +halfHeight, 0);	//上半球の平行移動行列(シリンダーの上端に移動)
-//	const XMMATRIX botT = XMMatrixTranslation(0, -halfHeight, 0);	//下半球の平行移動行列(シリンダーの下端に移動)
-//
-//	//ワールド行列の計算
-//	const XMMATRIX cylW = cylS * R * T;
-//	const XMMATRIX topW = sphS * topT * R * T;
-//	const XMMATRIX botW = sphS * botT * R * T;
-//
-//	//描画情報構造体配列の作成
-//	out.clear();				//出力先配列のクリア
-//	out.resize(infos.size());	//出力先配列のリサイズ
-//	for (size_t i = 0; i < infos.size(); i++)
-//	{//描画情報構造体のコピー
-//		out[i] = infos[i];
-//	}
-//
-//	//各描画情報構造体のワールド行列と色の設定
-//	//円柱部分
-//	out[0].worldMatrix = Matrix4x4(cylW);
-//	out[0].common.color = Vector4(color);
-//	//上半球部分
-//	out[1].worldMatrix = Matrix4x4(topW);
-//	out[1].common.color = Vector4(color);
-//	//下半球部分
-//	out[2].worldMatrix = Matrix4x4(botW);
-//	out[2].common.color = Vector4(color);
-//}

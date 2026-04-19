@@ -337,7 +337,7 @@ enum class DEFAULT_MESH
 //四角平面
 //=======================
 //四角平面の頂点データ
-inline constexpr Vertex QuadVertices[4] =
+static const Vertex QuadVertices[4] =
 {
 	{{-0.5f, 0.5f, 0.0f}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//頂点0
 	{{ 0.5f, 0.5f, 0.0f}, {0,0,1}, {1,0}, {1,0,0}, {1,1,1,1}},	//頂点1
@@ -346,7 +346,7 @@ inline constexpr Vertex QuadVertices[4] =
 };
 
 //四角平面のインデックスデータ
-inline constexpr uint32_t QuadIndices[6] =
+inline uint32_t QuadIndices[6] =
 {
 	0,1,2,	//三角形1
 	0,2,3	//三角形2
@@ -359,7 +359,7 @@ Model MakeQuadModel();
 //立方体
 //=======================
 //立方体の頂点データ(24頂点)
-inline constexpr Vertex CubeVertices[24] =
+static const Vertex CubeVertices[24] =
 {
 	// +Z
 	{{-0.5,  0.5,  0.5}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//頂点0
