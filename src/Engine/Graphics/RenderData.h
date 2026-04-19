@@ -265,10 +265,8 @@ static inline RenderQueue GetRenderQueueFromBlendMode(BlendMode blendMode)
 enum class BillboardType
 {
 	None,			//ビルボードなし
-	Spherical,	//全軸ビルボード
-	FixedX,		//X軸固定ビルボード
-	FixedY,		//Y軸固定ビルボード
-	FixedZ,		//Z軸固定ビルボード
+	Spherical,		//全軸ビルボード
+	Cylindirical,	//円柱ビルボード
 };
 
 //=======================================================================================================

@@ -50,24 +50,23 @@ void SpriteRenderer::Flush()
 	CheckIfTransformChanged();
 }
 
-const SpriteRendererProxy& SpriteRenderer::GetRenderProxy()
+const SpriteRendererProxy& SpriteRenderer::GetRenderProxy(const CameraInfo& cameraInfo)
 {
 	if (m_isProxyDirty)
 	{
-		RebuildRenderProxy();
+		RebuildRenderProxy(cameraInfo);
 		m_isProxyDirty = false;
 	}
 	return m_proxy;
 }
 
-void SpriteRenderer::RebuildRenderProxy()
+void SpriteRenderer::RebuildRenderProxy(const CameraInfo& cameraInfo)
 {
 	auto owner = GetOwner();
 	if (owner) {
 		auto transform = owner->GetTransform();
 		if (transform) {
 			m_proxy.position = transform->GetWorldPosition();
-			m_proxy.worldMatrix = transform->GetWorldMatrix();
 			m_proxy.color = m_color;
 			m_proxy.uvScale = m_uvScale;
 			m_proxy.uvOffset = m_uvOffset;
@@ -75,6 +74,22 @@ void SpriteRenderer::RebuildRenderProxy()
 			m_proxy.visible = m_isVisible;
 			m_proxy.flip.x = m_flipX ? -1.0f : 1.0f;
 			m_proxy.flip.y = m_flipY ? -1.0f : 1.0f;
+
+			switch (m_billboardType)
+			{
+			case BillboardType::None:
+				m_proxy.worldMatrix = transform->GetWorldMatrix();
+				break;
+			case BillboardType::Spherical:
+				m_proxy.worldMatrix = transform->GetWorldMatrix().ToBillboard(cameraInfo.position, cameraInfo.up);
+				break;
+			case BillboardType::Cylindirical:
+				m_proxy.worldMatrix = transform->GetWorldMatrix().ToCylindricalBillboard(cameraInfo.position, cameraInfo.up);
+				break;
+			default:
+				break;
+			}
+
 		}
 	}
 }

@@ -33,10 +33,10 @@ private:
 	std::unique_ptr<SceneManager> m_pSceneManager = nullptr;		// Scene manager pointer
 	std::unique_ptr<TextureManager> m_pTextureManager = nullptr;	// Texture manager pointer
 	std::unique_ptr<MeshManager> m_pMeshManager = nullptr;			// Mesh manager pointer
-	std::unique_ptr<Time> m_pTime = nullptr;						// Time manager pointer
 
-	InputManager* m_pInputManager = nullptr;		// Input manager pointer
-	AudioManager* m_pAudioManager = nullptr;		// Audio manager pointer
+	TimeManager& m_time = TimeManager::GetInstance();			// Time manager reference
+	InputManager& m_inputManager = InputManager::GetInstance();	// Input manager reference
+	AudioManager& m_audioManager = AudioManager::GetInstance();	// Audio manager reference
 
 	EngineContext m_engineContext{};	// Engine context structure
 

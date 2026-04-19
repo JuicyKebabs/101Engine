@@ -87,7 +87,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
 		{
 			const auto& renderTemplate = renderer->GetRenderTemplate();
-			const auto& renderProxy = renderer->GetRenderProxy();
+			const auto& renderProxy = renderer->GetRenderProxy(m_cameraInfo);
 			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
 			RenderQueue queue = GetRenderQueue(renderTemplate.materialDesc.psoKey);
 			NormalizePSOKey(item.materialDesc.psoKey, queue);

@@ -7,9 +7,9 @@ public:
 	CameraTest(const std::string& name = "CameraTest") : Behavior(name) {}
 	virtual ~CameraTest() = default;
 	void OnStartBehavior() override;
-	void PreUpdateBehavior(float deltaTime) override {}
-	void UpdateBehavior(float deltaTime) override;
-	void LateUpdateBehavior(float deltaTime) override {}
+	void PreUpdateBehavior() override {}
+	void UpdateBehavior() override;
+	void LateUpdateBehavior() override {}
 	void OnDestroyBehavior() override {}
 
 private:

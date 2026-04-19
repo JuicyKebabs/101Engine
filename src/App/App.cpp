@@ -123,7 +123,7 @@ void App::Run()
 				Render();		// Draw
 
 				// Input update
-				m_pInputManager->Copy(); // Copy key information from input manager
+				m_inputManager.Copy(); // Copy key information from input manager
 
 			}
 		}
@@ -134,7 +134,7 @@ void App::Run()
 void App::Terminate()
 {
 	m_pEngine->Terminate();			// DirectX12 engine termination
-	m_pAudioManager->Terminate();	// Audio manager termination
+	m_audioManager.Terminate();	// Audio manager termination
 
 	UnregisterClass(wc.lpszClassName, wc.hInstance);	// Unregister window class
 }
@@ -189,10 +189,6 @@ void App::PrepareInstance()
 	m_pSceneManager = std::make_unique<SceneManager>(static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT));
 	m_pTextureManager = std::make_unique<TextureManager>();
 	m_pMeshManager = std::make_unique<MeshManager>();	
-	m_pTime = std::make_unique<Time>();					
-
-	m_pAudioManager = AudioManager::GetInstance();
-	m_pInputManager = InputManager::GetInstance();
 
 	// Set up engine context structure
 	m_engineContext = {
@@ -246,27 +242,30 @@ void App::InitInstance()
 	m_pEngine->RenderEnd();
 
 	// Initialize audio management class
-	m_pAudioManager->Initialize();
+	m_audioManager.Initialize();
 
 	// Initialize input management class
-	m_pInputManager->Initialize();
+	m_inputManager.Initialize();
 
 }
 
 // Update
 void App::Update()
 {
+	// Update time manager and get delta time
+	m_time.Update();
+	float deltaTime = m_time.GetDeltaTime();
+
 	// Update various systems
-	m_pInputManager->Update();								// Update input management class
-	m_pSceneManager->PreUpdate(m_pTime->GetDeltaTime());	// Pre-update scene management class (for late update)
-	m_pSceneManager->Update(m_pTime->GetDeltaTime());		// Update scene management class
-	m_pSceneManager->LateUpdate(m_pTime->GetDeltaTime());	// Post-update scene management class (for late update)
-	m_pRenderer->Update(									// Update renderer
+	m_inputManager.Update();				// Update input management class
+	m_audioManager.Update();				// Update audio management class
+	m_pSceneManager->PreUpdate(deltaTime);	// Pre-update scene management class (for late update)
+	m_pSceneManager->Update(deltaTime);		// Update scene management class
+	m_pSceneManager->LateUpdate(deltaTime);	// Post-update scene management class (for late update)
+	m_pRenderer->Update(					// Update renderer
 		m_pEngine->GetCurrentBufferIndex(),
 		*m_pSceneManager->GetCameraInfo()
 	);
-	m_pAudioManager->Update();			// Update audio management class
-	m_pTime->Update();					// Update time management class
 }
 
 // Draw

@@ -101,23 +101,13 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 	p_commandList->SetGraphicsRootConstantBufferView(2, m_lightCB->GetAddress());
 
 	// Allocate constant buffers for this frame
-	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
-	if (m_objectCBWorld.size() < totalMeshCount)
+	size_t totalItemCount = m_frameRenderData.GetMeshCount() + m_frameRenderData.GetSpriteCount();
+	if (m_objectCBWorld.size() < totalItemCount)
 	{
-		size_t toAllocate = totalMeshCount - m_objectCBWorld.size();
+		size_t toAllocate = totalItemCount - m_objectCBWorld.size();
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
-		}
-	}
-
-	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
-	if (m_objectCBWorld.size() < totalSpriteCount)
-	{
-		size_t toAllocate = totalSpriteCount - m_objectCBWorld.size();
-		for (size_t i = 0; i < toAllocate; i++)
-		{
-			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
 		}
 	}
 

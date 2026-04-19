@@ -11,14 +11,14 @@ public:
 	virtual ~Behavior() = default;
 
 	void OnStart() override { OnStartBehavior(); }
-	void PreUpdate(float deltaTime) override { PreUpdateBehavior(deltaTime); }
-	void Update(float deltaTime) override { UpdateBehavior(deltaTime); }
-	void LateUpdate(float deltaTime) override { LateUpdateBehavior(deltaTime); }
+	void PreUpdate(float deltaTime) override { PreUpdateBehavior(); }
+	void Update(float deltaTime) override { UpdateBehavior(); }
+	void LateUpdate(float deltaTime) override { LateUpdateBehavior(); }
 	void OnDestroy() override { OnDestroyBehavior(); }
 
 	virtual void OnStartBehavior() = 0;
-	virtual void PreUpdateBehavior(float deltaTime) = 0;
-	virtual void UpdateBehavior(float deltaTime) = 0;
-	virtual void LateUpdateBehavior(float deltaTime) = 0;
+	virtual void PreUpdateBehavior() = 0;
+	virtual void UpdateBehavior() = 0;
+	virtual void LateUpdateBehavior() = 0;
 	virtual void OnDestroyBehavior() = 0;
 };
