@@ -237,6 +237,9 @@
     <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp">
       <Filter>src\Engine\Component</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Resource\GpuTexture.cpp">
+      <Filter>src\Engine\Resource</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -401,7 +404,7 @@
     <ClInclude Include="src\Engine\Resource\Texture.h">
       <Filter>src\Engine\Resource</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\Resource\RenderTargetTexture.h">
+    <ClInclude Include="src\Engine\Resource\GpuTexture.h">
       <Filter>src\Engine\Resource</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\Graphics\FrameRenderData.h">

@@ -160,7 +160,7 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 }
 
 // Draw post-process effects
-void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, RenderTargetTexture* input)
+void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input)
 {
 	// Set the pipeline state object for post-processing
 	auto pso = GetPipelineStateObject(m_postProcessKey);		// Get the pipeline state object for post-processing

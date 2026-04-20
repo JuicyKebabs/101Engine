@@ -69,20 +69,20 @@ void Engine::BeginPass(RenderPassTarget target)
 		clearColor[2] = rt.clearColor[2];
 		clearColor[3] = rt.clearColor[3];
 
-		rt.currentState = RenderTargetTexture::ConvertToD3D12State(RenderTargetTexture::State::Write);	// Update the current state of the back buffer to "Write" for rendering
+		rt.currentState = GpuTexture::ConvertToD3D12State(GpuTexture::ResourceState::Write);	// Update the current state of the back buffer to "Write" for rendering
 	}
 	else if (target.type == RenderPassTargetType::Builtin)
 	{
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();	// Get the render target for the specified built-in index
 		resource = rt->GetResource();												// Get the resource for the built-in render target
 		rtvIndex = rt->GetRtvIndex();												// Get the RTV index for the built-in render target
-		currentState = RenderTargetTexture::ConvertToD3D12State(rt->GetState());	// Get the current resource state of the built-in render target
+		currentState = GpuTexture::ConvertToD3D12State(rt->GetState());	// Get the current resource state of the built-in render target
 		clearColor[0] = rt->GetClearColor()[0];
 		clearColor[1] = rt->GetClearColor()[1];
 		clearColor[2] = rt->GetClearColor()[2];
 		clearColor[3] = rt->GetClearColor()[3];
 
-		rt->MarkAsWrite();	// Mark the built-in render target as being written to (rendering)
+		rt->MarkAsRenderTarget();	// Mark the built-in render target as being written to (rendering)
 	}
 
 	// Set up the resource barrier to render target state
@@ -155,9 +155,9 @@ void Engine::EndPass(RenderPassTarget target)
 	{
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();				// Get the render target for the specified built-in index
 		resource = rt->GetResource();															// Get the resource for the built-in render target
-		currentState = RenderTargetTexture::ConvertToD3D12State(rt->GetState());				// Get the current resource state of the built-in render target
-		nextState = RenderTargetTexture::ConvertToD3D12State(RenderTargetTexture::State::Read);	// Next state for the built-in render target is "Read" for post-processing
-		rt->MarkAsRead();																		// Mark the built-in render target as being read from (post-processing)
+		currentState = GpuTexture::ConvertToD3D12State(rt->GetState());				// Get the current resource state of the built-in render target
+		nextState = GpuTexture::ConvertToD3D12State(GpuTexture::ResourceState::Read);	// Next state for the built-in render target is "Read" for post-processing
+		rt->MarkAsShaderResource();																		// Mark the built-in render target as being read from (post-processing)
 	}
 
 	// Set up the resource barrier to transition to the next state
@@ -457,10 +457,56 @@ void Engine::CreateBackBuffers()
 void Engine::CreateBuiltinRenderTargets()
 {
 	for(auto& target : m_builtinRenderTargets) {
-		target = make_unique<RenderTargetTexture>();
+		target = make_unique<GpuTexture>();
 	}
 
 	CreatePostProcessRenderTarget();
+}
+
+void Engine::CreateShadowMapRenderTarget()
+{
+	// Clear color
+	float clearColor[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+	D3D12_CLEAR_VALUE clearValue = CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R16G16B16A16_FLOAT, clearColor);
+
+	// Heap properties
+	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+	// Resource description
+	auto resourceDesc = m_backBuffers[0].resource->GetDesc();
+
+	// Format 
+	GpuTexture::Format format = GpuTexture::Format::RGBA16F;
+	resourceDesc.Format = GpuTexture::ConvertToDXGIFormat(format);
+
+	// Initial state
+	GpuTexture::ResourceState initialState = GpuTexture::ResourceState::Read;
+	auto d3dState = GpuTexture::ConvertToD3D12State(initialState);
+
+	// Create the render target resource
+	ComPtr<ID3D12Resource> renderTarget;
+	result = m_pDevice->CreateCommittedResource(
+		&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDesc,
+		d3dState,
+		&clearValue,
+		IID_PPV_ARGS(renderTarget.ReleaseAndGetAddressOf())
+	);
+
+	// Create render target view (RTV)
+	auto rtvIndex = m_pDescriptorHeapAllocator->AllocateRtv();				// Allocate an RTV descriptor from the heap allocator
+	auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the CPU handle for the allocated RTV descriptor
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+	rtvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+	m_pDevice->CreateRenderTargetView(
+		renderTarget.Get(),
+		&rtvDesc,
+		rtvHandle
+	);
+
 }
 
 // Create post-process render target
@@ -477,12 +523,12 @@ void Engine::CreatePostProcessRenderTarget()
 	auto resourceDesc = m_backBuffers[0].resource->GetDesc();
 
 	// Format 
-	RenderTargetTexture::Format format = RenderTargetTexture::Format::RGBA16F;
-	resourceDesc.Format = RenderTargetTexture::ConvertToDXGIFormat(format);
+	GpuTexture::Format format = GpuTexture::Format::RGBA16F;
+	resourceDesc.Format = GpuTexture::ConvertToDXGIFormat(format);
 
 	// Initial state
-	RenderTargetTexture::State initialState = RenderTargetTexture::State::Read;
-	auto d3dState = RenderTargetTexture::ConvertToD3D12State(initialState);
+	GpuTexture::ResourceState initialState = GpuTexture::ResourceState::Read;
+	auto d3dState = GpuTexture::ConvertToD3D12State(initialState);
 
 	// Create the render target resource
 	ComPtr<ID3D12Resource> renderTarget;
@@ -523,7 +569,7 @@ void Engine::CreatePostProcessRenderTarget()
 	);
 
 	// Create the RenderTargetTexture object and initialize it
-	RenderTargetTexture::InitDesc desc = {};
+	GpuTexture::InitDesc desc = {};
 	desc.clearColor[0] = clearColor[0];
 	desc.clearColor[1] = clearColor[1];
 	desc.clearColor[2] = clearColor[2];
@@ -533,7 +579,7 @@ void Engine::CreatePostProcessRenderTarget()
 	desc.width = m_FrameBufferWidth;
 	desc.m_rtvIndex = rtvIndex;
 	desc.m_srvIndex = srvIndex;
-	desc.state = initialState;
+	desc.initialState = initialState;
 	m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)]->Initialize(renderTarget, desc);
 }
 

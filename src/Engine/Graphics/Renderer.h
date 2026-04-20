@@ -43,7 +43,7 @@ public:
 	// Render list management functions
 	void BeginFrame(ID3D12GraphicsCommandList* p_commandList);											// Begin frame (set root signature, descriptor heaps, etc.)
 	void RenderScene(ID3D12GraphicsCommandList* p_commandList);											// Render the scene using submitted draw packets
-	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, RenderTargetTexture* input);	// Render a full-screen pass (for post-processing)
+	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input);	// Render a full-screen pass (for post-processing)
 
 	void SubmitFrameRenderData(const FrameRenderData& frameRenderData);	// Submit draw packets
 	void SubmitCameraInfo(const CameraInfo& cameraInfo);				// Submit camera information for this frame

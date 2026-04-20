@@ -184,6 +184,7 @@
     <ClCompile Include="src\Engine\Physics\ColliderSet.cpp" />
     <ClCompile Include="src\Engine\Physics\CollisionData.cpp" />
     <ClCompile Include="src\Engine\Physics\CollisionManager.cpp" />
+    <ClCompile Include="src\Engine\Resource\GpuTexture.cpp" />
     <ClCompile Include="src\Engine\Resource\MeshGPU.cpp" />
     <ClCompile Include="src\Engine\Resource\MeshManager.cpp" />
     <ClCompile Include="src\Engine\Resource\TextureManager.cpp" />
@@ -243,7 +244,7 @@
     <ClInclude Include="src\Engine\Physics\CollisionManager.h" />
     <ClInclude Include="src\Engine\Resource\MeshGPU.h" />
     <ClInclude Include="src\Engine\Resource\MeshManager.h" />
-    <ClInclude Include="src\Engine\Resource\RenderTargetTexture.h" />
+    <ClInclude Include="src\Engine\Resource\GpuTexture.h" />
     <ClInclude Include="src\Engine\Resource\Texture.h" />
     <ClInclude Include="src\Engine\Resource\TextureManager.h" />
     <ClInclude Include="src\Engine\Scene\SceneBase.h" />
