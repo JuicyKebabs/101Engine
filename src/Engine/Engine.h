@@ -14,7 +14,7 @@
 #include <array>
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
-#include "Engine/Resource/RenderTargetTexture.h"
+#include "Engine/Resource/GpuTexture.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")

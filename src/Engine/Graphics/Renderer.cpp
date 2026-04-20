@@ -102,39 +102,40 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 
 	// Allocate constant buffers for this frame
 	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
-	if (m_objectCBWorld.size() < totalMeshCount)
+	if (m_meshCBWorld.size() < totalMeshCount)
 	{
-		size_t toAllocate = totalMeshCount - m_objectCBWorld.size();
+		size_t toAllocate = totalMeshCount - m_meshCBWorld.size();
 		for (size_t i = 0; i < toAllocate; i++)
 		{
-			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+			m_meshCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
 		}
 	}
 
 	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
-	if (m_objectCBWorld.size() < totalSpriteCount)
+	if (m_spriteCBWorld.size() < totalSpriteCount)
 	{
-		size_t toAllocate = totalSpriteCount - m_objectCBWorld.size();
+		size_t toAllocate = totalSpriteCount - m_spriteCBWorld.size();
 		for (size_t i = 0; i < toAllocate; i++)
 		{
-			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
+			m_spriteCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
 		}
 	}
 
 	PSOKey compare{};
-	int ItemIndex = 0; 
+	int meshItemIndex = 0;
+	int spriteItemIndex = 0;
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
+			meshItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
+			spriteItemIndex++;
 			break;
 		default:
 			break;
@@ -146,12 +147,12 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
+			meshItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
+			spriteItemIndex++;
 			break;
 		default:
 			break;
@@ -184,12 +185,12 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Gp
 void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_objectCBWorld.size())
+	if (itemIndex >= m_meshCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	if (!m_meshCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -212,11 +213,11 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
+	auto ptr = m_meshCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
 	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
 	ptr->objectColor = item.color;
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCBWorld[itemIndex]->GetAddress());
 
 	// Set mesh data
 	auto meshGPU = item.meshDesc.gpuHandle;
@@ -244,12 +245,12 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_objectCBWorld.size())
+	if (itemIndex >= m_spriteCBWorld.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	if (!m_spriteCBWorld[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -270,7 +271,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	}
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
+	auto ptr = m_spriteCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
 	ptr->color = item.color;
 	ptr->uvRect = Vector4(
@@ -281,7 +282,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	);
 	ptr->pivot = item.pivot;
 	ptr->flip = item.flip;
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_spriteCBWorld[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);

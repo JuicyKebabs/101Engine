@@ -66,7 +66,8 @@ private:
 	// Constant buffers for per-frame and per-draw data
 	std::unique_ptr<ConstantBuffer> m_frameCB;
 	std::unique_ptr<ConstantBuffer> m_lightCB;
-	std::vector<std::unique_ptr<ConstantBuffer>> m_objectCBWorld;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCBWorld;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCBWorld;
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light

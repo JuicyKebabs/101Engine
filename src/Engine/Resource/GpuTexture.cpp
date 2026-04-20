@@ -3,6 +3,9 @@
 void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allocator, const GpuTexture::InitDesc& desc)
 {
 	assert(!(desc.useDSV && desc.useUAV) &&"GpuTexture: DSV and UAV cannot be used together");
+	assert(!(desc.initialState == ResourceState::RenderTarget && !desc.useRTV) && "GpuTexture: InitialState::RenderTarget requires useRTV=true");
+	assert(!(desc.initialState == ResourceState::DepthWrite && !desc.useDSV) && "GpuTexture: InitialState::DepthWrite requires useDSV=true");
+	assert(!(desc.initialState == ResourceState::UnorderedAccess && !desc.useUAV) && "GpuTexture: InitialState::UnorderedAccess requires useUAV=true");
 
 	// Set parameters from the initialization description
 	m_width = desc.width;
@@ -15,34 +18,42 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 	m_depthFormat = desc.depthFormat;
 	m_clearDepth = desc.clearDepth;
 
-	// Convert formats and states
+	// Determine the resource format based on the usage
 	DXGI_FORMAT resourceFormat;
 	if (desc.useDSV && desc.useSRV)
-	{
-		if (desc.depthFormat == DepthFormat::DEPTH16F) { resourceFormat = DXGI_FORMAT_R16_TYPELESS; m_format = GpuTexture::Format::R16F; }
-		else if (desc.depthFormat == DepthFormat::DEPTH24F) { resourceFormat = DXGI_FORMAT_R24G8_TYPELESS; m_format = GpuTexture::Format::R24G8_TYPELESS; }
-		else if (desc.depthFormat == DepthFormat::DEPTH32F) { resourceFormat = DXGI_FORMAT_R32_TYPELESS; m_format = GpuTexture::Format::R32F; }
+	{// In case of using both DSV and SRV
+		if (m_depthFormat == DepthFormat::D16_UNORM) { resourceFormat = DXGI_FORMAT_R16_TYPELESS; m_colorFormat = GpuTexture::ColorFormat::R16_UNORM; }
+		else if (m_depthFormat == DepthFormat::D24F) { resourceFormat = DXGI_FORMAT_R24G8_TYPELESS; m_colorFormat = GpuTexture::ColorFormat::R24_UNORM_X8_TYPELESS; }
+		else if (m_depthFormat == DepthFormat::D32F) { resourceFormat = DXGI_FORMAT_R32_TYPELESS; m_colorFormat = GpuTexture::ColorFormat::R32F; }
 		else { assert(false && "GpuTexture: Invalid depth format for DSV+SRV"); resourceFormat = DXGI_FORMAT_UNKNOWN; }
 	}
+	else if(desc.useDSV)
+	{// If only DSV is used, use the depth format directly
+		resourceFormat = ConvertToDXGIDepthFormat(m_depthFormat);
+	}
 	else 
-	{
-		m_format = desc.format;
-		resourceFormat = ConvertToDXGIFormat(m_format);
+	{// If DSV is not used, use the color format
+		m_colorFormat = desc.format;
+		resourceFormat = ConvertToDXGIColorFormat(m_colorFormat);
 	}
 
-	DXGI_FORMAT depthFormat = ConvertToDXGIDepthFormat(m_depthFormat);
+	// Convert the initial state to D3D12 resource state
 	D3D12_RESOURCE_STATES initialState = ConvertToD3D12State(desc.initialState);
 
-	// Set up clear value
+	// Set up clear value( only for RTV or DSV)
 	D3D12_CLEAR_VALUE clearValue = {};
+	D3D12_CLEAR_VALUE* pClearValue = nullptr;
 	if (desc.useRTV)
 	{
 		clearValue = CD3DX12_CLEAR_VALUE(resourceFormat, m_clearColor);
+		pClearValue = &clearValue;
 	}
 	else if (desc.useDSV)
 	{
+		clearValue.Format = ConvertToDXGIDepthFormat(m_depthFormat);
 		clearValue.DepthStencil.Depth = m_clearDepth;
-		clearValue.Format = depthFormat;
+		clearValue.DepthStencil.Stencil = 0;
+		pClearValue = &clearValue;
 	}
 
 	// Set up heap properties and resource description
@@ -57,14 +68,15 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 	if (desc.useUAV) { resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS; }
 
 	// Create resource
-	HRESULT resurt = pDevice->CreateCommittedResource(
+	HRESULT result = pDevice->CreateCommittedResource(
 		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resourceDesc,
 		initialState,
-		&clearValue,
+		pClearValue,
 		IID_PPV_ARGS(m_pResource.ReleaseAndGetAddressOf())
 	);
+	assert(SUCCEEDED(result) && "GpuTexture: Failed to create resource");
 
 	// Create views if needed
 	if (desc.useRTV)
@@ -72,7 +84,7 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 		m_rtvIndex = allocator->AllocateRtv();
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = allocator->GetRtvCpuHandle(m_rtvIndex);
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-		rtvDesc.Format = ConvertToDXGIFormat(m_format);
+		rtvDesc.Format = ConvertToDXGIColorFormat(m_colorFormat);
 		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 		pDevice->CreateRenderTargetView(
 			m_pResource.Get(),
@@ -85,7 +97,7 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 		m_dsvIndex = allocator->AllocateDsv();
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = allocator->GetDsvCpuHandle(m_dsvIndex);
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-		dsvDesc.Format = depthFormat;
+		dsvDesc.Format = ConvertToDXGIDepthFormat(m_depthFormat);
 		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 		pDevice->CreateDepthStencilView(
 			m_pResource.Get(),
@@ -98,7 +110,7 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 		m_srvIndex = allocator->AllocateCbvSrvUav();
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = allocator->GetCbvSrvUavCpuHandle(m_srvIndex);
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = ConvertToDXGIFormat(m_format);
+		srvDesc.Format = ConvertToDXGIColorFormat(m_colorFormat);
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Texture2D.MipLevels = 1;
@@ -113,7 +125,7 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 		m_uavIndex = allocator->AllocateCbvSrvUav();
 		D3D12_CPU_DESCRIPTOR_HANDLE uavHandle = allocator->GetCbvSrvUavCpuHandle(m_uavIndex);
 		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-		uavDesc.Format = ConvertToDXGIFormat(m_format);
+		uavDesc.Format = ConvertToDXGIColorFormat(m_colorFormat);
 		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		uavDesc.Texture2D.MipSlice = 0;
 		pDevice->CreateUnorderedAccessView(
@@ -123,4 +135,16 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 			uavHandle
 		);
 	}
+}
+
+void GpuTexture::TransitionToState(ID3D12GraphicsCommandList* cmdList, ResourceState newState)
+{
+	if (m_currentState == newState) return;
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_pResource.Get(),						// Current render target resource
+			ConvertToD3D12State(m_currentState),	// Current resource state
+			ConvertToD3D12State(newState)			// New resource state for rendering
+		);
+	cmdList->ResourceBarrier(1, &barrier);
+	m_currentState = newState;
 }
