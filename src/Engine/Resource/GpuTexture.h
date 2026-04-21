@@ -112,8 +112,8 @@ public:
 	}
 
 	struct InitDesc {
-		UINT width = 0.0f;
-		UINT height = 0.0f;
+		UINT width = 0;
+		UINT height = 0;
 
 		ResourceState initialState = ResourceState::Common;
 
@@ -139,8 +139,8 @@ public:
 	ID3D12Resource* GetResource() const { return m_pResource.Get(); }
 	ResourceState GetState() const { return m_currentState; }
 	ColorFormat GetFormat() const { return m_colorFormat; }
-	float GetWidth() const { return m_width; }
-	float GetHeight() const { return m_height; }
+	UINT GetWidth() const { return m_width; }
+	UINT GetHeight() const { return m_height; }
 	const float* GetClearColor() const { return m_clearColor; }
 	float GetClearDepth() const { return m_clearDepth; }
 
@@ -157,8 +157,8 @@ private:
 	uint32_t m_srvIndex = UINT32_MAX;
 	uint32_t m_uavIndex = UINT32_MAX;
 
-	UINT m_width = 0.0f;
-	UINT m_height = 0.0f;
+	UINT m_width = 0;
+	UINT m_height = 0;
 
 	ResourceState m_currentState = ResourceState::Common;
 

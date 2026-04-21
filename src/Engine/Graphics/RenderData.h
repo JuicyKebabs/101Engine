@@ -25,7 +25,8 @@ enum class VS_FILE_ID
 {
 	Mesh = 0,
 	Sprite = 1,
-	PostEffect = 2,
+	ShadowMap = 2,
+	PostEffect = 3,
 };
 // Enumeration for pixel shader IDs
 enum class PS_FILE_ID
@@ -151,6 +152,7 @@ struct PSOKey
 	CullMode  cull = CullMode::None;						// Culling mode
 	RenderTargetFormat rtvFormat = RenderTargetFormat::LDR;	// Render target format
 	bool indexFree = false;									// Whether to use index-free drawing (e.g., for sprites)
+	bool depthOnly = false;									// Whether this PSO is for depth-only rendering (e.g., shadow maps)
 
 	// Equality operators for PSOKey
 	bool operator == (const PSOKey& other) const
@@ -163,7 +165,8 @@ struct PSOKey
 			depth == other.depth &&
 			cull == other.cull &&
 			rtvFormat == other.rtvFormat &&
-			indexFree == other.indexFree;
+			indexFree == other.indexFree &&
+			depthOnly == other.depthOnly;
 	}
 	bool operator != (const PSOKey& other) const
 	{
@@ -236,7 +239,7 @@ struct PSOKeyHash
 		size_t h1 = std::hash<VS_FILE_ID>{}(k.vsKey.fileID) ^ std::hash<PS_FILE_ID>{}(k.psKey.fileID);
 		size_t h2 = std::hash<VS_ENTRY_ID>{}(k.vsKey.entryID) ^ std::hash<PS_ENTRY_ID>{}(k.psKey.entryID);
 		size_t h3 = std::hash<int>{}(static_cast<int>(k.blend)) ^ std::hash<int>{}(static_cast<int>(k.depth)) ^ std::hash<int>{}(static_cast<int>(k.cull)) ^ std::hash<int>{}(static_cast<int>(k.rtvFormat));
-		size_t h4 = std::hash<bool>{}(k.indexFree);
+		size_t h4 = std::hash<bool>{}(k.indexFree) ^ std::hash<bool>{}(k.depthOnly);
 		size_t h5 = std::hash<uint64_t>{}(k.commonDefines) ^ std::hash<uint64_t>{}(k.vsKey.defines) ^ std::hash<uint64_t>{}(k.psKey.defines);
 		return (((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4);
 	}

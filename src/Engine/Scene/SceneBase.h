@@ -58,6 +58,7 @@ private:
 
 	//std::unique_ptr<CollisionManager> m_pCollisionManager = nullptr;	// Collision manager
 
+protected:
 	DirectionalLight m_directionalLight;	// Directional light
 
 private:

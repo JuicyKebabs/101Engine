@@ -282,11 +282,18 @@ void App::Render()
 	// Submit draw requests for the game scene
 	m_pSceneManager->OnRender();
 
+	// Render the shadow depth on map
+	RenderPassTarget shadowTarget{ RenderPassTargetType::DepthOnly, static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap) };
+	m_pEngine->BeginPass(shadowTarget);
+	m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
+	m_pEngine->EndPass(shadowTarget);
+
 	// Render the scene to the main render target
-	RenderPassTarget target{ RenderPassTargetType::Builtin, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
-	m_pEngine->BeginPass(target);
-	m_pRenderer->RenderScene(m_pEngine->GetCommandList());
-	m_pEngine->EndPass(target);
+	RenderPassTarget sceneTarget{ RenderPassTargetType::ColorDepth, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
+	m_pEngine->BeginPass(sceneTarget);
+	uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
+	m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
+	m_pEngine->EndPass(sceneTarget);
 
 	// Draw for back buffer
 	RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };

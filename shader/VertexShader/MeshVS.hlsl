@@ -29,6 +29,7 @@ VSOutPut main(
     output.color = input.color * objColor; //頂点カラーを設定
     output.uv = input.uv; //テクスチャ座標を設定
     output.normal = normalize(mul((float3x3) worldInvTranspose, input.normal)); //法線の設定
+    output.worldPos = mul(world, float4(input.position, 1.0f)).xyz; //ワールド座標を設定
 
     return output;
 }

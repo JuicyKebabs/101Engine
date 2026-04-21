@@ -208,10 +208,19 @@ void PipelineState::FreeIndex(bool isFree)
 	}
 }
 
-//パイプラインステートオブジェクトを取得
+void PipelineState::SetDepthOnly()
+{
+	m_desc.NumRenderTargets = 0;
+	m_desc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+	m_desc.PS = { nullptr, 0 };
+	m_desc.RasterizerState.DepthBias = 2000;
+	m_desc.RasterizerState.DepthBiasClamp = 0.0f;
+	m_desc.RasterizerState.SlopeScaledDepthBias = 2.0f;
+}
+
 ID3D12PipelineState* PipelineState::GetPipelineState() const
 {
-	return m_pipelineState.Get(); //パイプラインステートオブジェクトを取得
+	return m_pipelineState.Get();
 }
 
 bool PipelineState::IsValid() const

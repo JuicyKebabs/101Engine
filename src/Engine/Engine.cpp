@@ -43,7 +43,7 @@ void Engine::Terminate()
 void Engine::BeginPass(RenderPassTarget target)
 {
 	// Check if the target is valid
-	if (target.type != RenderPassTargetType::BackBuffer && target.type != RenderPassTargetType::Builtin)
+	if (static_cast<UINT>(target.type) >= static_cast<UINT>(RenderPassTargetType::Count))
 	{
 		assert(false && "Invalid render pass target type");
 	}
@@ -58,6 +58,7 @@ void Engine::BeginPass(RenderPassTarget target)
 	D3D12_RESOURCE_STATES nextState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
+	// Set up the render target based on the target type
 	if(target.type == RenderPassTargetType::BackBuffer)
 	{
 		auto& rt = m_backBuffers[target.index];				// Get the back buffer render target for the specified index
@@ -83,18 +84,29 @@ void Engine::BeginPass(RenderPassTarget target)
 		m_pCommandList->ResourceBarrier(1, &barrier);
 
 	}
-	else if (target.type == RenderPassTargetType::Builtin)
-	{
+	else if (target.type == RenderPassTargetType::ColorDepth)
+	{// Color depth uses render target, and next state is RenderTrget
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();	// Get the render target for the specified built-in index
-		rtvIndex = rt->GetRtvIndex();														// Get the RTV index for the built-in render target
+		rtvIndex = rt->GetRtvIndex();												// Get the RTV index for the built-in render target
 		clearColor[0] = rt->GetClearColor()[0];
 		clearColor[1] = rt->GetClearColor()[1];
 		clearColor[2] = rt->GetClearColor()[2];
 		clearColor[3] = rt->GetClearColor()[3];
 		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::RenderTarget);	// Transition the built-in render target to "RenderTarget" state for rendering
 	}
+	else if (target.type == RenderPassTargetType::DepthOnly)
+	{// Depth only does not use rensdder target, and next state is DepthWrite
+		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();			// Get the render target for the specified built-in index
+		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::DepthWrite);	// Transition the built-in render target to "RenderTarget" state for rendering
+	
+		// Set the depth stencil view and clear the depth buffer without setting a render target
+		auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(rt->GetDsvIndex());
+		m_pCommandList->OMSetRenderTargets( 0, nullptr, false, &dsvHandle);
+		m_pCommandList->ClearDepthStencilView( dsvHandle, D3D12_CLEAR_FLAG_DEPTH, rt->GetClearDepth(), 0,0, nullptr);
+		return;
+	}
 
-	auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(0);		// Get the DSV handle (assuming a single depth stencil view for simplicity)
+	auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(m_depthStencilDsvIndex);		// Get the DSV handle (assuming a single depth stencil view for simplicity)
 	auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the RTV handle for the current render target slot
 
 	// Set the render target and depth stencil view
@@ -107,10 +119,10 @@ void Engine::BeginPass(RenderPassTarget target)
 
 	// Clear the render target
 	m_pCommandList->ClearRenderTargetView(
-		rtvHandle,					// Handle to the render target view to clear
-		clearColor,					// Clear color
-		0,							// Number of rectangles to clear
-		nullptr						// Clear rectangle (NULL means full screen)
+		rtvHandle,	// Handle to the render target view to clear
+		clearColor,	// Clear color
+		0,			// Number of rectangles to clear
+		nullptr		// Clear rectangle (NULL means full screen)
 	);
 
 	// Clear the depth buffer
@@ -128,7 +140,7 @@ void Engine::BeginPass(RenderPassTarget target)
 void Engine::EndPass(RenderPassTarget target)
 {
 	// Check if the target is valid
-	if(target.type != RenderPassTargetType::BackBuffer && target.type != RenderPassTargetType::Builtin)
+	if(static_cast<UINT>(target.type) >= static_cast<UINT>(RenderPassTargetType::Count))
 	{
 		assert(false && "Invalid render pass target type");
 	}
@@ -160,7 +172,12 @@ void Engine::EndPass(RenderPassTarget target)
 		// Set the resource barrier command
 		m_pCommandList->ResourceBarrier(1, &barrier);
 	}
-	else if (target.type == RenderPassTargetType::Builtin)
+	else if (target.type == RenderPassTargetType::ColorDepth)
+	{
+		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();				// Get the render target for the specified built-in index
+		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::ShaderResource);	// Transition the built-in render target back to "Common" state for future use
+	}
+	else if (target.type == RenderPassTargetType::DepthOnly)
 	{
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();				// Get the render target for the specified built-in index
 		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::ShaderResource);	// Transition the built-in render target back to "Common" state for future use
@@ -182,25 +199,21 @@ void Engine::BeginFrame()
 	m_pCommandList->RSSetScissorRects(1, &m_scissorRect);
 }
 
-//前のフレームの終了待ち
+// Wait for the GPU to finish rendering the current frame
 void Engine::WaitRender()
 {
-	//描画終了待ち
 	const UINT64 fenceValue = m_fenceValue[m_currentBackBufferIndex];
 	m_pCommandQueue->Signal(m_pFence.Get(), fenceValue);
 	m_fenceValue[m_currentBackBufferIndex]++;
 
-	// 次のフレームの描画準備がまだであれば待機する.
 	if (m_pFence->GetCompletedValue() < fenceValue)
 	{
-		// 完了時にイベントを設定.
 		auto hr = m_pFence->SetEventOnCompletion(fenceValue, m_fenceEvent);
 		if (FAILED(hr))
 		{
 			return;
 		}
 
-		// 待機処理.
 		if (WAIT_OBJECT_0 != WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE))
 		{
 			return;
@@ -410,7 +423,7 @@ void Engine::CreateBackBuffers()
 	result = m_pSwapChain->GetDesc(&swcDesc);
 
 	//バッファの数だけループ
-	for (int idx = 0; idx < swcDesc.BufferCount; idx++)
+	for (UINT idx = 0; idx < swcDesc.BufferCount; idx++)
 	{
 		auto& buffer = m_backBuffers[idx];
 		float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };	//バックバッファのクリアカラー(黒)
@@ -455,13 +468,14 @@ void Engine::CreateBuiltinRenderTargets()
 	}
 
 	CreatePostProcessRenderTarget();
+	CreateShadowMapRenderTarget();
 }
 
 void Engine::CreateShadowMapRenderTarget()
 {
 	GpuTexture::InitDesc desc{};
-	desc.width = 1024;
-	desc.height = 1024;
+	desc.width = m_FrameBufferWidth;
+	desc.height = m_FrameBufferHeight;
 	desc.initialState = GpuTexture::ResourceState::ShaderResource;
 	desc.depthFormat = GpuTexture::DepthFormat::D32F;
 	desc.useDSV = true;
@@ -481,7 +495,7 @@ void Engine::CreatePostProcessRenderTarget()
 	desc.format = GpuTexture::ColorFormat::RGBA16F;
 	desc.clearColor[0] = 0.0f;
 	desc.clearColor[1] = 0.0f;
-	desc.clearColor[2] = 0.0f;
+	desc.clearColor[2] = 1.0f;
 	desc.clearColor[3] = 1.0f;
 	desc.useRTV = true;
 	desc.useSRV = true;
@@ -536,7 +550,8 @@ void Engine::CreateDepthStencil()
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;	//2Dテクスチャ
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;					//フラグなし
 
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(0);
+	m_depthStencilDsvIndex = m_pDescriptorHeapAllocator->AllocateDsv();	//DSVインデックスを割り当て
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(m_depthStencilDsvIndex);
 
 	m_pDevice->CreateDepthStencilView(	//生成
 		m_pDepthStencilBuffer.Get(),	//深度ステンシルバッファ

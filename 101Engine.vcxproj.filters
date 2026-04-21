@@ -17,6 +17,8 @@
     <None Include="shader\SpriteObjectConstants.hlsli">
       <Filter>shader</Filter>
     </None>
+    <None Include=".github\upgrades\assessment.md" />
+    <None Include=".github\upgrades\plan.md" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -413,6 +415,9 @@
     <ClInclude Include="src\Engine\Component\SpriteRenderer.h">
       <Filter>src\Engine\Component</Filter>
     </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\RenderPipeline.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\PixelShader\MeshPS.hlsl">
@@ -431,6 +436,9 @@
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
     <FxCompile Include="shader\VertexShader\SpriteVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\ShadowVS.hlsl">
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
   </ItemGroup>
