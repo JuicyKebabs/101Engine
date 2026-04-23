@@ -457,7 +457,7 @@ void Renderer::PrepareShadowMapKey()
 	key.vsKey.fileID = VS_FILE_ID::ShadowMap;
 	key.vsKey.entryID = VS_ENTRY_ID::Main;
 	key.depth = DepthMode::TestWrite;
-	key.cull = CullMode::None;
+	key.cull = CullMode::Back;
 	key.depthOnly = true;
 	m_shadowMapKey = key;
 }

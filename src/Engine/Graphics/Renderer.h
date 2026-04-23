@@ -83,7 +83,6 @@ private:
 	void RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex);					// Render a mesh for shadow map
 	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemINdex, PSOKey& compare);		// Render a sprite
 
-
 	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
 	std::shared_ptr<PipelineState> CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object
 	void PreparePostProcessKey();	// Prepare post-processing information

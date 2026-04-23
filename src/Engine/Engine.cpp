@@ -79,10 +79,24 @@ void Engine::BeginPass(RenderPassTarget target)
 				currentState,	// Current resource state
 				nextState		// New resource state for rendering
 			);
-
 		// Set the resource barrier command
 		m_pCommandList->ResourceBarrier(1, &barrier);
 
+		D3D12_VIEWPORT viewport = {};
+		viewport.Width = static_cast<float>(m_FrameBufferWidth);
+		viewport.Height = static_cast<float>(m_FrameBufferHeight);
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.MaxDepth = 1.0f;
+		viewport.MinDepth = 0.0f;
+		m_pCommandList->RSSetViewports(1, &viewport);
+
+		D3D12_RECT scissorRect = {};
+		scissorRect.left = 0;
+		scissorRect.top = 0;
+		scissorRect.right = m_FrameBufferWidth;
+		scissorRect.bottom = m_FrameBufferHeight;
+		m_pCommandList->RSSetScissorRects(1, &scissorRect);
 	}
 	else if (target.type == RenderPassTargetType::ColorDepth)
 	{// Color depth uses render target, and next state is RenderTrget
@@ -93,12 +107,16 @@ void Engine::BeginPass(RenderPassTarget target)
 		clearColor[2] = rt->GetClearColor()[2];
 		clearColor[3] = rt->GetClearColor()[3];
 		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::RenderTarget);	// Transition the built-in render target to "RenderTarget" state for rendering
+	
+		SetViewPortAndScissorRect(*rt);	// Set the viewport and scissor rectangle for rendering
 	}
 	else if (target.type == RenderPassTargetType::DepthOnly)
 	{// Depth only does not use rensdder target, and next state is DepthWrite
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();			// Get the render target for the specified built-in index
 		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::DepthWrite);	// Transition the built-in render target to "RenderTarget" state for rendering
 	
+		SetViewPortAndScissorRect(*rt);	// Set the viewport and scissor rectangle for rendering
+
 		// Set the depth stencil view and clear the depth buffer without setting a render target
 		auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(rt->GetDsvIndex());
 		m_pCommandList->OMSetRenderTargets( 0, nullptr, false, &dsvHandle);
@@ -193,10 +211,6 @@ void Engine::BeginFrame()
 		m_pCommandAllocator[m_currentBackBufferIndex].Get(),	// Get the command allocator for the current back buffer index
 		nullptr													// Initial pipeline state (nullptr means no initial pipeline state)
 	);
-
-	// Set up the viewport and scissor rectangle for rendering
-	m_pCommandList->RSSetViewports(1, &m_viewport);
-	m_pCommandList->RSSetScissorRects(1, &m_scissorRect);
 }
 
 // Wait for the GPU to finish rendering the current frame
@@ -474,8 +488,8 @@ void Engine::CreateBuiltinRenderTargets()
 void Engine::CreateShadowMapRenderTarget()
 {
 	GpuTexture::InitDesc desc{};
-	desc.width = m_FrameBufferWidth;
-	desc.height = m_FrameBufferHeight;
+	desc.width = 2048;
+	desc.height = 2048;
 	desc.initialState = GpuTexture::ResourceState::ShaderResource;
 	desc.depthFormat = GpuTexture::DepthFormat::D32F;
 	desc.useDSV = true;
@@ -502,6 +516,25 @@ void Engine::CreatePostProcessRenderTarget()
 
 	auto& rt = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)];
 	rt->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+}
+
+void Engine::SetViewPortAndScissorRect(const GpuTexture& renderTarget)
+{
+	D3D12_VIEWPORT viewport = {};
+	viewport.Width = static_cast<float>(renderTarget.GetWidth());
+	viewport.Height = static_cast<float>(renderTarget.GetHeight());
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.MaxDepth = 1.0f;
+	viewport.MinDepth = 0.0f;
+	m_pCommandList->RSSetViewports(1, &viewport);
+
+	D3D12_RECT scissorRect = {};
+	scissorRect.left = 0;
+	scissorRect.top = 0;
+	scissorRect.right = renderTarget.GetWidth();
+	scissorRect.bottom = renderTarget.GetHeight();
+	m_pCommandList->RSSetScissorRects(1, &scissorRect);
 }
 
 //深度ステンシルの生成
