@@ -116,6 +116,7 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 	auto framePtr = m_colorFrameCB->GetPtr<FrameConstants>();
 	framePtr->view = m_cameraInfoThisFrame.viewMatrix;
 	framePtr->proj = m_cameraInfoThisFrame.projMatrix;
+	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_colorFrameCB->GetAddress());
 
 	// Set lighting constants ( Currently, one directional light is only supported for simplicity)

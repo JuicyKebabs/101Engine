@@ -28,6 +28,21 @@ float CalculateShadow(float4 worldPos)
     return gShadowMap.SampleCmpLevelZero(gShadowSampler, shadowUV, currentDepth);
 }
 
+float3 CreateLambert(float3 normal, float3 lightDir, float3 diffuse)
+{
+    float dotValue = saturate(dot(normal, lightDir));
+    dotValue = pow(dotValue, 2.0f);
+    return diffuse * dotValue;
+}
+
+float3 CreateSpecular(float3 normal, float3 lightDir, float3 viewDir, float materialSpecular)
+{
+    float3 reflection = reflect(-lightDir, normal);
+    float dotValue = saturate(dot(reflection, viewDir));
+    dotValue = pow(dotValue, materialSpecular);
+    return dotValue;
+}
+
 float4 main(VSOutPut input) : SV_TARGET
 {
     float4 base = gTexture.Sample(gSampler, input.uv) * input.color;
@@ -41,19 +56,15 @@ float4 main(VSOutPut input) : SV_TARGET
 #endif
 
 #ifdef USE_LIGHTING
-    float3 normal = normalize(input.normal);
-    float3 length = normalize(-lightDir_Intensity.xyz);
-    float dotValue = saturate(dot(normal, length));
+    float3 diffuse = lightColor_Ambient.rgb;
+    float3 ambient = lightColor_Ambient.a;
+        
+    float3 lambert = CreateLambert(input.normal, -lightDir_Intensity.xyz, diffuse);
+    float specular = CreateSpecular(input.normal, -lightDir_Intensity.xyz, normalize(cameraPos - input.worldPos), 2.0f);
+    float shadow = CalculateShadow(float4(input.worldPos, 1.0f));
     
-    float intensity = lightDir_Intensity.w;
-    float3 color = lightColor_Ambient.rgb;
-    float ambient = lightColor_Ambient.a;
-    
-    float4 worldPos = float4(input.worldPos, 1.0f);
-    float shadow = CalculateShadow(worldPos);
-    
-    float3 lit = color * (ambient + dotValue * intensity) * shadow;
-    base = float4(base.rgb * lit, base.a);
+    float3 lightEffect = (lambert.xyz + specular) * shadow + ambient;
+    base.xyz *= lightEffect;
     
 #endif
     return base;

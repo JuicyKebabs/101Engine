@@ -54,6 +54,7 @@ struct alignas(256) FrameConstants
 	// Camera related data
 	Matrix4x4 view;	//view matrix
 	Matrix4x4 proj;	//projection matrix
+	Vector3 cameraPosition;	//camera position (for lighting calculations)
 };
 
 // Object constant buffer structure for mesh rendering (b1)

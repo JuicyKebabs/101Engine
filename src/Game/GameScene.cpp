@@ -24,6 +24,7 @@ GameScene::~GameScene()
 void GameScene::InitializeOverride(EngineContext& context)
 {
 	m_directionalLight.position = Vector3{ 0.0f, 0.0f, 0.0f };
+	m_directionalLight.color = Vector3{ 1.0f, 1.0f, 1.0f };
 
 	//Create player actor and add it to the scene
 	auto playerActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, 5.0f });
