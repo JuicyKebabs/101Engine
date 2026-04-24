@@ -17,6 +17,8 @@
     <None Include="shader\SpriteObjectConstants.hlsli">
       <Filter>shader</Filter>
     </None>
+    <None Include=".github\upgrades\assessment.md" />
+    <None Include=".github\upgrades\plan.md" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -237,6 +239,9 @@
     <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp">
       <Filter>src\Engine\Component</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Resource\GpuTexture.cpp">
+      <Filter>src\Engine\Resource</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -401,7 +406,7 @@
     <ClInclude Include="src\Engine\Resource\Texture.h">
       <Filter>src\Engine\Resource</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\Resource\RenderTargetTexture.h">
+    <ClInclude Include="src\Engine\Resource\GpuTexture.h">
       <Filter>src\Engine\Resource</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\Graphics\FrameRenderData.h">
@@ -409,6 +414,9 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Component\SpriteRenderer.h">
       <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\RenderPipeline.h">
+      <Filter>src\Engine\Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -428,6 +436,9 @@
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
     <FxCompile Include="shader\VertexShader\SpriteVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\ShadowVS.hlsl">
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
   </ItemGroup>

@@ -16,6 +16,14 @@ LayerMask MakeLayerMask(COLLISION_LAYER layer)
 	switch (layer)
 	{//コリジョンレイヤーごとに当たり判定を行うレイヤーマスクを設定
 	case COLLISION_LAYER::DEFAULT:
+		return MakeMask({
+			COLLISION_LAYER::PLAYER,			//プレイヤーレイヤー
+			COLLISION_LAYER::ENEMY,				//エネミーレイヤー
+			COLLISION_LAYER::WALL,				//壁レイヤー
+			COLLISION_LAYER::PLAYER_BULLET,		//プレイヤーブレットレイヤー
+			COLLISION_LAYER::PLAYER_RAY,		//プレイヤーレイキャストレイヤー
+			COLLISION_LAYER::ENEMY_BULLET		//エネミーブレットレイヤー
+			});
 		break;
 	case COLLISION_LAYER::PLAYER:
 		return MakeMask({
@@ -63,8 +71,8 @@ LayerMask MakeLayerMask(COLLISION_LAYER layer)
 
 	case COLLISION_LAYER::MAX_LAYER:
 		return 0;
-		break;
 	default:
+		return 0;
 		break;
 	}
 }

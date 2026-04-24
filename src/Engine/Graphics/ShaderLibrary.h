@@ -30,8 +30,8 @@ struct ShaderKeyHash
         size_t h2 = std::hash<std::string>{}(std::get<1>(k));  // entry point
         size_t h3 = std::hash<std::string>{}(std::get<2>(k));  // profile
         size_t h4 = std::hash<uint64_t>{}(std::get<3>(k));     // stage defines
-		size_t h5 = std::hash<uint32_t>{}(std::get<4>(k));     // common defines
-		size_t h6 = std::hash<uint32_t>{}(std::get<5>(k));     // compile flags
+		size_t h5 = std::hash<uint64_t>{}(std::get<4>(k));     // common defines
+		size_t h6 = std::hash<uint64_t>{}(std::get<5>(k));     // compile flags
 		return ((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5);
 	}
 };
@@ -48,6 +48,7 @@ struct ShaderDesc
 static const std::wstring VS_FILE_TABLE[] = {
     L"shader/VertexShader/MeshVS.hlsl",
     L"shader/VertexShader/SpriteVS.hlsl",
+    L"shader/VertexShader/ShadowVS.hlsl",
     L"shader/VertexShader/PostEffectVS.hlsl",
 };
 // Pixel shader file tables

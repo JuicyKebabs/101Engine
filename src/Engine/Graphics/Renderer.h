@@ -37,14 +37,14 @@ public:
 		return &instance;
 	}
 
-	// Main processing functions
 	void Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager);	// Initialization
 	void Update(UINT currentBackBufferIndex, const CameraInfo& info);															// Update
-	// Render list management functions
-	void BeginFrame(ID3D12GraphicsCommandList* p_commandList);											// Begin frame (set root signature, descriptor heaps, etc.)
-	void RenderScene(ID3D12GraphicsCommandList* p_commandList);											// Render the scene using submitted draw packets
-	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, RenderTargetTexture* input);	// Render a full-screen pass (for post-processing)
-
+	
+	void BeginFrame(ID3D12GraphicsCommandList* p_commandList);	// Begin frame (set root signature, descriptor heaps, etc.)
+	
+	void RenderShadowMap(ID3D12GraphicsCommandList* p_commandList);							// Render shadow map (if needed)
+	void RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t shadowMapSrvIndex);	// Render the scene using submitted draw packets
+	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input);	// Render a full-screen pass (for post-processing)
 	void SubmitFrameRenderData(const FrameRenderData& frameRenderData);	// Submit draw packets
 	void SubmitCameraInfo(const CameraInfo& cameraInfo);				// Submit camera information for this frame
 	void SubmitDirectionalLight(const DirectionalLight& light);			// Directional light information
@@ -64,22 +64,27 @@ private:
 	CameraInfo m_cameraInfoThisFrame;	// Camera information for this frame (for post-processing)
 
 	// Constant buffers for per-frame and per-draw data
-	std::unique_ptr<ConstantBuffer> m_frameCB;
+	std::unique_ptr<ConstantBuffer> m_colorFrameCB;
+	std::unique_ptr<ConstantBuffer> m_shadowFrameCB;
 	std::unique_ptr<ConstantBuffer> m_lightCB;
-	std::vector<std::unique_ptr<ConstantBuffer>> m_objectCBWorld;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_meshForShadowCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCB;
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light
 
 	// Post-processing related
 	PSOKey m_postProcessKey;	// Post-processing PSO key
+	PSOKey m_shadowMapKey;		// Shadow map PSO key
 
 private:
-	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare);		// Render a mesh
-	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemINdex, PSOKey& compare);	// Render a sprite
-
+	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare);			// Render a mesh
+	void RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex);					// Render a mesh for shadow map
+	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemINdex, PSOKey& compare);		// Render a sprite
 
 	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
 	std::shared_ptr<PipelineState> CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object
 	void PreparePostProcessKey();	// Prepare post-processing information
+	void PrepareShadowMapKey();		// Prepare shadow map information
 };

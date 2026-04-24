@@ -41,7 +41,9 @@ public:
 	void SetDepthMode(DepthMode mode);			//深度モードを設定
 	void SetCullMode(CullMode mode);			//カリングモードを設定
 	void SetFormat(RenderTargetFormat format);	//レンダーターゲットのフォーマットを設定
-	void FreeIndex(bool isFree);				//フリーインデックスの使用を設定
+	
+	void FreeIndex(bool isFree);	//フリーインデックスの使用を設定
+	void SetDepthOnly();			//深度のみのレンダリングを設定
 
 	ID3D12PipelineState* GetPipelineState() const; //パイプラインステートオブジェクトを取得
 	bool IsValid() const; //パイプラインステート生成に成功したかを取得

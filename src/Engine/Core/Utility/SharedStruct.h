@@ -54,6 +54,7 @@ struct alignas(256) FrameConstants
 	// Camera related data
 	Matrix4x4 view;	//view matrix
 	Matrix4x4 proj;	//projection matrix
+	Vector3 cameraPosition;	//camera position (for lighting calculations)
 };
 
 // Object constant buffer structure for mesh rendering (b1)
@@ -61,17 +62,18 @@ struct alignas(256) MeshRenderConstants
 {
 	Matrix4x4 worldMatrix;			//world matrix
 	Matrix4x4 worldInvTranspose;	//world inverse transpose matrix
+	Matrix4x4 lightViewProj;			//light view projection matrix (for shadow mapping)
 	Vector4 objectColor;			//object color (RGBA)
 };
 
 // Object constant buffer structure for sprite rendering (b1)
 struct alignas(256) SpriteRenderConstants
 {
-	Matrix4x4 worldMatrix;			//world matrix
-	Vector4 color;	//sprite color (RGBA)
-	Vector4 uvRect;	//UV rectangle
-	Vector2 pivot;	//pivot point for the sprite
-	Vector2 flip;	//flip flags for X and Y axes (1 for normal, -1 for flipped)
+	Matrix4x4 worldMatrix;	//world matrix
+	Vector4 color;			//sprite color (RGBA)
+	Vector4 uvRect;			//UV rectangle
+	Vector2 pivot;			//pivot point for the sprite
+	Vector2 flip;			//flip flags for X and Y axes (1 for normal, -1 for flipped)
 };
 
 // Light constant buffer structure for point lights (b2)
@@ -85,7 +87,10 @@ struct alignas(256) LightConstants
 //directional light structure
 struct DirectionalLight
 {
+	Vector3 position = { 0.0f, 0.0f, 0.0f };	//light position (not used for directional light but can be used for shadow mapping)
 	Vector3 direction = { -1.0f, -1.0f, 0.0f };	//light direction
+	Matrix4x4 view;								//light view matrix (used for shadow mapping)
+	Matrix4x4 proj;								//light projection matrix (used for shadow mapping)
 	float intensity = 1.0f;						//light intensity
 	Vector3 color = { 1.0f, 1.0f, 1.0f };		//light color
 	float ambient = 0.1f;						//ambient light intensity
