@@ -6,7 +6,6 @@
 #include <assimp/postprocess.h>
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
-#include "Engine/Physics/Collider.h"
 #include "Engine/Actor/Actor.h"
 
 using namespace DirectX;

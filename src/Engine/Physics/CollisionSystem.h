@@ -2,107 +2,72 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include <vector>
-#include "Collider.h"
+#include "Engine/Component/Collider.h"
 #include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Core/Context/Context.h"
-#include "CollisionData.h"
+#include "Engine/Physics/CollisionData.h"
 
-//前方宣言
-class Renderer;
-class TextureManager;
-class MeshManager;
-
-//衝突ペア構造体
+// Structure to define a pair of colliders for collision checking
 struct CollisionPair
 {
-	Collider* colliderA; // コライダーA
-	Collider* colliderB; // コライダーB
+	Collider* colliderA; // Collider A
+	Collider* colliderB; // Collider B
 };
 
-//OBB構造体
+// Structure for Oriented Bounding Box (OBB)
 struct OBB
 {
-	DirectX::XMVECTOR center;		//中心点
-	DirectX::XMVECTOR axis[3];		//各軸の方向ベクトル(正規化済みワールド軸)
-	DirectX::XMFLOAT3 halfSizes;	//各軸方向の半分のサイズ
+	DirectX::XMVECTOR center;		// Center point
+	DirectX::XMVECTOR axis[3];		// Direction vectors for each axis (normalized)
+	Vector3 halfSizes;	// Half sizes along each axis
 };
 
-//球セグメント構造体
+// Structure for sphere segment (used for raycasting)
 struct SphereSegment
 {
-	DirectX::XMVECTOR center;	//中心点
-	float radius;				//半径
+	DirectX::XMVECTOR center;	// Center point
+	float radius;				// Radius
 };
 
-//カプセルセグメント構造体
+// Structure for capsule segment
 struct CapsuleSegment
 {
-	DirectX::XMVECTOR pointA;	//端点A
-	DirectX::XMVECTOR pointB;	//端点B
-	float radius;				//半径
+	DirectX::XMVECTOR pointA;	// Edge point A (bottom center)
+	DirectX::XMVECTOR pointB;	// Edge point B (top center)
+	float radius;				// Radius
 };
 
-//衝突時のパラメータ
+// Structure for contact result of a collision
 struct ContactResult
 {
-	bool isCollided = false;	//衝突しているかどうか
-	DirectX::XMVECTOR point{};	//接触点
-	DirectX::XMVECTOR normal{};	//接触法線
-	float depth = 0.0f;			//貫通深度
+	bool isCollided = false;	// Collision detected flag
+	DirectX::XMVECTOR point{};	// Contact point
+	DirectX::XMVECTOR normal{};	// Contact normal vector
+	float depth = 0.0f;			// Penetration depth
 };
 
-// 衝突管理クラス
-class CollisionManager
+// Collision system class responsible for managing colliders and performing collision detection
+class CollisionSystem
 {
 public:
-	static constexpr DirectX::XMFLOAT4 DRAW_COLOR_DEFAULT = { 0.0f, 1.0f, 0.0f, 0.1f };		//描画時のデフォルトカラー
-	static constexpr DirectX::XMFLOAT4 DRAW_COLOR_DETECTED = { 1.0f, 0.0f, 0.0f, 0.1f };	//描画時の衝突検知時カラー
+	CollisionSystem() = default;	// Constructor
+	~CollisionSystem() = default;	// Destructor
 
-public:
-	const wchar_t* texPath = L"asset/texture/white.png";
+	void Register(Collider* collider);		// Register a collider to the collision system
+	void Unregister(Collider* collider);	// Unregister a collider from the collision system
+	void ClearColliders();					// Clear all colliders from the collision system
+	void CheckColliders();					// Check each collider if it is active and perform collision detection
 
-public:
-	CollisionManager();		//コンストラクタ
-	~CollisionManager();	//デストラクタ
-
-	//メイン関数
-	void Initialize(EngineContext& context);
-	void Draw(Renderer& renderer);		//描画
-	void CheckColliders();
-	//void SubmitDraw(
-	//	Renderer& renderer,			//シーンの参照
-	//	Collider& collider,			//コライダー配列
-	//	WorldRenderModel& infos	//描画モデル
-	//);
-
-	//衝突判定処理
-	void CheckCollisions();			//衝突判定
-	void CheckCollisionStates();	//衝突状態チェック
-
-	//コライダー配列の操作
-	void RegisterCollider(Collider* collider);	//コライダー登録
-	void ClearColliders();						//コライダークリア
-
-	void CreateColliderRenderInfo(	//コライダー描画情報作成
-		TextureManager& textureManager,	//テクスチャ管理クラスの参照
-		MeshManager& meshManager		//メッシュ管理クラスの参照
-	);
-
-	//レイキャスト関数
-	void RaycastSegmentQuery(
-		RaycastSegment& ray	//レイ情報
-	);
+	void CheckCollisions();							// Check collisions between registered colliders
+	void CheckCollisionStates();					// Check collision states
+	void RaycastSegmentQuery(RaycastSegment& ray);	// Perform raycast segment query for collision detection
 
 private:
-	std::vector<Collider*> m_pCollidersList;				//コライダー配列
-	std::vector<CollisionPair> m_pNarrowPhaseColliders;		//ナローフェーズ用コライダー配列
-	std::vector<CollisionPair> m_currentCollisionPairs;		//今回の衝突ペア配列
-	std::vector<CollisionPair> m_previousCollisionPairs;	//前回の衝突ペア配列
-
-	//WorldRenderModel m_colliderRenderModelBox;		//ボックスコライダー描画情報
-	//WorldRenderModel m_colliderRenderModelSphere;	//球コライダー描画情報
-	//WorldRenderModel m_colliderRenderModelCapsule;	//カプセルコライダー描画情報
+	std::vector<Collider*> m_pCollidersList;				// Pointer array of colliders registered in the collision system
+	std::vector<CollisionPair> m_pNarrowPhaseColliders;		// Array of collider pairs for narrow phase collision detection
+	std::vector<CollisionPair> m_currentCollisionPairs;		// Current collision pairs array (pairs that are currently colliding)
+	std::vector<CollisionPair> m_previousCollisionPairs;	// Previous collision pairs array (pairs that were colliding in the previous frame)
 
 private:
 	//ChackCollisions()の補助関数

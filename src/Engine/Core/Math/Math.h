@@ -195,6 +195,8 @@ struct Quaternion : public DirectX::XMFLOAT4
 	Quaternion(float value) : DirectX::XMFLOAT4(value, value, value, value) {}
 	Quaternion(float x, float y, float z, float w) : DirectX::XMFLOAT4(x, y, z, w) {}
 	Quaternion(float arr[4]) : DirectX::XMFLOAT4(arr[0], arr[1], arr[2], arr[3]) {}
+	explicit Quaternion(Vector3 vec3) : DirectX::XMFLOAT4(vec3.x, vec3.y, vec3.z, 1.0f) {}
+	explicit Quaternion(Vector4 vec4) : DirectX::XMFLOAT4(vec4.x, vec4.y, vec4.z, vec4.w) {}
 	explicit Quaternion(DirectX::XMFLOAT3 vec3) : DirectX::XMFLOAT4(vec3.x, vec3.y, vec3.z, 1.0f) {}
 	explicit Quaternion(DirectX::XMFLOAT4 vec4) : DirectX::XMFLOAT4(vec4.x, vec4.y, vec4.z, vec4.w) {}
 	explicit Quaternion(DirectX::FXMVECTOR m) { DirectX::XMStoreFloat4(this, m); }

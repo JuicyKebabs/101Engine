@@ -5,10 +5,10 @@
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/UI/Canvas.h"
-#include "Engine/Physics/CollisionManager.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Graphics/CameraSystem.h"
+#include "Engine/Physics/CollisionSystem.h"
 
 // Scene base class
 // Base class for all scene classes
@@ -27,7 +27,6 @@ public:
 	void LateUpdate(float deltaTime);			// Late update
 	void OnRender(EngineContext& context);		// Render
 	void Finalize();							// Finalize
-	void ResolveCollisions() {};				// Resolve collisions
 
 	// Add an actor
 	template<class T, class... Args>
@@ -44,8 +43,9 @@ public:
 		m_addPendingActors.push_back(std::move(actor));
 	}
 
-	RenderSystem* GetRenderSystem() const { return m_pRenderSystem.get(); }	// Get render system
-	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }	// Get camera system
+	RenderSystem* GetRenderSystem() const { return m_pRenderSystem.get(); }				// Get render system
+	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }				// Get camera system
+	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
 
 private:
 	std::vector<std::unique_ptr<Actor>> m_actors;		// Object list in the scene
@@ -53,10 +53,9 @@ private:
 
 	std::vector<std::unique_ptr<Actor>> m_addPendingActors;	// Pending objects to be added
 
-	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;	// Render system
-	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;	// Camera system
-
-	//std::unique_ptr<CollisionManager> m_pCollisionManager = nullptr;	// Collision manager
+	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;		// Render system
+	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;		// Camera system
+	std::unique_ptr<CollisionSystem> m_pCollisionSystem = nullptr;	// Collision system
 
 protected:
 	DirectionalLight m_directionalLight;	// Directional light

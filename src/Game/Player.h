@@ -13,6 +13,6 @@ private:
 	void OnStartBehavior() override {}
 	void PreUpdateBehavior(float deltaTime) override {}
 	void UpdateBehavior(float deltaTime) override;
-	void LateUpdateBehavior(float deltaTime) override {}
+	void LateUpdateBehavior(float deltaTime) override;
 	void OnDestroyBehavior() override {}
 };

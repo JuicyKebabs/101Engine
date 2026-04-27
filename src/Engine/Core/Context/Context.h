@@ -4,7 +4,7 @@
 class Renderer;					// Renderer
 class TextureManager;			// Texture manager
 class MeshManager;				// Mesh manager
-class CollisionManager;			// Collision manager
+class CollisionSystem;			// Collision manager
 
 // Engine context structure
 struct EngineContext
@@ -22,5 +22,5 @@ struct FrameContext
 // Game context structure inheriting from EngineContext
 struct GameContext : public EngineContext
 {
-	CollisionManager* pCollisionManager = nullptr;	// Pointer to the collision manager
+	CollisionSystem* pCollisionManager = nullptr;	// Pointer to the collision manager
 };
