@@ -8,11 +8,11 @@ void CameraTest::OnStartBehavior()
 	m_isMainCamera = false;
 }
 
-void CameraTest::UpdateBehavior(float deltaTime)
+void CameraTest::UpdateBehavior()
 {
-	auto inputInfo = InputManager::GetInstance()->GetInputInfo();
+	auto inputInfo = InputManager::GetInstance().GetInputInfo();
 
-	if (inputInfo->key.space.trigger){
+	if (inputInfo.key.space.trigger){
 		auto camera = GetOwner()->GetComponentByClass<Camera>();
 		if (camera) {
 			camera->SetAsMainCamera();
@@ -28,34 +28,34 @@ void CameraTest::UpdateBehavior(float deltaTime)
 
 		const float rotationSpeed = 1.0f; // degrees per second
 
-		if(inputInfo->key.up.down) {
+		if(inputInfo.key.up.down) {
 			transform->RotateLocalByEulerDeg({ -rotationSpeed, 0.0f, 0.0f });
 		}
-		if(inputInfo->key.down.down) {
+		if(inputInfo.key.down.down) {
 			transform->RotateLocalByEulerDeg({ rotationSpeed, 0.0f, 0.0f });
 		}
-		if(inputInfo->key.left.down) {
+		if(inputInfo.key.left.down) {
 			transform->RotateLocalByEulerDeg({ 0.0f, -rotationSpeed, 0.0f });
 		}
-		if(inputInfo->key.right.down) {
+		if(inputInfo.key.right.down) {
 			transform->RotateLocalByEulerDeg({ 0.0f, rotationSpeed, 0.0f });
 		}
 
 		const float moveSpeed = 0.1f; // units per second
 
-		if(inputInfo->key.i.down) {
+		if(inputInfo.key.i.down) {
 			auto forward = transform->GetLocalForward();
 			transform->SetLocalPosition(transform->GetLocalPosition() + forward * moveSpeed);
 		}
-		if(inputInfo->key.k.down) {
+		if(inputInfo.key.k.down) {
 			auto backward = transform->GetLocalBack();
 			transform->SetLocalPosition(transform->GetLocalPosition() + backward * moveSpeed);
 		}
-		if(inputInfo->key.j.down) {
+		if(inputInfo.key.j.down) {
 			auto left = transform->GetLocalLeft();
 			transform->SetLocalPosition(transform->GetLocalPosition() + left * moveSpeed);
 		}
-		if(inputInfo->key.l.down) {
+		if(inputInfo.key.l.down) {
 			auto right = transform->GetLocalRight();
 			transform->SetLocalPosition(transform->GetLocalPosition() + right * moveSpeed);
 		}

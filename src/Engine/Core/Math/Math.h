@@ -2,14 +2,19 @@
 #include <DirectXMath.h>
 #include <numbers>
 #include <cmath>
-#include <string>
-
 // Forward declarations
 struct Vector2;
 struct Vector3;
 struct Vector4;
 struct Quaternion;
 struct Matrix4x4;
+
+enum class CylindricalAxis
+{
+	X = 0,
+	Y = 1,
+	Z = 2
+};
 
 // 2D vector for positions, directions, and scales
 struct Vector2 : public DirectX::XMFLOAT2
@@ -292,6 +297,8 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 	Vector3 TransformDirection(const Vector3& direction) const;
 	Vector3 TransformVector(const Vector3& vector) const;
 	Vector3 TransformNormal(const Vector3& normal) const;
+	Matrix4x4 ToBillboard(const Vector3& cameraPos, const Vector3& cameraUp);
+	Matrix4x4 ToCylindricalBillboard(const Vector3& cameraPos, const Vector3& cameraUp);
 
 	// Statics
 	static Matrix4x4 CreateTranslation(const Vector3& translation);
@@ -305,8 +312,6 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 	static Matrix4x4 CreateLookAt(const Vector3& eye, const Vector3& target, const Vector3& up);
 	static Matrix4x4 CreatePerspectiveFov(float fovY, float aspect, float nearZ, float farZ);
 	static Matrix4x4 CreateOrthographic(float width, float height, float nearZ, float farZ);
-	static Matrix4x4 CreateBillboard(const Vector3& objectPos, const Vector3& cameraPos, const Vector3& cameraUp);
-	static Matrix4x4 CreateCylindricalBillboard(const Vector3& objectPos, const Vector3& cameraPos, const Vector3& cameraUp, const Vector3& axis);
 	static Matrix4x4 Transpose(const Matrix4x4& m);
 
 	// Operators
