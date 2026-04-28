@@ -38,7 +38,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 	);
 
 	Collider::InitDesc playerColliderDesc;
-	playerColliderDesc.type = ColliderType::SPHERE;
+	playerColliderDesc.type = ColliderType::BOX;
 	playerColliderDesc.localScale = Vector3{ 1.0f, 1.0f, 1.0f };
 
 	playerActor->AddComponent<Collider>()->Initialize(playerColliderDesc);
@@ -67,7 +67,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 
 	Collider::InitDesc groundColliderDesc;
 	groundColliderDesc.type = ColliderType::BOX;
-	groundColliderDesc.localScale = Vector3{ 50.0f, 1.0f, 50.0f };
+	groundColliderDesc.localScale = Vector3{ 1.0f, 1.0f, 1.0f };
 	groundActor->AddComponent<Collider>()->Initialize(groundColliderDesc);
 
 	auto cameraTestActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, -5.0f });

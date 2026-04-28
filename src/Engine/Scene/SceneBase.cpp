@@ -65,13 +65,6 @@ void SceneBase::Update(float deltaTime)
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->FlushTransform();
 	}
-
-	// Check colliders
-	m_pCollisionSystem->CheckColliders();
-
-	// Update collision system
-	m_pCollisionSystem->CheckCollisions();
-
 }
 
 // Late update
@@ -89,7 +82,14 @@ void SceneBase::LateUpdate(float deltaTime)
 	{
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->FlushTransform();
+		actor->FlushColliderTransforms();
 	}
+
+	// Check colliders
+	m_pCollisionSystem->CheckColliders();
+
+	// Update collision system
+	m_pCollisionSystem->CheckCollisions();
 
 	//Flush camera parameters to update camera information
 	if (m_pCameraSystem) {
