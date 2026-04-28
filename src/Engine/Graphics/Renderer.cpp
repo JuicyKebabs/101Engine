@@ -10,44 +10,47 @@
 
 using namespace DirectX;
 
-//ƒfƒXƒgƒ‰ƒNƒ^
+//ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 Renderer::~Renderer()
 {
 	m_psoMap.clear();
 }
 
-//‰Šú‰»
+//åˆæœŸåŒ–
 void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager)
 {
 	m_pDevice = pDevice;
 	m_pDescriptorHeapAllocator = pDescriptorHeapAllocator;
 	m_pTextureManager = pTextureManager;
 
-	m_directionalLight = {}; //‰Šú‰»
+	m_directionalLight = {}; //åˆæœŸåŒ–
 
-	//ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚Ì¶¬
+	//ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã®ç”Ÿæˆ
 	m_pRootSignature = std::make_unique<RootSignature>(m_pDevice);
 
-	//ƒVƒF[ƒ_[ƒ‰ƒCƒuƒ‰ƒŠ‚Ì¶¬
+	//ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®ç”Ÿæˆ
 	m_pShaderLibrary = std::make_unique<ShaderLibrary>();
 
-	//ƒx[ƒVƒbƒNPSO‚Ì¶¬
+	//ãƒ™ãƒ¼ã‚·ãƒƒã‚¯PSOã®ç”Ÿæˆ
 	PSOKey defaultKey{};
 	m_pDefaultPSO = CreatePipelineStateObject(defaultKey);
 
-	m_frameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
+	m_colorFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
+	m_shadowFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
 
-	//ƒ|ƒXƒgƒvƒƒZƒX—pPSOƒL[‚Ìİ’è
+	//ãƒã‚¹ãƒˆãƒ—ãƒ­ã‚»ã‚¹ç”¨PSOã‚­ãƒ¼ã®è¨­å®š
 	PreparePostProcessKey();
+	//ã‚·ãƒ£ãƒ‰ã‚¦ãƒãƒƒãƒ—ç”¨PSOã‚­ãƒ¼ã®è¨­å®š
+	PrepareShadowMapKey();
 }
 
-//XV
+//æ›´æ–°
 void Renderer::Update(UINT currentBackBufferIndex, const CameraInfo& info)
 {
 }
 
-//ƒtƒŒ[ƒ€ŠJn
+//ãƒ•ãƒ¬ãƒ¼ãƒ é–‹å§‹
 void Renderer::BeginFrame(ID3D12GraphicsCommandList* p_commandList)
 {
 	// Set descriptor heaps
@@ -69,20 +72,52 @@ void Renderer::SubmitCameraInfo(const CameraInfo& cameraInfo)
 	m_cameraInfoThisFrame = cameraInfo;
 }
 
-//•½sŒõŒ¹î•ñ‚ğİ’è
+// Submit directional Light information
 void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 {
-	m_directionalLight = light;	//•½sŒõŒ¹î•ñ‚ğ•Û‘¶
+	m_directionalLight = light;
+
+	Vector3 dir = light.direction.Normalized();
+	Vector3 sceneCenter = Vector3::Zero();
+	Vector3 eye = sceneCenter - dir * 80.0f;
+
+	Vector3 up = (std::abs(dir.y) > 0.99f)
+		? Vector3(0.0f, 0.0f, 1.0f)
+		: Vector3(0.0f, 1.0f, 0.0f);
+
+	m_directionalLight.view = Matrix4x4::CreateLookAt(eye, sceneCenter, up);
+	m_directionalLight.proj = Matrix4x4::CreateOrthographic(20.0f, 20.0f, 0.1f, 200.0f);
+}
+
+void Renderer::RenderShadowMap(ID3D12GraphicsCommandList* p_commandList)
+{
+	auto pso = GetPipelineStateObject(m_shadowMapKey);
+	p_commandList->SetPipelineState(pso->GetPipelineState());
+
+	// Set frame constants for shadow map rendering
+	auto framePtr = m_shadowFrameCB->GetPtr<FrameConstants>();
+	framePtr->view = m_directionalLight.view;
+	framePtr->proj = m_directionalLight.proj;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_shadowFrameCB->GetAddress());
+
+	int itemIndex = 0;
+
+	for (auto& item : m_frameRenderData.opaque)
+	{
+		if (item.renderType == RenderType::Mesh) RenderMeshForShadow(p_commandList, m_frameRenderData.GetMesh(item.handle), itemIndex);
+		itemIndex++;
+	}
 }
 
 // Render all items in this frame's render data
-void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
+void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t shadowMapSrvIndex)
 {
 	// Set frame-level constants
-	auto framePtr = m_frameCB->GetPtr<FrameConstants>();
+	auto framePtr = m_colorFrameCB->GetPtr<FrameConstants>();
 	framePtr->view = m_cameraInfoThisFrame.viewMatrix;
 	framePtr->proj = m_cameraInfoThisFrame.projMatrix;
-	p_commandList->SetGraphicsRootConstantBufferView(0, m_frameCB->GetAddress());
+	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_colorFrameCB->GetAddress());
 
 	// Set lighting constants ( Currently, one directional light is only supported for simplicity)
 	auto lightPtr = m_lightCB->GetPtr<LightConstants>();
@@ -100,31 +135,46 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 	);
 	p_commandList->SetGraphicsRootConstantBufferView(2, m_lightCB->GetAddress());
 
+	// Set shadow map SRV
+	auto shadowGpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(shadowMapSrvIndex);
+	p_commandList->SetGraphicsRootDescriptorTable(4, shadowGpuHandle);
+
 	// Allocate constant buffers for this frame
-	size_t totalItemCount = m_frameRenderData.GetMeshCount() + m_frameRenderData.GetSpriteCount();
-	if (m_objectCBWorld.size() < totalItemCount)
+	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
+	if (m_meshCB.size() < totalMeshCount)
 	{
-		size_t toAllocate = totalItemCount - m_objectCBWorld.size();
+		size_t toAllocate = totalMeshCount - m_meshCB.size();
 		for (size_t i = 0; i < toAllocate; i++)
 		{
-			m_objectCBWorld.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+			m_meshCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+		}
+	}
+
+	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
+	if (m_spriteCB.size() < totalSpriteCount)
+	{
+		size_t toAllocate = totalSpriteCount - m_spriteCB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_spriteCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
 		}
 	}
 
 	PSOKey compare{};
-	int ItemIndex = 0; 
+	int meshItemIndex = 0;
+	int spriteItemIndex = 0;
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
+			meshItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
+			spriteItemIndex++;
 			break;
 		default:
 			break;
@@ -136,12 +186,12 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
+			meshItemIndex++;
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), ItemIndex, compare);
-			ItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
+			spriteItemIndex++;
 			break;
 		default:
 			break;
@@ -150,7 +200,7 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList)
 }
 
 // Draw post-process effects
-void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, RenderTargetTexture* input)
+void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input)
 {
 	// Set the pipeline state object for post-processing
 	auto pso = GetPipelineStateObject(m_postProcessKey);		// Get the pipeline state object for post-processing
@@ -174,12 +224,12 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Re
 void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_objectCBWorld.size())
+	if (itemIndex >= m_meshCB.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	if (!m_meshCB[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -202,11 +252,12 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<MeshRenderConstants>();
+	auto ptr = m_meshCB[itemIndex]->GetPtr<MeshRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
 	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
+	ptr->lightViewProj = m_directionalLight.view * m_directionalLight.proj;
 	ptr->objectColor = item.color;
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCB[itemIndex]->GetAddress());
 
 	// Set mesh data
 	auto meshGPU = item.meshDesc.gpuHandle;
@@ -231,15 +282,47 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	);
 }
 
+void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex)
+{
+	if(itemIndex >= m_meshForShadowCB.size())
+	{
+		m_meshForShadowCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+	}
+
+	// Set up the constant buffer for this mesh
+	auto ptr = m_meshForShadowCB[itemIndex]->GetPtr<MeshRenderConstants>();
+	ptr->worldMatrix = item.worldMatrix;
+	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
+	ptr->objectColor = item.color;
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshForShadowCB[itemIndex]->GetAddress());
+
+	// Set mesh data
+	auto meshGPU = item.meshDesc.gpuHandle;
+	auto vbv = meshGPU->GetVertexBuffer()->GetView();
+	auto ibv = meshGPU->GetIndexBuffer()->GetView();
+	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
+	p_commandList->IASetVertexBuffers(0, 1, &vbv);
+	p_commandList->IASetIndexBuffer(&ibv);
+
+	// Draw command
+	p_commandList->DrawIndexedInstanced(
+		meshGPU->GetIndexCount(),
+		1,
+		item.meshDesc.startIndex,
+		item.meshDesc.baseVertex,
+		0
+	);
+}
+
 void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
-	if (itemIndex >= m_objectCBWorld.size())
+	if (itemIndex >= m_spriteCB.size())
 	{
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
-	if (!m_objectCBWorld[itemIndex]->GetIsValid())
+	if (!m_spriteCB[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
 		return;
@@ -260,7 +343,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	}
 
 	// Set up the constant buffer for this mesh
-	auto ptr = m_objectCBWorld[itemIndex]->GetPtr<SpriteRenderConstants>();
+	auto ptr = m_spriteCB[itemIndex]->GetPtr<SpriteRenderConstants>();
 	ptr->worldMatrix = item.worldMatrix;
 	ptr->color = item.color;
 	ptr->uvRect = Vector4(
@@ -271,7 +354,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	);
 	ptr->pivot = item.pivot;
 	ptr->flip = item.flip;
-	p_commandList->SetGraphicsRootConstantBufferView(1, m_objectCBWorld[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_spriteCB[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
@@ -283,7 +366,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	p_commandList->DrawInstanced(6, 1, 0, 0); // Draw a quad (2 triangles)
 }
 
-//PSOæ“¾
+//PSOå–å¾—
 PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 {
 	// Serch for the PSO in the map
@@ -302,30 +385,43 @@ PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 	return m_psoMap[key].get();
 }
 
-//PSO¶¬
+//PSOç”Ÿæˆ
 std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey& key)
 {
 	std::shared_ptr<PipelineState> pso = nullptr;
-
-	// Get shaders
-	auto vs = m_pShaderLibrary->GetVS(key.vsKey.fileID, key.vsKey.entryID, key.vsKey.defines, key.commonDefines);
-	auto ps = m_pShaderLibrary->GetPS(key.psKey.fileID, key.psKey.entryID, key.psKey.defines, key.commonDefines);
-	if (!vs || !ps)
-	{
-		OutputDebugStringA("Shader blob missing\n");
-		return nullptr;
-	}
 
 	// Create a new pipeline state object
 	pso = std::make_shared<PipelineState>(m_pDevice);
 	pso->SetInputLayout(Vertex::InputLayout);
 	pso->SetRootSignature(m_pRootSignature->GetRootSignature());
+
+	auto vs = m_pShaderLibrary->GetVS(key.vsKey.fileID, key.vsKey.entryID, key.vsKey.defines, key.commonDefines);
+	if (!vs) 
+	{
+		OutputDebugStringA("Vertex shader blob missing\n");
+		return nullptr;
+	}
 	pso->SetVertexShader(vs.Get());
-	pso->SetPixelShader(ps.Get());
-	pso->SetBlendMode(key.blend);
+
+	if (!key.depthOnly) 
+	{
+		auto ps = m_pShaderLibrary->GetPS(key.psKey.fileID, key.psKey.entryID, key.psKey.defines, key.commonDefines);
+		if (!ps)
+		{
+			OutputDebugStringA("Pixel shader blob missing\n");
+			return nullptr;
+		}
+		pso->SetPixelShader(ps.Get());
+		pso->SetBlendMode(key.blend);
+		pso->FreeIndex(key.indexFree);
+	}
+	else
+	{
+		pso->SetDepthOnly();
+	}
+
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
-	pso->FreeIndex(key.indexFree);
 	pso->Create();
 
 	// Check if creation was successful
@@ -353,6 +449,16 @@ void Renderer::PreparePostProcessKey()
 	key.depth = DepthMode::Disable;
 	key.cull = CullMode::Back;
 	key.rtvFormat = RenderTargetFormat::LDR;
-
 	m_postProcessKey = key;
+}
+
+void Renderer::PrepareShadowMapKey()
+{
+	PSOKey key{};
+	key.vsKey.fileID = VS_FILE_ID::ShadowMap;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
+	key.depth = DepthMode::TestWrite;
+	key.cull = CullMode::Back;
+	key.depthOnly = true;
+	m_shadowMapKey = key;
 }

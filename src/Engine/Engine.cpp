@@ -43,7 +43,7 @@ void Engine::Terminate()
 void Engine::BeginPass(RenderPassTarget target)
 {
 	// Check if the target is valid
-	if (target.type != RenderPassTargetType::BackBuffer && target.type != RenderPassTargetType::Builtin)
+	if (static_cast<UINT>(target.type) >= static_cast<UINT>(RenderPassTargetType::Count))
 	{
 		assert(false && "Invalid render pass target type");
 	}
@@ -58,6 +58,7 @@ void Engine::BeginPass(RenderPassTarget target)
 	D3D12_RESOURCE_STATES nextState = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
+	// Set up the render target based on the target type
 	if(target.type == RenderPassTargetType::BackBuffer)
 	{
 		auto& rt = m_backBuffers[target.index];				// Get the back buffer render target for the specified index
@@ -69,34 +70,61 @@ void Engine::BeginPass(RenderPassTarget target)
 		clearColor[2] = rt.clearColor[2];
 		clearColor[3] = rt.clearColor[3];
 
-		rt.currentState = RenderTargetTexture::ConvertToD3D12State(RenderTargetTexture::State::Write);	// Update the current state of the back buffer to "Write" for rendering
+		rt.currentState = GpuTexture::ConvertToD3D12State(GpuTexture::ResourceState::RenderTarget);	// Update the current state of the back buffer to "Write" for rendering
+	
+		// Set up the resource barrier to render target state
+		auto barrier =
+			CD3DX12_RESOURCE_BARRIER::Transition(
+				resource,		// Current render target resource
+				currentState,	// Current resource state
+				nextState		// New resource state for rendering
+			);
+		// Set the resource barrier command
+		m_pCommandList->ResourceBarrier(1, &barrier);
+
+		D3D12_VIEWPORT viewport = {};
+		viewport.Width = static_cast<float>(m_FrameBufferWidth);
+		viewport.Height = static_cast<float>(m_FrameBufferHeight);
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.MaxDepth = 1.0f;
+		viewport.MinDepth = 0.0f;
+		m_pCommandList->RSSetViewports(1, &viewport);
+
+		D3D12_RECT scissorRect = {};
+		scissorRect.left = 0;
+		scissorRect.top = 0;
+		scissorRect.right = m_FrameBufferWidth;
+		scissorRect.bottom = m_FrameBufferHeight;
+		m_pCommandList->RSSetScissorRects(1, &scissorRect);
 	}
-	else if (target.type == RenderPassTargetType::Builtin)
-	{
+	else if (target.type == RenderPassTargetType::ColorDepth)
+	{// Color depth uses render target, and next state is RenderTrget
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();	// Get the render target for the specified built-in index
-		resource = rt->GetResource();												// Get the resource for the built-in render target
 		rtvIndex = rt->GetRtvIndex();												// Get the RTV index for the built-in render target
-		currentState = RenderTargetTexture::ConvertToD3D12State(rt->GetState());	// Get the current resource state of the built-in render target
 		clearColor[0] = rt->GetClearColor()[0];
 		clearColor[1] = rt->GetClearColor()[1];
 		clearColor[2] = rt->GetClearColor()[2];
 		clearColor[3] = rt->GetClearColor()[3];
+		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::RenderTarget);	// Transition the built-in render target to "RenderTarget" state for rendering
+	
+		SetViewPortAndScissorRect(*rt);	// Set the viewport and scissor rectangle for rendering
+	}
+	else if (target.type == RenderPassTargetType::DepthOnly)
+	{// Depth only does not use rensdder target, and next state is DepthWrite
+		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();			// Get the render target for the specified built-in index
+		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::DepthWrite);	// Transition the built-in render target to "RenderTarget" state for rendering
+	
+		SetViewPortAndScissorRect(*rt);	// Set the viewport and scissor rectangle for rendering
 
-		rt->MarkAsWrite();	// Mark the built-in render target as being written to (rendering)
+		// Set the depth stencil view and clear the depth buffer without setting a render target
+		auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(rt->GetDsvIndex());
+		m_pCommandList->OMSetRenderTargets( 0, nullptr, false, &dsvHandle);
+		m_pCommandList->ClearDepthStencilView( dsvHandle, D3D12_CLEAR_FLAG_DEPTH, rt->GetClearDepth(), 0,0, nullptr);
+		return;
 	}
 
-	// Set up the resource barrier to render target state
-	auto barrier =
-		CD3DX12_RESOURCE_BARRIER::Transition(
-			resource,		// Current render target resource
-			currentState,	// Current resource state
-			nextState		// New resource state for rendering
-		);
-
-	// Set the resource barrier command
-	m_pCommandList->ResourceBarrier(1, &barrier);
-
-	auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(0);		// Get the DSV handle (assuming a single depth stencil view for simplicity)
+	auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(m_depthStencilDsvIndex);		// Get the DSV handle (assuming a single depth stencil view for simplicity)
 	auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the RTV handle for the current render target slot
 
 	// Set the render target and depth stencil view
@@ -109,10 +137,10 @@ void Engine::BeginPass(RenderPassTarget target)
 
 	// Clear the render target
 	m_pCommandList->ClearRenderTargetView(
-		rtvHandle,					// Handle to the render target view to clear
-		clearColor,					// Clear color
-		0,							// Number of rectangles to clear
-		nullptr						// Clear rectangle (NULL means full screen)
+		rtvHandle,	// Handle to the render target view to clear
+		clearColor,	// Clear color
+		0,			// Number of rectangles to clear
+		nullptr		// Clear rectangle (NULL means full screen)
 	);
 
 	// Clear the depth buffer
@@ -130,7 +158,7 @@ void Engine::BeginPass(RenderPassTarget target)
 void Engine::EndPass(RenderPassTarget target)
 {
 	// Check if the target is valid
-	if(target.type != RenderPassTargetType::BackBuffer && target.type != RenderPassTargetType::Builtin)
+	if(static_cast<UINT>(target.type) >= static_cast<UINT>(RenderPassTargetType::Count))
 	{
 		assert(false && "Invalid render pass target type");
 	}
@@ -150,26 +178,28 @@ void Engine::EndPass(RenderPassTarget target)
 		currentState = rt.currentState;						// Get the current resource state of the back buffer
 		nextState = D3D12_RESOURCE_STATE_PRESENT;			// Next state for the back buffer is "Present" for presentation to the screen
 		rt.currentState = D3D12_RESOURCE_STATE_PRESENT;		// Update the current state of the back buffer to "Present" for post-processing
+		
+		// Set up the resource barrier to transition to the next state
+		auto barrier =
+			CD3DX12_RESOURCE_BARRIER::Transition(
+				resource,		// Current render target
+				currentState,	// Current resource state
+				nextState		// New resource state for post-processing
+			);
+
+		// Set the resource barrier command
+		m_pCommandList->ResourceBarrier(1, &barrier);
 	}
-	else if (target.type == RenderPassTargetType::Builtin)
+	else if (target.type == RenderPassTargetType::ColorDepth)
 	{
 		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();				// Get the render target for the specified built-in index
-		resource = rt->GetResource();															// Get the resource for the built-in render target
-		currentState = RenderTargetTexture::ConvertToD3D12State(rt->GetState());				// Get the current resource state of the built-in render target
-		nextState = RenderTargetTexture::ConvertToD3D12State(RenderTargetTexture::State::Read);	// Next state for the built-in render target is "Read" for post-processing
-		rt->MarkAsRead();																		// Mark the built-in render target as being read from (post-processing)
+		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::ShaderResource);	// Transition the built-in render target back to "Common" state for future use
 	}
-
-	// Set up the resource barrier to transition to the next state
-	auto barrier =
-		CD3DX12_RESOURCE_BARRIER::Transition(
-			resource,		// Current render target
-			currentState,	// Current resource state
-			nextState		// New resource state for post-processing
-		);
-
-	// Set the resource barrier command
-	m_pCommandList->ResourceBarrier(1, &barrier);
+	else if (target.type == RenderPassTargetType::DepthOnly)
+	{
+		auto rt = m_builtinRenderTargets[static_cast<size_t>(target.index)].get();				// Get the render target for the specified built-in index
+		rt->TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::ShaderResource);	// Transition the built-in render target back to "Common" state for future use
+	}
 }
 
 // Begin rendering the frame
@@ -181,31 +211,23 @@ void Engine::BeginFrame()
 		m_pCommandAllocator[m_currentBackBufferIndex].Get(),	// Get the command allocator for the current back buffer index
 		nullptr													// Initial pipeline state (nullptr means no initial pipeline state)
 	);
-
-	// Set up the viewport and scissor rectangle for rendering
-	m_pCommandList->RSSetViewports(1, &m_viewport);
-	m_pCommandList->RSSetScissorRects(1, &m_scissorRect);
 }
 
-//前のフレームの終了待ち
+// Wait for the GPU to finish rendering the current frame
 void Engine::WaitRender()
 {
-	//描画終了待ち
 	const UINT64 fenceValue = m_fenceValue[m_currentBackBufferIndex];
 	m_pCommandQueue->Signal(m_pFence.Get(), fenceValue);
 	m_fenceValue[m_currentBackBufferIndex]++;
 
-	// 次のフレームの描画準備がまだであれば待機する.
 	if (m_pFence->GetCompletedValue() < fenceValue)
 	{
-		// 完了時にイベントを設定.
 		auto hr = m_pFence->SetEventOnCompletion(fenceValue, m_fenceEvent);
 		if (FAILED(hr))
 		{
 			return;
 		}
 
-		// 待機処理.
 		if (WAIT_OBJECT_0 != WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE))
 		{
 			return;
@@ -371,7 +393,6 @@ void Engine::CreateFence()
 		IID_PPV_ARGS(&m_pFence)	//フェンスのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
 	);
 
-	//同期を行うときのイベントハンドラを作成する。
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
@@ -416,7 +437,7 @@ void Engine::CreateBackBuffers()
 	result = m_pSwapChain->GetDesc(&swcDesc);
 
 	//バッファの数だけループ
-	for (int idx = 0; idx < swcDesc.BufferCount; idx++)
+	for (UINT idx = 0; idx < swcDesc.BufferCount; idx++)
 	{
 		auto& buffer = m_backBuffers[idx];
 		float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };	//バックバッファのクリアカラー(黒)
@@ -457,84 +478,63 @@ void Engine::CreateBackBuffers()
 void Engine::CreateBuiltinRenderTargets()
 {
 	for(auto& target : m_builtinRenderTargets) {
-		target = make_unique<RenderTargetTexture>();
+		target = make_unique<GpuTexture>();
 	}
 
 	CreatePostProcessRenderTarget();
+	CreateShadowMapRenderTarget();
+}
+
+void Engine::CreateShadowMapRenderTarget()
+{
+	GpuTexture::InitDesc desc{};
+	desc.width = 2048;
+	desc.height = 2048;
+	desc.initialState = GpuTexture::ResourceState::ShaderResource;
+	desc.depthFormat = GpuTexture::DepthFormat::D32F;
+	desc.useDSV = true;
+	desc.useSRV = true;
+
+	auto& rt = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::ShadowMap)];
+	rt->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
 }
 
 // Create post-process render target
 void Engine::CreatePostProcessRenderTarget()
 {
-	// Clear color
-	float clearColor[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-	D3D12_CLEAR_VALUE clearValue = CD3DX12_CLEAR_VALUE(DXGI_FORMAT_R16G16B16A16_FLOAT, clearColor);
-
-	// Heap properties
-	D3D12_HEAP_PROPERTIES heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-	// Resource description
-	auto resourceDesc = m_backBuffers[0].resource->GetDesc();
-
-	// Format 
-	RenderTargetTexture::Format format = RenderTargetTexture::Format::RGBA16F;
-	resourceDesc.Format = RenderTargetTexture::ConvertToDXGIFormat(format);
-
-	// Initial state
-	RenderTargetTexture::State initialState = RenderTargetTexture::State::Read;
-	auto d3dState = RenderTargetTexture::ConvertToD3D12State(initialState);
-
-	// Create the render target resource
-	ComPtr<ID3D12Resource> renderTarget;
-	result = m_pDevice->CreateCommittedResource(
-		&heapProp,
-		D3D12_HEAP_FLAG_NONE,
-		&resourceDesc,
-		d3dState,
-		&clearValue,
-		IID_PPV_ARGS(renderTarget.ReleaseAndGetAddressOf())
-		);
-
-	// Create render target view (RTV)
-	auto rtvIndex = m_pDescriptorHeapAllocator->AllocateRtv();				// Allocate an RTV descriptor from the heap allocator
-	auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the CPU handle for the allocated RTV descriptor
-	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-	rtvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-	m_pDevice->CreateRenderTargetView(
-		renderTarget.Get(),
-		&rtvDesc,
-		rtvHandle
-	);
-
-	// Create shader resource view (SRV)
-	auto srvIndex = m_pDescriptorHeapAllocator->AllocateCbvSrvUav();				// Allocate an SRV descriptor from the heap allocator
-	auto srvHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavCpuHandle(srvIndex);	// Get the CPU handle for the allocated SRV descriptor
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Texture2D.MipLevels = 1;
-	m_pDevice->CreateShaderResourceView(
-		renderTarget.Get(),
-		&srvDesc,
-		srvHandle
-	);
-
-	// Create the RenderTargetTexture object and initialize it
-	RenderTargetTexture::InitDesc desc = {};
-	desc.clearColor[0] = clearColor[0];
-	desc.clearColor[1] = clearColor[1];
-	desc.clearColor[2] = clearColor[2];
-	desc.clearColor[3] = clearColor[3];
-	desc.format = format;
-	desc.height = m_FrameBufferHeight;
+	GpuTexture::InitDesc desc{};
 	desc.width = m_FrameBufferWidth;
-	desc.m_rtvIndex = rtvIndex;
-	desc.m_srvIndex = srvIndex;
-	desc.state = initialState;
-	m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)]->Initialize(renderTarget, desc);
+	desc.height = m_FrameBufferHeight;
+	desc.initialState = GpuTexture::ResourceState::ShaderResource;
+	desc.format = GpuTexture::ColorFormat::RGBA16F;
+	desc.clearColor[0] = 0.0f;
+	desc.clearColor[1] = 0.0f;
+	desc.clearColor[2] = 1.0f;
+	desc.clearColor[3] = 1.0f;
+	desc.useRTV = true;
+	desc.useSRV = true;
+
+	auto& rt = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)];
+	rt->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+}
+
+void Engine::SetViewPortAndScissorRect(const GpuTexture& renderTarget)
+{
+	D3D12_VIEWPORT viewport = {};
+	viewport.Width = static_cast<float>(renderTarget.GetWidth());
+	viewport.Height = static_cast<float>(renderTarget.GetHeight());
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.MaxDepth = 1.0f;
+	viewport.MinDepth = 0.0f;
+	m_pCommandList->RSSetViewports(1, &viewport);
+
+	D3D12_RECT scissorRect = {};
+	scissorRect.left = 0;
+	scissorRect.top = 0;
+	scissorRect.right = renderTarget.GetWidth();
+	scissorRect.bottom = renderTarget.GetHeight();
+	m_pCommandList->RSSetScissorRects(1, &scissorRect);
 }
 
 //深度ステンシルの生成
@@ -583,7 +583,8 @@ void Engine::CreateDepthStencil()
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;	//2Dテクスチャ
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;					//フラグなし
 
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(0);
+	m_depthStencilDsvIndex = m_pDescriptorHeapAllocator->AllocateDsv();	//DSVインデックスを割り当て
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(m_depthStencilDsvIndex);
 
 	m_pDevice->CreateDepthStencilView(	//生成
 		m_pDepthStencilBuffer.Get(),	//深度ステンシルバッファ

@@ -368,9 +368,9 @@ Model MakeCapsuleModel(int slices, int stacks)
 
 	//インデックスデータの作成
 	//シリンダ部分のインデックスデータ作成
-	for (uint32_t stack = 0; stack < cylinderStacks; stack++)
+	for (int stack = 0; stack < cylinderStacks; stack++)
 	{
-		for (uint32_t slice = 0; slice < slices; slice++)
+		for (int slice = 0; slice < slices; slice++)
 		{
 			uint32_t i0 = stack * ringStride + slice;
 			uint32_t i1 = i0 + 1;
@@ -388,9 +388,9 @@ Model MakeCapsuleModel(int slices, int stacks)
 
 	//上半球部分のインデックスデータ作成
 	const int ringCountTop = hemiStacks + 1;
-	for (uint32_t stack = 0; stack < ringCountTop - 1; stack++)
+	for (int stack = 0; stack < ringCountTop - 1; stack++)
 	{
-		for (uint32_t slice = 0; slice < slices; slice++)
+		for (int slice = 0; slice < slices; slice++)
 		{
 			uint32_t i0 = stack * ringStride + slice;
 			uint32_t i1 = i0 + 1;
@@ -407,9 +407,9 @@ Model MakeCapsuleModel(int slices, int stacks)
 
 	//下半球部分のインデックスデータ作成
 	const int ringCountBottom = hemiStacks + 1;
-	for (uint32_t stack = 0; stack < ringCountBottom - 1; stack++)
+	for (int stack = 0; stack < ringCountBottom - 1; stack++)
 	{
-		for (uint32_t slice = 0; slice < slices; slice++)
+		for (int slice = 0; slice < slices; slice++)
 		{
 			uint32_t i0 = stack * ringStride + slice;
 			uint32_t i1 = i0 + 1;
@@ -493,9 +493,9 @@ Model MakeCylinderModel(int slices, int stacks)
 	}
 
 	//インデックスデータの作成
-	for (uint32_t stack = 0; stack < cylinderStacks; stack++)
+	for (int stack = 0; stack < cylinderStacks; stack++)
 	{
-		for (uint32_t slice = 0; slice < slices; slice++)
+		for (int slice = 0; slice < slices; slice++)
 		{
 			uint32_t i0 = stack * ringStride + slice;
 			uint32_t i1 = i0 + 1;

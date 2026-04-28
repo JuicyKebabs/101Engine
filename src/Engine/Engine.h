@@ -14,7 +14,7 @@
 #include <array>
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
-#include "Engine/Resource/RenderTargetTexture.h"
+#include "Engine/Resource/GpuTexture.h"
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -28,8 +28,10 @@ static constexpr RenderTargetHandle InvalidRenderTargetHandle = UINT32_MAX;
 // Render pass target types (Built-in render target or back buffer)
 enum class RenderPassTargetType
 {
-	BackBuffer,
-	Builtin,
+	BackBuffer,	// Back buffer render target (for presenting to the screen)
+	ColorDepth,	// Both color and depth (RTV and DSV)
+	DepthOnly,	// Depth only (DSV only)
+	Count
 };
 
 // Render pass target structure (used to specify the render target for rendering)
@@ -56,7 +58,8 @@ public:
 
 	enum class BuiltinRenderTarget
 	{
-		SceneColor = 0,	// Main render target for the scene
+		ShadowMap = 0,	// Shadow map render target
+		SceneColor,		// Main render target for the scene
 		//BloomA,
 		//BloomB,
 		//MotionBlur,
@@ -88,7 +91,7 @@ public:
 	ID3D12GraphicsCommandList* GetCommandList() { return m_pCommandList.Get(); }						// Get command list
 	UINT GetCurrentBufferIndex() const { return m_currentBackBufferIndex; }								// Get frame buffer index
 	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return m_pDescriptorHeapAllocator.get(); }	// Get descriptor heap allocator
-	RenderTargetTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
+	GpuTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
 
 private:
 	// Window related
@@ -114,11 +117,12 @@ private:	// Rendering related
 	UINT m_currentBackBufferIndex = 0;	// Current back buffer index
 
 	// Resource management
-	BackBufferRenderTarget m_backBuffers[FRAME_BUFFER_COUNT];																		// Back buffers
-	ComPtr<ID3D12Resource> m_pDepthStencilBuffer = nullptr;																			// Depth stencil buffer (only one is needed)
-	std::array< std::unique_ptr<RenderTargetTexture>, static_cast<size_t>(BuiltinRenderTarget::Count)> m_builtinRenderTargets{};	// Built-in render target handles (post-processing, bloom, motion blur, etc.)
-	std::unique_ptr<DescriptorHeapAllocator> m_pDescriptorHeapAllocator;															// Descriptor heap allocator (for CBV/SRV/UAV, RTV, DSV)	
-	RenderTargetHandle m_nextRenderTargetHandle = static_cast<RenderTargetHandle>(BuiltinRenderTarget::Count);						// Next render target handle to assign
+	BackBufferRenderTarget m_backBuffers[FRAME_BUFFER_COUNT];															// Back buffers
+	ComPtr<ID3D12Resource> m_pDepthStencilBuffer = nullptr;																// Depth stencil buffer (only one is needed)
+	uint32_t m_depthStencilDsvIndex = UINT32_MAX;																		// DSV index for the depth stencil buffer
+	std::array< std::unique_ptr<GpuTexture>, static_cast<size_t>(BuiltinRenderTarget::Count)> m_builtinRenderTargets{};	// Built-in render target handles (post-processing, bloom, motion blur, etc.)
+	std::unique_ptr<DescriptorHeapAllocator> m_pDescriptorHeapAllocator;												// Descriptor heap allocator (for CBV/SRV/UAV, RTV, DSV)	
+	RenderTargetHandle m_nextRenderTargetHandle = static_cast<RenderTargetHandle>(BuiltinRenderTarget::Count);			// Next render target handle to assign
 	TextureManager* m_pTextureManager = nullptr;	// Texture manager (for post-processing render target)
 
 private:	// Result code
@@ -138,6 +142,8 @@ private:	// Internal functions
 	void CreateDepthStencil();				// Depth stencil creation
 
 	// Built-in render target creation functions
+	void CreateShadowMapRenderTarget();	// Shadow map render target creation
 	void CreatePostProcessRenderTarget();	// Post-processing render target creation
 
+	void SetViewPortAndScissorRect(const GpuTexture& renderTarget);	// Set viewport and scissor rectangle based on the render target
 };

@@ -118,6 +118,7 @@ void SceneBase::OnRender(
 	m_pRenderSystem->BuildFrameRenderData(cameraInfo);
 	context.pRenderer->SubmitFrameRenderData(m_pRenderSystem->GetFrameRenderData());
 	context.pRenderer->SubmitCameraInfo(cameraInfo);
+	context.pRenderer->SubmitDirectionalLight(m_directionalLight);
 }
 
 // Finalization
