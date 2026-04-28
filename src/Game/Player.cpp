@@ -5,35 +5,37 @@
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/Collider.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Core/Time/Time.h"
 
 using namespace DirectX;
 
 // Scene-specific update
-void PlayerBehavior::UpdateBehavior(float deltaTime)
+void PlayerBehavior::UpdateBehavior()
 {
 	Transform* transform = GetOwner()->GetComponentByClass<Transform>();
 
 	//movement speed
 	const float MOVE_SPEED = 0.2f;
 
-	auto controllerLeftStick = InputManager::GetInstance()->GetInputInfo()->controller->leftStick;
+	auto controllerLeftStick = InputManager::GetInstance().GetInputInfo().controller->leftStick;
 	if (fabs(controllerLeftStick.x) < 0.1f) controllerLeftStick.x = 0.0f;
 	if (fabs(controllerLeftStick.y) < 0.1f) controllerLeftStick.y = 0.0f;
 	Vector3 currentPosition = transform->GetLocalPosition();
 	Vector3 velocityInput = { controllerLeftStick.x, 0.0f, controllerLeftStick.y };
+	float deltaTime = Time::GetTimeSeconds();
 	currentPosition.x += velocityInput.x * MOVE_SPEED * deltaTime;
 	currentPosition.y += velocityInput.y * MOVE_SPEED * deltaTime;
 	currentPosition.z += velocityInput.z * MOVE_SPEED * deltaTime;
 	transform->SetLocalPosition(currentPosition);
 
-	auto controllerRightStick = InputManager::GetInstance()->GetInputInfo()->controller->rightStick;
+	auto controllerRightStick = InputManager::GetInstance().GetInputInfo().controller->rightStick;
 	if (fabs(controllerRightStick.x) < 0.1f) controllerRightStick.x = 0.0f;
 	if (fabs(controllerRightStick.y) < 0.1f) controllerRightStick.y = 0.0f;
 	Quaternion currentRotation = transform->GetLocalRotationQuat();
 	Vector3 rotationInput = { controllerRightStick.y, -controllerRightStick.x, 0.0f };
 	transform->RotateLocalByEulerDeg(rotationInput);
 
-	auto controllerRdown = InputManager::GetInstance()->GetInputInfo()->controller->RSHOULDER.down;
+	auto controllerRdown = InputManager::GetInstance().GetInputInfo().controller->RSHOULDER.down;
 	if (controllerRdown)
 	{
 		Vector3 currentScale = transform->GetLocalScale();
@@ -42,7 +44,7 @@ void PlayerBehavior::UpdateBehavior(float deltaTime)
 		currentScale.z += 0.1f;
 		transform->SetLocalScale(currentScale);
 	}
-	auto controllerLdown = InputManager::GetInstance()->GetInputInfo()->controller->LSHOULDER.down;
+	auto controllerLdown = InputManager::GetInstance().GetInputInfo().controller->LSHOULDER.down;
 	if (controllerLdown)
 	{
 		Vector3 currentScale = transform->GetLocalScale();
@@ -52,7 +54,7 @@ void PlayerBehavior::UpdateBehavior(float deltaTime)
 		transform->SetLocalScale(currentScale);
 	}
 
-	auto keyInput = InputManager::GetInstance()->GetInputInfo()->key;
+	auto keyInput = InputManager::GetInstance().GetInputInfo().key;
 	auto downW = keyInput.w.down;
 	auto downA = keyInput.a.down;
 	auto downS = keyInput.s.down;
@@ -133,21 +135,21 @@ void PlayerBehavior::UpdateBehavior(float deltaTime)
 	// Controller vibration test
 	if (controllerLeftStick.x < 0.2f)
 	{
-		InputManager::GetInstance()->SetAllControllerVibrations(
+		InputManager::GetInstance().SetAllControllerVibrations(
 			fabs(controllerLeftStick.x),
 			0.0f
 		);
 	}
 	else if (controllerLeftStick.x > 0.2f)
 	{
-		InputManager::GetInstance()->SetAllControllerVibrations(
+		InputManager::GetInstance().SetAllControllerVibrations(
 			0.0f,
 			controllerLeftStick.x
 		);
 	}
 	else
 	{
-		InputManager::GetInstance()->StopAllControllerVibrations();
+		InputManager::GetInstance().StopAllControllerVibrations();
 	}
 }
 

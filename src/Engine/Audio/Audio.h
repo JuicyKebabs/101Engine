@@ -1,8 +1,7 @@
 #pragma once
 #include <xaudio2.h>
-#include <d3d11.h>
-#include <DirectXMath.h>
 #include <vector>
+#include <memory>
 #include "AudioData.h"
 
 // Audio structure
@@ -22,15 +21,20 @@ class AudioManager
 public:
 	static constexpr int AUDIO_MAX = 100; //ç≈ëÂìØéûçƒê∂êî
 public:
+	static AudioManager& GetInstance()
+	{
+		if(!m_instance){
+			m_instance = std::unique_ptr<AudioManager>(new AudioManager());
+		}
+		return *m_instance;
+	}
+
+	AudioManager(const AudioManager&) = delete;
+	AudioManager& operator=(const AudioManager&) = delete;
+
 	void Initialize();
 	void Update();
 	void Terminate();
-
-	static AudioManager* GetInstance()
-	{
-		static AudioManager instance;
-		return &instance;
-	}
 
 	void Load(AudioData::AUDIO_TYPE type)
 	{
@@ -50,6 +54,8 @@ public:
 	}
 
 private:
+	static inline std::unique_ptr<AudioManager> m_instance;
+
 	IXAudio2* m_pXaudio{};
 	IXAudio2MasteringVoice* m_pMasteringVoice{};
 	AUDIO m_pAudio[AUDIO_MAX]{};
@@ -58,6 +64,8 @@ private:
 	std::vector<AudioData::AudioCommand> m_audioCommandQueue;
 
 private:
+	AudioManager() = default;	// Constructor
+
 	void InitAudio();	// Initialize audio
 	void UninitAudio();	// Uninitialize audio
 

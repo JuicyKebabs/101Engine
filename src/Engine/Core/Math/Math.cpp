@@ -1177,6 +1177,69 @@ Vector3 Matrix4x4::TransformNormal(const Vector3& normal) const {
     return Vector3(XMVector3TransformNormal(normal, invTrans));
 }
 
+Matrix4x4 Matrix4x4::ToBillboard(const Vector3& cameraPos, const Vector3& cameraUp)
+{
+    constexpr float kEpsilon = 1e-6f;
+
+    float sx = Vector3(_11, _12, _13).Length();
+    float sy = Vector3(_21, _22, _23).Length();
+    float sz = Vector3(_31, _32, _33).Length();
+    Vector3 objectPos(_41, _42, _43);
+
+    Vector3 view = cameraPos - objectPos;
+    if (view.LengthSq() <= kEpsilon)
+    {
+        return *this;
+    }
+
+    Vector3 forward = view.Normalized();
+    Vector3 right = cameraUp.Cross(forward);
+    if (right.LengthSq() <= kEpsilon)
+    {
+        right = Vector3::Right();
+    }
+    right = right.Normalized();
+    Vector3 up = forward.Cross(right).Normalized();
+
+    Matrix4x4 result = Identity;
+    result._11 = right.x * sx;  result._12 = right.y * sx;  result._13 = right.z * sx;
+    result._21 = up.x * sy;  result._22 = up.y * sy;  result._23 = up.z * sy;
+    result._31 = forward.x * sz;  result._32 = forward.y * sz;  result._33 = forward.z * sz;
+    result._41 = objectPos.x;     result._42 = objectPos.y;     result._43 = objectPos.z;
+    return result;
+}
+
+Matrix4x4 Matrix4x4::ToCylindricalBillboard(const Vector3& cameraPos, const Vector3& cameraUp)
+{
+    constexpr float kEpsilon = 1e-6f;
+
+    float sx = Vector3(_11, _12, _13).Length();
+    float sy = Vector3(_21, _22, _23).Length();
+    float sz = Vector3(_31, _32, _33).Length();
+    Vector3 objectPos(_41, _42, _43);
+
+    Vector3 view = cameraPos - objectPos;
+    if (view.LengthSq() <= kEpsilon) return *this;
+
+    Vector3 up = Vector3::Up();
+
+    Vector3 planar = view.Reject(up);
+    if (planar.LengthSq() <= kEpsilon) planar = cameraUp.Reject(up);
+    if (planar.LengthSq() <= kEpsilon) planar = Vector3::Forward().Reject(up);
+    if (planar.LengthSq() <= kEpsilon) planar = Vector3::Right().Reject(up);
+
+    Vector3 forward = planar.Normalized();
+    Vector3 right = up.Cross(forward).Normalized();
+    forward = right.Cross(up).Normalized();
+
+    Matrix4x4 result = Identity;
+    result._11 = right.x * sx;  result._12 = right.y * sx;  result._13 = right.z * sx;
+    result._21 = up.x * sy;  result._22 = up.y * sy;  result._23 = up.z * sy;
+    result._31 = forward.x * sz;  result._32 = forward.y * sz;  result._33 = forward.z * sz;
+    result._41 = objectPos.x;     result._42 = objectPos.y;     result._43 = objectPos.z;
+    return result;
+}
+
 Matrix4x4 Matrix4x4::Transpose() const
 {
 	return Matrix4x4(XMMatrixTranspose(*this));
@@ -1239,148 +1302,6 @@ Matrix4x4 Matrix4x4::CreatePerspectiveFov(float fovY, float aspect, float nearZ,
 Matrix4x4 Matrix4x4::CreateOrthographic(float width, float height, float nearZ, float farZ)
 {
     return Matrix4x4(XMMatrixOrthographicLH(width, height, nearZ, farZ));
-}
-
-Matrix4x4 Matrix4x4::CreateBillboard(const Vector3& objectPos, const Vector3& cameraPos, const Vector3& cameraUp)
-{
-    constexpr float kEpsilon = 1e-6f;
-
-    auto makeTranslationIdentity = [&](const Vector3& pos) -> Matrix4x4
-        {
-            Matrix4x4 m = Identity;
-            m._41 = pos.x;
-            m._42 = pos.y;
-            m._43 = pos.z;
-            return m;
-        };
-
-    Vector3 view = cameraPos - objectPos;
-    if (view.LengthSq() <= kEpsilon)
-    {
-        return makeTranslationIdentity(objectPos);
-    }
-
-    Vector3 forward = view.Normalized();
-
-    Vector3 upRef = cameraUp;
-    if (upRef.LengthSq() <= kEpsilon)
-    {
-        upRef = Vector3::Up();
-    }
-    else
-    {
-        upRef = upRef.Normalized();
-    }
-
-    Vector3 right = upRef.Cross(forward);
-
-    if (right.LengthSq() <= kEpsilon)
-    {
-        Vector3 fallbackUp = Vector3::Forward();
-
-        if (std::fabs(fallbackUp.Dot(forward)) > 0.999f)
-        {
-            fallbackUp = Vector3::Right();
-        }
-
-        right = fallbackUp.Cross(forward);
-
-        if (right.LengthSq() <= kEpsilon)
-        {
-            return makeTranslationIdentity(objectPos);
-        }
-    }
-
-    right = right.Normalized();
-
-    Vector3 up = forward.Cross(right).Normalized();
-
-    Matrix4x4 billboardMatrix = Identity;
-    billboardMatrix._11 = right.x;
-    billboardMatrix._12 = right.y;
-    billboardMatrix._13 = right.z;
-    billboardMatrix._14 = 0.0f;
-    billboardMatrix._21 = up.x;
-    billboardMatrix._22 = up.y;
-    billboardMatrix._23 = up.z;
-    billboardMatrix._24 = 0.0f;
-    billboardMatrix._31 = forward.x;
-    billboardMatrix._32 = forward.y;
-    billboardMatrix._33 = forward.z;
-    billboardMatrix._34 = 0.0f;
-    billboardMatrix._41 = objectPos.x;
-    billboardMatrix._42 = objectPos.y;
-    billboardMatrix._43 = objectPos.z;
-    billboardMatrix._44 = 1.0f;
-
-    return billboardMatrix;
-}
-
-Matrix4x4 Matrix4x4::CreateCylindricalBillboard(const Vector3& objectPos, const Vector3& cameraPos, const Vector3& cameraUp,const Vector3& axis)
-{
-    constexpr float kEpsilon = 1e-6f;
-
-    auto makeTranslationIdentity = [&](const Vector3& pos) -> Matrix4x4
-        {
-            Matrix4x4 m = Identity;
-            m._41 = pos.x;
-            m._42 = pos.y;
-            m._43 = pos.z;
-            return m;
-        };
-
-    Vector3 view = cameraPos - objectPos;
-    if (view.LengthSq() <= kEpsilon)
-    {
-        return makeTranslationIdentity(objectPos);
-    }
-
-    Vector3 up = axis.Normalized();
-    if (up.LengthSq() <= kEpsilon)
-    {
-        return CreateBillboard(objectPos, cameraPos, cameraUp);
-    }
-
-    Vector3 planarForward = view.Reject(up);
-
-    if (planarForward.LengthSq() <= kEpsilon)
-    {
-        planarForward = cameraUp.Reject(up);
-
-        if (planarForward.LengthSq() <= kEpsilon)
-        {
-            planarForward = Vector3::Forward().Reject(up);
-
-            if (planarForward.LengthSq() <= kEpsilon)
-            {
-                planarForward = Vector3::Right().Reject(up);
-            }
-        }
-    }
-
-    Vector3 forward = planarForward.Normalized();
-    Vector3 right = up.Cross(forward).Normalized();
-    forward = right.Cross(up).Normalized();
-
-    Matrix4x4 billboardMatrix = Identity;
-    billboardMatrix._11 = right.x;
-    billboardMatrix._12 = right.y;
-    billboardMatrix._13 = right.z;
-    billboardMatrix._14 = 0.0f;
-    billboardMatrix._21 = up.x;
-    billboardMatrix._22 = up.y;
-    billboardMatrix._23 = up.z;
-    billboardMatrix._24 = 0.0f;
-    billboardMatrix._31 = forward.x;
-    billboardMatrix._32 = forward.y;
-    billboardMatrix._33 = forward.z;
-    billboardMatrix._34 = 0.0f;
-    billboardMatrix._41 = objectPos.x;
-    billboardMatrix._42 = objectPos.y;
-    billboardMatrix._43 = objectPos.z;
-    billboardMatrix._44 = 1.0f;
-
-    return billboardMatrix;
 }
 
 Matrix4x4 Matrix4x4::Transpose(const Matrix4x4& m)

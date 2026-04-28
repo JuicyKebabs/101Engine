@@ -27,9 +27,9 @@ void InputManager::Copy()
 }
 
 //入力情報構造体取得
-InputInfo* InputManager::GetInputInfo()
+const InputInfo& InputManager::GetInputInfo() const
 {
-	return &m_inputInfo;
+	return m_inputInfo;
 }
 
 //コントローラー振動セット

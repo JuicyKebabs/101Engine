@@ -11,8 +11,8 @@ public:	// Public functions
 private:
 	// Overridden functions
 	void OnStartBehavior() override {}
-	void PreUpdateBehavior(float deltaTime) override {}
-	void UpdateBehavior(float deltaTime) override;
-	void LateUpdateBehavior(float deltaTime) override;
+	void PreUpdateBehavior() override {}
+	void UpdateBehavior() override;
+	void LateUpdateBehavior() override {}
 	void OnDestroyBehavior() override {}
 };

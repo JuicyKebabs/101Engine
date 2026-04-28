@@ -2,9 +2,8 @@
 #include "Component.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Graphics/RenderData.h"
-#include "Engine/Resource/Texture.h"
 #include "Engine/Core/Math/Math.h"
-#include "Engine/Graphics/RenderTemplateFactory.h"
+#include "Engine/Component/Camera.h"
 
 struct SpriteRendererProxy
 {
@@ -50,7 +49,7 @@ public:
 	bool IsFlipY() const { return m_flipY; }
 
 	const SpriteRenderTemplate& GetRenderTemplate() const { return m_template; }
-	const SpriteRendererProxy& GetRenderProxy();
+	const SpriteRendererProxy& GetRenderProxy(const CameraInfo& cameraInfo);
 
 	void SetVisibility(bool visible) { m_isVisible = visible; m_isProxyDirty = true; }
 	bool IsVisible() const { return m_isVisible; }
@@ -74,6 +73,6 @@ private:
 	bool m_isConfigured = false;	// Flag to indicate if the render templates have been configured (used to prevent rendering before initialization)
 
 private:
-	void RebuildRenderProxy();		// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)
-	void CheckIfTransformChanged();	// Check if the transform has changed since the last frame and mark the render proxy as dirty if it has
+	void RebuildRenderProxy(const CameraInfo& cameraInfo);	// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)
+	void CheckIfTransformChanged();							// Check if the transform has changed since the last frame and mark the render proxy as dirty if it has
 };
