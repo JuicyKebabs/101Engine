@@ -153,7 +153,7 @@ void PlayerBehavior::UpdateBehavior()
 	}
 }
 
-void PlayerBehavior::LateUpdateBehavior(float deltaTime)
+void PlayerBehavior::LateUpdateBehavior()
 {
 	auto collider = GetOwner()->GetComponentByClass<Collider>();
 	if (collider)

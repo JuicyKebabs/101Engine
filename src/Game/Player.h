@@ -13,6 +13,6 @@ private:
 	void OnStartBehavior() override {}
 	void PreUpdateBehavior() override {}
 	void UpdateBehavior() override;
-	void LateUpdateBehavior() override {}
+	void LateUpdateBehavior() override;
 	void OnDestroyBehavior() override {}
 };
