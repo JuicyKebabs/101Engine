@@ -169,7 +169,7 @@ void PlayerBehavior::LateUpdateBehavior()
 		{
 			renderer->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f }); // Red color when collision is detected
 
-			auto pushBack = collider->GetCollisionInfos()[0].penetrationDepth; // Get the push back vector from the first collision info
+			auto pushBack = collider->GetCollisionInfos()[0].penetrationDepth * 1.001f; // Get the push back vector from the first collision info
 
 			auto transform = GetOwner()->GetTransform();
 			transform->SetLocalPosition(transform->GetLocalPosition() - pushBack); // Move the player back by the push back vector to resolve the collision

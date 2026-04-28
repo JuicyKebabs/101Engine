@@ -102,6 +102,14 @@ void Actor::FlushTransform()
 	}
 }
 
+void Actor::FlushColliderTransforms()
+{
+	auto colliders = GetComponentsByClass<Collider>();
+	for (auto& collider : colliders) {
+		collider->Flush();
+	}
+}
+
 // Add pending components to the main component container
 void Actor::AddPendingComponents()
 {

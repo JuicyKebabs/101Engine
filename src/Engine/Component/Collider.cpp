@@ -49,36 +49,18 @@ void Collider::Update(float deltaTime)
 
 void Collider::LateUpdate(float deltaTime)
 {
-	ChackIfTransformChanged();
-
-	if (!m_isDirty) return;
-
-	auto owner = GetOwner();
-	if (!owner)
-	{
-		DBG("Collider : Owner actor is null.");
-		return;
-	}
-	auto ownerTransform = owner->GetTransform();
-	if (!ownerTransform)
-	{
-		DBG("Collider : Owner transform form is null.");
-		return;
-	}
-
-	m_worldTransformCurrent.position = Vector3::Transform(m_localTransform.position, ownerTransform->GetWorldMatrix());
-
-	m_worldTransformCurrent.rotation = ownerTransform->GetWorldRotationQuat() * m_localTransform.rotation;
-
-	UpdateCollider(ownerTransform->GetWorldScale());
-
-	UpdateAABB();
+	RefreshWorldTransform();
 }
 
 void Collider::OnDestroy()
 {
 	m_isActive = false;
 	m_deleteFlag = true;
+}
+
+void Collider::Flush()
+{
+	RefreshWorldTransform();
 }
 
 //コライダー更新
@@ -283,6 +265,33 @@ void Collider::ChackIfTransformChanged()
 			}
 		}
 	}
+}
+
+void Collider::RefreshWorldTransform()
+{
+	ChackIfTransformChanged();
+
+	if (!m_isDirty) return;
+
+	auto owner = GetOwner();
+	if (!owner)
+	{
+		DBG("Collider : Owner actor is null.");
+		return;
+	}
+	auto ownerTransform = owner->GetTransform();
+	if (!ownerTransform)
+	{
+		DBG("Collider : Owner transform form is null.");
+		return;
+	}
+
+	m_worldTransformCurrent.position = Vector3::Transform(m_localTransform.position, ownerTransform->GetWorldMatrix());
+	m_worldTransformCurrent.rotation = m_localTransform.rotation * ownerTransform->GetWorldRotationQuat();
+	UpdateCollider(ownerTransform->GetWorldScale());
+	UpdateAABB();
+
+	m_isDirty = false;
 }
 
 //コライダー更新関数

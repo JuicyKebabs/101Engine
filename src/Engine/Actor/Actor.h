@@ -201,6 +201,7 @@ public:
 	Transform* GetTransform() const { return m_pTransform; }	// Get Transform component
 
 	void FlushTransform();	// Update world transform of this actor and all child actors;
+	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
 
 private:
 	bool m_isActive = false;	// Active flag

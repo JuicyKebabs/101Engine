@@ -76,6 +76,7 @@ public:
 	void Update(float deltaTime) override;
 	void LateUpdate(float deltaTime) override;
 	void OnDestroy() override;
+	void Flush();
 
 	void AddCollisionInfo(const CollisionInfo& info) { m_collisionInfos.push_back(info); };	//衝突情報追加
 	void ClearCollisionInfos() { m_collisionInfos.clear(); }								//衝突情報配列クリア
@@ -148,6 +149,7 @@ private:
 
 private:
 	void ChackIfTransformChanged();
+	void RefreshWorldTransform();
 
 	//コライダー更新関数
 	void UpdateBoxCollider(Vector3 ownerScale);		//ボックスコライダー更新
