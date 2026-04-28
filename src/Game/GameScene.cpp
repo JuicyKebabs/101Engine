@@ -7,6 +7,7 @@
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Game/Player.h"
 #include "Game/CameraTest.h"
+#include "Engine/Component/Collider.h"
 
 using namespace DirectX;
 
@@ -26,9 +27,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 	m_directionalLight.position = Vector3{ 0.0f, 0.0f, 0.0f };
 	m_directionalLight.color = Vector3{ 1.0f, 1.0f, 1.0f };
 
-	//Create player actor and add it to the scene
 	auto playerActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, 5.0f });
-	playerActor->AddComponent<PlayerBehavior>();
 	playerActor->AddComponent<MeshRenderer>()->Initialize(
 		RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(
 			*context.pMeshManager,
@@ -38,39 +37,23 @@ void GameScene::InitializeOverride(EngineContext& context)
 		)
 	);
 
-	//auto spriteActor = AddActor<Actor>(Vector3{ 2.0f, 0.0f, 5.0f });
-	//SpriteRenderer* renderer = spriteActor->AddComponent<SpriteRenderer>();
-	//renderer->Initialize(
-	//	RenderTemplateFactory::CreateSpriteRenderTemplate(
-	//		*context.pTextureManager,
-	//		MaterialInput{ .texturePath = L"asset/texture/MINION_1.png", .psoKey = PSO_KEY_DEFAULT::SPRITE_TRANSPARENT },
-	//		BillboardType::None
-	//	)
-	//);
-	//renderer->SetUVScale(Vector2{ 1.0f / 5.0f, 1.0f / 6.0f });
+	Collider::InitDesc playerColliderDesc;
+	playerColliderDesc.type = ColliderType::SPHERE;
+	playerColliderDesc.localScale = Vector3{ 1.0f, 1.0f, 1.0f };
 
-	//spriteActor->AddComponent<PlayerBehavior>();
-
-	auto playerChild = playerActor->AddChild<Actor>(Vector3{ 0.0f, 0.0f, -1.0f });
-	playerChild->AddComponent<MeshRenderer>()->Initialize(
-		RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(
-			*context.pMeshManager,
-			*context.pTextureManager,
-			DEFAULT_MESH::SPHERE,
-			MaterialInput{.texturePath = L"asset/texture/skin.png",.baseColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f), .psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting(),}
-		)
-	);
+	playerActor->AddComponent<Collider>()->Initialize(playerColliderDesc);
 
 	auto modelActor = AddActor<Actor>(Vector3{ 2.0f, 0.0f, 5.0f });
 	modelActor->AddComponent<PlayerBehavior>();
 	modelActor->AddComponent<MeshRenderer>()->Initialize(
-		RenderTemplateFactory::CreateMeshRenderTemplate(
+		RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(
 			*context.pMeshManager,
 			*context.pTextureManager,
-			MeshInput{ .modelPath = L"asset/fbx/spray/Spray_01.fbx" },
-			MaterialInput{.texturePath = L"asset/fbx/sourceimages/T_Spray01.png", .baseColor = Vector4(1.0f,1.0f,1.0f,1.0f), .psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting() }
+			DEFAULT_MESH::SPHERE,
+			MaterialInput{ .texturePath = L"asset/texture/skin.png",.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting(), }
 		)
 	);
+	modelActor->AddComponent<Collider>()->Initialize(playerColliderDesc);
 
 	auto groundActor = AddActor<Actor>(Vector3{ 0.0f, -10.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }, Vector3{ 50.0f, 1.0f, 50.0f });
 	groundActor->AddComponent<MeshRenderer>()->Initialize(
@@ -78,9 +61,14 @@ void GameScene::InitializeOverride(EngineContext& context)
 			*context.pMeshManager,
 			*context.pTextureManager,
 			DEFAULT_MESH::CUBE,
-			MaterialInput{ .texturePath = L"asset/texture/white.png",.baseColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f), .psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting(), }
+			MaterialInput{ .texturePath = L"asset/texture/white.png",.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting(), }
 		)
 	);
+
+	Collider::InitDesc groundColliderDesc;
+	groundColliderDesc.type = ColliderType::BOX;
+	groundColliderDesc.localScale = Vector3{ 50.0f, 1.0f, 50.0f };
+	groundActor->AddComponent<Collider>()->Initialize(groundColliderDesc);
 
 	auto cameraTestActor = AddActor<Actor>(Vector3{ 0.0f, 0.0f, -5.0f });
 	cameraTestActor->AddComponent<CameraTest>();

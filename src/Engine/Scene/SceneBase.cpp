@@ -3,7 +3,6 @@
 #include "Engine/Input/InputManager.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
-#include "Engine/Physics/CollisionManager.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Game/CameraTest.h"
 
@@ -12,7 +11,7 @@ SceneBase::SceneBase(float window_width, float window_height)
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>();
 	m_pRenderSystem = std::make_unique<RenderSystem>();
-	//m_pCollisionManager = std::make_unique<CollisionManager>();
+	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 
 	// Create default camera actor and set it as the main camera actor
 	auto defaultCameraActor = AddActor<Actor>();
@@ -29,8 +28,6 @@ SceneBase::~SceneBase()
 // Initialization
 void SceneBase::Initialize(EngineContext& context)
 {
-	// Collision manager initialization
-	//m_pCollisionManager->Initialize(context);
 	InitializeOverride(context);
 }
 
@@ -68,6 +65,13 @@ void SceneBase::Update(float deltaTime)
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->FlushTransform();
 	}
+
+	// Check colliders
+	m_pCollisionSystem->CheckColliders();
+
+	// Update collision system
+	m_pCollisionSystem->CheckCollisions();
+
 }
 
 // Late update
@@ -79,15 +83,6 @@ void SceneBase::LateUpdate(float deltaTime)
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->LateUpdate(deltaTime);
 	}
-
-	// Check colliders
-	//m_pCollisionManager->CheckColliders();
-
-	// Update collision manager
-	//m_pCollisionManager->CheckCollisions();
-
-	// Scene specific collision resolution
-	//ResolveCollisions();
 
 	// Flush transforms of all actors again
 	for(auto& actor : m_actors)
@@ -124,5 +119,5 @@ void SceneBase::OnRender(
 // Finalization
 void SceneBase::Finalize()
 {
-	//m_pCollisionManager->ClearColliders();
+	m_pCollisionSystem->ClearColliders();
 }

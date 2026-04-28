@@ -1,4 +1,4 @@
-#include "CollisionManager.h"
+#include "CollisionSystem.h"
 #include <algorithm>
 #include <unordered_set>
 #include <cfloat>
@@ -6,233 +6,46 @@
 #include "Engine/Graphics/Renderer.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
-#include "Engine/Physics/ColliderSet.h"
 #include "Engine/Core/Utility/SharedStruct.h"
 
 using namespace DirectX;
 
-
-//コンストラクタ
-CollisionManager::CollisionManager()
+void CollisionSystem::Register(Collider* collider)
 {
+	if (std::find(m_pCollidersList.begin(), m_pCollidersList.end(), collider) == m_pCollidersList.end())
+	{
+		m_pCollidersList.push_back(collider);
+	}
 }
 
-//デストラクタ
-CollisionManager::~CollisionManager()
+void CollisionSystem::Unregister(Collider* collider)
 {
+	m_pCollidersList.erase(std::remove(m_pCollidersList.begin(), m_pCollidersList.end(), collider), m_pCollidersList.end());
 }
 
-//初期化
-void CollisionManager::Initialize(EngineContext& context)
+void CollisionSystem::CheckColliders()
 {
-	//CreateColliderRenderInfo(	//コライダー描画情報作成
-	//	*context.pTextureManager,	//テクスチャ管理クラスの参照
-	//	*context.pMeshManager		//メッシュ管理クラスの参照
-	//);
-}
-
-//nullptrになっているコライダーをリストから削除
-void CollisionManager::CheckColliders()
-{
-	//コライダーリストを走査してデリートフラグが立っているコライダーをnullptrに設定
 	for (auto& c : m_pCollidersList)
 	{
-		if (c->deleteFlag())
-		{
-			c = nullptr;
-		}
-	}
-
-	//nullptrになっているコライダーをリストから削除
-	m_pCollidersList.erase(
-		std::remove(
-			m_pCollidersList.begin(),
-			m_pCollidersList.end(),
-			nullptr
-		),
-		m_pCollidersList.end()
-	);
-
-	//所有者オブジェクトが非アクティブの場合、コライダーも非アクティブに設定
-	for(auto& c : m_pCollidersList)
-	{
-		if (!c->GetParentSet()->GetOwner()->IsActive())
-		{
-			c->SetActive(false);
-		}
+		if (c->deleteFlag() || !c->GetOwner()) { Unregister(c); }
+		else if (!c->GetOwner()->IsActive()) { c->SetActive(false); }
 	}
 
 	//前回の衝突ペアリストを走査してデリートフラグが立っているコライダーを含むペアを削除
 	for (auto it = m_previousCollisionPairs.begin(); it != m_previousCollisionPairs.end(); ) {
-		if (it->colliderA->deleteFlag() || it->colliderB->deleteFlag()) {
-			it = m_previousCollisionPairs.erase(it);
-		}
-		else {
-			it++;
-		}
+		if (it->colliderA->deleteFlag() || it->colliderB->deleteFlag()) { it = m_previousCollisionPairs.erase(it); }
+		else { it++; }
 	}
 }
 
-//描画
-void CollisionManager::Draw(Renderer& renderer)
-{
-	//for (auto& collider : m_pCollidersList)
-	//{
-	//	if (!collider->isActive()) continue;
-
-	//	ColliderType type = collider->GetType();	//コライダータイプ取得
-
-	//	switch (type)
-	//	{
-	//	case ColliderType::BOX:		//ボックスコライダー
-	//		SubmitDraw(				//描画要求をシーンに提出
-	//			renderer,
-	//			*collider,
-	//			m_colliderRenderModelBox
-	//		);
-	//		break;
-	//	case ColliderType::SPHERE:	//球コライダー
-	//		SubmitDraw(				//描画要求をシーンに提出
-	//			renderer,
-	//			*collider,
-	//			m_colliderRenderModelSphere
-	//		);
-	//		break;
-	//	case ColliderType::CAPSULE:	//カプセルコライダー
-	//		SubmitDraw(				//描画要求をシーンに提出
-	//			renderer,
-	//			*collider,
-	//			m_colliderRenderModelCapsule
-	//		);
-	//		break;
-	//	}
-	//}
-}
-
-////描画要求をシーンに提出
-//void CollisionManager::SubmitDraw(
-//	Renderer& renderer,	//シーンの参照
-//	Collider& collider,	//コライダー配列
-//	WorldRenderModel& info	//描画モデル
-//)
-//{
-//	XMFLOAT4 objColor{};
-//	if (collider.isDetected())
-//	{//衝突時(ownerに衝突情報があるとき)は赤
-//		objColor = DRAW_COLOR_DETECTED;
-//	}
-//	else
-//	{//非衝突時は緑
-//		objColor = DRAW_COLOR_DEFAULT;
-//	}
-//
-//	std::vector<WorldRenderInfo> submitInfos;		//Rendererへの提出用描画情報構造体配列
-//	submitInfos.reserve(info.size());			//容量確保
-//
-//	XMFLOAT4 color;	//描画色
-//	if (collider.isDetected())
-//	{//衝突時(ownerに衝突情報があるとき)は赤
-//		color = DRAW_COLOR_DETECTED;
-//	}
-//	else
-//	{//非衝突時は緑
-//		color = DRAW_COLOR_DEFAULT;
-//	}
-//
-//	if (collider.GetType() == ColliderType::CAPSULE)
-//	{//カプセルメッシュの場合(複数メッシュに分かれているため個別に処理)
-//		CapsuleVisualDesc desc{};	//カプセルメッシュの記述データ
-//		float diamiter = (std::max)(collider.GetCurrentScale().x, collider.GetCurrentScale().z);
-//		XMFLOAT3 scale =
-//		{
-//			diamiter,
-//			collider.GetCurrentScale().y,
-//			diamiter
-//		};
-//
-//		//カプセルメッシュの記述データ設定
-//		AppendCapsuleRenderInfos(
-//			desc,					//カプセル描画情報記述子
-//			collider.GetCurrentCenter(),	//位置
-//			scale,					//スケール
-//			collider.GetRotation(),	//回転Euler角
-//			color,					//色
-//			info,					//入力元描画情報配列
-//			submitInfos				//出力先描画情報配列
-//		);
-//	}
-//	else
-//	{//それ以外のメッシュの場合
-//		//描画情報構造体配列をそのまま提出用配列にコピー
-//		for (auto& i : info)
-//		{
-//			submitInfos.push_back(i);
-//		}
-//
-//		//ワールド行列と色を設定
-//		for (auto& i : submitInfos)
-//		{
-//			i.worldMatrix = collider.GetWorldMatrix();
-//			i.common.color = color;
-//		}
-//	}
-//
-//	//位置とブレンドモードを設定
-//	for (int i = 0; i < submitInfos.size(); i++)
-//	{
-//		submitInfos[i].position = collider.GetCurrentCenter();
-//		submitInfos[i].scale = collider.GetCurrentScale();
-//		submitInfos[i].common.psoKey = PSO_KEY_TRANSPARENT;
-//	}
-//
-//	renderer.SubmitToWorldList(submitInfos);	//Rendererへ描画要求を提出
-//}
-//
-////コライダー描画情報作成
-//void CollisionManager::CreateColliderRenderInfo(TextureManager& textureManager, MeshManager& meshManager)
-//{
-//	//ボックスコライダーの描画情報作成
-//	m_colliderRenderModelBox.clear();
-//	CreateRenderInfo(
-//		textureManager,				//テクスチャ管理クラスの参照
-//		meshManager,				//メッシュ管理クラスの参照
-//		&m_colliderRenderModelBox,	//描画情報構造体配列へのポインタ
-//		DEFAULT_MESH::CUBE,			//メッシュタイプ
-//		PSOKey{},					//ブレンドモード
-//		texPath						//テクスチャのファイル名
-//	);
-//
-//	//球コライダーの描画情報作成
-//	m_colliderRenderModelSphere.clear();
-//	CreateRenderInfo(
-//		textureManager,					//テクスチャ管理クラスの参照
-//		meshManager,					//メッシュ管理クラスの参照
-//		&m_colliderRenderModelSphere,	//描画情報構造体配列へのポインタ
-//		DEFAULT_MESH::SPHERE,				//メッシュタイプ
-//		PSOKey{},					//ブレンドモード
-//		texPath							//テクスチャのファイル名
-//	);
-//
-//	//カプセルコライダーの描画情報作成
-//	m_colliderRenderModelCapsule.clear();
-//	CreateRenderInfo(
-//		textureManager,					//テクスチャ管理クラスの参照
-//		meshManager,					//メッシュ管理クラスの参照
-//		&m_colliderRenderModelCapsule,	//描画情報構造体配列へのポインタ
-//		DEFAULT_MESH::CAPSULE,	//メッシュタイプ
-//		PSOKey{},					//ブレンドモード
-//		texPath							//テクスチャのファイル名
-//	);
-//}
-
 //衝突判定処理
-void CollisionManager::CheckCollisions()
+void CollisionSystem::CheckCollisions()
 {
 	//各コライダーの初期化
 	for (auto& collider : m_pCollidersList)
 	{
 		//各コライダーの衝突情報クリア
-		collider->GetParentSet()->ClearCollisionInfos();
+		collider->ClearCollisionInfos();
 		//衝突検知フラグOFF
 		collider->SetDetected(false);
 	}
@@ -256,7 +69,7 @@ void CollisionManager::CheckCollisions()
 }
 
 //衝突状態チェック
-void CollisionManager::CheckCollisionStates()
+void CollisionSystem::CheckCollisionStates()
 {
 	//衝突ステート更新
 	UpdateCollisionState();
@@ -265,7 +78,7 @@ void CollisionManager::CheckCollisionStates()
 //ブロードフェーズ(衝突可能性のあるコライダーを絞り込む処理)
 //AABB同士の簡易当たり判定
 //当たっている可能性のあるコライダーをナローフェーズ用配列に追加
-void CollisionManager::BroadPhase()
+void CollisionSystem::BroadPhase()
 {
 	for (int i = 0; i < m_pCollidersList.size(); i++)
 	{
@@ -308,7 +121,7 @@ void CollisionManager::BroadPhase()
 }
 
 //ナローフェーズ
-void CollisionManager::NarrowPhase()
+void CollisionSystem::NarrowPhase()
 {
 	for (int i = 0; i < m_pNarrowPhaseColliders.size(); i++)
 	{
@@ -344,7 +157,7 @@ void CollisionManager::NarrowPhase()
 }
 
 //ナローフェーズの衝突判定
-ContactResult CollisionManager::NarrowPhaseCollision(Collider* colliderA, Collider* colliderB)
+ContactResult CollisionSystem::NarrowPhaseCollision(Collider* colliderA, Collider* colliderB)
 {
 	//CCDの必要性チェック
 	bool ccd = NeedsCCD(colliderA) || NeedsCCD(colliderB);
@@ -425,7 +238,7 @@ ContactResult CollisionManager::NarrowPhaseCollision(Collider* colliderA, Collid
 }
 
 //レイヤーチェック
-bool CollisionManager::CheckLayer(
+bool CollisionSystem::CheckLayer(
 	Collider* colliderA, 
 	Collider* colliderB
 )
@@ -443,13 +256,13 @@ bool CollisionManager::CheckLayer(
 }
 
 //衝突ペアを登録
-void CollisionManager::RegisterCollisionPair(Collider* colliderA, Collider* colliderB)
+void CollisionSystem::RegisterCollisionPair(Collider* colliderA, Collider* colliderB)
 {
 	m_currentCollisionPairs.push_back({ colliderA, colliderB });
 }
 
 //前回の衝突ペアと比較して新規衝突か継続衝突かをチェック
-void CollisionManager::UpdateCollisionState()
+void CollisionSystem::UpdateCollisionState()
 {
 	//今回の衝突ペア配列をループ
 	for (auto& pair : m_currentCollisionPairs)
@@ -501,20 +314,14 @@ void CollisionManager::UpdateCollisionState()
 	m_currentCollisionPairs.clear();
 }
 
-//コライダーの登録
-void CollisionManager::RegisterCollider(Collider* collider)
-{
-	m_pCollidersList.push_back(collider);
-}
-
 //コライダーのクリア
-void CollisionManager::ClearColliders()
+void CollisionSystem::ClearColliders()
 {
 	m_pCollidersList.clear();
 }
 
 //レイキャスト
-void CollisionManager::RaycastSegmentQuery(
+void CollisionSystem::RaycastSegmentQuery(
 	RaycastSegment& ray	//レイ情報
 )
 {
@@ -583,7 +390,7 @@ void CollisionManager::RaycastSegmentQuery(
 }
 
 //AABBの衝突判定
-bool CollisionManager::CollisionAABB(
+bool CollisionSystem::CollisionAABB(
 	Collider* colliderA,	//コライダーA
 	Collider* colliderB		//コライダーB
 )
@@ -601,7 +408,7 @@ bool CollisionManager::CollisionAABB(
 }
 
 //ナローフェーズ用配列に衝突ペアを追加
-void CollisionManager::SendNarrowPhase(Collider* colliderA, Collider* colliderB)
+void CollisionSystem::SendNarrowPhase(Collider* colliderA, Collider* colliderB)
 {
 	//ナローフェーズ用配列に追加
 	CollisionPair pair;							//衝突ペア構造体
@@ -611,14 +418,14 @@ void CollisionManager::SendNarrowPhase(Collider* colliderA, Collider* colliderB)
 }
 
 //コライダーからOBBを作成
-OBB CollisionManager::CreateOBB(Collider* collider, float alpha)
+OBB CollisionSystem::CreateOBB(Collider* collider, float alpha)
 {
 	OBB obb{};	//OBB構造体
 
 	//中心
-	XMFLOAT3 currCenter = collider->GetCurrentCenter();		//今回の中心座標
-	XMFLOAT3 prevCenter = collider->GetPreviousCenter();	//前回の中心座標
-	XMFLOAT3 center = LerpXMF3(prevCenter, currCenter, alpha);	//LERP補間で中心座標を求める
+	Vector3 prevCenter = collider->GetWorldTransformPrevious().position;	//前回の中心座標
+	Vector3 currCenter = collider->GetWorldTransformCurrent().position;		//今回の中心座標
+	Vector3 center = prevCenter.Lerp(currCenter, alpha);					//LERP補間で中心座標を求める
 	obb.center = XMVectorSet(
 		center.x,
 		center.y,
@@ -627,22 +434,17 @@ OBB CollisionManager::CreateOBB(Collider* collider, float alpha)
 	);
 
 	//半分のサイズ
-	XMFLOAT3 prevScale = collider->GetPreviousScale();	//前回のスケール
-	XMFLOAT3 currScale = collider->GetCurrentScale();	//今回のスケール
-	auto scale = LerpXMF3(prevScale, currScale, alpha);	//LERP補間でスケールを求める
-	obb.halfSizes = XMFLOAT3(
+	Vector3 prevScale = collider->GetWorldTransformPrevious().scale;	//前回のスケール
+	Vector3 currScale = collider->GetWorldTransformCurrent().scale;		//今回のスケール
+	auto scale = prevScale.Lerp(currScale, alpha);						//LERP補間でスケールを求める
+	obb.halfSizes = Vector3(
 		scale.x * 0.5f,
 		scale.y * 0.5f,
 		scale.z * 0.5f
 	);
 
 	//各軸の方向ベクトル(ローカル座標系の基底ベクトルを回転させて求める)
-	auto rot = collider->GetRotation();
-	XMMATRIX R = XMMatrixRotationRollPitchYaw(
-		XMConvertToRadians(rot.x),
-		XMConvertToRadians(rot.y),
-		XMConvertToRadians(rot.z)
-	);
+	Matrix4x4 R = collider->GetWorldTransformCurrent().rotation.ToRotationMatrix();
 
 	//ローカル座標系の基底ベクトルを回転させて各軸の方向ベクトルを求める
 	obb.axis[0] = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), R));
@@ -653,7 +455,7 @@ OBB CollisionManager::CreateOBB(Collider* collider, float alpha)
 }
 
 //コライダーからカプセルセグメントを作成
-CapsuleSegment CollisionManager::CreateCapsuleSegment(Collider* collider, float alpha)
+CapsuleSegment CollisionSystem::CreateCapsuleSegment(Collider* collider, float alpha)
 {
 	CapsuleSegment seg{};	//カプセルセグメント構造体
 	const CapsuleCollider currCap = collider->GetCurrentCapsuleCollider(); //現在のカプセルコライダー取得
@@ -667,10 +469,10 @@ CapsuleSegment CollisionManager::CreateCapsuleSegment(Collider* collider, float 
 }
 
 //連続衝突検知が必要かどうかの判定
-bool CollisionManager::NeedsCCD(Collider* collider)
+bool CollisionSystem::NeedsCCD(Collider* collider)
 {
-	const XMFLOAT3& prevCenter = collider->GetPreviousCenter();	//前回の中心座標
-	const XMFLOAT3& currCenter = collider->GetCurrentCenter();	//今回の中心座標
+	const Vector3& prevCenter = collider->GetWorldTransformPrevious().position;	//前回の中心座標
+	const Vector3& currCenter = collider->GetWorldTransformCurrent().position;	//今回の中心座標
 	float distSq = LengthSqBetween(prevCenter, currCenter);			//移動距離の二乗
 
 	float thresh = 0.0f;	//閾値
@@ -678,11 +480,12 @@ bool CollisionManager::NeedsCCD(Collider* collider)
 
 	float minExtent = 0.0f; //最小寸法
 
+	Vector3 scale = collider->GetWorldTransformCurrent().scale;	//現在のスケール
+
 	//コライダータイプに応じて閾値を設定
 	switch (type)
 	{
 	case ColliderType::BOX:		//ボックスコライダー
-		auto scale = collider->GetCurrentScale();
 		minExtent = (std::min)(scale.x, (std::min)(scale.y, scale.z));
 		thresh = minExtent * 0.25f;
 		break;
@@ -692,18 +495,21 @@ bool CollisionManager::NeedsCCD(Collider* collider)
 	case ColliderType::CAPSULE:	//カプセルコライダー
 		thresh = collider->GetCurrentCapsuleCollider().radius * 0.5f;
 		break;
+	default:
+		thresh = 0.1f;
+		break;
 	}
 
 	return distSq > thresh * thresh;	//閾値を超えている場合はtrueを返す
 }
 
 //サブステップ数の計算
-int CollisionManager::CalculateSubsteps(Collider* colliderA, Collider* colliderB)
+int CollisionSystem::CalculateSubsteps(Collider* colliderA, Collider* colliderB)
 {
 	//移動距離を計算するラムダ式
 	auto disp = [&](Collider* collider) {
-		const XMFLOAT3& prevCenter = collider->GetPreviousCenter();	//前回の中心座標
-		const XMFLOAT3& currCenter = collider->GetCurrentCenter();	//今回の中心座標
+		const Vector3& prevCenter = collider->GetWorldTransformPrevious().position;	//前回の中心座標
+		const Vector3& currCenter = collider->GetWorldTransformCurrent().position;	//今回の中心座標
 		return LengthBetween(prevCenter, currCenter);						//移動距離
 		};
 
@@ -717,7 +523,7 @@ int CollisionManager::CalculateSubsteps(Collider* colliderA, Collider* colliderB
 		{
 		case ColliderType::BOX:		//ボックスコライダー
 		{
-			auto scale = collider->GetCurrentScale();
+			auto scale = collider->GetWorldTransformCurrent().scale;
 			float minExtent = (std::min)(scale.x, (std::min)(scale.y, scale.z));
 			return minExtent * 0.25f;
 		}
@@ -741,15 +547,15 @@ int CollisionManager::CalculateSubsteps(Collider* colliderA, Collider* colliderB
 }
 
 //ボックス同士の衝突判定
-ContactResult CollisionManager::CollisionBoxToBox(Collider* colliderA, Collider* colliderB)
+ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* colliderB)
 {
 	ContactResult result{};	//衝突結果構造体
 
 	OBB a = CreateOBB(colliderA);	//コライダーAからOBB作成
 	OBB b = CreateOBB(colliderB);	//コライダーBからOBB作成
 
-	XMFLOAT3 ea = a.halfSizes;	//コライダーAの各軸方向の半分のサイズ
-	XMFLOAT3 eb = b.halfSizes;	//コライダーBの各軸方向の半分のサイズ
+	Vector3 ea = a.halfSizes;	//コライダーAの各軸方向の半分のサイズ
+	Vector3 eb = b.halfSizes;	//コライダーBの各軸方向の半分のサイズ
 
 	XMVECTOR tWorld = XMVectorSubtract(b.center, a.center); //コライダーAから見たコライダーBの位置ベクトル
 
@@ -962,14 +768,14 @@ ContactResult CollisionManager::CollisionBoxToBox(Collider* colliderA, Collider*
 }
 
 //球同士の衝突判定
-ContactResult CollisionManager::CollisionSphereToSphere(
+ContactResult CollisionSystem::CollisionSphereToSphere(
 	Collider* colliderA,	//コライダーA
 	Collider* colliderB		//コライダーB
 )
 {
 	ContactResult result{};	//衝突結果構造体
-	XMFLOAT3 centerA = colliderA->GetCurrentSphereCollider().center; //コライダーAの中心座標
-	XMFLOAT3 centerB = colliderB->GetCurrentSphereCollider().center; //コライダーBの中心座標
+	Vector3 centerA = colliderA->GetCurrentSphereCollider().center; //コライダーAの中心座標
+	Vector3 centerB = colliderB->GetCurrentSphereCollider().center; //コライダーBの中心座標
 
 	SphereSegment segA, segB;	//球セグメント構造体
 	segA.center = XMLoadFloat3(&centerA);						//コライダーAの中心座標
@@ -984,7 +790,7 @@ ContactResult CollisionManager::CollisionSphereToSphere(
 }
 
 //カプセル同士の衝突判定
-ContactResult CollisionManager::CollisionCapsuleToCapsule(
+ContactResult CollisionSystem::CollisionCapsuleToCapsule(
 	Collider* colliderA,	//コライダーA
 	Collider* colliderB		//コライダーB
 )
@@ -1019,7 +825,7 @@ ContactResult CollisionManager::CollisionCapsuleToCapsule(
 
 	//最短距離の二乗を取得
 	XMVECTOR closestA, closestB;	//コライダーA・B上の最短点
-	float distSq = CollisionManager::GetMinDistanceSquaredSegmentToSegment(
+	float distSq = CollisionSystem::GetMinDistanceSquaredSegmentToSegment(
 		segA.pointA, segA.pointB,	//セグメントAの端点
 		segB.pointA, segB.pointB,	//セグメントBの端点
 		closestA,					//セグメントA上の最短点
@@ -1071,7 +877,7 @@ ContactResult CollisionManager::CollisionCapsuleToCapsule(
 }
 
 //ボックスと球の衝突判定
-ContactResult CollisionManager::CollisionBoxToSphere(
+ContactResult CollisionSystem::CollisionBoxToSphere(
 	Collider* box,		//ボックスコライダー
 	Collider* sphere	//スフィアコライダー
 )
@@ -1081,12 +887,12 @@ ContactResult CollisionManager::CollisionBoxToSphere(
 	OBB obb = CreateOBB(box);	//ボックスコライダーからOBB作成
 
 	//OBB情報
-	XMFLOAT3 boxCenter;		//OBBの中心点
-	XMFLOAT3 boxHalfSizes;	//OBBの各軸方向の半分のサイズ
+	Vector3 boxCenter;		//OBBの中心点
+	Vector3 boxHalfSizes;	//OBBの各軸方向の半分のサイズ
 	XMVECTOR boxAxis[3];	//OBBの各軸の方向ベクトル
 
 	//球情報
-	XMFLOAT3 sphereCenter;	//球の中心点
+	Vector3 sphereCenter;	//球の中心点
 	float sphereRadius;		//球の半径
 
 	//OBB情報の取得
@@ -1235,7 +1041,7 @@ ContactResult CollisionManager::CollisionBoxToSphere(
 }
 
 //ボックスとカプセルの衝突判定
-ContactResult CollisionManager::CollisionBoxToCapsule(
+ContactResult CollisionSystem::CollisionBoxToCapsule(
 	Collider* box,	//コライダーA
 	Collider* capsule		//コライダーB
 )
@@ -1251,7 +1057,7 @@ ContactResult CollisionManager::CollisionBoxToCapsule(
 }
 
 //球とカプセルの衝突判定
-ContactResult CollisionManager::CollisionSphereToCapsule(
+ContactResult CollisionSystem::CollisionSphereToCapsule(
 	Collider* sphere,	//球コライダー
 	Collider* capsule	//カプセルコライダー
 )
@@ -1265,7 +1071,7 @@ ContactResult CollisionManager::CollisionSphereToCapsule(
 
 	//最短距離の二乗を取得
 	XMVECTOR closestPoint; //カプセルセグメント上の最短点
-	float distSq = CollisionManager::GetMinDistanceSquaredPointToSegment(
+	float distSq = CollisionSystem::GetMinDistanceSquaredPointToSegment(
 		sphereCenter,				//点(球の中心点)
 		cupSeg.pointA,				//カプセルセグメントの端点A
 		cupSeg.pointB,				//カプセルセグメントの端点B
@@ -1302,13 +1108,13 @@ ContactResult CollisionManager::CollisionSphereToCapsule(
 	depth = radiusSum - dist;								//貫入深さ計算
 
 	//衝突点の計算(最短点と球の中心点の中間)
-	XMFLOAT3 surfacePoint; //球の表面上の点
+	Vector3 surfacePoint; //球の表面上の点
 	surfacePoint = {
 		XMVectorGetX(sphereCenter) + XMVectorGetX(normal) * radius,
 		XMVectorGetY(sphereCenter) + XMVectorGetY(normal) * radius,
 		XMVectorGetZ(sphereCenter) + XMVectorGetZ(normal) * radius
 	};
-	XMFLOAT3 surfaceCapsule; //カプセルの表面上の点
+	Vector3 surfaceCapsule; //カプセルの表面上の点
 	surfaceCapsule = {
 		XMVectorGetX(closestPoint) - XMVectorGetX(normal) * cupSeg.radius,
 		XMVectorGetY(closestPoint) - XMVectorGetY(normal) * cupSeg.radius,
@@ -1332,7 +1138,7 @@ ContactResult CollisionManager::CollisionSphereToCapsule(
 }
 
 //ボックスとカプセルのCCD衝突判定
-ContactResult CollisionManager::CollisionBoxToCapsuleCCD(Collider* box, Collider* capsule)
+ContactResult CollisionSystem::CollisionBoxToCapsuleCCD(Collider* box, Collider* capsule)
 {
 	int steps = CalculateSubsteps(box, capsule);	//サブステップ数計算
 	ContactResult hit{};
@@ -1375,10 +1181,10 @@ ContactResult CollisionManager::CollisionBoxToCapsuleCCD(Collider* box, Collider
 
 	// 3) ヒット後に法線方向へ進んだ量を depth に反映
 	XMVECTOR n = hit.normal;
-	XMFLOAT3 ccPrev = capsule->GetPreviousCenter();
-	XMFLOAT3 ccCurr = capsule->GetCurrentCenter();
-	XMFLOAT3 bcPrev = box->GetPreviousCenter();
-	XMFLOAT3 bcCurr = box->GetCurrentCenter();
+	Vector3 ccPrev = capsule->GetWorldTransformPrevious().position;
+	Vector3 ccCurr = capsule->GetWorldTransformCurrent().position;
+	Vector3 bcPrev = box->GetWorldTransformPrevious().position;
+	Vector3 bcCurr = box->GetWorldTransformCurrent().position;
 
 	XMVECTOR cPrev = XMLoadFloat3(&ccPrev);
 	XMVECTOR cCurr = XMLoadFloat3(&ccCurr);
@@ -1405,7 +1211,7 @@ ContactResult CollisionManager::CollisionBoxToCapsuleCCD(Collider* box, Collider
 }
 
 //OBB対カプセルの衝突判定
-ContactResult CollisionManager::CollisonOBBtoCapsule(const OBB& obb, const CapsuleSegment& capSeg)
+ContactResult CollisionSystem::CollisonOBBtoCapsule(const OBB& obb, const CapsuleSegment& capSeg)
 {
 	ContactResult result{};	//衝突結果構造体
 
@@ -1598,12 +1404,12 @@ ContactResult CollisionManager::CollisonOBBtoCapsule(const OBB& obb, const Capsu
 }
 
 //球セグメント間の衝突判定
-ContactResult CollisionManager::CollisionSpheresSegments(const SphereSegment& segA, const SphereSegment& segB)
+ContactResult CollisionSystem::CollisionSpheresSegments(const SphereSegment& segA, const SphereSegment& segB)
 {
 	ContactResult result{};	//衝突結果構造体
 
 	//中心点の取得
-	XMFLOAT3 centerA, centerB;
+	Vector3 centerA, centerB;
 	XMStoreFloat3(&centerA, segA.center);
 	XMStoreFloat3(&centerB, segB.center);
 
@@ -1665,7 +1471,7 @@ ContactResult CollisionManager::CollisionSpheresSegments(const SphereSegment& se
 }
 
 //セグメント間の最小距離の二乗を取得
-float CollisionManager::GetMinDistanceSquaredSegmentToSegment(
+float CollisionSystem::GetMinDistanceSquaredSegmentToSegment(
 	const DirectX::FXMVECTOR& p0, const DirectX::FXMVECTOR& p1,	//セグメントPの端点
 	const DirectX::FXMVECTOR& q0, const DirectX::FXMVECTOR& q1,	//セグメントQの端点
 	DirectX::XMVECTOR& outP,									//セグメントP上の最短点
@@ -1714,7 +1520,7 @@ float CollisionManager::GetMinDistanceSquaredSegmentToSegment(
 }
 
 //点とセグメント間の最小距離の二乗を取得
-float CollisionManager::GetMinDistanceSquaredPointToSegment(const DirectX::FXMVECTOR& point, const DirectX::FXMVECTOR& segA, const DirectX::FXMVECTOR& segB, DirectX::XMVECTOR& outClosest)
+float CollisionSystem::GetMinDistanceSquaredPointToSegment(const DirectX::FXMVECTOR& point, const DirectX::FXMVECTOR& segA, const DirectX::FXMVECTOR& segB, DirectX::XMVECTOR& outClosest)
 {
 	XMVECTOR segDir = XMVectorSubtract(segB, segA);		//セグメントの方向ベクトル
 	XMVECTOR toPoint = XMVectorSubtract(point, segA);	//セグメントの端点Aから点へのベクトル
@@ -1744,11 +1550,11 @@ float CollisionManager::GetMinDistanceSquaredPointToSegment(const DirectX::FXMVE
 }
 
 //点とOBB間の最小距離の二乗を取得
-float CollisionManager::GetMinDistanceSquaredPointToOBB(const DirectX::FXMVECTOR& point, const OBB& obb, DirectX::XMVECTOR& outClosest)
+float CollisionSystem::GetMinDistanceSquaredPointToOBB(const DirectX::FXMVECTOR& point, const OBB& obb, DirectX::XMVECTOR& outClosest)
 {
 	XMVECTOR d = XMVectorSubtract(point, obb.center); //点からOBBの中心へのベクトル
 
-	const XMFLOAT3& halfSizes = obb.halfSizes; //OBBの各軸方向の半分のサイズ
+	const Vector3& halfSizes = obb.halfSizes; //OBBの各軸方向の半分のサイズ
 
 	//点のOBBのローカル座標系での位置を計算
 	float local[3]; //OBBのローカル座標系での点の位置
@@ -1782,7 +1588,7 @@ float CollisionManager::GetMinDistanceSquaredPointToOBB(const DirectX::FXMVECTOR
 }
 
 //衝突ペアが保存されているかどうかチェック
-bool CollisionManager::PairExistsinList(const CollisionPair& pair, const std::vector<CollisionPair>& collisionPairs)
+bool CollisionSystem::PairExistsinList(const CollisionPair& pair, const std::vector<CollisionPair>& collisionPairs)
 {
 	//保存されている衝突ペアと比較
 	for (auto& p : collisionPairs)
@@ -1797,7 +1603,7 @@ bool CollisionManager::PairExistsinList(const CollisionPair& pair, const std::ve
 }
 
 //コライダーの衝突状態を設定
-void CollisionManager::SetCollisionState(Collider* self, Collider* opponent, COLLISION_STATE state)
+void CollisionSystem::SetCollisionState(Collider* self, Collider* opponent, COLLISION_STATE state)
 {
 	auto& infoList = self->GetCollisionInfos();
 	//衝突情報リストから相手コライダーを探して状態を設定
@@ -1812,13 +1618,13 @@ void CollisionManager::SetCollisionState(Collider* self, Collider* opponent, COL
 }
 
 //コライダーに衝突情報を追加
-void CollisionManager::PushCollisionInfo(Collider* colliderA, Collider* colliderB, ContactResult& result)
+void CollisionSystem::PushCollisionInfo(Collider* colliderA, Collider* colliderB, ContactResult& result)
 {
-	XMFLOAT3 contactP, normalF;
+	Vector3 contactP, normalF;
 	XMStoreFloat3(&contactP, result.point);	//衝突点
 	XMStoreFloat3(&normalF, result.normal);	//法線ベクトル
 
-	XMFLOAT3 penetration =
+	Vector3 penetration =
 	{//貫入深さベクトルの計算
 		normalF.x * result.depth,
 		normalF.y * result.depth,
@@ -1855,12 +1661,12 @@ void CollisionManager::PushCollisionInfo(Collider* colliderA, Collider* collider
 }
 
 //法線ベクトルをコライダーAからBの方向に向ける
-void CollisionManager::OrientNormalAToB(Collider* colliderA, Collider* colliderB, ContactResult& result)
+void CollisionSystem::OrientNormalAToB(Collider* colliderA, Collider* colliderB, ContactResult& result)
 {
 	XMVECTOR normal = result.normal;	//法線ベクトル
 
-	XMFLOAT3 centerAF = colliderA->GetCurrentCenter();
-	XMFLOAT3 centerBF = colliderB->GetCurrentCenter();
+	Vector3 centerAF = colliderA->GetWorldTransformCurrent().position;
+	Vector3 centerBF = colliderB->GetWorldTransformCurrent().position;
 
 	//コライダーA・Bの中心点ベクトルを取得
 	XMVECTOR centerA = XMLoadFloat3(&centerAF);
@@ -1878,7 +1684,7 @@ void CollisionManager::OrientNormalAToB(Collider* colliderA, Collider* colliderB
 }
 
 //レイヤーマスクによるレイキャストの衝突判定
-bool CollisionManager::CheckLayerRaycast(const RaycastSegment& ray, Collider* collider)
+bool CollisionSystem::CheckLayerRaycast(const RaycastSegment& ray, Collider* collider)
 {
 	LayerMask rayBit = LayerToBit(ray.layer);				//レイのレイヤーマスク
 	LayerMask colBit = LayerToBit(collider->GetLayer());	//コライダーのレイヤーマスク
@@ -1893,7 +1699,7 @@ bool CollisionManager::CheckLayerRaycast(const RaycastSegment& ray, Collider* co
 }
 
 //レイキャストの衝突状態を更新
-void CollisionManager::UpdateRaycastCollisionState(RaycastSegment& ray)
+void CollisionSystem::UpdateRaycastCollisionState(RaycastSegment& ray)
 {
 	std::unordered_set<Collider*> prevSet;
 	prevSet.reserve(ray.prevHitInfos.size());
@@ -1930,7 +1736,7 @@ void CollisionManager::UpdateRaycastCollisionState(RaycastSegment& ray)
 }
 
 //レイキャストとボックスコライダーの衝突判定
-bool CollisionManager::RaycastBox(const RaycastSegment& ray, Collider* collider, RaycastHitInfo& outHitInfo)
+bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, RaycastHitInfo& outHitInfo)
 {
 	const float EPSILON = 0.0001f; //微小値
 
@@ -1964,7 +1770,7 @@ bool CollisionManager::RaycastBox(const RaycastSegment& ray, Collider* collider,
 	}
 
 	//スラブ法によるレイとOBBの衝突判定
-	const XMFLOAT3& halfSizes = obb.halfSizes; //OBBの各軸方向の半分のサイズ
+	const Vector3& halfSizes = obb.halfSizes; //OBBの各軸方向の半分のサイズ
 	float half[3] = { halfSizes.x, halfSizes.y, halfSizes.z };
 
 	float tEnter = 0.0f;		//レイの入り口パラメータ
@@ -2037,7 +1843,7 @@ bool CollisionManager::RaycastBox(const RaycastSegment& ray, Collider* collider,
 }
 
 //レイキャストと球コライダーの衝突判定
-bool CollisionManager::RaycastSphere(const RaycastSegment& ray, Collider* collider, RaycastHitInfo& outHitInfo)
+bool CollisionSystem::RaycastSphere(const RaycastSegment& ray, Collider* collider, RaycastHitInfo& outHitInfo)
 {
 	//レイの始点と方向ベクトル取得
 	XMVECTOR rayOrigin = XMLoadFloat3(&ray.startPoint);				//レイの始点ベクトル
@@ -2112,7 +1918,7 @@ bool CollisionManager::RaycastSphere(const RaycastSegment& ray, Collider* collid
 }
 
 //レイキャストとカプセルコライダーの衝突判定
-bool CollisionManager::RaycastCapsule(const RaycastSegment& ray, Collider* collider, RaycastHitInfo& outHitInfo)
+bool CollisionSystem::RaycastCapsule(const RaycastSegment& ray, Collider* collider, RaycastHitInfo& outHitInfo)
 {
 	const float EPSILON = 0.0001f; //微小値
 
@@ -2139,7 +1945,7 @@ bool CollisionManager::RaycastCapsule(const RaycastSegment& ray, Collider* colli
 
 	//衝突情報の設定
 	//衝突点の計算
-	XMFLOAT3 hitPos;
+	Vector3 hitPos;
 	XMStoreFloat3(&hitPos, outP); //レイ上の最短点を衝突点とする
 
 	//法線の計算

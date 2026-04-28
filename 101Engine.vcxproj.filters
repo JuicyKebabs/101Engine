@@ -155,16 +155,10 @@
     <ClCompile Include="src\Engine\Model\AssimpLoader.cpp">
       <Filter>src\Engine\Model</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\Physics\Collider.cpp">
-      <Filter>src\Engine\Physics</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Engine\Physics\ColliderSet.cpp">
-      <Filter>src\Engine\Physics</Filter>
-    </ClCompile>
     <ClCompile Include="src\Engine\Physics\CollisionData.cpp">
       <Filter>src\Engine\Physics</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\Physics\CollisionManager.cpp">
+    <ClCompile Include="src\Engine\Physics\CollisionSystem.cpp">
       <Filter>src\Engine\Physics</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Resource\MeshGPU.cpp">
@@ -241,6 +235,9 @@
     </ClCompile>
     <ClCompile Include="src\Engine\Resource\GpuTexture.cpp">
       <Filter>src\Engine\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Component\Collider.cpp">
+      <Filter>src\Engine\Component</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -319,16 +316,10 @@
     <ClInclude Include="src\Engine\Model\AssimpLoader.h">
       <Filter>src\Engine\Model</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\Physics\Collider.h">
-      <Filter>src\Engine\Physics</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Engine\Physics\ColliderSet.h">
-      <Filter>src\Engine\Physics</Filter>
-    </ClInclude>
     <ClInclude Include="src\Engine\Physics\CollisionData.h">
       <Filter>src\Engine\Physics</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\Physics\CollisionManager.h">
+    <ClInclude Include="src\Engine\Physics\CollisionSystem.h">
       <Filter>src\Engine\Physics</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\Resource\MeshGPU.h">
@@ -417,6 +408,9 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Graphics\RenderPipeline.h">
       <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\Collider.h">
+      <Filter>src\Engine\Component</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

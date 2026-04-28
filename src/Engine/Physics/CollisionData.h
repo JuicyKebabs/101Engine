@@ -3,6 +3,7 @@
 #include <DirectXMath.h>
 #include <vector>
 #include "Engine/Core/Utility/SharedStruct.h"
+#include "Engine/Core/Math/Math.h"
 
 // Forward declarations
 class Collider;
@@ -18,9 +19,9 @@ enum COLLISION_STATE
 };
 
 //enumeration for collision layers
-enum class COLLISION_LAYER
+enum class CollisionLayer
 {
-	DEFAULT = 0,	//default
+	Default = 0,	//default
 	PLAYER,			//player
 	ENEMY,			//enemy
 	WALL,			//wall
@@ -37,9 +38,9 @@ using LayerMask = uint32_t;
 struct CollisionInfo
 {
 	Collider* opponent = nullptr;								//opponent collider
-	DirectX::XMFLOAT3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
-	DirectX::XMFLOAT3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
-	DirectX::XMFLOAT3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth
+	Vector3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
+	Vector3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
+	Vector3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth
 	COLLISION_STATE state =
 		COLLISION_STATE::COLLISION_NONE;			//collision state
 };
@@ -48,9 +49,9 @@ struct CollisionInfo
 struct ObjectCollisionInfo
 {
 	Actor* opponent = nullptr;								//opponent object
-	DirectX::XMFLOAT3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
-	DirectX::XMFLOAT3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
-	DirectX::XMFLOAT3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth
+	Vector3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
+	Vector3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
+	Vector3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth
 	COLLISION_STATE state =
 		COLLISION_STATE::COLLISION_NONE;			//collision state
 };
@@ -72,19 +73,19 @@ struct RaycastSegment
 	DirectX::XMFLOAT3 startPoint = { 0.0f, 0.0f, 0.0f };	//start point
 	DirectX::XMFLOAT3 endPoint = { 0.0f, 0.0f, 0.0f };		//end point
 	LayerMask layerMask = 0;								//layer mask
-	COLLISION_LAYER layer = COLLISION_LAYER::DEFAULT;		//layer
+	CollisionLayer layer = CollisionLayer::Default;		//layer
 	std::vector<RaycastHitInfo> currHitInfos;					//hit information array
 	std::vector<RaycastHitInfo> prevHitInfos;				//previous hit information array
 };
 
 //Layer to bit conversion function
-LayerMask LayerToBit(COLLISION_LAYER layer);
+LayerMask LayerToBit(CollisionLayer layer);
 
 //Layer mask retrieval function
-LayerMask MakeLayerMask(COLLISION_LAYER layer);
+LayerMask MakeLayerMask(CollisionLayer layer);
 
 //Layer mask creation function from initializer list
-LayerMask MakeMask(std::initializer_list<COLLISION_LAYER> layers);
+LayerMask MakeMask(std::initializer_list<CollisionLayer> layers);
 
 //Get push-out vector from penetration depth
 DirectX::XMFLOAT3 GetPushOutVector(

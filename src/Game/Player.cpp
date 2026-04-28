@@ -2,6 +2,8 @@
 #include "Engine/Input/InputManager.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/Collider.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/Time/Time.h"
 
@@ -62,31 +64,31 @@ void PlayerBehavior::UpdateBehavior()
 
 	if (downW)
 	{
-		//Vector3 currentPosition = transform->GetLocalPosition();
-		//currentPosition.y += MOVE_SPEED;
-		//transform->SetLocalPosition(currentPosition);
-		transform->RotateLocalByEulerDeg({ -ROTATION_SPEED, 0.0f, 0.0f });
+		Vector3 currentPosition = transform->GetLocalPosition();
+		currentPosition.y += MOVE_SPEED;
+		transform->SetLocalPosition(currentPosition);
+		//transform->RotateLocalByEulerDeg({ -ROTATION_SPEED, 0.0f, 0.0f });
 	}
 	if (downA)
 	{
-		//Vector3 currentPosition = transform->GetLocalPosition();
-		//currentPosition.x -= MOVE_SPEED;
-		//transform->SetLocalPosition(currentPosition);
-		transform->RotateLocalByEulerDeg({ 0.0f, -ROTATION_SPEED, 0.0f });
+		Vector3 currentPosition = transform->GetLocalPosition();
+		currentPosition.x -= MOVE_SPEED;
+		transform->SetLocalPosition(currentPosition);
+		//transform->RotateLocalByEulerDeg({ 0.0f, -ROTATION_SPEED, 0.0f });
 	}
 	if (downS)
 	{
-		//Vector3 currentPosition = transform->GetLocalPosition();
-		//currentPosition.y -= MOVE_SPEED;
-		//transform->SetLocalPosition(currentPosition);
-		transform->RotateLocalByEulerDeg({ ROTATION_SPEED, 0.0f, 0.0f });
+		Vector3 currentPosition = transform->GetLocalPosition();
+		currentPosition.y -= MOVE_SPEED;
+		transform->SetLocalPosition(currentPosition);
+		//transform->RotateLocalByEulerDeg({ ROTATION_SPEED, 0.0f, 0.0f });
 	}
 	if (downD)
 	{
-		//Vector3 currentPosition = transform->GetLocalPosition();
-		//currentPosition.x += MOVE_SPEED;
-		//transform->SetLocalPosition(currentPosition);
-		transform->RotateLocalByEulerDeg({ 0.0f, ROTATION_SPEED, 0.0f });
+		Vector3 currentPosition = transform->GetLocalPosition();
+		currentPosition.x += MOVE_SPEED;
+		transform->SetLocalPosition(currentPosition);
+		//transform->RotateLocalByEulerDeg({ 0.0f, ROTATION_SPEED, 0.0f });
 	}
 
 	//auto downUp = keyInput.up.down;
@@ -149,5 +151,32 @@ void PlayerBehavior::UpdateBehavior()
 	{
 		InputManager::GetInstance().StopAllControllerVibrations();
 	}
+}
 
+void PlayerBehavior::LateUpdateBehavior(float deltaTime)
+{
+	auto collider = GetOwner()->GetComponentByClass<Collider>();
+	if (collider)
+	{
+		auto renderer = GetOwner()->GetComponentByClass<MeshRenderer>();
+		if (!renderer)
+		{
+			DBG("PlayerBehavior: Renderer component not found on the actor.");
+			return;
+		}
+
+		if (collider->isDetected())
+		{
+			renderer->SetColor({ 1.0f, 0.0f, 0.0f, 1.0f }); // Red color when collision is detected
+
+			auto pushBack = collider->GetCollisionInfos()[0].penetrationDepth; // Get the push back vector from the first collision info
+
+			auto transform = GetOwner()->GetTransform();
+			transform->SetLocalPosition(transform->GetLocalPosition() - pushBack); // Move the player back by the push back vector to resolve the collision
+		}
+		else
+		{
+			renderer->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f }); // Default color when no collision is detected
+		}
+	}
 }

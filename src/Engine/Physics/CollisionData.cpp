@@ -5,71 +5,72 @@
 using namespace DirectX;
 
 //コリジョンレイヤーをビットマスクに変換する関数
-LayerMask LayerToBit(COLLISION_LAYER layer)
+LayerMask LayerToBit(CollisionLayer layer)
 {
 	return static_cast<LayerMask>(1 << static_cast<uint32_t>(layer));
 }
 
 //コリジョンレイヤーからレイヤーマスクを取得する関数
-LayerMask MakeLayerMask(COLLISION_LAYER layer)
+LayerMask MakeLayerMask(CollisionLayer layer)
 {
 	switch (layer)
 	{//コリジョンレイヤーごとに当たり判定を行うレイヤーマスクを設定
-	case COLLISION_LAYER::DEFAULT:
+	case CollisionLayer::Default:
 		return MakeMask({
-			COLLISION_LAYER::PLAYER,			//プレイヤーレイヤー
-			COLLISION_LAYER::ENEMY,				//エネミーレイヤー
-			COLLISION_LAYER::WALL,				//壁レイヤー
-			COLLISION_LAYER::PLAYER_BULLET,		//プレイヤーブレットレイヤー
-			COLLISION_LAYER::PLAYER_RAY,		//プレイヤーレイキャストレイヤー
-			COLLISION_LAYER::ENEMY_BULLET		//エネミーブレットレイヤー
+			CollisionLayer::Default,		//デフォルトレイヤー
+			CollisionLayer::PLAYER,			//プレイヤーレイヤー
+			CollisionLayer::ENEMY,			//エネミーレイヤー
+			CollisionLayer::WALL,			//壁レイヤー
+			CollisionLayer::PLAYER_BULLET,	//プレイヤーブレットレイヤー
+			CollisionLayer::PLAYER_RAY,		//プレイヤーレイキャストレイヤー
+			CollisionLayer::ENEMY_BULLET	//エネミーブレットレイヤー
 			});
 		break;
-	case COLLISION_LAYER::PLAYER:
+	case CollisionLayer::PLAYER:
 		return MakeMask({
-			COLLISION_LAYER::ENEMY,				//エネミーレイヤー
-			COLLISION_LAYER::WALL,				//壁レイヤー
-			COLLISION_LAYER::ENEMY_BULLET		//エネミーブレットレイヤー
-			});
-		break;
-
-	case COLLISION_LAYER::ENEMY:
-		return MakeMask({
-			COLLISION_LAYER::PLAYER,			//プレイヤーレイヤー
-			COLLISION_LAYER::PLAYER_BULLET,		//プレイヤーブレットレイヤー
-			COLLISION_LAYER::PLAYER_RAY			//プレイヤーレイキャストレイヤー
+			CollisionLayer::ENEMY,				//エネミーレイヤー
+			CollisionLayer::WALL,				//壁レイヤー
+			CollisionLayer::ENEMY_BULLET		//エネミーブレットレイヤー
 			});
 		break;
 
-	case COLLISION_LAYER::WALL:
+	case CollisionLayer::ENEMY:
 		return MakeMask({
-			COLLISION_LAYER::PLAYER,			//プレイヤーレイヤー
-			COLLISION_LAYER::PLAYER_BULLET,		//プレイヤーブレットレイヤー
-			COLLISION_LAYER::PLAYER_RAY			//プレイヤーレイキャストレイヤー
+			CollisionLayer::PLAYER,			//プレイヤーレイヤー
+			CollisionLayer::PLAYER_BULLET,		//プレイヤーブレットレイヤー
+			CollisionLayer::PLAYER_RAY			//プレイヤーレイキャストレイヤー
 			});
 		break;
 
-	case COLLISION_LAYER::PLAYER_BULLET:
+	case CollisionLayer::WALL:
 		return MakeMask({
-			COLLISION_LAYER::ENEMY,				//エネミーレイヤー
-			COLLISION_LAYER::WALL				//壁レイヤー
+			CollisionLayer::PLAYER,			//プレイヤーレイヤー
+			CollisionLayer::PLAYER_BULLET,		//プレイヤーブレットレイヤー
+			CollisionLayer::PLAYER_RAY			//プレイヤーレイキャストレイヤー
 			});
 		break;
 
-	case COLLISION_LAYER::PLAYER_RAY:
+	case CollisionLayer::PLAYER_BULLET:
 		return MakeMask({
-			COLLISION_LAYER::ENEMY,				//エネミーレイヤー
-			COLLISION_LAYER::WALL				//壁レイヤー
+			CollisionLayer::ENEMY,				//エネミーレイヤー
+			CollisionLayer::WALL				//壁レイヤー
 			});
 		break;
 
-	case COLLISION_LAYER::ENEMY_BULLET:
+	case CollisionLayer::PLAYER_RAY:
 		return MakeMask({
-			COLLISION_LAYER::PLAYER,			//プレイヤーレイヤー
+			CollisionLayer::ENEMY,				//エネミーレイヤー
+			CollisionLayer::WALL				//壁レイヤー
 			});
 		break;
 
-	case COLLISION_LAYER::MAX_LAYER:
+	case CollisionLayer::ENEMY_BULLET:
+		return MakeMask({
+			CollisionLayer::PLAYER,			//プレイヤーレイヤー
+			});
+		break;
+
+	case CollisionLayer::MAX_LAYER:
 		return 0;
 	default:
 		return 0;
@@ -78,7 +79,7 @@ LayerMask MakeLayerMask(COLLISION_LAYER layer)
 }
 
 //複数のコリジョンレイヤーからレイヤーマスクを作成する関数
-LayerMask MakeMask(std::initializer_list<COLLISION_LAYER> layers)
+LayerMask MakeMask(std::initializer_list<CollisionLayer> layers)
 {
 	LayerMask mask = 0;	//レイヤーマスク
 	for (auto layer : layers)

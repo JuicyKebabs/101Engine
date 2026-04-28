@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -157,6 +157,7 @@
     </ClCompile>
     <ClCompile Include="src\Engine\Audio\Audio.cpp" />
     <ClCompile Include="src\Engine\Component\Camera.cpp" />
+    <ClCompile Include="src\Engine\Component\Collider.cpp" />
     <ClCompile Include="src\Engine\Component\Component.cpp" />
     <ClCompile Include="src\Engine\Component\MeshRenderer.cpp" />
     <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp" />
@@ -182,10 +183,8 @@
     <ClCompile Include="src\Engine\Input\InputManager.cpp" />
     <ClCompile Include="src\Engine\Input\keyboard.cpp" />
     <ClCompile Include="src\Engine\Model\AssimpLoader.cpp" />
-    <ClCompile Include="src\Engine\Physics\Collider.cpp" />
-    <ClCompile Include="src\Engine\Physics\ColliderSet.cpp" />
     <ClCompile Include="src\Engine\Physics\CollisionData.cpp" />
-    <ClCompile Include="src\Engine\Physics\CollisionManager.cpp" />
+    <ClCompile Include="src\Engine\Physics\CollisionSystem.cpp" />
     <ClCompile Include="src\Engine\Resource\GpuTexture.cpp" />
     <ClCompile Include="src\Engine\Resource\MeshGPU.cpp" />
     <ClCompile Include="src\Engine\Resource\MeshManager.cpp" />
@@ -210,6 +209,7 @@
     <ClInclude Include="src\Engine\Component\AssimpNodeTransformAnim.h" />
     <ClInclude Include="src\Engine\Component\Behavior.h" />
     <ClInclude Include="src\Engine\Component\Camera.h" />
+    <ClInclude Include="src\Engine\Component\Collider.h" />
     <ClInclude Include="src\Engine\Component\Component.h" />
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h" />
     <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
@@ -241,10 +241,8 @@
     <ClInclude Include="src\Engine\Input\InputManager.h" />
     <ClInclude Include="src\Engine\Input\keyboard.h" />
     <ClInclude Include="src\Engine\Model\AssimpLoader.h" />
-    <ClInclude Include="src\Engine\Physics\Collider.h" />
-    <ClInclude Include="src\Engine\Physics\ColliderSet.h" />
     <ClInclude Include="src\Engine\Physics\CollisionData.h" />
-    <ClInclude Include="src\Engine\Physics\CollisionManager.h" />
+    <ClInclude Include="src\Engine\Physics\CollisionSystem.h" />
     <ClInclude Include="src\Engine\Resource\MeshGPU.h" />
     <ClInclude Include="src\Engine\Resource\MeshManager.h" />
     <ClInclude Include="src\Engine\Resource\GpuTexture.h" />
