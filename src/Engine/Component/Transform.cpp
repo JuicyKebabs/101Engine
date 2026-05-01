@@ -3,31 +3,25 @@
 
 using namespace DirectX;
 
-Transform::Transform(Vector3 localPosition, Vector3 localEulerDeg, Vector3 localScale, const std::string& name)
-	: Component(name)
-{
-	m_localTransform = { localPosition, Quaternion::CreateFromEulerDeg(localEulerDeg), localScale };
-}
-
 // Called when the component is initialized
-void Transform::OnStart()
+void Transform::OnStartOverride()
 {
 	
 }
 
 // Called every frame before Update to perform pre-update tasks
-void Transform::PreUpdate(float deltaTime)
+void Transform::PreUpdateOverride(float deltaTime)
 {
 }
 
 // Called every frame after Update to perform late updates
-void Transform::LateUpdate(float deltaTime)
+void Transform::LateUpdateOverride(float deltaTime)
 {
 	UpdateGeometry();
 }
 
 // Called when the component is destroyed
-void Transform::OnDestroy()
+void Transform::OnDestroyOverride()
 {
 }
 

@@ -29,15 +29,13 @@ public:
 	void Finalize();							// Finalize
 
 	// Add an actor
-	template<class T, class... Args>
-	T* AddActor(Args&&... args) {
-		static_assert(std::is_base_of_v<Actor, T>, "AddActor<T>: T must derive from Actor");
-		auto actor = std::make_unique<T>(std::forward<Args>(args)...);
-		T* ptr = actor.get();
+	Actor* AddActor(Actor* actor) {
+		if (!actor) return nullptr;
 		actor->SetOwner(this);
-		m_addPendingActors.push_back(std::move(actor));
-		return ptr;
+		m_actors.push_back(std::unique_ptr<Actor>(actor));
+		return actor;
 	}
+
 	void AddActorToPending(std::unique_ptr<Actor> actor) {
 		actor->SetOwner(this);
 		m_addPendingActors.push_back(std::move(actor));

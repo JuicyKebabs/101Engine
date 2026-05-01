@@ -8,6 +8,7 @@
 #include "Engine/Core/Utility/SharedStruct.h"
 
 // Forward declaration
+class ActorFactory;
 class Renderer;
 class TextureManager;
 class MeshManager;
@@ -18,6 +19,15 @@ class SceneBase;
 class Actor
 {
 public:
+	struct InitDesc
+	{
+		bool isActive;
+		ACTOR_TAG tag;
+		std::string name;
+		InitDesc(bool isActive = true, ACTOR_TAG tag = ACTOR_TAG::NONE, std::string name = "Actor"
+		) : isActive(isActive), tag(tag), name(name) {}
+	};
+
 	struct ComponentBucket {
 		std::vector<std::unique_ptr<Component>> instances;
 	};
@@ -28,13 +38,6 @@ public:
 	};
 
 public:
-	Actor(	// Constructor
-		Vector3 position = Vector3{ 0.0f, 0.0f, 0.0f },	// Position
-		Vector3 rotation = Vector3{ 0.0f, 0.0f, 0.0f },	// Rotation
-		Vector3 scale = Vector3{ 1.0f, 1.0f, 1.0f },	// Scale
-		bool isActive = true,							// Active flag
-		ACTOR_TAG tag = ACTOR_TAG::NONE					// Object tag
-	);
 	~Actor();	// Destructor
 
 	void PreUpdate(float deltaTime);	// Pre-update
@@ -54,6 +57,7 @@ public:
 	SceneBase* GetOwner() const { return m_pOwner; }				// Get owning scene
 	ACTOR_TAG GetTag() const { return m_tag; }						// Get object tag
 	bool IsActive() const { return m_isActive; }					// Get active status
+	bool IsInitialized() const { return m_isInitialized; }			// Check if the actor has been initialized (Init function has been called at least once)
 	Actor* GetParent() const { return m_pParent; }					// Get parent actor
 	std::vector<Actor*> GetChildren() const { return m_children; }	// Get child actors
 
@@ -198,14 +202,13 @@ public:
 		return ptr;
 	}
 
-	Transform* GetTransform() const { return m_pTransform; }	// Get Transform component
-
 	void FlushTransform();	// Update world transform of this actor and all child actors;
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
 
 private:
-	bool m_isActive = false;	// Active flag
-	bool m_destroyed = false;	// Flag to check if the actor is marked for destruction
+	bool m_isActive = false;		// Active flag
+	bool m_destroyed = false;		// Flag to check if the actor is marked for destruction
+	bool m_isInitialized = false;	// Flag to check if the actor has been initialized (Init function has been called at least once)
 
 	ACTOR_TAG m_tag = ACTOR_TAG::NONE; // Object tag
 
@@ -214,13 +217,24 @@ private:
 	std::vector<PendingComponent> m_pendingComponents;					// Pending component container
 
 	SceneBase* m_pOwner = nullptr;		// Pointer to the owning scene
-	Transform* m_pTransform = nullptr;	// Pointer to the Transform component
 
 	Actor* m_pParent = nullptr;		// Pointer to the parent actor (nullptr if no parent)
 	std::vector<Actor*> m_children;	// Child actors
+
+	std::string m_name;				// Actor name (for debugging and editor)
 
 private:
 	void AddPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
 	void AddChildActorToScene(std::unique_ptr<Actor> child);
+
+	Actor() = default;			// Hide default constructor, ActorFactory is only allowed to create actors
+	friend class ActorFactory;	// Allow ActorFactory to access private constructor
+
+	void Init(const InitDesc& desc) {
+		m_isActive = desc.isActive;
+		m_tag = desc.tag;
+		m_name = desc.name;
+		m_isInitialized = true;
+	}
 };

@@ -5,32 +5,23 @@
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Core/Debug/Debug.h"
 
-using namespace DirectX;
-
-Camera::Camera(float window_width, float window_height, const std::string& name)
-	: Component(name)
-{
-	m_cameraLens.width = window_width;
-	m_cameraLens.height = window_height;
-}
-
-void Camera::OnStart()
+void Camera::OnStartOverride()
 {
 }
 
-void Camera::PreUpdate(float deltaTime)
+void Camera::PreUpdateOverride(float deltaTime)
 {
 }
 
-void Camera::Update(float deltaTime)
+void Camera::UpdateOverride(float deltaTime)
 {
 }
 
-void Camera::LateUpdate(float deltaTime)
+void Camera::LateUpdateOverride(float deltaTime)
 {
 }
 
-void Camera::OnDestroy()
+void Camera::OnDestroyOverride()
 {
 }
 
@@ -128,7 +119,7 @@ void Camera::UpdateCameraPose(float deltaTime)
 
 	// Check if the following target's transform has changed since the last update
 	if (followingTarget) {
-		auto followTransform = followingTarget->GetTransform();
+		auto followTransform = followingTarget->GetComponentByClass<Transform>();
 		if (followTransform) {
 			if (m_followingTransformGeneration != followTransform->GetWorldGeneration()) {
 				m_followingTransformGeneration = followTransform->GetWorldGeneration();
@@ -156,7 +147,7 @@ void Camera::UpdateCameraPose(float deltaTime)
 
 	// Check if the rotating target's transform has changed since the last update
 	if (rotatingTarget) {
-		auto rotatingTransform = rotatingTarget->GetTransform();
+		auto rotatingTransform = rotatingTarget->GetComponentByClass<Transform>();
 		if (rotatingTransform) {
 			if (m_rotatingTransformGeneration != rotatingTransform->GetWorldGeneration()) {
 				m_rotatingTransformGeneration = rotatingTransform->GetWorldGeneration();
@@ -191,7 +182,7 @@ void Camera::UpdatePosition(float deltaTime)
 	}
 	if (!followTarget) return; // No valid follow target, do not update position
 
-	auto targetTransform = followTarget->GetTransform();
+	auto targetTransform = followTarget->GetComponentByClass<Transform>();
 	if (!targetTransform) return; // Follow target does not have a Transform component, do not update position
 
 	Vector3 newPosition = targetTransform->TransformPoint(m_cameraRig.offsetPosition); // Apply offset position from the camera rig
@@ -210,7 +201,7 @@ void Camera::UpdateRotation(float deltaTime)
 
 	case CAMERA_ROTATION_MODE::ROTATION_MODE_MATCH_OWNER:
 		if (GetOwner()) {
-			auto ownerTransform = GetOwner()->GetTransform();
+			auto ownerTransform = GetOwner()->GetComponentByClass<Transform>();
 			if (ownerTransform) {
 				targetRotation = ownerTransform->GetWorldRotationQuat();
 				// Apply offset rotation from the camera rig
@@ -221,7 +212,7 @@ void Camera::UpdateRotation(float deltaTime)
 
 	case CAMERA_ROTATION_MODE::ROTATION_MODE_LOOK_AT_TARGET:
 		if (m_pTargetActor) {
-			auto targetTransform = m_pTargetActor->GetTransform();
+			auto targetTransform = m_pTargetActor->GetComponentByClass<Transform>();
 			if (targetTransform) {
 				Vector3 targetPosition = targetTransform->GetWorldPosition();
 				Vector3 cameraPosition = m_cameraPose.position;

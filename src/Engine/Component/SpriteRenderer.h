@@ -20,14 +20,29 @@ struct SpriteRendererProxy
 class SpriteRenderer : public Component
 {
 public:
-    SpriteRenderer(std::string name = "SpriteRenderer") : Component(name) {}
-	~SpriteRenderer() {};
+	struct InitDesc : public Component::InitDesc
+	{
+		SpriteRenderTemplate renderTemplate;	// Render template for the sprite (contains the texture and billboard type)
+		InitDesc(std::string name) : Component::InitDesc(name) {}
+		InitDesc(const SpriteRenderTemplate& renderTemplate, const std::string& name = "SpriteRenderer")
+			: Component::InitDesc(name), renderTemplate(renderTemplate) {}
+	};
 
-	void OnStart() override;
-	void PreUpdate(float deltaTime) override;
-	void Update(float deltaTime) override;
-	void LateUpdate(float deltaTime) override;
-	void OnDestroy() override;
+public:
+	SpriteRenderer() = default;
+	~SpriteRenderer() = default;
+	void Init(const InitDesc& desc) {
+		m_template = desc.renderTemplate;
+		m_isConfigured = true;
+		m_isProxyDirty = true;
+		Component::Init(desc);
+	}
+
+	void OnStartOverride() override;
+	void PreUpdateOverride(float deltaTime) override;
+	void UpdateOverride(float deltaTime) override;
+	void LateUpdateOverride(float deltaTime) override;
+	void OnDestroyOverride() override;
 	void Flush();
 
 	void Initialize(const SpriteRenderTemplate& renderTemplate) { m_template = renderTemplate; m_isConfigured = true; m_isProxyDirty = true; }

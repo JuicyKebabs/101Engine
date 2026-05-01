@@ -3,7 +3,7 @@
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
 
-void SpriteRenderer::OnStart()
+void SpriteRenderer::OnStartOverride()
 {
 	// Register this component to the renderer system
 	auto owner = GetOwner();
@@ -18,19 +18,19 @@ void SpriteRenderer::OnStart()
 	}
 }
 
-void SpriteRenderer::PreUpdate(float deltaTime)
+void SpriteRenderer::PreUpdateOverride(float deltaTime)
 {
 }
 
-void SpriteRenderer::Update(float deltaTime)
+void SpriteRenderer::UpdateOverride(float deltaTime)
 {
 }
 
-void SpriteRenderer::LateUpdate(float deltaTime)
+void SpriteRenderer::LateUpdateOverride(float deltaTime)
 {
 }
 
-void SpriteRenderer::OnDestroy()
+void SpriteRenderer::OnDestroyOverride()
 {
 	// Unregister this component from the renderer system
 	auto owner = GetOwner();
@@ -64,7 +64,7 @@ void SpriteRenderer::RebuildRenderProxy(const CameraInfo& cameraInfo)
 {
 	auto owner = GetOwner();
 	if (owner) {
-		auto transform = owner->GetTransform();
+		auto transform = owner->GetComponentByClass<Transform>();
 		if (transform) {
 			m_proxy.position = transform->GetWorldPosition();
 			m_proxy.color = m_color;
@@ -98,7 +98,7 @@ void SpriteRenderer::CheckIfTransformChanged()
 {
 	auto owner = GetOwner();
 	if (owner) {
-		auto transform = owner->GetTransform();
+		auto transform = owner->GetComponentByClass<Transform>();
 		if (transform) {
 			uint64_t currentGeneration = transform->GetWorldGeneration();
 			if (m_transformGeneration != currentGeneration) {

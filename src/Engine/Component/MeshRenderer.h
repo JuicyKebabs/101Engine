@@ -22,14 +22,28 @@ struct MeshRendererProxy
 class MeshRenderer : public Component
 {
 public:
-	MeshRenderer(const std::string& name = "MeshRenderer") : Component(name) {}
-	~MeshRenderer() = default;
+	struct InitDesc : public Component::InitDesc
+	{
+		std::vector<SubmeshRenderTemplate> templates;	// Render templates for each mesh to be drawn (contains mesh data, texture info, and rendering settings)
+		InitDesc(std::string name = "MeshRenderer") : Component::InitDesc(name) {}
+		InitDesc(const std::vector<SubmeshRenderTemplate>& templates, const std::string& name = "MeshRenderer")
+			: Component::InitDesc(name), templates(templates) {}
+	};
 
-	void OnStart() override;
-	void PreUpdate(float deltaTime) override;
-	void Update(float deltaTime) override;
-	void LateUpdate(float deltaTime) override;
-	void OnDestroy() override;
+public:
+	MeshRenderer() = default;
+	~MeshRenderer() = default;
+	void Init(const InitDesc& desc) {
+		m_templates = desc.templates;
+		m_isConfigured = true;
+		Component::Init(desc);
+	}
+
+	void OnStartOverride() override;
+	void PreUpdateOverride(float deltaTime) override;
+	void UpdateOverride(float deltaTime) override;
+	void LateUpdateOverride(float deltaTime) override;
+	void OnDestroyOverride() override;
 	void Flush();
 
 	void SetColor(const Vector4& color) { m_color = color; m_isProxyDirty = true; }
@@ -41,8 +55,6 @@ public:
 
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
 	const MeshRendererProxy& GetRenderProxy();
-
-	void Initialize(std::vector<SubmeshRenderTemplate> templates);	// Initialize the render templates
 
 private:
 	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn (contains mesh data, texture info, and rendering settings)

@@ -7,15 +7,32 @@
 class Transform : public Component
 {
 public:
-	Transform(Vector3 localPosition, Vector3 localEulerDeg, Vector3 localScale, const std::string& name = "Transform");
+	struct InitDesc : public Component::InitDesc
+	{
+		Vector3 localPosition;
+		Vector3 localEulerDeg;
+		Vector3 localScale;
+		InitDesc(std::string name = "Transform") : Component::InitDesc(name) {}
+		InitDesc(Vector3 localPosition, Vector3 localEulerDeg, Vector3 localScale, std::string name = "Transform")
+			: Component::InitDesc(name), localPosition(localPosition), localEulerDeg(localEulerDeg), localScale(localScale) {}
+	};
+
+public:
+	Transform() = default;
 	virtual ~Transform() = default;
+	void Init(const InitDesc& desc) {
+		m_localTransform.position = desc.localPosition;
+		m_localTransform.rotation = Quaternion::CreateFromEulerDeg(desc.localEulerDeg);
+		m_localTransform.scale = desc.localScale;
+		Component::Init(desc);
+	}
 
 	// Overrides
-	void OnStart() override;
-	void PreUpdate(float deltaTime) override;
-	void Update(float deltaTime) override {};
-	void LateUpdate(float deltaTime) override;
-	void OnDestroy() override;
+	void OnStartOverride() override;
+	void PreUpdateOverride(float deltaTime) override;
+	void UpdateOverride(float deltaTime) override {};
+	void LateUpdateOverride(float deltaTime) override;
+	void OnDestroyOverride() override;
 
 	// Dirty flag
 	void MarkDirty();	// Mark the local transform as dirty (has been modified since last world transform update)

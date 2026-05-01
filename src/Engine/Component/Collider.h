@@ -55,7 +55,7 @@ struct AABB
 class Collider : public Component
 {
 public:
-	struct InitDesc
+	struct InitDesc : public Component::InitDesc
 	{
 		Vector3 localCenter = Vector3(0, 0, 0);				// Local center position
 		Quaternion localRotation = Quaternion::Identity();	// Local rotation
@@ -63,19 +63,29 @@ public:
 		ColliderType type = ColliderType::None;				// Collider type
 		CollisionLayer layer = CollisionLayer::Default;		// Collision layer
 		bool isTrigger = false;								// Trigger flag (whether to ignore physical collisions)
+		InitDesc(std::string name = "Collider") : Component::InitDesc(name) {}
+		InitDesc(Vector3 localCenter, Quaternion localRotation, Vector3 localScale, ColliderType type, CollisionLayer layer, bool isTrigger, const std::string& name = "Collider")
+			: Component::InitDesc(name), localCenter(localCenter), localRotation(localRotation), localScale(localScale), type(type), layer(layer), isTrigger(isTrigger) {
+		}
 	};
 
 public:
-	Collider(const std::string& name = "collider") : Component(name) {};
+	Collider() = default;
 	~Collider() = default;
+	void Init(const InitDesc& desc) {
+		m_localTransform = { desc.localCenter, desc.localRotation, desc.localScale };
+		m_type = desc.type;
+		m_layer = desc.layer;
+		m_isTrigger = desc.isTrigger;
+		m_layerMask = MakeLayerMask(m_layer);
+		Component::Init(desc);
+	}
 
-	void Initialize(const InitDesc& desc);
-
-	void OnStart() override;
-	void PreUpdate(float deltaTime) override;
-	void Update(float deltaTime) override;
-	void LateUpdate(float deltaTime) override;
-	void OnDestroy() override;
+	void OnStartOverride() override;
+	void PreUpdateOverride(float deltaTime) override;
+	void UpdateOverride(float deltaTime) override;
+	void LateUpdateOverride(float deltaTime) override;
+	void OnDestroyOverride() override;
 	void Flush();
 
 	void AddCollisionInfo(const CollisionInfo& info) { m_collisionInfos.push_back(info); };	//衝突情報追加
@@ -138,7 +148,7 @@ private:
 
 	Vector3 m_scaleOffset;	//オブジェクトとのサイズ差
 
-	ACTOR_TAG m_ownerTag;				//所有者オブジェクトのタグ
+	ACTOR_TAG m_ownerTag = ACTOR_TAG::NONE;	//所有者オブジェクトのタグ
 
 	bool m_isActive = true;
 	bool m_isDetected = false;	//衝突検知フラグ（描画用）

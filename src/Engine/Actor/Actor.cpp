@@ -12,14 +12,6 @@
 using namespace DirectX;
 
 
-// Constructor
-Actor::Actor(Vector3 position, Vector3 rotation, Vector3 scale, bool isActive,  ACTOR_TAG tag) : 
-	m_isActive(isActive), m_tag(tag)
-{
-	//Add TransformComponent by default
-	m_pTransform = AddComponent<Transform>(position, rotation, scale);
-}
-
 // Destructor
 Actor::~Actor()
 {
@@ -38,13 +30,9 @@ void Actor::PreUpdate(float deltaTime)
 
 	// Post-update all components
 	for (const auto& component : m_componentPtrs) {
-		// if component is destoryed, skip to next
-		if (component->IsDestroyed()) continue;
-
 		// If the component has not been started, call OnStart and mark it as started
-		if(!component->IsStarted()) {
-			component->OnStart();
-			component->MarkAsStarted();
+		if (!component->IsStarted()) { 
+			component->OnStart(); 
 		}
 
 		// Call PostUpdate for each component
@@ -56,10 +44,7 @@ void Actor::PreUpdate(float deltaTime)
 void Actor::Update(float deltaTime)
 {
 	// Update all components
-	for (const auto& component : m_componentPtrs) {
-		if (component->IsDestroyed()) continue;
-		component->Update(deltaTime);
-	}
+	for (const auto& component : m_componentPtrs) { component->Update(deltaTime); }
 }
 
 // Late update
@@ -97,8 +82,9 @@ bool Actor::IsDestroyed()
 // Update world transform of this actor and all child actors;
 void Actor::FlushTransform()
 {
-	if (m_pTransform) {
-		m_pTransform->UpdateGeometry();
+	auto pTransform = GetComponentByClass<Transform>();
+	if (pTransform && pTransform->IsInitialized()) {
+		pTransform->UpdateGeometry();
 	}
 }
 
@@ -106,7 +92,7 @@ void Actor::FlushColliderTransforms()
 {
 	auto colliders = GetComponentsByClass<Collider>();
 	for (auto& collider : colliders) {
-		collider->Flush();
+		if(collider->IsInitialized()) collider->Flush();
 	}
 }
 

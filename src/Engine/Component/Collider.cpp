@@ -3,18 +3,7 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Core/Debug/Debug.h"
 
-using namespace DirectX;
-
-void Collider::Initialize(const InitDesc& desc)
-{
-	m_localTransform = { desc.localCenter, desc.localRotation, desc.localScale };
-	m_type = desc.type;
-	m_layer = desc.layer;
-	m_isTrigger = desc.isTrigger;
-	m_layerMask = MakeLayerMask(m_layer);
-}
-
-void Collider::OnStart()
+void Collider::OnStartOverride()
 {
 	m_layerMask = MakeLayerMask(m_layer);
 
@@ -38,21 +27,21 @@ void Collider::OnStart()
 	}
 }
 
-void Collider::PreUpdate(float deltaTime)
+void Collider::PreUpdateOverride(float deltaTime)
 {
 }
 
 //コライダー変換更新
-void Collider::Update(float deltaTime)
+void Collider::UpdateOverride(float deltaTime)
 {
 }
 
-void Collider::LateUpdate(float deltaTime)
+void Collider::LateUpdateOverride(float deltaTime)
 {
 	RefreshWorldTransform();
 }
 
-void Collider::OnDestroy()
+void Collider::OnDestroyOverride()
 {
 	m_isActive = false;
 	m_deleteFlag = true;
@@ -256,7 +245,7 @@ void Collider::ChackIfTransformChanged()
 {
 	auto owner = GetOwner();
 	if (owner) {
-		auto transform = owner->GetTransform();
+		auto transform = owner->GetComponentByClass<Transform>();
 		if (transform) {
 			uint64_t currentGeneration = transform->GetWorldGeneration();
 			if (m_transformGeneration != currentGeneration) {
@@ -279,7 +268,7 @@ void Collider::RefreshWorldTransform()
 		DBG("Collider : Owner actor is null.");
 		return;
 	}
-	auto ownerTransform = owner->GetTransform();
+	auto ownerTransform = owner->GetComponentByClass<Transform>();
 	if (!ownerTransform)
 	{
 		DBG("Collider : Owner transform form is null.");
@@ -317,7 +306,7 @@ void Collider::UpdateSphereCollider(Vector3 ownerScale)
 	m_currentSphereCollider.center = m_worldTransformCurrent.position;	//球コライダー中心点更新
 
 	//スケール反映
-	XMFLOAT3 scale =
+	Vector3 scale =
 	{
 		ownerScale.x * m_localTransform.scale.x,
 		ownerScale.y * m_localTransform.scale.y,
@@ -338,7 +327,7 @@ void Collider::UpdateSphereCollider(Vector3 ownerScale)
 void Collider::UpdateCapsuleCollider(Vector3 ownerScale)
 {
 	//スケール反映
-	const XMFLOAT3 scale = 
+	const Vector3 scale = 
 	{
 		ownerScale.x * m_localTransform.scale.x,
 		ownerScale.y * m_localTransform.scale.y,

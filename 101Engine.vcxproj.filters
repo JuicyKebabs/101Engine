@@ -239,6 +239,9 @@
     <ClCompile Include="src\Engine\Component\Collider.cpp">
       <Filter>src\Engine\Component</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Actor\ActorFactory.cpp">
+      <Filter>src\Engine\Actor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -410,6 +413,12 @@
       <Filter>src\Engine\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\Component\Collider.h">
+      <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Actor\ActorFactory.h">
+      <Filter>src\Engine\Actor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\RectTransform.h">
       <Filter>src\Engine\Component</Filter>
     </ClInclude>
   </ItemGroup>

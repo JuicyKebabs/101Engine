@@ -4,6 +4,7 @@
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Actor/ActorFactory.h"
 #include "Game/CameraTest.h"
 
 // Constructor
@@ -14,8 +15,11 @@ SceneBase::SceneBase(float window_width, float window_height)
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 
 	// Create default camera actor and set it as the main camera actor
-	auto defaultCameraActor = AddActor<Actor>();
-	auto camera = defaultCameraActor->AddComponent<Camera>(window_width, window_height);
+	Actor::InitDesc cameraInitDesc;
+	cameraInitDesc.name = "DefaultCamera";
+	auto defaultCameraActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, cameraInitDesc));
+	auto camera = defaultCameraActor->GetComponentByClass<Camera>();
+	camera->Init(Camera::InitDesc(window_width, window_height));
 	m_pCameraSystem->SetMainCamera(camera);
 }
 
