@@ -59,7 +59,7 @@ public:
 	bool IsActive() const { return m_isActive; }					// Get active status
 	bool IsInitialized() const { return m_isInitialized; }			// Check if the actor has been initialized (Init function has been called at least once)
 	Actor* GetParent() const { return m_pParent; }					// Get parent actor
-	std::vector<Actor*> GetChildren() const { return m_children; }	// Get child actors
+	std::vector<Actor*> GetChildren() const;
 
 	// Add a component of type T to the container
 	template<class T, class... Args>
@@ -147,6 +147,8 @@ public:
 	template<class T>
 	T* GetComponentByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
+		
+		// Exact type match search
 		auto typeId = GetComponentTypeId<T>();
 		auto it = m_components.find(typeId);
 		if (it != m_components.end() && !it->second.instances.empty()) {
@@ -163,6 +165,23 @@ public:
 				}
 			}
 		}
+
+		// Inheritance search
+		for (auto& [id, bucket] : m_components) {
+			if (id == typeId) continue;
+			for(const auto& instance : bucket.instances) {
+				if (auto casted = dynamic_cast<T*>(instance.get())) {
+					return casted;
+				}
+			}
+		}
+		for(auto& pending : m_pendingComponents) {
+			if (pending.typeId == typeId) continue;
+			if (auto casted = dynamic_cast<T*>(pending.instance.get())) {
+				return casted;
+			}
+		}
+
 		return nullptr;
 	}
 
@@ -170,6 +189,8 @@ public:
 	template<class T>
 	std::vector<T*> GetComponentsByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
+		
+		// Exact type match search
 		auto it = m_components.find(GetComponentTypeId<T>());
 		std::vector<T*> result;
 		if(it != m_components.end() && !it->second.instances.empty()) {
@@ -185,6 +206,22 @@ public:
 					 result.push_back(casted);
 				 }
 			 }
+		}
+
+		// Inheritance search
+		for (auto& [id, bucket] : m_components) {
+			if (id == GetComponentTypeId<T>()) continue;
+			for(const auto& instance : bucket.instances) {
+				if (auto casted = dynamic_cast<T*>(instance.get())) {
+					result.push_back(casted);
+				}
+			}
+		}
+		for(auto& pending : m_pendingComponents) {
+			if (pending.typeId == GetComponentTypeId<T>()) continue;
+			if (auto casted = dynamic_cast<T*>(pending.instance.get())) {
+				result.push_back(casted);
+			}
 		}
 		return result;
 	}

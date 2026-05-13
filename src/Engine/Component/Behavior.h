@@ -15,9 +15,7 @@ public:
 public:
 	Behavior() = default;
 	virtual ~Behavior() = default;
-	void Init(const InitDesc& desc) {
-		Component::Init(desc);
-	}
+	void Init(const InitDesc& desc = InitDesc()) { Component::Init(desc); }
 
 	void OnStartOverride() override { OnStartBehavior(); }
 	void PreUpdateOverride(float deltaTime) override { PreUpdateBehavior(); }

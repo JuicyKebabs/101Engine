@@ -6,8 +6,8 @@
 class GameScene : public SceneBase
 {
 public:	// Public functions
-	GameScene(float window_width, float window_height);	// Constructor
-	~GameScene();										// Destructor
+	GameScene();	// Constructor
+	~GameScene();	// Destructor
 private:
 	void InitializeOverride(EngineContext& context) override;	// Initialization (override in derived class)
 };

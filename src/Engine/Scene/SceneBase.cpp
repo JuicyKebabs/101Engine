@@ -8,7 +8,7 @@
 #include "Game/CameraTest.h"
 
 // Constructor
-SceneBase::SceneBase(float window_width, float window_height)
+SceneBase::SceneBase()
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>();
 	m_pRenderSystem = std::make_unique<RenderSystem>();
@@ -18,8 +18,9 @@ SceneBase::SceneBase(float window_width, float window_height)
 	Actor::InitDesc cameraInitDesc;
 	cameraInitDesc.name = "DefaultCamera";
 	auto defaultCameraActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, cameraInitDesc));
+	defaultCameraActor->GetComponentByClass<Transform>()->Init(Transform::InitDesc(Vector3{ 0,0,-5 }));
 	auto camera = defaultCameraActor->GetComponentByClass<Camera>();
-	camera->Init(Camera::InitDesc(window_width, window_height));
+	camera->Init(Camera::InitDesc(WindowInfo::GetInstance().GetWidth(), WindowInfo::GetInstance().GetHeight()));
 	m_pCameraSystem->SetMainCamera(camera);
 }
 

@@ -12,15 +12,14 @@ public:
 		Vector3 localPosition;
 		Vector3 localEulerDeg;
 		Vector3 localScale;
-		InitDesc(std::string name = "Transform") : Component::InitDesc(name) {}
-		InitDesc(Vector3 localPosition, Vector3 localEulerDeg, Vector3 localScale, std::string name = "Transform")
+		InitDesc(Vector3 localPosition = Vector3::Zero(), Vector3 localEulerDeg = Vector3::Zero(), Vector3 localScale = Vector3::One(), std::string name = "Transform")
 			: Component::InitDesc(name), localPosition(localPosition), localEulerDeg(localEulerDeg), localScale(localScale) {}
 	};
 
 public:
 	Transform() = default;
 	virtual ~Transform() = default;
-	void Init(const InitDesc& desc) {
+	void Init(const InitDesc& desc = InitDesc()) {
 		m_localTransform.position = desc.localPosition;
 		m_localTransform.rotation = Quaternion::CreateFromEulerDeg(desc.localEulerDeg);
 		m_localTransform.scale = desc.localScale;
@@ -93,10 +92,10 @@ public:
 	Vector3 InverseTransformPoint(Vector3 worldPoint) const;			// Transform a point from world space to local space
 	Vector3 InverseTransformDirection(Vector3 worldDirection) const;	// Transform a direction from world space to local space (ignoring position)
 
-	void UpdateGeometry();					// Update world transform based on local transform and parent's world transform
+	virtual void UpdateGeometry();			// Update world transform based on local transform and parent's world transform
 	uint64_t GetWorldGeneration() const;	// Get world transform generation counter (incremented every time world transform is updated)
 
-private:
+protected:
 	Transform3D m_localTransform{};	// Local transform data (position, rotation, scale)
 	Transform3D m_worldTransform{};	// World transform data (position, rotation, scale)
 	Matrix4x4 m_localMatrix{};		// Local transformation matrix

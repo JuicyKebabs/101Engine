@@ -13,8 +13,7 @@
 using namespace DirectX;
 
 // Constructor
-GameScene::GameScene(float window_width, float window_height)
-	: SceneBase(window_width, window_height)
+GameScene::GameScene() : SceneBase()
 {
 }
 
@@ -48,7 +47,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 
     auto modelActor = AddActor(ActorFactory::CreateActor(ActorType::Mesh, Actor::InitDesc()));
 	modelActor->GetComponentByClass<Transform>()->Init(Transform::InitDesc(Vector3{5.0f, 0.0f, 0.0f}, Vector3{ 0.0f, 0.0f, 0.0f }, Vector3{ 1.0f, 1.0f, 1.0f }));
-	modelActor->AddComponent<PlayerBehavior>();
+	modelActor->AddComponent<PlayerBehavior>()->Init();
 	auto modelMesh = modelActor->GetComponentByClass<MeshRenderer>();
 	modelMesh->Init(
 		RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(
@@ -62,7 +61,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 
 
     auto groundActor = AddActor(ActorFactory::CreateActor(ActorType::Mesh, Actor::InitDesc()));
-	groundActor->GetComponentByClass<Transform>()->Init(Transform::InitDesc(Vector3{ 0.0f, -10.0f, 0.0f }, Vector3{ 50.0f, 0.0f, 50.0f }, Vector3{ 1.0f, 1.0f, 1.0f }));
+	groundActor->GetComponentByClass<Transform>()->Init(Transform::InitDesc(Vector3{ 0.0f, -5.0f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }, Vector3{ 50.0f, 1.0f, 50.0f }));
 	auto groundMesh = groundActor->GetComponentByClass<MeshRenderer>();
 	groundMesh->Init(
 		RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(
@@ -79,8 +78,9 @@ void GameScene::InitializeOverride(EngineContext& context)
 	groundActor->AddComponent<Collider>()->Init(groundColliderDesc);
 
 	auto cameraTestActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, Actor::InitDesc()));
-	auto camera = cameraTestActor->AddComponent<Camera>();
-	camera->Init(Camera::InitDesc(1920.0f, 1080.0f));
+	cameraTestActor->GetComponentByClass<Camera>()->Init(Camera::InitDesc(1920.0f, 1080.0f));
+	cameraTestActor->GetComponentByClass<Transform>()->Init(Transform::InitDesc(Vector3(0,0,-6)));
+	cameraTestActor->AddComponent<CameraTest>()->Init();
 	//camera->SetRotationMode(CAMERA_ROTATION_MODE::ROTATION_MODE_LOOK_AT_TARGET);
 	//camera->SetTargetActor(playerActor);
 }

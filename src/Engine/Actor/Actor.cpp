@@ -79,6 +79,18 @@ bool Actor::IsDestroyed()
 	return m_destroyed;
 }
 
+// Get child actors by recursively traversing the hierarchy
+std::vector<Actor*> Actor::GetChildren() const
+{
+	std::vector<Actor*> result;
+	for (auto& child : m_children) {
+		result.push_back(child);
+		auto childChildren = child->GetChildren();
+		result.insert(result.end(), childChildren.begin(), childChildren.end());
+	}
+	return result;
+}
+
 // Update world transform of this actor and all child actors;
 void Actor::FlushTransform()
 {

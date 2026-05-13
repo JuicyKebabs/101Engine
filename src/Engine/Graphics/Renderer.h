@@ -45,6 +45,9 @@ public:
 	void RenderShadowMap(ID3D12GraphicsCommandList* p_commandList);							// Render shadow map (if needed)
 	void RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t shadowMapSrvIndex);	// Render the scene using submitted draw packets
 	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input);	// Render a full-screen pass (for post-processing)
+	void RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList);						// Render screen space draw packet (to avoid post effect)
+
+
 	void SubmitFrameRenderData(const FrameRenderData& frameRenderData);	// Submit draw packets
 	void SubmitCameraInfo(const CameraInfo& cameraInfo);				// Submit camera information for this frame
 	void SubmitDirectionalLight(const DirectionalLight& light);			// Directional light information
@@ -70,6 +73,7 @@ private:
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshForShadowCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_uiCB;
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light
@@ -81,7 +85,9 @@ private:
 private:
 	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare);			// Render a mesh
 	void RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex);					// Render a mesh for shadow map
-	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemINdex, PSOKey& compare);		// Render a sprite
+	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare);		// Render a sprite
+	void RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare);				// Render a UI element
+
 
 	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
 	std::shared_ptr<PipelineState> CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object

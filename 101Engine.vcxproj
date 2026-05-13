@@ -161,6 +161,8 @@
     <ClCompile Include="src\Engine\Component\Collider.cpp" />
     <ClCompile Include="src\Engine\Component\Component.cpp" />
     <ClCompile Include="src\Engine\Component\MeshRenderer.cpp" />
+    <ClCompile Include="src\Engine\Component\RectTransform.cpp" />
+    <ClCompile Include="src\Engine\Component\RendererComponent.cpp" />
     <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp" />
     <ClCompile Include="src\Engine\Component\Transform.cpp" />
     <ClCompile Include="src\Engine\Core\Math\Math.cpp" />
@@ -193,8 +195,8 @@
     <ClCompile Include="src\Engine\Scene\SceneBase.cpp" />
     <ClCompile Include="src\Engine\Scene\SceneManager.cpp" />
     <ClCompile Include="src\Engine\UI\Canvas.cpp" />
-    <ClCompile Include="src\Engine\UI\UIBase.cpp" />
-    <ClCompile Include="src\Engine\UI\UIimage.cpp" />
+    <ClCompile Include="src\Engine\UI\UIRenderer.cpp" />
+    <ClCompile Include="src\Engine\UI\UIImage.cpp" />
     <ClCompile Include="src\Game\CameraTest.cpp" />
     <ClCompile Include="src\Game\GameScene.cpp" />
     <ClCompile Include="src\Game\Player.cpp" />
@@ -216,6 +218,7 @@
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h" />
     <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
     <ClInclude Include="src\Engine\Component\RectTransform.h" />
+    <ClInclude Include="src\Engine\Component\RendererComponent.h" />
     <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
     <ClInclude Include="src\Engine\Component\Transform.h" />
     <ClInclude Include="src\Engine\Core\ComPtr\ComPtr.h" />
@@ -254,8 +257,9 @@
     <ClInclude Include="src\Engine\Scene\SceneBase.h" />
     <ClInclude Include="src\Engine\Scene\SceneManager.h" />
     <ClInclude Include="src\Engine\UI\Canvas.h" />
-    <ClInclude Include="src\Engine\UI\UIBase.h" />
-    <ClInclude Include="src\Engine\UI\UIimage.h" />
+    <ClInclude Include="src\Engine\UI\UIRenderer.h" />
+    <ClInclude Include="src\Engine\UI\UIImage.h" />
+    <ClInclude Include="src\Engine\Window\WindowInfo.h" />
     <ClInclude Include="src\Game\CameraTest.h" />
     <ClInclude Include="src\Game\GameScene.h" />
     <ClInclude Include="src\Game\Player.h" />

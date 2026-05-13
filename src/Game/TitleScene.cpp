@@ -8,8 +8,7 @@
 using namespace DirectX;
 
 // Constructor
-TitleScene::TitleScene(float window_width, float window_height)
-	: SceneBase(window_width, window_height)
+TitleScene::TitleScene() : SceneBase()
 {
 }
 

@@ -99,6 +99,9 @@
     <Filter Include="shader\PixelShader">
       <UniqueIdentifier>{3c9013ff-8876-41c5-925c-6dd164a6d4ca}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Window">
+      <UniqueIdentifier>{6efa6eac-94bf-444f-97d2-f97b31623b1e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\App\App.cpp">
@@ -179,10 +182,10 @@
     <ClCompile Include="src\Engine\UI\Canvas.cpp">
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\UI\UIBase.cpp">
+    <ClCompile Include="src\Engine\UI\UIRenderer.cpp">
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\UI\UIimage.cpp">
+    <ClCompile Include="src\Engine\UI\UIImage.cpp">
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\GameScene.cpp">
@@ -241,6 +244,12 @@
     </ClCompile>
     <ClCompile Include="src\Engine\Actor\ActorFactory.cpp">
       <Filter>src\Engine\Actor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Component\RendererComponent.cpp">
+      <Filter>src\Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Component\RectTransform.cpp">
+      <Filter>src\Engine\Component</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -343,10 +352,10 @@
     <ClInclude Include="src\Engine\UI\Canvas.h">
       <Filter>src\Engine\UI</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\UI\UIBase.h">
+    <ClInclude Include="src\Engine\UI\UIRenderer.h">
       <Filter>src\Engine\UI</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\UI\UIimage.h">
+    <ClInclude Include="src\Engine\UI\UIImage.h">
       <Filter>src\Engine\UI</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\GameScene.h">
@@ -420,6 +429,12 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Component\RectTransform.h">
       <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\RendererComponent.h">
+      <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Window\WindowInfo.h">
+      <Filter>src\Window</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

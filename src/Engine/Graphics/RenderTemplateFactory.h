@@ -32,7 +32,6 @@ struct SubmeshRenderTemplate
 	MeshDesc meshDesc;			// Mesh data and rendering settings
 	MaterialDesc materialDesc;	// Material information and rendering settings
 };
-
 using MeshRenderTemplate = std::vector<SubmeshRenderTemplate>;	// Alias for a render template consisting of multiple submesh templates
 
 // Render template structure for a sprite
@@ -41,6 +40,13 @@ struct SpriteRenderTemplate
 	MaterialDesc materialDesc;							// Material description for the sprite
 	BillboardType billboardType = BillboardType::None;	// Billboard type for the sprite
 };
+
+// Render template structure for a UI element
+struct UIRenderElement
+{
+	MaterialDesc materialDesc;							// Material description for the UI element
+};
+using UIRenderTemplate = std::vector<UIRenderElement>;	// Alias for a render template consisting of multiple UI elements
 
 // Material input structure for creating material descriptions
 struct MaterialInput
@@ -82,6 +88,17 @@ public:
 		const MaterialInput& materialInput,
 		BillboardType billboardType
 	);
+
+	static UIRenderTemplate CreateUIImageRenderTemplate(
+		TextureManager& textureManager,
+		const MaterialInput& materialInput
+	);
+
+	//static UIRenderTemplate CreateUITextTemplate(
+	//	GpuTexture* fontAtlas,
+	//	const std::vector<GlyphInfo>& glyphs,
+	//	const Vector4& color
+	//);
 
 	static MaterialDesc BuildMaterialDesc(
 		TextureManager& textureManager,

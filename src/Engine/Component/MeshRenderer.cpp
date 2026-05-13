@@ -45,11 +45,6 @@ void MeshRenderer::OnDestroyOverride()
 	}
 }
 
-void MeshRenderer::Flush()
-{
-	CheckIfTransformChanged();
-}
-
 const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 {
 	if (m_isProxyDirty)
@@ -66,25 +61,10 @@ void MeshRenderer::RebuildRenderProxy()
 	if (owner) {
 		auto transform = owner->GetComponentByClass<Transform>();
 		if (transform) {
-			m_proxy.position = transform->GetWorldPosition();
-			m_proxy.worldMatrix = transform->GetWorldMatrix();
-			m_proxy.color = m_color;
-			m_proxy.visible = m_isVisible;
-		}
-	}
-}
-
-void MeshRenderer::CheckIfTransformChanged()
-{
-	auto owner = GetOwner();
-	if (owner) {
-		auto transform = owner->GetComponentByClass<Transform>();
-		if (transform) {
-			uint64_t currentGeneration = transform->GetWorldGeneration();
-			if(m_transformGeneration != currentGeneration) {
-				m_transformGeneration = currentGeneration;
-				m_isProxyDirty = true;
-			}
+			m_proxy.common.position = transform->GetWorldPosition();
+			m_proxy.common.worldMatrix = transform->GetWorldMatrix();
+			m_proxy.common.color = m_color;
+			m_proxy.common.visible = m_isVisible;
 		}
 	}
 }

@@ -23,11 +23,7 @@ public:
 		m_isInitialized = true;
 	}
 
-	void OnStart() { 
-		if (m_isInitialized) { 
-		OnStartOverride(); 
-		MarkAsStarted(); 
-		} }							// Call OnStartOverride if not already started
+	void OnStart() { if (m_isInitialized) { OnStartOverride(); MarkAsStarted(); } }							// Call OnStartOverride if not already started
 	void PreUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) PreUpdateOverride(deltaTime); }	// Call PreUpdateOverride if started and not destroyed
 	void Update(float deltaTime) { if (IsStarted() && !IsDestroyed()) UpdateOverride(deltaTime); }			// Call UpdateOverride if started and not destroyed
 	void LateUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) LateUpdateOverride(deltaTime); }	// Call LateUpdateOverride if started and not destroyed

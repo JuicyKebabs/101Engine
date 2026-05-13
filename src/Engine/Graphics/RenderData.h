@@ -252,6 +252,7 @@ enum class RenderQueue
 	Opaque = 0,
 	Additive = 1,
 	Transparent = 2,
+	Screenspace = 3,
 };
 
 // Helper function to determine render queue based on blend mode
@@ -269,7 +270,7 @@ enum class BillboardType
 {
 	None,			//ビルボードなし
 	Spherical,		//全軸ビルボード
-	Cylindirical,	//円柱ビルボード
+	Cylindrical,	//円柱ビルボード
 };
 
 //=======================================================================================================
