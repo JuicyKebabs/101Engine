@@ -7,23 +7,22 @@
 class Transform : public Component
 {
 public:
-	struct InitDesc : public Component::InitDesc
+	struct ParamDesc
 	{
-		Vector3 localPosition;
-		Vector3 localEulerDeg;
-		Vector3 localScale;
-		InitDesc(Vector3 localPosition = Vector3::Zero(), Vector3 localEulerDeg = Vector3::Zero(), Vector3 localScale = Vector3::One(), std::string name = "Transform")
-			: Component::InitDesc(name), localPosition(localPosition), localEulerDeg(localEulerDeg), localScale(localScale) {}
+		Vector3 localPosition = Vector3::Zero();	// Local position relative to parent
+		Vector3 localEulerDeg = Vector3::Zero();	// Local rotation in Euler angles
+		Vector3 localScale = Vector3::One();		// Local scale relative to parent
+		std::string name = "Transform";				// Component name (optional, can be used for debugging or identification)
 	};
 
 public:
 	Transform() = default;
 	virtual ~Transform() = default;
-	void Init(const InitDesc& desc = InitDesc()) {
+	void SetParams(const ParamDesc& desc) {
 		m_localTransform.position = desc.localPosition;
 		m_localTransform.rotation = Quaternion::CreateFromEulerDeg(desc.localEulerDeg);
 		m_localTransform.scale = desc.localScale;
-		Component::Init(desc);
+		SetName(desc.name);
 	}
 
 	// Overrides

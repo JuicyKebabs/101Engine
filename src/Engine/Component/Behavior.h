@@ -7,15 +7,8 @@
 class Behavior : public Component
 {
 public:
-	struct InitDesc : public Component::InitDesc
-	{
-		InitDesc(const std::string& name = "Behavior") : Component::InitDesc(name) {}
-	};
-
-public:
 	Behavior() = default;
 	virtual ~Behavior() = default;
-	void Init(const InitDesc& desc = InitDesc()) { Component::Init(desc); }
 
 	void OnStartOverride() override { OnStartBehavior(); }
 	void PreUpdateOverride(float deltaTime) override { PreUpdateBehavior(); }

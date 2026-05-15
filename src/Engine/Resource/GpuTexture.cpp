@@ -1,6 +1,6 @@
 #include "Engine/Resource/GpuTexture.h"
 
-void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allocator, const GpuTexture::InitDesc& desc)
+void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allocator, const GpuTexture::ParamDesc& desc)
 {
 	assert(!(desc.useDSV && desc.useUAV) &&"GpuTexture: DSV and UAV cannot be used together");
 	assert(!(desc.initialState == ResourceState::RenderTarget && !desc.useRTV) && "GpuTexture: InitialState::RenderTarget requires useRTV=true");

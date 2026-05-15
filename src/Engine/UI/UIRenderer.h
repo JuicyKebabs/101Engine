@@ -19,37 +19,8 @@ struct UIRendererProxy
 class UIRenderer : public RendererComponent
 {
 public:
-	struct InitDesc : public RendererComponent::InitDesc
-	{
-		Canvas* pCanvas = nullptr;		// Pointer to the canvas this UI element belongs to (used for sorting and rendering)
-		UIRenderTemplate renderTemplate;
-		UINT order = 0;
-		Vector4 color{ 1,1,1,1 };
-		Vector2 uvScale{ 1,1 };
-		Vector2 uvOffset{ 0,0 };
-		Vector2 pivot{ 0.5f, 0.5f };
-		bool flipX = false;
-		bool flipY = false;
-		InitDesc(const std::string& name = "UIRenderer") : RendererComponent::InitDesc(Vector4(1, 1, 1, 1), true, name) {}
-		InitDesc(Canvas* pCanvas, const UIRenderTemplate& renderTemplate, UINT order, const Vector4& color, const Vector2& uvScale, const Vector2& uvOffset, const Vector2& pivot, bool flipX, bool flipY, const std::string& name = "UIRenderer")
-			: RendererComponent::InitDesc(color, true, name), pCanvas(pCanvas), renderTemplate(renderTemplate), order(order), uvScale(uvScale), uvOffset(uvOffset), pivot(pivot), flipX(flipX), flipY(flipY) {}
-	};
-
-public:
 	UIRenderer() = default;
 	~UIRenderer() = default;
-	void Init(const InitDesc& desc) { 
-		assert(desc.pCanvas && "UIRenderer requires a valid Canvas pointer");
-		m_pCanvas = desc.pCanvas;
-		m_renderTemplate = desc.renderTemplate;
-		m_order = desc.order;
-		m_uvScale = desc.uvScale;
-		m_uvOffset = desc.uvOffset;
-		m_pivot = desc.pivot;
-		m_flipX = desc.flipX;
-		m_flipY = desc.flipY;
-		RendererComponent::Init(desc); 
-	}
 
 	// Setters
 	void SetCanvasOrder(UINT canvasOrder) { m_canvasOrder = canvasOrder; m_isProxyDirty = true; }
@@ -70,10 +41,11 @@ public:
 	bool IsFlipX() const { return m_flipX; }
 	bool IsFlipY() const { return m_flipY; }
 	bool IsVisible() const override;
+	bool IsConfigured() const override { return !m_renderTemplate.empty(); }	// Check if the renderer has been configured with necessary resources (at least one render template)
 
 	void OnCanvasDestroyed() { m_pCanvas = nullptr; }
 
-private:
+protected:
 	UIRenderTemplate m_renderTemplate;	// Render template containing static rendering information for this UI element
 	UIRendererProxy m_renderProxy;		// Render proxy containing dynamic rendering information for this UI element
 	bool m_isProxyDirty = true;			// Flag to indicate if the render proxy needs to be updated

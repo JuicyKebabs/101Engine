@@ -1,5 +1,6 @@
 #pragma once
 #include "Component.h"
+#include "Engine/Core/Math/Math.h"
 
 // Common render proxy structure for draw packets (Specific renderer component has this structure with additional fields as needed)
 struct CommonRendererProxy
@@ -14,25 +15,8 @@ struct CommonRendererProxy
 class RendererComponent : public Component
 {
 public:
-	// Structure for initializing
-	struct InitDesc : public Component::InitDesc
-	{
-		Vector4 color{ 1,1,1,1 };	// Color for rendering (can be used to tint the rendered object)
-		bool visible = true;		// Visibility flag for this renderer
-		InitDesc(const Vector4& color = Vector4(1,1,1,1), bool visible = true, const std::string& name = "RendererComponent")
-			: Component::InitDesc(name), color(color), visible(visible) {}
-	};
-
-public:
 	RendererComponent() = default;
 	~RendererComponent() = default;
-
-	// Initialize function by InitDesc
-	void Init(const InitDesc& desc) {
-		m_color = desc.color;
-		m_isVisible = desc.visible;
-		Component::Init(desc);
-	}
 
 	// Flush function to be called before rendering
 	void Flush() { CheckIfTransformChanged(); }
@@ -42,13 +26,13 @@ public:
 	void SetColor(const Vector4& color) { m_color = color; m_isProxyDirty = true; }
 
 	// Getters
-	virtual bool IsVisible() const { return m_isVisible; }
 	Vector4 GetColor() const { return m_color; }
+	virtual bool IsVisible() const { return m_isVisible; }
+	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources
 
 protected:
 	Vector4 m_color{ 1,1,1,1 };		// Color for rendering (can be used to tint the rendered object)
 	bool m_isVisible = true;		// Visibility flag for this renderer
-	bool m_isConfigured = false;	// Flag to check if the renderer has been configured with necessary data (e.g., render templates)
 
 	uint64_t m_transformGeneration = 0;	// Cached generation of the transform to detect changes
 	bool m_isProxyDirty = true;			// Flag to indicate if the render proxy needs to be rebuilt due to transform changes

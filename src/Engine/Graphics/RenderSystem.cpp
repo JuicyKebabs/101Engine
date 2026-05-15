@@ -67,7 +67,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 
 	// Build draw packets for mesh renderers
 	for (const auto& renderer : m_meshRenderers){
-		if (renderer->IsVisible() && renderer->IsInitialized())	// Skip invisible or unconfigured renderers
+		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
 		{
 			const auto& renderTemplates = renderer->GetRenderTemplates();
 			const auto& renderProxy = renderer->GetRenderProxy();
@@ -104,7 +104,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 	// Build draw packets for sprite renderers
 	for(const auto& renderer : m_spriteRenderers)
 	{
-		if (renderer->IsVisible() && renderer->IsInitialized())	// Skip invisible or unconfigured renderers
+		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
 		{
 			const auto& renderTemplate = renderer->GetRenderTemplate();
 			const auto& renderProxy = renderer->GetRenderProxy(m_cameraInfo);
@@ -138,7 +138,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 	// Build draw packets for UI renderers
 	for(const auto& renderer : m_uiRenderers)
 	{
-		if (renderer->IsVisible() && renderer->IsInitialized())	// Skip invisible or unconfigured renderers
+		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
 		{
 			const auto& renderTemplate = renderer->GetRenderTemplate();
 			const auto& renderProxy = renderer->GetRenderProxy();

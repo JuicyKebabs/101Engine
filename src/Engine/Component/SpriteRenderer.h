@@ -17,28 +17,35 @@ struct SpriteRendererProxy
 class SpriteRenderer : public RendererComponent
 {
 public:
-	struct InitDesc : public RendererComponent::InitDesc
+	struct ParamDesc
 	{
-		SpriteRenderTemplate renderTemplate;
-		Vector2 uvScale{ 1,1 };
-		Vector2 uvOffset{ 0,0 };
-		Vector2 pivot{ 0.5f, 0.5f };
-		BillboardType billboardType = BillboardType::None;
-		bool flipX = false;
-		bool flipY = false;
-		InitDesc(std::string name) : RendererComponent::InitDesc(Vector4(1,1,1,1), true, name) {}
-		InitDesc(const SpriteRenderTemplate& renderTemplate, const Vector2& uvScale, const Vector2& uvOffset, const Vector2& pivot, BillboardType billboardType, bool flipX, bool flipY, const std::string& name = "SpriteRenderer")
-			: RendererComponent::InitDesc(color, visible, name), renderTemplate(renderTemplate), uvScale(uvScale), uvOffset(uvOffset), pivot(pivot), billboardType(billboardType), flipX(flipX), flipY(flipY) {}
+		SpriteRenderTemplate renderTemplate;				// Render template for this sprite
+		Vector2 uvScale{ 1,1 };								// UV scale for texture mapping
+		Vector2 uvOffset{ 0,0 };							// UV offset for texture mapping
+		Vector2 pivot{ 0.5f, 0.5f };						// Pivot point for the sprite
+		BillboardType billboardType = BillboardType::None;	// Type of billboard to use for this sprite
+		bool flipX = false;									// Whether to flip the sprite horizontally
+		bool flipY = false;									// Whether to flip the sprite vertically
+		Vector4 color{ 1,1,1,1 };							// Color for rendering (can be used to tint the rendered object)
+		bool visible = true;								// Visibility flag for this renderer
+		std::string name = "SpriteRenderer";				// Component name (optional, can be used for debugging or identification)
 	};
 
 public:
 	SpriteRenderer() = default;
 	~SpriteRenderer() = default;
-	void Init(const InitDesc& desc) {
+	void SetParams(const ParamDesc& desc) {
 		m_template = desc.renderTemplate;
-		m_isConfigured = true;
 		m_isProxyDirty = true;
-		RendererComponent::Init(desc);
+		SetUVScale(desc.uvScale);
+		SetUVOffset(desc.uvOffset);
+		SetPivot(desc.pivot);
+		SetBillboardType(desc.billboardType);
+		SetFlipX(desc.flipX);
+		SetFlipY(desc.flipY);
+		SetColor(desc.color);
+		SetVisible(desc.visible);
+		SetName(desc.name);
 	}
 
 	// Setters
@@ -58,6 +65,7 @@ public:
 	BillboardType GetBillboardType() const { return m_billboardType; }
 	bool IsFlipX() const { return m_flipX; }
 	bool IsFlipY() const { return m_flipY; }
+	bool IsConfigured() const override { return m_template.materialDesc.textureHandle != InvalidTextureHandle; }	// Check if the render template is valid (has a texture)
 
 private:
 	Vector2 m_uvScale{ 1,1 };								// UV scale for texture mapping

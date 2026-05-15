@@ -228,7 +228,7 @@ void Renderer::RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList)
 	auto orthoProj = Matrix4x4::CreateOrthographic(
 		WindowInfo::GetInstance().GetWidth(), 
 		WindowInfo::GetInstance().GetHeight(), 
-		0.1f, 
+		-1.0f, 
 		100.0f);
 
 	// Set frame-level constants for screen space rendering
@@ -237,6 +237,17 @@ void Renderer::RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList)
 	framePtr->proj = orthoProj;
 	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_colorFrameCB->GetAddress());
+
+	// Allocate constant buffers for ui items
+	size_t totalUIItemCount = m_frameRenderData.GetUICount();
+	if (m_uiCB.size() < totalUIItemCount)
+	{
+		size_t toAllocate = totalUIItemCount - m_uiCB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_uiCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
+		}
+	}
 
 	PSOKey compare{};
 	int meshItemIndex = 0;

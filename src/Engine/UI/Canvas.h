@@ -13,22 +13,21 @@ public:
 		WorldSpace
 	};
 
-	struct InitDesc : Component::InitDesc {
+	struct ParamDesc {
 		RenderMode renderMode = RenderMode::ScreenSpace_Overlay;
 		UINT sortOrder = 0;
 		bool isVisible = true;
-		InitDesc(RenderMode renderMode = RenderMode::ScreenSpace_Overlay, UINT sortOrder = 0, bool isVisible = true, const std::string& name = "Canvas") 
-			: Component::InitDesc(name), renderMode(renderMode), sortOrder(sortOrder), isVisible(isVisible) {}
+		std::string name = "Canvas";
 	};
 
 public:
 	Canvas() = default;
 	~Canvas() = default;
-	void Init(const InitDesc& desc = InitDesc()) {
+	void Init(const ParamDesc& desc = ParamDesc()) {
 		m_renderMode = desc.renderMode;
 		m_sortOrder = desc.sortOrder;
 		m_isVisible = desc.isVisible;
-		Component::Init(desc);
+		SetName(desc.name);
 	}
 
 	// Setters

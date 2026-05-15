@@ -111,7 +111,7 @@ public:
 		}
 	}
 
-	struct InitDesc {
+	struct ParamDesc {
 		UINT width = 0;
 		UINT height = 0;
 
@@ -133,7 +133,7 @@ public:
 	GpuTexture() = default;
 	~GpuTexture() = default;
 
-	void Initialize(ID3D12Device* device, DescriptorHeapAllocator* allocator, const InitDesc& desc);
+	void Initialize(ID3D12Device* device, DescriptorHeapAllocator* allocator, const ParamDesc& desc);
 	void TransitionToState(ID3D12GraphicsCommandList* cmdList, ResourceState newState);
 
 	ID3D12Resource* GetResource() const { return m_pResource.Get(); }

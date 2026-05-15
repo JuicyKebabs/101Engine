@@ -8,19 +8,19 @@
 #include "Game/GameScene.h"
 
 // Constructor
-SceneManager::SceneManager(float windowWidth, float windowHeight)
+SceneManager::SceneManager()
 {
 	// Create scene elements and add to the list
 	m_sceneElements.push_back(
 		{
 			SCENE_TYPE::SCENE_TITLE,
-			std::make_unique<TitleScene>(windowWidth, windowHeight)
+			std::make_unique<TitleScene>()
 		}
 	);
 	m_sceneElements.push_back(
 		{
 			SCENE_TYPE::SCENE_GAME,
-			std::make_unique<GameScene>(windowWidth, windowHeight)
+			std::make_unique<GameScene>()
 		}
 	);
 

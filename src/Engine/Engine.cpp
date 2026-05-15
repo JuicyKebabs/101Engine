@@ -487,7 +487,7 @@ void Engine::CreateBuiltinRenderTargets()
 
 void Engine::CreateShadowMapRenderTarget()
 {
-	GpuTexture::InitDesc desc{};
+	GpuTexture::ParamDesc desc{};
 	desc.width = 2048;
 	desc.height = 2048;
 	desc.initialState = GpuTexture::ResourceState::ShaderResource;
@@ -502,7 +502,7 @@ void Engine::CreateShadowMapRenderTarget()
 // Create post-process render target
 void Engine::CreatePostProcessRenderTarget()
 {
-	GpuTexture::InitDesc desc{};
+	GpuTexture::ParamDesc desc{};
 	desc.width = m_FrameBufferWidth;
 	desc.height = m_FrameBufferHeight;
 	desc.initialState = GpuTexture::ResourceState::ShaderResource;

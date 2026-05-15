@@ -73,22 +73,20 @@ struct CameraLens
 class Camera : public Component
 {
 public:
-	struct InitDesc : public Component::InitDesc
+	struct ParamDesc
 	{
-		float window_width = 0.0f;
-		float window_height = 0.0f;
-		InitDesc(std::string name = "Camera") : Component::InitDesc(name) {}
-		InitDesc(float window_width = 0.0f, float window_height = 0.0f, const std::string& name = "Camera")
-			: Component::InitDesc(name), window_width(window_width), window_height(window_height) {}
+		uint32_t window_width = 0.0f;
+		uint32_t window_height = 0.0f;
+		std::string name = "Camera";
 	};
 
 public:
 	Camera() = default;
 	~Camera() = default;	// Destructor
-	void Init(const InitDesc& desc){
+	void SetParams(const ParamDesc& desc){
 		m_cameraLens.width = desc.window_width;
 		m_cameraLens.height = desc.window_height;
-		Component::Init(desc);
+		SetName(desc.name);
 	}
 
 	void OnStartOverride() override;

@@ -15,12 +15,6 @@ using namespace DirectX;
 // Destructor
 Actor::~Actor()
 {
-	for (auto& component : m_componentPtrs){
-		component->OnDestroy();
-	}
-	for (auto& pending : m_pendingComponents){
-		pending.instance->OnDestroy();
-	}
 }
 
 // Post-update (for late update)
@@ -95,17 +89,13 @@ std::vector<Actor*> Actor::GetChildren() const
 void Actor::FlushTransform()
 {
 	auto pTransform = GetComponentByClass<Transform>();
-	if (pTransform && pTransform->IsInitialized()) {
-		pTransform->UpdateGeometry();
-	}
+	if (pTransform) pTransform->UpdateGeometry();
 }
 
 void Actor::FlushColliderTransforms()
 {
 	auto colliders = GetComponentsByClass<Collider>();
-	for (auto& collider : colliders) {
-		if(collider->IsInitialized()) collider->Flush();
-	}
+	for (auto& collider : colliders) collider->Flush();
 }
 
 // Add pending components to the main component container

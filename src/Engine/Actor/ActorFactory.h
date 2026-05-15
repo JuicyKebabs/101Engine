@@ -4,11 +4,6 @@
 #include <vector>
 #include <assert.h>
 #include "Actor.h"
-#include "Engine/Component/Transform.h"
-#include "Engine/Component/RectTransform.h"
-#include "Engine/Component/MeshRenderer.h"
-#include "Engine/Component/SpriteRenderer.h"
-#include "Engine/Component/Camera.h"
 
 enum class ActorType
 {

@@ -12,29 +12,32 @@ struct MeshRendererProxy
 class MeshRenderer : public RendererComponent
 {
 public:
-	struct InitDesc : public RendererComponent::InitDesc
+	struct ParamDesc
 	{
-		std::vector<SubmeshRenderTemplate> templates;
-		InitDesc(std::string name = "MeshRenderer") : RendererComponent::InitDesc(Vector4(1,1,1,1), true, name) {}
-		InitDesc(const std::vector<SubmeshRenderTemplate>& templates, Vector4 color, bool visible, const std::string& name = "MeshRenderer")
-			: RendererComponent::InitDesc(color, visible, name), templates(templates) {}
+		std::vector<SubmeshRenderTemplate> templates;	// Render templates for each mesh to be drawn
+		Vector4 color{ 1,1,1,1 };						// Color for rendering (can be used to tint the rendered object)
+		bool visible = true;							// Visibility flag for this renderer
+		std::string name = "MeshRenderer";				// Component name (optional, can be used for debugging or identification)
 	};
 
 public:
 	MeshRenderer() = default;
 	~MeshRenderer() = default;
-	void Init(const InitDesc& desc) {
+	void SetParams(const ParamDesc& desc) {
 		m_templates = desc.templates;
-		RendererComponent::Init(desc);
+		SetColor(desc.color);
+		SetVisible(desc.visible);
+		SetName(desc.name);
 	}
 
 	// Getters
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
 	const MeshRendererProxy& GetRenderProxy();
+	bool IsConfigured() const override { return !m_templates.empty(); }	// Check if the renderer has been configured with necessary resources (at least one render template)
 
 private:
-	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn (contains mesh data, texture info, and rendering settings)
-	MeshRendererProxy m_proxy;						// Cached render proxy for this component (used for rendering)
+	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn
+	MeshRendererProxy m_proxy;						// Cached render proxy for this component
 
 private:
 	// Override functions for component lifecycle

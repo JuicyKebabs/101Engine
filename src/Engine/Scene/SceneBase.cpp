@@ -15,19 +15,18 @@ SceneBase::SceneBase()
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 
 	// Create default camera actor and set it as the main camera actor
-	Actor::InitDesc cameraInitDesc;
-	cameraInitDesc.name = "DefaultCamera";
-	auto defaultCameraActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, cameraInitDesc));
-	defaultCameraActor->GetComponentByClass<Transform>()->Init(Transform::InitDesc(Vector3{ 0,0,-5 }));
+	Actor::InitDesc cameraParamDesc;
+	cameraParamDesc.name = "DefaultCamera";
+	auto defaultCameraActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, cameraParamDesc));
+	defaultCameraActor->GetComponentByClass<Transform>()->SetParams(Transform::ParamDesc(Vector3{ 0,0,-5 }));
 	auto camera = defaultCameraActor->GetComponentByClass<Camera>();
-	camera->Init(Camera::InitDesc(WindowInfo::GetInstance().GetWidth(), WindowInfo::GetInstance().GetHeight()));
+	camera->SetParams(Camera::ParamDesc{.window_width = WindowInfo::GetInstance().GetWidth(), .window_height = WindowInfo::GetInstance().GetHeight()});
 	m_pCameraSystem->SetMainCamera(camera);
 }
 
 // Destructor
 SceneBase::~SceneBase()
 {
-	m_actors.clear();
 }
 
 // Initialization

@@ -55,7 +55,7 @@ struct AABB
 class Collider : public Component
 {
 public:
-	struct InitDesc : public Component::InitDesc
+	struct ParamDesc
 	{
 		Vector3 localCenter = Vector3(0, 0, 0);				// Local center position
 		Quaternion localRotation = Quaternion::Identity();	// Local rotation
@@ -63,22 +63,19 @@ public:
 		ColliderType type = ColliderType::None;				// Collider type
 		CollisionLayer layer = CollisionLayer::Default;		// Collision layer
 		bool isTrigger = false;								// Trigger flag (whether to ignore physical collisions)
-		InitDesc(std::string name = "Collider") : Component::InitDesc(name) {}
-		InitDesc(Vector3 localCenter, Quaternion localRotation, Vector3 localScale, ColliderType type, CollisionLayer layer, bool isTrigger, const std::string& name = "Collider")
-			: Component::InitDesc(name), localCenter(localCenter), localRotation(localRotation), localScale(localScale), type(type), layer(layer), isTrigger(isTrigger) {
-		}
+		std::string name = "Collider";						// Component name (optional, can be used for debugging or identification)
 	};
 
 public:
 	Collider() = default;
 	~Collider() = default;
-	void Init(const InitDesc& desc) {
+	void SetParams(const ParamDesc& desc) {
 		m_localTransform = { desc.localCenter, desc.localRotation, desc.localScale };
 		m_type = desc.type;
 		m_layer = desc.layer;
 		m_isTrigger = desc.isTrigger;
 		m_layerMask = MakeLayerMask(m_layer);
-		Component::Init(desc);
+		SetName(desc.name);
 	}
 
 	void OnStartOverride() override;
