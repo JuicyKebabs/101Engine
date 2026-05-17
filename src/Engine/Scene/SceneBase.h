@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/Window/WindowInfo.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Core/Utility/SharedStruct.h"
@@ -17,8 +18,8 @@ class SceneBase
 public:
 	static constexpr DirectX::XMFLOAT3 SKY_BOX_SIZE = { 50.0f, 50.0f, 50.0f }; // Skybox size
 public:
-	SceneBase(float window_width, float window_height);	// Constructor
-	~SceneBase();										// Destructor
+	SceneBase();	// Constructor
+	~SceneBase();	// Destructor
 
 	// Main processing functions
 	void Initialize(EngineContext& context);	// Initialization
@@ -29,15 +30,13 @@ public:
 	void Finalize();							// Finalize
 
 	// Add an actor
-	template<class T, class... Args>
-	T* AddActor(Args&&... args) {
-		static_assert(std::is_base_of_v<Actor, T>, "AddActor<T>: T must derive from Actor");
-		auto actor = std::make_unique<T>(std::forward<Args>(args)...);
-		T* ptr = actor.get();
+	Actor* AddActor(Actor* actor) {
+		if (!actor) return nullptr;
 		actor->SetOwner(this);
-		m_addPendingActors.push_back(std::move(actor));
-		return ptr;
+		m_actors.push_back(std::unique_ptr<Actor>(actor));
+		return actor;
 	}
+
 	void AddActorToPending(std::unique_ptr<Actor> actor) {
 		actor->SetOwner(this);
 		m_addPendingActors.push_back(std::move(actor));
@@ -48,9 +47,7 @@ public:
 	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
 
 private:
-	std::vector<std::unique_ptr<Actor>> m_actors;		// Object list in the scene
-	std::vector<std::unique_ptr<Canvas>> m_canvasList;	// Canvas list in the scene
-
+	std::vector<std::unique_ptr<Actor>> m_actors;			// Object list in the scene
 	std::vector<std::unique_ptr<Actor>> m_addPendingActors;	// Pending objects to be added
 
 	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;		// Render system

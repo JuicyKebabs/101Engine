@@ -4,6 +4,7 @@
 #include "App.h"
 #include <tchar.h>
 #include "Engine/Input/keyboard.h"
+#include "Engine/Window/WindowInfo.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -183,10 +184,12 @@ void App::CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc)
 
 void App::PrepareInstance()
 {
+	WindowInfo::GetInstance().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+
 	// Get singleton instances of various classes
 	m_pEngine = std::make_unique<Engine>();
 	m_pRenderer = std::make_unique<Renderer>();
-	m_pSceneManager = std::make_unique<SceneManager>(static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT));
+	m_pSceneManager = std::make_unique<SceneManager>();
 	m_pTextureManager = std::make_unique<TextureManager>();
 	m_pMeshManager = std::make_unique<MeshManager>();	
 
@@ -298,6 +301,7 @@ void App::Render()
 	RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };
 	m_pEngine->BeginPass(backBufferTarget);
 	m_pRenderer->RenderFullScreenPass(m_pEngine->GetCommandList(), m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor));
+	m_pRenderer->RenderScreenSpace(m_pEngine->GetCommandList());
 	m_pEngine->EndPass(backBufferTarget);
 
 	// End rendering

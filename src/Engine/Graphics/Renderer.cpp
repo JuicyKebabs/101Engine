@@ -7,6 +7,7 @@
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Window/WindowInfo.h"
 
 using namespace DirectX;
 
@@ -221,6 +222,61 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Gp
 	p_commandList->DrawInstanced(3, 1, 0, 0);									// Issue draw command (full-screen triangle)
 }
 
+void Renderer::RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList)
+{
+	// Set orthographic projection for screen space rendering
+	auto orthoProj = Matrix4x4::CreateOrthographic(
+		WindowInfo::GetInstance().GetWidth(), 
+		WindowInfo::GetInstance().GetHeight(), 
+		-1.0f, 
+		100.0f);
+
+	// Set frame-level constants for screen space rendering
+	auto framePtr = m_colorFrameCB->GetPtr<FrameConstants>();
+	framePtr->view = Matrix4x4::Identity;
+	framePtr->proj = orthoProj;
+	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_colorFrameCB->GetAddress());
+
+	// Allocate constant buffers for ui items
+	size_t totalUIItemCount = m_frameRenderData.GetUICount();
+	if (m_uiCB.size() < totalUIItemCount)
+	{
+		size_t toAllocate = totalUIItemCount - m_uiCB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_uiCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
+		}
+	}
+
+	PSOKey compare{};
+	int meshItemIndex = 0;
+	int spriteItemIndex = 0;
+	int uiItemIndex = 0;
+
+	for(auto& item : m_frameRenderData.screenspace)
+	{
+		switch (item.renderType)
+		{
+		case RenderType::Mesh:
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare); // Screen space items can reuse the first constant buffer since they won't be drawn together
+			meshItemIndex++;
+			break;
+		case RenderType::Sprite:
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare); // Screen space items can reuse the first constant buffer since they won't be drawn together
+			spriteItemIndex++;
+			break;
+		case RenderType::UI:
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), uiItemIndex, compare); // Screen space items can reuse the first constant buffer since they won't be drawn together
+			uiItemIndex++;
+			break;
+		default:
+			break;
+		}
+	}
+
+}
+
 void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
 {
 	// Check if the Constant buffer is valid
@@ -236,7 +292,7 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	}
 
 	// Check if the PSO key's vertex shader file ID is correct
-	PSOKey currentKey = item.materialDesc.psoKey;
+	PSOKey currentKey = item.common.materialDesc.psoKey;
 	if (currentKey.vsKey.fileID != VS_FILE_ID::Mesh) {
 		currentKey.vsKey.fileID = VS_FILE_ID::Mesh;
 	}
@@ -253,10 +309,10 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 
 	// Set up the constant buffer for this mesh
 	auto ptr = m_meshCB[itemIndex]->GetPtr<MeshRenderConstants>();
-	ptr->worldMatrix = item.worldMatrix;
-	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
+	ptr->worldMatrix = item.common.worldMatrix;
+	ptr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
 	ptr->lightViewProj = m_directionalLight.view * m_directionalLight.proj;
-	ptr->objectColor = item.color;
+	ptr->objectColor = item.common.color;
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCB[itemIndex]->GetAddress());
 
 	// Set mesh data
@@ -268,7 +324,7 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	p_commandList->IASetIndexBuffer(&ibv);
 
 	// Set SRV for the texture
-	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
 	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 
@@ -291,9 +347,9 @@ void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, con
 
 	// Set up the constant buffer for this mesh
 	auto ptr = m_meshForShadowCB[itemIndex]->GetPtr<MeshRenderConstants>();
-	ptr->worldMatrix = item.worldMatrix;
-	ptr->worldInvTranspose = Matrix4x4::Transpose(item.worldMatrix.Inverse());
-	ptr->objectColor = item.color;
+	ptr->worldMatrix = item.common.worldMatrix;
+	ptr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+	ptr->objectColor = item.common.color;
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshForShadowCB[itemIndex]->GetAddress());
 
 	// Set mesh data
@@ -329,10 +385,8 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	}
 
 	// Compare PSO keys to minimize state changes (optional optimization)
-	PSOKey currentKey = item.materialDesc.psoKey;
-	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) {
-		currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
-	}
+	PSOKey currentKey = item.common.materialDesc.psoKey;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
 	if (!currentKey.indexFree) currentKey.indexFree = true;
 
 	if (currentKey != compare || itemIndex == 0)
@@ -344,8 +398,8 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 
 	// Set up the constant buffer for this mesh
 	auto ptr = m_spriteCB[itemIndex]->GetPtr<SpriteRenderConstants>();
-	ptr->worldMatrix = item.worldMatrix;
-	ptr->color = item.color;
+	ptr->worldMatrix = item.common.worldMatrix;
+	ptr->color = item.common.color;
 	ptr->uvRect = Vector4(
 		item.uvOffset.x,
 		item.uvOffset.y,
@@ -357,7 +411,57 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_spriteCB[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
-	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.materialDesc.textureHandle);
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+
+	// Draw command (assuming a full-screen quad for sprites)
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	p_commandList->DrawInstanced(6, 1, 0, 0); // Draw a quad (2 triangles)
+}
+
+void Renderer::RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare)
+{
+	// Check if the Constant buffer is valid
+	if (itemIndex >= m_uiCB.size())
+	{
+		DBG("Not enough constant buffers allocated\n");
+		return;
+	}
+	if (!m_uiCB[itemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid\n");
+		return;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
+	PSOKey currentKey = item.common.materialDesc.psoKey;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::UI) currentKey.vsKey.fileID = VS_FILE_ID::UI;
+	if (currentKey.psKey.fileID != PS_FILE_ID::UI) currentKey.psKey.fileID = PS_FILE_ID::UI;
+	if (!currentKey.indexFree) currentKey.indexFree = true;
+
+	if (currentKey != compare || itemIndex == 0)
+	{
+		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
+		compare = currentKey;										// Update the compare key
+	}
+
+	// Set up the constant buffer for this mesh
+	auto ptr = m_uiCB[itemIndex]->GetPtr<UIRenderConstants>();
+	ptr->worldMatrix = item.common.worldMatrix;
+	ptr->color = item.common.color;
+	ptr->uvRect = Vector4(
+		item.uvOffset.x,
+		item.uvOffset.y,
+		item.uvOffset.x + item.uvScale.x,
+		item.uvOffset.y + item.uvScale.y
+	);
+	ptr->flip = item.flip;
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_uiCB[itemIndex]->GetAddress());
+
+	// Set SRV for the texture
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
 	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
 

@@ -141,7 +141,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	std::unique_ptr<Texture> textureData = std::make_unique<Texture>();	// Texture data
 	textureData->Initialize(
 		pTexture,		// Texture resource
-		Texture::InitDesc{
+		Texture::ParamDesc{
 		m_nextTextureHandle,	// Texture handle (using next free index)
 		srvIndex,				// SRV index
 		path,					// File path
@@ -375,11 +375,11 @@ void TextureManager::CreateDefaultTexture()
 
 	const uint32_t defaultTextureHandle = m_nextTextureHandle;	// Default texture handle (using next free index)
 	auto textureData = std::make_unique<Texture>();	// Texture data
-	Texture::InitDesc initDesc = {};		// Texture initialization descriptor
-	initDesc.handle = defaultTextureHandle;	// Texture handle (using reserved index)
-	initDesc.srvIndex = srvIndex;			// SRV index (using next free index)
-	initDesc.path = L"DefaultWhite";		// File path (for identification)
-	initDesc.meta = TexMetadata{			// Metadata
+	Texture::ParamDesc paramDesc = {};		// Texture initialization descriptor
+	paramDesc.handle = defaultTextureHandle;	// Texture handle (using reserved index)
+	paramDesc.srvIndex = srvIndex;			// SRV index (using next free index)
+	paramDesc.path = L"DefaultWhite";		// File path (for identification)
+	paramDesc.meta = TexMetadata{			// Metadata
 		DXGI_FORMAT_R8G8B8A8_UNORM, // Format
 		1,							// Width
 		1,							// Height
@@ -388,7 +388,7 @@ void TextureManager::CreateDefaultTexture()
 	};
 	textureData->Initialize(
 		pTexture,
-		initDesc
+		paramDesc
 	);
 
 	m_textures[defaultTextureHandle] = std::move(textureData);	// Keep texture resource alive

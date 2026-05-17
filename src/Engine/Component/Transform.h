@@ -7,15 +7,30 @@
 class Transform : public Component
 {
 public:
-	Transform(Vector3 localPosition, Vector3 localEulerDeg, Vector3 localScale, const std::string& name = "Transform");
+	struct ParamDesc
+	{
+		Vector3 localPosition = Vector3::Zero();	// Local position relative to parent
+		Vector3 localEulerDeg = Vector3::Zero();	// Local rotation in Euler angles
+		Vector3 localScale = Vector3::One();		// Local scale relative to parent
+		std::string name = "Transform";				// Component name (optional, can be used for debugging or identification)
+	};
+
+public:
+	Transform() = default;
 	virtual ~Transform() = default;
+	void SetParams(const ParamDesc& desc) {
+		m_localTransform.position = desc.localPosition;
+		m_localTransform.rotation = Quaternion::CreateFromEulerDeg(desc.localEulerDeg);
+		m_localTransform.scale = desc.localScale;
+		SetName(desc.name);
+	}
 
 	// Overrides
-	void OnStart() override;
-	void PreUpdate(float deltaTime) override;
-	void Update(float deltaTime) override {};
-	void LateUpdate(float deltaTime) override;
-	void OnDestroy() override;
+	void OnStartOverride() override;
+	void PreUpdateOverride(float deltaTime) override;
+	void UpdateOverride(float deltaTime) override {};
+	void LateUpdateOverride(float deltaTime) override;
+	void OnDestroyOverride() override;
 
 	// Dirty flag
 	void MarkDirty();	// Mark the local transform as dirty (has been modified since last world transform update)
@@ -76,10 +91,10 @@ public:
 	Vector3 InverseTransformPoint(Vector3 worldPoint) const;			// Transform a point from world space to local space
 	Vector3 InverseTransformDirection(Vector3 worldDirection) const;	// Transform a direction from world space to local space (ignoring position)
 
-	void UpdateGeometry();					// Update world transform based on local transform and parent's world transform
+	virtual void UpdateGeometry();			// Update world transform based on local transform and parent's world transform
 	uint64_t GetWorldGeneration() const;	// Get world transform generation counter (incremented every time world transform is updated)
 
-private:
+protected:
 	Transform3D m_localTransform{};	// Local transform data (position, rotation, scale)
 	Transform3D m_worldTransform{};	// World transform data (position, rotation, scale)
 	Matrix4x4 m_localMatrix{};		// Local transformation matrix

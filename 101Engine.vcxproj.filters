@@ -19,6 +19,9 @@
     </None>
     <None Include=".github\upgrades\assessment.md" />
     <None Include=".github\upgrades\plan.md" />
+    <None Include="shader\UIObjectConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -98,6 +101,9 @@
     </Filter>
     <Filter Include="shader\PixelShader">
       <UniqueIdentifier>{3c9013ff-8876-41c5-925c-6dd164a6d4ca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Window">
+      <UniqueIdentifier>{6efa6eac-94bf-444f-97d2-f97b31623b1e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -179,10 +185,7 @@
     <ClCompile Include="src\Engine\UI\Canvas.cpp">
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\UI\UIBase.cpp">
-      <Filter>src\Engine\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Engine\UI\UIimage.cpp">
+    <ClCompile Include="src\Engine\UI\UIRenderer.cpp">
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\GameScene.cpp">
@@ -237,6 +240,15 @@
       <Filter>src\Engine\Resource</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Component\Collider.cpp">
+      <Filter>src\Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Actor\ActorFactory.cpp">
+      <Filter>src\Engine\Actor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Component\RendererComponent.cpp">
+      <Filter>src\Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Component\RectTransform.cpp">
       <Filter>src\Engine\Component</Filter>
     </ClCompile>
   </ItemGroup>
@@ -340,10 +352,10 @@
     <ClInclude Include="src\Engine\UI\Canvas.h">
       <Filter>src\Engine\UI</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\UI\UIBase.h">
+    <ClInclude Include="src\Engine\UI\UIRenderer.h">
       <Filter>src\Engine\UI</Filter>
     </ClInclude>
-    <ClInclude Include="src\Engine\UI\UIimage.h">
+    <ClInclude Include="src\Engine\UI\UIImage.h">
       <Filter>src\Engine\UI</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\GameScene.h">
@@ -412,6 +424,18 @@
     <ClInclude Include="src\Engine\Component\Collider.h">
       <Filter>src\Engine\Component</Filter>
     </ClInclude>
+    <ClInclude Include="src\Engine\Actor\ActorFactory.h">
+      <Filter>src\Engine\Actor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\RectTransform.h">
+      <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Component\RendererComponent.h">
+      <Filter>src\Engine\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Window\WindowInfo.h">
+      <Filter>src\Window</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\PixelShader\MeshPS.hlsl">
@@ -433,6 +457,12 @@
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
     <FxCompile Include="shader\VertexShader\ShadowVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\PixelShader\UIPS.hlsl">
+      <Filter>shader\PixelShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\UIVS.hlsl">
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
   </ItemGroup>

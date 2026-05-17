@@ -149,17 +149,21 @@
     <None Include="shader\LightConstants.hlsli" />
     <None Include="shader\MeshObjectConstants.hlsli" />
     <None Include="shader\SpriteObjectConstants.hlsli" />
+    <None Include="shader\UIObjectConstants.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\App\App.cpp" />
     <ClCompile Include="src\Engine\Actor\Actor.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)third_party\DirectX\d3dx12;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <ClCompile Include="src\Engine\Actor\ActorFactory.cpp" />
     <ClCompile Include="src\Engine\Audio\Audio.cpp" />
     <ClCompile Include="src\Engine\Component\Camera.cpp" />
     <ClCompile Include="src\Engine\Component\Collider.cpp" />
     <ClCompile Include="src\Engine\Component\Component.cpp" />
     <ClCompile Include="src\Engine\Component\MeshRenderer.cpp" />
+    <ClCompile Include="src\Engine\Component\RectTransform.cpp" />
+    <ClCompile Include="src\Engine\Component\RendererComponent.cpp" />
     <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp" />
     <ClCompile Include="src\Engine\Component\Transform.cpp" />
     <ClCompile Include="src\Engine\Core\Math\Math.cpp" />
@@ -192,8 +196,7 @@
     <ClCompile Include="src\Engine\Scene\SceneBase.cpp" />
     <ClCompile Include="src\Engine\Scene\SceneManager.cpp" />
     <ClCompile Include="src\Engine\UI\Canvas.cpp" />
-    <ClCompile Include="src\Engine\UI\UIBase.cpp" />
-    <ClCompile Include="src\Engine\UI\UIimage.cpp" />
+    <ClCompile Include="src\Engine\UI\UIRenderer.cpp" />
     <ClCompile Include="src\Game\CameraTest.cpp" />
     <ClCompile Include="src\Game\GameScene.cpp" />
     <ClCompile Include="src\Game\Player.cpp" />
@@ -204,6 +207,7 @@
     <ClInclude Include="CameraSystem.h" />
     <ClInclude Include="src\App\App.h" />
     <ClInclude Include="src\Engine\Actor\Actor.h" />
+    <ClInclude Include="src\Engine\Actor\ActorFactory.h" />
     <ClInclude Include="src\Engine\Audio\Audio.h" />
     <ClInclude Include="src\Engine\Audio\AudioData.h" />
     <ClInclude Include="src\Engine\Component\AssimpNodeTransformAnim.h" />
@@ -213,6 +217,8 @@
     <ClInclude Include="src\Engine\Component\Component.h" />
     <ClInclude Include="src\Engine\Component\ComponentPolicy.h" />
     <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
+    <ClInclude Include="src\Engine\Component\RectTransform.h" />
+    <ClInclude Include="src\Engine\Component\RendererComponent.h" />
     <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
     <ClInclude Include="src\Engine\Component\Transform.h" />
     <ClInclude Include="src\Engine\Core\ComPtr\ComPtr.h" />
@@ -251,8 +257,9 @@
     <ClInclude Include="src\Engine\Scene\SceneBase.h" />
     <ClInclude Include="src\Engine\Scene\SceneManager.h" />
     <ClInclude Include="src\Engine\UI\Canvas.h" />
-    <ClInclude Include="src\Engine\UI\UIBase.h" />
-    <ClInclude Include="src\Engine\UI\UIimage.h" />
+    <ClInclude Include="src\Engine\UI\UIRenderer.h" />
+    <ClInclude Include="src\Engine\UI\UIImage.h" />
+    <ClInclude Include="src\Engine\Window\WindowInfo.h" />
     <ClInclude Include="src\Game\CameraTest.h" />
     <ClInclude Include="src\Game\GameScene.h" />
     <ClInclude Include="src\Game\Player.h" />
@@ -279,6 +286,12 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
     </FxCompile>
+    <FxCompile Include="shader\PixelShader\UIPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
     <FxCompile Include="shader\VertexShader\MeshVS.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">main</EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
@@ -297,6 +310,12 @@
     <FxCompile Include="shader\VertexShader\SpriteVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\UIVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

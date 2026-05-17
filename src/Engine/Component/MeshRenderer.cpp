@@ -3,7 +3,7 @@
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
 
-void MeshRenderer::OnStart()
+void MeshRenderer::OnStartOverride()
 {
 	// Register this component to the renderer system
 	auto owner = GetOwner();
@@ -18,19 +18,19 @@ void MeshRenderer::OnStart()
 	}
 }
 
-void MeshRenderer::PreUpdate(float deltaTime)
+void MeshRenderer::PreUpdateOverride(float deltaTime)
 {
 }
 
-void MeshRenderer::Update(float deltaTime)
+void MeshRenderer::UpdateOverride(float deltaTime)
 {
 }
 
-void MeshRenderer::LateUpdate(float deltaTime)
+void MeshRenderer::LateUpdateOverride(float deltaTime)
 {
 }
 
-void MeshRenderer::OnDestroy()
+void MeshRenderer::OnDestroyOverride()
 {
 	// Unregister this component from the renderer system
 	auto owner = GetOwner();
@@ -45,11 +45,6 @@ void MeshRenderer::OnDestroy()
 	}
 }
 
-void MeshRenderer::Flush()
-{
-	CheckIfTransformChanged();
-}
-
 const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 {
 	if (m_isProxyDirty)
@@ -60,39 +55,16 @@ const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 	return m_proxy;
 }
 
-void MeshRenderer::Initialize(std::vector<SubmeshRenderTemplate> templates)
-{
-	if (m_isConfigured) return;	// Prevent re-initialization if already configured
-
-	m_templates = std::move(templates);
-	m_isConfigured = true;
-}
-
 void MeshRenderer::RebuildRenderProxy()
 {
 	auto owner = GetOwner();
 	if (owner) {
-		auto transform = owner->GetTransform();
+		auto transform = owner->GetComponentByClass<Transform>();
 		if (transform) {
-			m_proxy.position = transform->GetWorldPosition();
-			m_proxy.worldMatrix = transform->GetWorldMatrix();
-			m_proxy.color = m_color;
-			m_proxy.visible = m_isVisible;
-		}
-	}
-}
-
-void MeshRenderer::CheckIfTransformChanged()
-{
-	auto owner = GetOwner();
-	if (owner) {
-		auto transform = owner->GetTransform();
-		if (transform) {
-			uint64_t currentGeneration = transform->GetWorldGeneration();
-			if(m_transformGeneration != currentGeneration) {
-				m_transformGeneration = currentGeneration;
-				m_isProxyDirty = true;
-			}
+			m_proxy.common.position = transform->GetWorldPosition();
+			m_proxy.common.worldMatrix = transform->GetWorldMatrix();
+			m_proxy.common.color = m_color;
+			m_proxy.common.visible = m_isVisible;
 		}
 	}
 }

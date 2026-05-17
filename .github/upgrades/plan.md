@@ -47,7 +47,7 @@ case COLLISION_LAYER::MAX_LAYER:
 
 **修正内容**:
 
-**1. InitDesc構造体（行115-116）**:
+**1. ParamDesc構造体（行115-116）**:
 ```cpp
 // 修正前:
 UINT width = 0.0f;   // ← floatリテラルでUINTを初期化（警告）

@@ -73,18 +73,27 @@ struct CameraLens
 class Camera : public Component
 {
 public:
-	Camera(		// Constructor
-		float window_width = 0.0f, 
-		float window_height = 0.0f,
-		const std::string& name = "Camera"
-	);
-	~Camera() {};	// Destructor
+	struct ParamDesc
+	{
+		uint32_t window_width = 0.0f;
+		uint32_t window_height = 0.0f;
+		std::string name = "Camera";
+	};
 
-	void OnStart() override;
-	void PreUpdate(float deltaTime) override;
-	void Update(float deltaTime) override;
-	void LateUpdate(float deltaTime) override;
-	void OnDestroy() override;
+public:
+	Camera() = default;
+	~Camera() = default;	// Destructor
+	void SetParams(const ParamDesc& desc){
+		m_cameraLens.width = desc.window_width;
+		m_cameraLens.height = desc.window_height;
+		SetName(desc.name);
+	}
+
+	void OnStartOverride() override;
+	void PreUpdateOverride(float deltaTime) override;
+	void UpdateOverride(float deltaTime) override;
+	void LateUpdateOverride(float deltaTime) override;
+	void OnDestroyOverride() override;
 	void Flush(float deltaTime);
 
 	const CameraInfo& GetCameraInfo();	// Build camera information (calculate view/projection matrices, etc.)

@@ -76,6 +76,14 @@ struct alignas(256) SpriteRenderConstants
 	Vector2 flip;			//flip flags for X and Y axes (1 for normal, -1 for flipped)
 };
 
+struct alignas(256) UIRenderConstants
+{
+	Matrix4x4 worldMatrix;	//world matrix
+	Vector4 color;			//sprite color (RGBA)
+	Vector4 uvRect;			//UV rectangle
+	Vector2 flip;			//flip flags for X and Y axes (1 for normal, -1 for flipped)
+};
+
 // Light constant buffer structure for point lights (b2)
 struct alignas(256) LightConstants
 {

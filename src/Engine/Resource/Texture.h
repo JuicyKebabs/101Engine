@@ -22,7 +22,7 @@ public:
 		Failed
 	};
 
-	struct InitDesc {
+	struct ParamDesc {
 		TextureHandle handle = InvalidTextureHandle;
 		SrvIndex srvIndex = InvalidSrvIndex;
 		std::wstring path;
@@ -31,13 +31,13 @@ public:
 
 public:
 	Texture() = default;
-	explicit Texture(ComPtr<ID3D12Resource> resource, const InitDesc& desc) { Initialize(resource, desc); }
+	explicit Texture(ComPtr<ID3D12Resource> resource, const ParamDesc& desc) { Initialize(resource, desc); }
 	~Texture() = default;
 
 	Texture(const Texture&) = delete;
 	Texture& operator=(const Texture&) = delete;
 
-	void Initialize(ComPtr<ID3D12Resource> resource, const InitDesc& desc)
+	void Initialize(ComPtr<ID3D12Resource> resource, const ParamDesc& desc)
 	{
 		assert(resource != nullptr && "Texture: Resource cannot be null");
 		m_pResource = resource;

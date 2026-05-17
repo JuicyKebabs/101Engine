@@ -4,25 +4,29 @@
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Actor/ActorFactory.h"
 #include "Game/CameraTest.h"
 
 // Constructor
-SceneBase::SceneBase(float window_width, float window_height)
+SceneBase::SceneBase()
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>();
 	m_pRenderSystem = std::make_unique<RenderSystem>();
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 
 	// Create default camera actor and set it as the main camera actor
-	auto defaultCameraActor = AddActor<Actor>();
-	auto camera = defaultCameraActor->AddComponent<Camera>(window_width, window_height);
+	Actor::InitDesc cameraParamDesc;
+	cameraParamDesc.name = "DefaultCamera";
+	auto defaultCameraActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, cameraParamDesc));
+	defaultCameraActor->GetComponentByClass<Transform>()->SetParams(Transform::ParamDesc(Vector3{ 0,0,-5 }));
+	auto camera = defaultCameraActor->GetComponentByClass<Camera>();
+	camera->SetParams(Camera::ParamDesc{.window_width = WindowInfo::GetInstance().GetWidth(), .window_height = WindowInfo::GetInstance().GetHeight()});
 	m_pCameraSystem->SetMainCamera(camera);
 }
 
 // Destructor
 SceneBase::~SceneBase()
 {
-	m_actors.clear();
 }
 
 // Initialization

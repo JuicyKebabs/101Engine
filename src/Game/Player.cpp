@@ -171,7 +171,7 @@ void PlayerBehavior::LateUpdateBehavior()
 
 			auto pushBack = collider->GetCollisionInfos()[0].penetrationDepth * 1.001f; // Get the push back vector from the first collision info
 
-			auto transform = GetOwner()->GetTransform();
+			auto transform = GetOwner()->GetComponentByClass<Transform>();
 			transform->SetLocalPosition(transform->GetLocalPosition() - pushBack); // Move the player back by the push back vector to resolve the collision
 		}
 		else

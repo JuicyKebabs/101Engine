@@ -24,16 +24,18 @@ struct NodeAnimationAsset;
 enum class VS_FILE_ID
 {
 	Mesh = 0,
-	Sprite = 1,
-	ShadowMap = 2,
-	PostEffect = 3,
+	Sprite,
+	UI,
+	ShadowMap,
+	PostEffect,
 };
 // Enumeration for pixel shader IDs
 enum class PS_FILE_ID
 {
 	Mesh = 0,
-	Sprite = 1,
-	PostEffect = 2,
+	Sprite,
+	UI,
+	PostEffect,
 };
 
 //-------------------------------------------------------------------------------------
@@ -229,6 +231,8 @@ namespace PSO_KEY_DEFAULT
 	inline constexpr PSOKey SPRITE_MASKED{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true };
 	inline constexpr PSOKey SPRITE_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
 	inline constexpr PSOKey SPRITE_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
+
+	inline constexpr PSOKey UI{ VS_KEY{.fileID = VS_FILE_ID::UI}, PS_KEY{.fileID = PS_FILE_ID::UI}, 0, BlendMode::Alpha, DepthMode::Disable, CullMode::None, RenderTargetFormat::LDR, true };
 }
 
 // Hash function for PSOKey to be used in unordered_map
@@ -252,6 +256,7 @@ enum class RenderQueue
 	Opaque = 0,
 	Additive = 1,
 	Transparent = 2,
+	Screenspace = 3,
 };
 
 // Helper function to determine render queue based on blend mode
@@ -269,7 +274,7 @@ enum class BillboardType
 {
 	None,			//ビルボードなし
 	Spherical,		//全軸ビルボード
-	Cylindirical,	//円柱ビルボード
+	Cylindrical,	//円柱ビルボード
 };
 
 //=======================================================================================================

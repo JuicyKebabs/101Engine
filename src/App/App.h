@@ -41,8 +41,7 @@ private:
 	EngineContext m_engineContext{};	// Engine context structure
 
 public:
-	App() {};	// Constructor
-	~App(){};	// Destructor
+	~App()= default;	// Destructor
 
 	static App* GetInstance();	// Get singleton instance
 
@@ -51,6 +50,8 @@ public:
 	void Terminate();	// Termination
 
 private:
+	App() = default;	// Constructor
+
 	void CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc);	// Create main window
 	void PrepareInstance();								// Prepare instance
 

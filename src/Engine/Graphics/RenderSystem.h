@@ -2,6 +2,7 @@
 #include "Engine/Graphics/FrameRenderData.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
+#include "Engine/UI/UIRenderer.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Resource/Texture.h"
@@ -19,13 +20,21 @@ public:
 	struct SortKeyTransparent
 	{
 		PSOKey psoKey = {};
-		float depth = 0.0f;	// Depth for sorting transparent objects (greater depth first)
+		float depth = 0.0f;
+	};
+
+	struct SortKeyScreenSpace
+	{
+		PSOKey psoKey = {};
+		UINT canvasOrder = 0;
+		UINT order = 0;
 	};
 
 	struct FrameSortData
 	{
 		std::vector<SortKeyOpaque> opaqueKeys;				// Sort keys for opaque objects
 		std::vector<SortKeyTransparent> transparentKeys;	// Sort keys for transparent objects
+		std::vector<SortKeyScreenSpace> screenSpaceKeys;	// Sort keys for screen-space objects (e.g., UI)
 
 		uint64_t AddOpaqueKey(SortKeyOpaque key) {
 			opaqueKeys.push_back(key);
@@ -45,9 +54,19 @@ public:
 			return transparentKeys[index];
 		}
 
+		uint64_t AddScreenSpaceKey(SortKeyScreenSpace key) {
+			screenSpaceKeys.push_back(key);
+			return screenSpaceKeys.size() - 1;
+		}
+
+		SortKeyScreenSpace GetScreenSpaceKey(uint64_t index) const {
+			return screenSpaceKeys[index];
+		}
+
 		void Clear() {
 			opaqueKeys.clear();
 			transparentKeys.clear();
+			screenSpaceKeys.clear();
 		}
 	};
 
@@ -57,8 +76,10 @@ public:
 
 	void Register(MeshRenderer* renderer);						// Register a mesh renderer to be rendered
 	void Register(SpriteRenderer* renderer);					// Register a sprite renderer to be rendered
+	void Register(UIRenderer* renderer);						// Register a UI renderer to be rendered
 	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
+	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
 	void FlushRegisters();										// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
 	void BuildFrameRenderData(const CameraInfo& cameraInfo);	// Build draw packets from the registered mesh renderers
 
@@ -67,6 +88,7 @@ public:
 private:
 	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
 	std::vector<SpriteRenderer*> m_spriteRenderers;	// List of sprite renderers in the scene
+	std::vector<UIRenderer*> m_uiRenderers;			// List of UI renderers in the scene
 	FrameRenderData m_frameRenderData;				// Render data for the current frame (contains draw packets and other rendering information)
 	FrameSortData m_frameSortData;					// Sort data for the current frame (contains sort keys for sorting draw packets)
 	CameraInfo m_cameraInfo;						// Cached camera information for the current frame (used for sorting transparent objects)
@@ -74,9 +96,11 @@ private:
 private:
 	MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
 	SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);	// Create a sprite draw packet from a sort entry
+	UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
 
 	void SortOpaque();		// Sort opaque draw packets
 	void SortTransparent();	// Sort transparent draw packets
+	void SortScreenSpace();	// Sort screen-space draw packets (e.g., UI)
 	
 	RenderQueue GetRenderQueue(const PSOKey& psoKey);			// Determine the render queue for sort entry 
 	void NormalizePSOKey(PSOKey& psoKey, RenderQueue queue);	// Normalize the draw packet data

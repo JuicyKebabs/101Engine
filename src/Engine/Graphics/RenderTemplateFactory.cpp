@@ -30,6 +30,16 @@ SpriteRenderTemplate RenderTemplateFactory::CreateSpriteRenderTemplate(TextureMa
 	return temp;
 }
 
+UIRenderTemplate RenderTemplateFactory::CreateUIImageRenderTemplate(TextureManager& textureManager, const MaterialInput& materialInput)
+{
+	UIRenderTemplate temp;
+	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
+	UIRenderElement element;
+	element.materialDesc = materialDesc;
+	temp.push_back(element);
+	return temp;
+}
+
 MaterialDesc RenderTemplateFactory::BuildMaterialDesc(TextureManager& textureManager, const MaterialInput& input)
 {
 	MaterialDesc desc;

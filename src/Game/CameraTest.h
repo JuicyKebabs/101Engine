@@ -4,7 +4,7 @@
 class CameraTest : public Behavior
 {
 public:
-	CameraTest(const std::string& name = "CameraTest") : Behavior(name) {}
+	CameraTest() : Behavior() {}
 	virtual ~CameraTest() = default;
 	void OnStartBehavior() override;
 	void PreUpdateBehavior() override {}

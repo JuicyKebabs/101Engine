@@ -1,82 +1,56 @@
 #pragma once
-#include <d3d12.h>
-#include "d3dx12.h"
 #include <vector>
-#include <memory>
 #include <utility>
-#include "UIBase.h"
-#include "UIImage.h"
-#include "Engine/Core/Utility/SharedStruct.h"
-#include "Engine/Graphics/RenderData.h"
+#include "UIRenderer.h"
 
-// 前方宣言
-class Renderer;
-class TextureManager;
-class MeshManager;
-
-//UI管理クラス
-class Canvas
+class Canvas : public Component
 {
-public:	//公開関数
-	Canvas(
-		float screenWidth = 0.0f,
-		float screenHeight = 0.0f
-	)
-		: m_screenWidth(screenWidth),
-		m_screenHeight(screenHeight)
-	{
-	};	//コンストラクタ
+public:
+	struct ParamDesc {
+		UINT sortOrder = 0;
+		bool isVisible = true;
+		std::string name = "Canvas";
+	};
 
-	~Canvas();	//デストラクタ
+public:
+	Canvas() = default;
+	~Canvas() = default;
+	void Init(const ParamDesc& desc = ParamDesc()) {
+		m_sortOrder = desc.sortOrder;
+		m_isVisible = desc.isVisible;
+		SetName(desc.name);
+	}
 
-	//メイン処理関数
-	void Initialize(										//初期化
-		TextureManager& textureManager,	//テクスチャ管理クラス
-		MeshManager& meshManager		//メッシュ管理クラス
-	);
-	void Update();											//更新
-	void SubmitDraws(Renderer& renderer);					//描画要求をシーンに提出
-	void Finalize();										//終了
+	// Setters
+	void SetVisible(bool flag) { m_isVisible = flag; }
+	void SetSortOrder(UINT order) { m_sortOrder = order; }
 
-	//フェード関連関数
-	void ResetFade();					//フェード状態リセット
-	void StartFadeIn(float duration);	//フェードイン開始
-	void StartFadeOut(float duration);	//フェードアウト開始
-	bool IsFading() const;				//フェード中かどうかを取得
-	bool IsFadeEnd() const;				//フェード終了かどうかを取得
+	//Getters
+	bool IsVisible() const { return m_isVisible; }
+	UINT GetSortOrder() const { return m_sortOrder; }
 
-protected:
-	virtual void InitializeOverride(							//初期化(派生クラスでオーバーライド)
-		TextureManager& textureManager,
-		MeshManager& meshManager
-	) = 0;
-	virtual void UpdateOverride() = 0;							//更新(派生クラスでオーバーライド)
-	virtual void FinalizeOverride() = 0;						//終了(派生クラスでオーバーライド)
-
-	void PrepareRenderInfo(	//オブジェクトの描画情報生成
-		TextureManager& textureManager,	//テクスチャ管理クラスの参照
-		MeshManager& meshManager		//メッシュ管理クラスの参照
-	);
-
-	//void SubmitRenderInfo(	//描画情報をシーンに提出
-	//	Renderer& renderer,							//シーンの参照
-	//	WorldRenderModel& info	//描画情報構造体
-	//);
-
-protected:
-	std::vector<std::unique_ptr<UIBase>> m_roots;		//ルートUIオブジェクト配列
-	float m_screenWidth = 0.0f;	//画面幅
-	float m_screenHeight = 0.0f;	//画面高さ
-
-	UIImage* m_pFadeImage = nullptr; //フェード画像UIポインタ
-	bool m_isFading = false;		//フェード中フラグ
-	bool m_isFadeEnd = false;		//フェード終了フラグ
-	float m_fadeDuration = 0.0f;	//フェード時間
+	// UIRenderer management
+	void RegisterUIRenderer(UIRenderer* ui) {
+		if (ui) {
+			m_uiList.push_back(ui);
+		}
+	}
+	void UnregisterUIRenderer(UIRenderer* ui) {
+		m_uiList.erase(std::remove(m_uiList.begin(), m_uiList.end(), ui), m_uiList.end());
+	}
 
 private:
-	uint64_t m_fadeStartEventID = 0;	//フェード開始イベントID
-	uint64_t m_fadeEndEventID = 0;		//フェード終了イベントID
+	std::vector<UIRenderer*> m_uiList;
+	UINT m_sortOrder = 0;
+	bool m_isVisible = true;
 
 private:
-	void UpdateFade();	//フェード更新関数
+	// Overrides
+	void OnStartOverride() override {};
+	void PreUpdateOverride(float deltaTime) override {};
+	void UpdateOverride(float deltaTime) override {};
+	void LateUpdateOverride(float deltaTime) override {};
+	void OnDestroyOverride() override {
+		for(auto* ui : m_uiList) if(ui) ui->OnCanvasDestroyed();
+	};
 };

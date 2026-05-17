@@ -20,13 +20,13 @@ struct SceneElement
 class SceneManager
 {
 public:
-	SceneManager(float windowWidth, float windowHeight);	// Constructor
-	~SceneManager();										// Destructor
+	SceneManager();		// Constructor
+	~SceneManager();	// Destructor
 
 	// Get singleton instance
-	static SceneManager* GetInstance(float windowWidth, float windowHeight)
+	static SceneManager* GetInstance()
 	{
-		static SceneManager instance(windowWidth, windowHeight);
+		static SceneManager instance;
 		return &instance;
 	}
 
