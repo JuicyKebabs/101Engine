@@ -386,9 +386,7 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 
 	// Compare PSO keys to minimize state changes (optional optimization)
 	PSOKey currentKey = item.common.materialDesc.psoKey;
-	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) {
-		currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
-	}
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
 	if (!currentKey.indexFree) currentKey.indexFree = true;
 
 	if (currentKey != compare || itemIndex == 0)
@@ -438,9 +436,8 @@ void Renderer::RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRender
 
 	// Compare PSO keys to minimize state changes (optional optimization)
 	PSOKey currentKey = item.common.materialDesc.psoKey;
-	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) {
-		currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
-	}
+	if (currentKey.vsKey.fileID != VS_FILE_ID::UI) currentKey.vsKey.fileID = VS_FILE_ID::UI;
+	if (currentKey.psKey.fileID != PS_FILE_ID::UI) currentKey.psKey.fileID = PS_FILE_ID::UI;
 	if (!currentKey.indexFree) currentKey.indexFree = true;
 
 	if (currentKey != compare || itemIndex == 0)
@@ -460,7 +457,6 @@ void Renderer::RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRender
 		item.uvOffset.x + item.uvScale.x,
 		item.uvOffset.y + item.uvScale.y
 	);
-	ptr->pivot = item.pivot;
 	ptr->flip = item.flip;
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_uiCB[itemIndex]->GetAddress());
 

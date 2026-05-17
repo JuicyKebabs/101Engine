@@ -38,7 +38,6 @@ struct UIRenderItem {
 	CommonRenderItem common;
 	Vector2 uvScale{ 1,1 };
 	Vector2 uvOffset{ 0,0 };
-	Vector2 pivot{ 0.5f, 0.5f };
 	Vector2 flip{ 1,1 };
 };
 

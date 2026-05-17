@@ -14,7 +14,6 @@ public:
 		Vector4 color{ 1,1,1,1 };			// Color of the UI element
 		Vector2 uvScale{ 1,1 };				// UV scale for texture mapping
 		Vector2 uvOffset{ 0,0 };			// UV offset for texture mapping
-		Vector2 pivot{ 0.5f, 0.5f };		// Pivot point for the UI element
 		bool flipX = false;					// Flip flag for X axis (false for normal, true for flipped)
 		bool flipY = false;					// Flip flag for Y axis (false for normal, true for flipped)
 		std::string name = "UIImage";		// Component name (optional, can be used for debugging or identification)
@@ -30,7 +29,6 @@ public:
 		m_color = desc.color;
 		m_uvScale = desc.uvScale;
 		m_uvOffset = desc.uvOffset;
-		m_pivot = desc.pivot;
 		m_flipX = desc.flipX;
 		m_flipY = desc.flipY;
 		SetName(desc.name);

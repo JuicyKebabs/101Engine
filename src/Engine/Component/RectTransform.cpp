@@ -15,26 +15,34 @@ void RectTransform::UpdateGeometry()
 	Vector2 parentSize = parentRT ? parentRT->GetSize() 
 		: Vector2(static_cast<float>(WindowInfo::GetInstance().GetWidth()), static_cast<float>(WindowInfo::GetInstance().GetHeight()));
 
+	// Calculate the world position by adding the anchor offset and anchored position to the parent's world position (if parent exists)
+	Vector3 parentWorldPos = parentRT ? parentRT->GetWorldPosition() : Vector3::Zero();
+
+	// Calculate anchor offset based on the anchor mode and parent size
 	Vector2 anchorOffset = CalcAnchorOffset(m_anchorMode, parentSize);
 
-	// Use anchor position as the local position
+	// Calculate pivot offset based on the pivot point and size of the UI element
+	Vector2 pivotOffset(
+		(0.5f - m_pivot.x) * m_size.x,	// Pivot offset in X direction (centered at 0.5)
+		(0.5f - m_pivot.y) * m_size.y	// Pivot offset in Y direction (centered at 0.5)
+	);
+	
+	// Calculate the final UI position
 	Vector3 uiPosition(
-		m_anchoredPosition.x + anchorOffset.x,
-		m_anchoredPosition.y + anchorOffset.y,
+		parentWorldPos.x + anchorOffset.x + m_anchoredPosition.x + pivotOffset.x,
+		parentWorldPos.y + anchorOffset.y + m_anchoredPosition.y + pivotOffset.y,
 		m_localTransform.position.z
 	);
 
-	// Use size as the local scale
+	// The scale is determined by the size of the UI element (width and height)
 	Vector3 uiScale(
 		m_size.x,
 		m_size.y,
 		1.0f
 	);
 
-	// Calculate the world matrix
-	Matrix4x4 localMatrix = Matrix4x4::CreateTRS(uiPosition, m_localTransform.rotation, uiScale);
-	Matrix4x4 worldMatrix = parentRT ? localMatrix * parentRT->GetWorldMatrix() : localMatrix;
-	m_worldMatrix = worldMatrix;
+	// Calculate the world matrix (Isolated from parent matrix)
+	m_worldMatrix = Matrix4x4::CreateTRS(uiPosition, m_localTransform.rotation, uiScale);
 
 	// Save world transform by decomposing the world matrix
 	m_worldMatrix.Decompose(

@@ -19,6 +19,9 @@
     </None>
     <None Include=".github\upgrades\assessment.md" />
     <None Include=".github\upgrades\plan.md" />
+    <None Include="shader\UIObjectConstants.hlsli">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -183,9 +186,6 @@
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\UI\UIRenderer.cpp">
-      <Filter>src\Engine\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Engine\UI\UIImage.cpp">
       <Filter>src\Engine\UI</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\GameScene.cpp">
@@ -457,6 +457,12 @@
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
     <FxCompile Include="shader\VertexShader\ShadowVS.hlsl">
+      <Filter>shader\VertexShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\PixelShader\UIPS.hlsl">
+      <Filter>shader\PixelShader</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\VertexShader\UIVS.hlsl">
       <Filter>shader\VertexShader</Filter>
     </FxCompile>
   </ItemGroup>

@@ -2,7 +2,7 @@
 #include "Engine/Actor/Actor.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "Engine/Component/Transform.h"
+#include "Engine/Component/RectTransform.h"
 
 void UIRenderer::OnStartOverride()
 {
@@ -49,13 +49,18 @@ bool UIRenderer::IsVisible() const
 	return m_isVisible && m_pCanvas && m_pCanvas->IsVisible();
 }
 
+UINT UIRenderer::GetCanvasOrder() const
+{
+	return m_pCanvas ? m_pCanvas->GetSortOrder() : 0;
+}
+
 void UIRenderer::RebuildRenderProxy()
 {
 	if (m_isProxyDirty)
 	{
 		auto owner = GetOwner();
 		if (owner) {
-			auto transform = owner->GetComponentByClass<Transform>();
+			auto transform = owner->GetComponentByClass<RectTransform>();
 			if (transform) {
 				m_renderProxy.common.position = transform->GetWorldPosition();
 				m_renderProxy.common.worldMatrix = transform->GetWorldMatrix();
@@ -63,11 +68,10 @@ void UIRenderer::RebuildRenderProxy()
 		}
 		m_renderProxy.common.color = m_color;
 		m_renderProxy.common.visible = m_isVisible;
-		m_renderProxy.canvasOrder = m_canvasOrder;
+		m_renderProxy.canvasOrder = GetCanvasOrder();
 		m_renderProxy.order = m_order;
 		m_renderProxy.uvScale = m_uvScale;
 		m_renderProxy.uvOffset = m_uvOffset;
-		m_renderProxy.pivot = m_pivot;
 		m_renderProxy.flip.x = m_flipX ? -1.0f : 1.0f;
 		m_renderProxy.flip.y = m_flipY ? -1.0f : 1.0f;
 		m_isProxyDirty = false;

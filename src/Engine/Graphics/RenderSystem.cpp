@@ -196,7 +196,6 @@ UIRenderItem RenderSystem::CreateUIRenderItem(const UIRenderElement& renderTempl
 	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
 	item.uvScale = renderProxy.uvScale;
 	item.uvOffset = renderProxy.uvOffset;
-	item.pivot = renderProxy.pivot;
 	item.flip = renderProxy.flip;
 	return item;
 }

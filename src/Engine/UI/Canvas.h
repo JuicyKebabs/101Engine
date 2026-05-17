@@ -6,15 +6,7 @@
 class Canvas : public Component
 {
 public:
-	enum class RenderMode
-	{
-		ScreenSpace_Overlay,
-		ScreenSpace_Camera,
-		WorldSpace
-	};
-
 	struct ParamDesc {
-		RenderMode renderMode = RenderMode::ScreenSpace_Overlay;
 		UINT sortOrder = 0;
 		bool isVisible = true;
 		std::string name = "Canvas";
@@ -24,7 +16,6 @@ public:
 	Canvas() = default;
 	~Canvas() = default;
 	void Init(const ParamDesc& desc = ParamDesc()) {
-		m_renderMode = desc.renderMode;
 		m_sortOrder = desc.sortOrder;
 		m_isVisible = desc.isVisible;
 		SetName(desc.name);
@@ -41,7 +32,6 @@ public:
 	// UIRenderer management
 	void RegisterUIRenderer(UIRenderer* ui) {
 		if (ui) {
-			ui->SetCanvasOrder(m_sortOrder); // Set the canvas order for sorting within the canvas
 			m_uiList.push_back(ui);
 		}
 	}
@@ -51,7 +41,6 @@ public:
 
 private:
 	std::vector<UIRenderer*> m_uiList;
-	RenderMode m_renderMode = RenderMode::ScreenSpace_Overlay;
 	UINT m_sortOrder = 0;
 	bool m_isVisible = true;
 

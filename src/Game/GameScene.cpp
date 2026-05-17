@@ -89,7 +89,7 @@ void GameScene::InitializeOverride(EngineContext& context)
 	canvasActor->GetComponentByClass<Canvas>()->Init(Canvas::ParamDesc());
 
 	auto uiActor = AddActor(ActorFactory::CreateActor(ActorType::UI, Actor::InitDesc()));
-	uiActor->GetComponentByClass<RectTransform>()->SetParams(RectTransform::ParamDesc{.anchorMode = AnchorMode::MiddleCenter});
+	uiActor->GetComponentByClass<RectTransform>()->SetParams(RectTransform::ParamDesc{.anchorMode = AnchorMode::TopLeft,  .pivot = Vector2(0.0f, 1.0f), .size = Vector2(100, 100),});
 	uiActor->GetComponentByClass<UIImage>()->SetParams(
 		UIImage::ParamDesc{
 			.pCanvas = canvasActor->GetComponentByClass<Canvas>(),
@@ -103,7 +103,6 @@ void GameScene::InitializeOverride(EngineContext& context)
 			.color = Vector4(1, 1, 1, 1),
 			.uvScale = Vector2(1, 1),
 			.uvOffset = Vector2(0, 0),
-			.pivot = Vector2(0.5f, 0.5f),
 			.flipX = false,
 			.flipY = false
 		}

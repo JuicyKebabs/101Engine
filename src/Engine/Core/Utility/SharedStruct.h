@@ -81,7 +81,6 @@ struct alignas(256) UIRenderConstants
 	Matrix4x4 worldMatrix;	//world matrix
 	Vector4 color;			//sprite color (RGBA)
 	Vector4 uvRect;			//UV rectangle
-	Vector2 pivot;			//pivot point for the sprite
 	Vector2 flip;			//flip flags for X and Y axes (1 for normal, -1 for flipped)
 };
 
