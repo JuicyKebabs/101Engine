@@ -105,6 +105,15 @@
     <Filter Include="shader\Constants">
       <UniqueIdentifier>{7e7c9f87-2eb3-4d6d-b129-5bb22528a20e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party">
+      <UniqueIdentifier>{433b3bdb-816b-4d7d-944e-59f1345abce0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\ImGui">
+      <UniqueIdentifier>{27e3f735-a8e6-4aea-b35a-6a0d8e18f8c8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\ImGui\backends">
+      <UniqueIdentifier>{3cba39ba-0bd0-47f6-a339-8adddefffeba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\App\App.cpp">
@@ -250,6 +259,24 @@
     </ClCompile>
     <ClCompile Include="src\Engine\Graphics\VertexTypes.cpp">
       <Filter>src\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\ImGui\backends\imgui_impl_win32.cpp">
+      <Filter>third_party\ImGui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\ImGui\backends\imgui_impl_dx12.cpp">
+      <Filter>third_party\ImGui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\ImGui\imgui.cpp">
+      <Filter>third_party\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\ImGui\imgui_tables.cpp">
+      <Filter>third_party\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\ImGui\imgui_widgets.cpp">
+      <Filter>third_party\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\ImGui\imgui_draw.cpp">
+      <Filter>third_party\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -450,6 +477,9 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Scene\SceneTypes.h">
       <Filter>src\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\ImGui\imgui_internal.h">
+      <Filter>third_party\ImGui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
