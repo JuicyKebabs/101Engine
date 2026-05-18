@@ -1,7 +1,6 @@
 #pragma once
 #include <d3d12.h>
 #include <DirectXMath.h>
-#include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Component/Component.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Physics/CollisionData.h"

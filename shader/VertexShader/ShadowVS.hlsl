@@ -1,5 +1,5 @@
-#include "../FrameConstants.hlsli"
-#include "../MeshObjectConstants.hlsli" 
+#include "../Constants/FrameConstants.hlsli"
+#include "../Constants/MeshObjectConstants.hlsli" 
 
 struct VSInput
 {

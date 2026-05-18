@@ -1,7 +1,7 @@
 #pragma once
 #include "SceneBase.h"
 #include "Engine/Core/Context/Context.h"
-#include "Engine/Core/Utility/SharedStruct.h"
+#include "Engine/Scene/SceneTypes.h"
 
 // Forward declaration
 class Renderer;			// Renderer

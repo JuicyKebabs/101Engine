@@ -1,4 +1,4 @@
-#include "../BasicShader.hlsli"
+#include "../Constants/BasicShader.hlsli"
 Texture2D gTexture : register(t0); //テクスチャオブジェクト
 SamplerState gSampler : register(s0); //サンプラーオブジェクト
 

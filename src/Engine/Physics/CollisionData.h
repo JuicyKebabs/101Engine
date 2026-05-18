@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <DirectXMath.h>
 #include <vector>
-#include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Core/Math/Math.h"
+#include "Engine/Actor/ActorTag.h"
 
 // Forward declarations
 class Collider;

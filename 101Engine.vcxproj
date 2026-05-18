@@ -168,7 +168,6 @@
     <ClCompile Include="src\Engine\Component\Transform.cpp" />
     <ClCompile Include="src\Engine\Core\Math\Math.cpp" />
     <ClCompile Include="src\Engine\Core\Time\Time.cpp" />
-    <ClCompile Include="src\Engine\Core\Utility\SharedStruct.cpp" />
     <ClCompile Include="src\Engine\Engine.cpp" />
     <ClCompile Include="src\Engine\Graphics\CameraSystem.cpp" />
     <ClCompile Include="src\Engine\Graphics\ConstantBuffer.cpp" />
@@ -183,6 +182,7 @@
     <ClCompile Include="src\Engine\Graphics\RootSignature.cpp" />
     <ClCompile Include="src\Engine\Graphics\ShaderLibrary.cpp" />
     <ClCompile Include="src\Engine\Graphics\VertexBuffer.cpp" />
+    <ClCompile Include="src\Engine\Graphics\VertexTypes.cpp" />
     <ClCompile Include="src\Engine\Input\Controller.cpp" />
     <ClCompile Include="src\Engine\Input\InputManager.cpp" />
     <ClCompile Include="src\Engine\Input\keyboard.cpp" />
@@ -208,6 +208,7 @@
     <ClInclude Include="src\App\App.h" />
     <ClInclude Include="src\Engine\Actor\Actor.h" />
     <ClInclude Include="src\Engine\Actor\ActorFactory.h" />
+    <ClInclude Include="src\Engine\Actor\ActorTag.h" />
     <ClInclude Include="src\Engine\Audio\Audio.h" />
     <ClInclude Include="src\Engine\Audio\AudioData.h" />
     <ClInclude Include="src\Engine\Component\AssimpNodeTransformAnim.h" />
@@ -227,13 +228,14 @@
     <ClInclude Include="src\Engine\Core\Math\Math.h" />
     <ClInclude Include="src\Engine\Core\Random\Random.h" />
     <ClInclude Include="src\Engine\Core\Time\Time.h" />
-    <ClInclude Include="src\Engine\Core\Utility\SharedStruct.h" />
     <ClInclude Include="src\Engine\Engine.h" />
     <ClInclude Include="src\Engine\Graphics\ConstantBuffer.h" />
     <ClInclude Include="src\Engine\Graphics\DescriptorHeapAllocator.h" />
     <ClInclude Include="src\Engine\Graphics\DescriptorHeap.h" />
     <ClInclude Include="src\Engine\Graphics\FrameRenderData.h" />
+    <ClInclude Include="src\Engine\Graphics\GpuBufferLayouts.h" />
     <ClInclude Include="src\Engine\Graphics\IndexBuffer.h" />
+    <ClInclude Include="src\Engine\Graphics\LightTypes.h" />
     <ClInclude Include="src\Engine\Graphics\PipelineState.h" />
     <ClInclude Include="src\Engine\Graphics\RenderData.h" />
     <ClInclude Include="src\Engine\Graphics\Renderer.h" />
@@ -242,7 +244,9 @@
     <ClInclude Include="src\Engine\Graphics\RenderTemplateFactory.h" />
     <ClInclude Include="src\Engine\Graphics\RootSignature.h" />
     <ClInclude Include="src\Engine\Graphics\ShaderLibrary.h" />
+    <ClInclude Include="src\Engine\Graphics\SpriteUtility.h" />
     <ClInclude Include="src\Engine\Graphics\VertexBuffer.h" />
+    <ClInclude Include="src\Engine\Graphics\VertexTypes.h" />
     <ClInclude Include="src\Engine\Input\Controller.h" />
     <ClInclude Include="src\Engine\Input\InputManager.h" />
     <ClInclude Include="src\Engine\Input\keyboard.h" />
@@ -256,6 +260,7 @@
     <ClInclude Include="src\Engine\Resource\TextureManager.h" />
     <ClInclude Include="src\Engine\Scene\SceneBase.h" />
     <ClInclude Include="src\Engine\Scene\SceneManager.h" />
+    <ClInclude Include="src\Engine\Scene\SceneTypes.h" />
     <ClInclude Include="src\Engine\UI\Canvas.h" />
     <ClInclude Include="src\Engine\UI\UIRenderer.h" />
     <ClInclude Include="src\Engine\UI\UIImage.h" />

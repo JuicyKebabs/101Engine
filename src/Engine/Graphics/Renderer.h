@@ -12,12 +12,12 @@
 #include "RootSignature.h"
 #include "PipelineState.h"
 #include "IndexBuffer.h"
-#include "Engine/Core/Utility/SharedStruct.h"
 #include "RenderData.h"
 #include "ShaderLibrary.h"
 #include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Graphics/FrameRenderData.h"
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
+#include "Engine/Graphics/LightTypes.h"
 
 
 // Forward declaration

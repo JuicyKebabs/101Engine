@@ -1,4 +1,4 @@
-#include "../BasicShader.hlsli"
+#include "../Constants/BasicShader.hlsli"
 
 VSOutPut main(
     uint vertexID : SV_VertexID //’¸“_ID
