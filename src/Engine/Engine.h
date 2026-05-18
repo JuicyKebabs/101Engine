@@ -1,7 +1,11 @@
 #pragma once
+#define _WIN32_WINNT 0x0A00
+#include <sdkddkver.h>
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+
 #include <tchar.h>
 #include <d3d12.h>
 #include <d3dx12.h>
@@ -36,7 +40,7 @@ enum class RenderPassTargetType
 
 // Render pass target structure (used to specify the render target for rendering)
 struct RenderPassTarget
-{
+{                              
 	RenderPassTargetType type;
 	uint32_t index;	// For BackBuffer, this is the buffer index; for Builtin, this is the built-in render target index
 };
@@ -142,7 +146,7 @@ private:	// Internal functions
 	void CreateDepthStencil();				// Depth stencil creation
 
 	// Built-in render target creation functions
-	void CreateShadowMapRenderTarget();	// Shadow map render target creation
+	void CreateShadowMapRenderTarget();		// Shadow map render target creation
 	void CreatePostProcessRenderTarget();	// Post-processing render target creation
 
 	void SetViewPortAndScissorRect(const GpuTexture& renderTarget);	// Set viewport and scissor rectangle based on the render target

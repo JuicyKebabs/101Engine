@@ -8,6 +8,7 @@
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Window/WindowInfo.h"
+#include "Engine/Graphics/GpuBufferLayouts.h"
 
 using namespace DirectX;
 

@@ -1,7 +1,5 @@
 #pragma once
-#include <d3d12.h>
 #include <vector>
-#include "Engine/Core/Utility/SharedStruct.h"
 #include "MeshGPU.h"
 
 // Mesh management class

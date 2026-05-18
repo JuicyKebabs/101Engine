@@ -3,7 +3,6 @@
 #include <DirectXMath.h>
 #include <vector>
 #include "Engine/Component/Collider.h"
-#include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Physics/CollisionData.h"

@@ -1,6 +1,6 @@
-#include "../BasicShader.hlsli"
-#include "../FrameConstants.hlsli"
-#include "../UIObjectConstants.hlsli"
+#include "../Constants/BasicShader.hlsli"
+#include "../Constants/FrameConstants.hlsli"
+#include "../Constants/UIObjectConstants.hlsli"
 
 Texture2D gTexture : register(t0); //テクスチャオブジェクト
 SamplerState gSampler : register(s0); //サンプラーオブジェクト

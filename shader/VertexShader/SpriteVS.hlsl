@@ -1,6 +1,6 @@
-#include "../BasicShader.hlsli"
-#include "../FrameConstants.hlsli"
-#include "../SpriteObjectConstants.hlsli"
+#include "../Constants/BasicShader.hlsli"
+#include "../Constants/FrameConstants.hlsli"
+#include "../Constants/SpriteObjectConstants.hlsli"
 
 VSOutPut main(
     uint vertexID : SV_VertexID

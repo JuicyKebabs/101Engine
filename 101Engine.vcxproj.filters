@@ -2,25 +2,25 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="shader\BasicShader.hlsli">
-      <Filter>shader</Filter>
-    </None>
-    <None Include="shader\FrameConstants.hlsli">
-      <Filter>shader</Filter>
-    </None>
-    <None Include="shader\LightConstants.hlsli">
-      <Filter>shader</Filter>
-    </None>
-    <None Include="shader\MeshObjectConstants.hlsli">
-      <Filter>shader</Filter>
-    </None>
-    <None Include="shader\SpriteObjectConstants.hlsli">
-      <Filter>shader</Filter>
-    </None>
     <None Include=".github\upgrades\assessment.md" />
     <None Include=".github\upgrades\plan.md" />
+    <None Include="shader\BasicShader.hlsli">
+      <Filter>shader\Constants</Filter>
+    </None>
+    <None Include="shader\FrameConstants.hlsli">
+      <Filter>shader\Constants</Filter>
+    </None>
+    <None Include="shader\LightConstants.hlsli">
+      <Filter>shader\Constants</Filter>
+    </None>
+    <None Include="shader\MeshObjectConstants.hlsli">
+      <Filter>shader\Constants</Filter>
+    </None>
+    <None Include="shader\SpriteObjectConstants.hlsli">
+      <Filter>shader\Constants</Filter>
+    </None>
     <None Include="shader\UIObjectConstants.hlsli">
-      <Filter>shader</Filter>
+      <Filter>shader\Constants</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -87,9 +87,6 @@
     <Filter Include="src\Engine\Core\TIme">
       <UniqueIdentifier>{f40aecd0-96c5-4c99-92d8-e6beee5de8bb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\Engine\Core\Utility">
-      <UniqueIdentifier>{cfa9c4a5-7994-4e46-98f0-ead9e8e36b89}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\Engine\Core\Math">
       <UniqueIdentifier>{e0f84781-6703-4bb5-99ef-4e32dc049611}</UniqueIdentifier>
     </Filter>
@@ -104,6 +101,9 @@
     </Filter>
     <Filter Include="src\Window">
       <UniqueIdentifier>{6efa6eac-94bf-444f-97d2-f97b31623b1e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shader\Constants">
+      <UniqueIdentifier>{7e7c9f87-2eb3-4d6d-b129-5bb22528a20e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -127,9 +127,6 @@
     </ClCompile>
     <ClCompile Include="src\Engine\Component\Transform.cpp">
       <Filter>src\Engine\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Engine\Core\Utility\SharedStruct.cpp">
-      <Filter>src\Engine\Core\Utility</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Core\Time\Time.cpp">
       <Filter>src\Engine\Core\TIme</Filter>
@@ -251,6 +248,9 @@
     <ClCompile Include="src\Engine\Component\RectTransform.cpp">
       <Filter>src\Engine\Component</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Graphics\VertexTypes.cpp">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\App\App.h">
@@ -282,9 +282,6 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Component\Transform.h">
       <Filter>src\Engine\Component</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Engine\Core\Utility\SharedStruct.h">
-      <Filter>src\Engine\Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\Core\Time\Time.h">
       <Filter>src\Engine\Core\TIme</Filter>
@@ -435,6 +432,24 @@
     </ClInclude>
     <ClInclude Include="src\Engine\Window\WindowInfo.h">
       <Filter>src\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Actor\ActorTag.h">
+      <Filter>src\Engine\Actor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\GpuBufferLayouts.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\LightTypes.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\VertexTypes.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Graphics\SpriteUtility.h">
+      <Filter>src\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\Scene\SceneTypes.h">
+      <Filter>src\Engine\Scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

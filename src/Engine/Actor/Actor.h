@@ -5,7 +5,7 @@
 #include "Engine/Component/Component.h"
 #include "Engine/Component/ComponentPolicy.h"
 #include "Engine/Component/Transform.h"
-#include "Engine/Core/Utility/SharedStruct.h"
+#include "Engine/Actor/ActorTag.h"
 
 // Forward declaration
 class ActorFactory;

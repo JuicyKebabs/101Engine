@@ -2,7 +2,6 @@
 #include <d3d12.h>
 #include "Engine/Graphics/VertexBuffer.h"
 #include "Engine/Graphics/IndexBuffer.h"
-#include "Engine/Core/Utility/SharedStruct.h"
 #include "Engine/Graphics/RenderData.h"
 
 //メッシュ情報をGPU上に保持するクラス

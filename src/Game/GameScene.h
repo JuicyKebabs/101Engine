@@ -1,6 +1,5 @@
 #pragma once
 #include "Engine/Scene/SceneBase.h"
-#include "Engine/Core/Utility/SharedStruct.h"
 
 // Game scene class
 class GameScene : public SceneBase

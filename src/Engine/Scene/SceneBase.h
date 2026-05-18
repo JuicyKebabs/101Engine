@@ -2,13 +2,14 @@
 #include "Engine/Window/WindowInfo.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/ComPtr/ComPtr.h"
-#include "Engine/Core/Utility/SharedStruct.h"
+#include "Engine/Scene/SceneTypes.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Graphics/CameraSystem.h"
+#include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
 
 // Scene base class

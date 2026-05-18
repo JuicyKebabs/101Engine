@@ -2,7 +2,6 @@
 #include <DirectXMath.h>
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
-#include "Engine/Core/Utility/SharedStruct.h"
 
 class Actor;
 

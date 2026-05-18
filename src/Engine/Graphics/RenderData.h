@@ -1,9 +1,8 @@
 #pragma once
-#include <DirectXMath.h>
-#include "Engine/Component/AssimpNodeTransformAnim.h"
-#include "Engine/Core/Utility/SharedStruct.h"
-#include "Engine/Core/Math/Math.h"
 #include <vector>
+#include "Engine/Component/AssimpNodeTransformAnim.h"
+#include "Engine/Core/Math/Math.h"
+#include "Engine/Graphics/VertexTypes.h"
 
 // Forward declarations
 class Renderer;

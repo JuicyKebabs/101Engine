@@ -1,7 +1,7 @@
-#include "../BasicShader.hlsli"
-#include "../FrameConstants.hlsli"
-#include "../MeshObjectConstants.hlsli"
-#include "../LightConstants.hlsli"
+#include "../Constants/BasicShader.hlsli"
+#include "../Constants/FrameConstants.hlsli"
+#include "../Constants/MeshObjectConstants.hlsli"
+#include "../Constants/LightConstants.hlsli"
 
 Texture2D gTexture : register(t0); // Texture object
 Texture2D gShadowMap : register(t1); // Shadow map texture object

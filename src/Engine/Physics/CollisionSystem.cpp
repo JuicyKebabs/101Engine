@@ -6,8 +6,6 @@
 #include "Engine/Graphics/Renderer.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
-#include "Engine/Core/Utility/SharedStruct.h"
-
 using namespace DirectX;
 
 void CollisionSystem::Register(Collider* collider)

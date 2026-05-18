@@ -3,7 +3,7 @@
 #include <DirectXMath.h>
 #include <string>
 #include <vector>
-#include "Engine/Core/Utility/SharedStruct.h"
+#include "Engine/Graphics/VertexTypes.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Core/Math/Math.h"
 
