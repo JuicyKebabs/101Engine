@@ -79,12 +79,17 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)FrameWork\src;$(SolutionDir)Game\src;$(SolutionDir)Game;$(SolutionDir)third_party\Assimp\include;$(SolutionDir)Game/GameCode;$(SolutionDir)third_party</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)third_party\Assimp\lib\Debug;$(SolutionDir)third_party\DirectX\DirectXTex\lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc142-mtd.lib;IrrXMLd.lib;dxguid.lib;DirectXTex_Debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(SolutionDir)third_party\Assimp\bin\Debug\assimp-vc142-mtd.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -94,12 +99,17 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)FrameWork\src;$(SolutionDir)Game\src;$(SolutionDir)Game;$(SolutionDir)third_party\Assimp\include;$(SolutionDir)Game/GameCode;$(SolutionDir)third_party</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)third_party\Assimp\lib\Release;$(SolutionDir)third_party\DirectX\DirectXTex\lib\Release</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc142-mt.lib;IrrXML.lib;dxguid.lib;DirectXTex_Release.lib</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(SolutionDir)third_party\Assimp\bin\Release\assimp-vc142-mt.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -109,15 +119,18 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)FrameWork\src;$(SolutionDir)Game\src;$(SolutionDir)Game;$(SolutionDir)third_party\Assimp\include;$(SolutionDir)Game/GameCode;$(SolutionDir)third_party</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;DirectXTex_Debug.lib;%(AdditionalDependencies);</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)third_party\DirectX\DirectXTex\lib\DirectXTex_Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc142-mtd.lib;IrrXMLd.lib;dxguid.lib;DirectXTex_Debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)third_party\Assimp\lib\Debug;$(SolutionDir)third_party\DirectX\DirectXTex\lib\Debug</AdditionalLibraryDirectories>
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(SolutionDir)third_party\Assimp\bin\Debug\assimp-vc142-mtd.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -131,23 +144,23 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)third_party\ImGui;$(SolutionDir)third_party\ImGui\backends;$(SolutionDir)third_party\DirectX\d3dx12;$(SolutionDir)third_party\DirectX\DirectXTex\include;$(SolutionDir)FrameWork\src;$(SolutionDir)Game\src;$(SolutionDir)Game;$(SolutionDir)third_party\Assimp\include;$(SolutionDir)Game/GameCode;$(SolutionDir)third_party</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;DirectXTex_Release.lib;%(AdditionalDependencies);</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)third_party\DirectX\DirectXTex\lib\DirectXTex_Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc142-mt.lib;IrrXML.lib;dxguid.lib;DirectXTex_Release.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)third_party\Assimp\lib\Release;$(SolutionDir)third_party\DirectX\DirectXTex\lib\Release</AdditionalLibraryDirectories>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(SolutionDir)third_party\Assimp\bin\Release\assimp-vc142-mt.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include=".github\upgrades\assessment.md" />
-    <None Include=".github\upgrades\plan.md" />
-    <None Include="packages.config" />
     <None Include="shader\BasicShader.hlsli" />
     <None Include="shader\FrameConstants.hlsli" />
     <None Include="shader\LightConstants.hlsli" />
@@ -156,82 +169,52 @@
     <None Include="shader\UIObjectConstants.hlsli" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\App\App.cpp" />
-    <ClCompile Include="src\Engine\Actor\Actor.cpp">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)third_party\DirectX\d3dx12;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    </ClCompile>
-    <ClCompile Include="src\Engine\Actor\ActorFactory.cpp" />
-    <ClCompile Include="src\Engine\Audio\Audio.cpp" />
-    <ClCompile Include="src\Engine\Component\Camera.cpp" />
-    <ClCompile Include="src\Engine\Component\Collider.cpp" />
-    <ClCompile Include="src\Engine\Component\Component.cpp" />
-    <ClCompile Include="src\Engine\Component\MeshRenderer.cpp" />
-    <ClCompile Include="src\Engine\Component\RectTransform.cpp" />
-    <ClCompile Include="src\Engine\Component\RendererComponent.cpp" />
-    <ClCompile Include="src\Engine\Component\SpriteRenderer.cpp" />
-    <ClCompile Include="src\Engine\Component\Transform.cpp" />
-    <ClCompile Include="src\Engine\Core\Math\Math.cpp" />
-    <ClCompile Include="src\Engine\Core\Time\Time.cpp" />
-    <ClCompile Include="src\Engine\Engine.cpp" />
-    <ClCompile Include="src\Engine\Graphics\CameraSystem.cpp" />
-    <ClCompile Include="src\Engine\Graphics\ConstantBuffer.cpp" />
-    <ClCompile Include="src\Engine\Graphics\DescriptorHeapAllocator.cpp" />
-    <ClCompile Include="src\Engine\Graphics\DescriptorHeap.cpp" />
-    <ClCompile Include="src\Engine\Graphics\IndexBuffer.cpp" />
-    <ClCompile Include="src\Engine\Graphics\PipelineState.cpp" />
-    <ClCompile Include="src\Engine\Graphics\RenderData.cpp" />
-    <ClCompile Include="src\Engine\Graphics\Renderer.cpp" />
-    <ClCompile Include="src\Engine\Graphics\RenderSystem.cpp" />
-    <ClCompile Include="src\Engine\Graphics\RenderTemplateFactory.cpp" />
-    <ClCompile Include="src\Engine\Graphics\RootSignature.cpp" />
-    <ClCompile Include="src\Engine\Graphics\ShaderLibrary.cpp" />
-    <ClCompile Include="src\Engine\Graphics\VertexBuffer.cpp" />
-    <ClCompile Include="src\Engine\Graphics\VertexTypes.cpp" />
-    <ClCompile Include="src\Engine\Input\Controller.cpp" />
-    <ClCompile Include="src\Engine\Input\InputManager.cpp" />
-    <ClCompile Include="src\Engine\Input\keyboard.cpp" />
-    <ClCompile Include="src\Engine\Model\AssimpLoader.cpp" />
-    <ClCompile Include="src\Engine\Physics\CollisionData.cpp" />
-    <ClCompile Include="src\Engine\Physics\CollisionSystem.cpp" />
-    <ClCompile Include="src\Engine\Resource\GpuTexture.cpp" />
-    <ClCompile Include="src\Engine\Resource\MeshGPU.cpp" />
-    <ClCompile Include="src\Engine\Resource\MeshManager.cpp" />
-    <ClCompile Include="src\Engine\Resource\TextureManager.cpp" />
-    <ClCompile Include="src\Engine\Scene\SceneBase.cpp" />
-    <ClCompile Include="src\Engine\Scene\SceneManager.cpp" />
-    <ClCompile Include="src\Engine\UI\Canvas.cpp" />
-    <ClCompile Include="src\Engine\UI\UIRenderer.cpp" />
-    <ClCompile Include="src\Game\CameraTest.cpp" />
-    <ClCompile Include="src\Game\GameScene.cpp" />
-    <ClCompile Include="src\Game\Player.cpp" />
-    <ClCompile Include="src\Game\TitleScene.cpp" />
-    <ClCompile Include="src\Main\main.cpp" />
-    <ClCompile Include="third_party\ImGui\backends\imgui_impl_dx12.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="third_party\ImGui\backends\imgui_impl_win32.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="third_party\ImGui\imgui.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="third_party\ImGui\imgui_draw.cpp" />
-    <ClCompile Include="third_party\ImGui\imgui_tables.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="third_party\ImGui\imgui_widgets.cpp">
+    <ClCompile Include="FrameWork\src\Engine\Actor\Actor.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Actor\ActorFactory.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Audio\Audio.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\Camera.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\Collider.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\Component.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\MeshRenderer.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\RectTransform.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\RendererComponent.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\SpriteRenderer.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Component\Transform.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Core\Math\Math.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Core\Path\PathManager.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Core\Time\Time.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Engine.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\CameraSystem.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\ConstantBuffer.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\DescriptorHeap.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\DescriptorHeapAllocator.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\IndexBuffer.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\PipelineState.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\RenderData.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\Renderer.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\RenderSystem.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\RenderTemplateFactory.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\RootSignature.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\ShaderLibrary.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\VertexBuffer.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Graphics\VertexTypes.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Input\Controller.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Input\InputManager.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Input\keyboard.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Model\AssimpLoader.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Physics\CollisionData.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Physics\CollisionSystem.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Resource\GpuTexture.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Resource\MeshGPU.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Resource\MeshManager.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Resource\TextureManager.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Scene\SceneBase.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Scene\SceneLoader.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\Scene\SceneManager.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\UI\Canvas.cpp" />
+    <ClCompile Include="FrameWork\src\Engine\UI\UIRenderer.cpp" />
+    <ClCompile Include="Game\src\App\App.cpp" />
+    <ClCompile Include="Game\src\main.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
@@ -239,73 +222,74 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CameraSystem.h" />
-    <ClInclude Include="src\App\App.h" />
-    <ClInclude Include="src\Engine\Actor\Actor.h" />
-    <ClInclude Include="src\Engine\Actor\ActorFactory.h" />
-    <ClInclude Include="src\Engine\Actor\ActorTag.h" />
-    <ClInclude Include="src\Engine\Audio\Audio.h" />
-    <ClInclude Include="src\Engine\Audio\AudioData.h" />
-    <ClInclude Include="src\Engine\Component\AssimpNodeTransformAnim.h" />
-    <ClInclude Include="src\Engine\Component\Behavior.h" />
-    <ClInclude Include="src\Engine\Component\Camera.h" />
-    <ClInclude Include="src\Engine\Component\Collider.h" />
-    <ClInclude Include="src\Engine\Component\Component.h" />
-    <ClInclude Include="src\Engine\Component\ComponentPolicy.h" />
-    <ClInclude Include="src\Engine\Component\MeshRenderer.h" />
-    <ClInclude Include="src\Engine\Component\RectTransform.h" />
-    <ClInclude Include="src\Engine\Component\RendererComponent.h" />
-    <ClInclude Include="src\Engine\Component\SpriteRenderer.h" />
-    <ClInclude Include="src\Engine\Component\Transform.h" />
-    <ClInclude Include="src\Engine\Core\ComPtr\ComPtr.h" />
-    <ClInclude Include="src\Engine\Core\Context\Context.h" />
-    <ClInclude Include="src\Engine\Core\Debug\Debug.h" />
-    <ClInclude Include="src\Engine\Core\Math\Math.h" />
-    <ClInclude Include="src\Engine\Core\Random\Random.h" />
-    <ClInclude Include="src\Engine\Core\Time\Time.h" />
-    <ClInclude Include="src\Engine\Engine.h" />
-    <ClInclude Include="src\Engine\Graphics\ConstantBuffer.h" />
-    <ClInclude Include="src\Engine\Graphics\DescriptorHeapAllocator.h" />
-    <ClInclude Include="src\Engine\Graphics\DescriptorHeap.h" />
-    <ClInclude Include="src\Engine\Graphics\FrameRenderData.h" />
-    <ClInclude Include="src\Engine\Graphics\GpuBufferLayouts.h" />
-    <ClInclude Include="src\Engine\Graphics\IndexBuffer.h" />
-    <ClInclude Include="src\Engine\Graphics\LightTypes.h" />
-    <ClInclude Include="src\Engine\Graphics\PipelineState.h" />
-    <ClInclude Include="src\Engine\Graphics\RenderData.h" />
-    <ClInclude Include="src\Engine\Graphics\Renderer.h" />
-    <ClInclude Include="src\Engine\Graphics\RenderPipeline.h" />
-    <ClInclude Include="src\Engine\Graphics\RenderSystem.h" />
-    <ClInclude Include="src\Engine\Graphics\RenderTemplateFactory.h" />
-    <ClInclude Include="src\Engine\Graphics\RootSignature.h" />
-    <ClInclude Include="src\Engine\Graphics\ShaderLibrary.h" />
-    <ClInclude Include="src\Engine\Graphics\SpriteUtility.h" />
-    <ClInclude Include="src\Engine\Graphics\VertexBuffer.h" />
-    <ClInclude Include="src\Engine\Graphics\VertexTypes.h" />
-    <ClInclude Include="src\Engine\Input\Controller.h" />
-    <ClInclude Include="src\Engine\Input\InputManager.h" />
-    <ClInclude Include="src\Engine\Input\keyboard.h" />
-    <ClInclude Include="src\Engine\Model\AssimpLoader.h" />
-    <ClInclude Include="src\Engine\Physics\CollisionData.h" />
-    <ClInclude Include="src\Engine\Physics\CollisionSystem.h" />
-    <ClInclude Include="src\Engine\Resource\MeshGPU.h" />
-    <ClInclude Include="src\Engine\Resource\MeshManager.h" />
-    <ClInclude Include="src\Engine\Resource\GpuTexture.h" />
-    <ClInclude Include="src\Engine\Resource\Texture.h" />
-    <ClInclude Include="src\Engine\Resource\TextureManager.h" />
-    <ClInclude Include="src\Engine\Scene\SceneBase.h" />
-    <ClInclude Include="src\Engine\Scene\SceneManager.h" />
-    <ClInclude Include="src\Engine\Scene\SceneTypes.h" />
-    <ClInclude Include="src\Engine\UI\Canvas.h" />
-    <ClInclude Include="src\Engine\UI\UIRenderer.h" />
-    <ClInclude Include="src\Engine\UI\UIImage.h" />
-    <ClInclude Include="src\Engine\Window\WindowInfo.h" />
-    <ClInclude Include="src\Game\CameraTest.h" />
-    <ClInclude Include="src\Game\GameScene.h" />
-    <ClInclude Include="src\Game\Player.h" />
-    <ClInclude Include="src\Game\TitleScene.h" />
-    <ClInclude Include="src\Main\main.h" />
-    <ClInclude Include="third_party\ImGui\imgui_internal.h" />
+    <ClInclude Include="FrameWork\src\Engine\Actor\Actor.h" />
+    <ClInclude Include="FrameWork\src\Engine\Actor\ActorFactory.h" />
+    <ClInclude Include="FrameWork\src\Engine\Actor\ActorTag.h" />
+    <ClInclude Include="FrameWork\src\Engine\Actor\EngineComponentRegistry.h" />
+    <ClInclude Include="FrameWork\src\Engine\Audio\Audio.h" />
+    <ClInclude Include="FrameWork\src\Engine\Audio\AudioData.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\AssimpNodeTransformAnim.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\Behavior.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\Camera.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\Collider.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\Component.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\ComponentPolicy.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\MeshRenderer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\RectTransform.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\RendererComponent.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\SpriteRenderer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Component\Transform.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\ComPtr\ComPtr.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\Context\Context.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\Debug\Debug.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\Math\Math.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\Path\PathManager.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\Random\Random.h" />
+    <ClInclude Include="FrameWork\src\Engine\Core\Time\Time.h" />
+    <ClInclude Include="FrameWork\src\Engine\Engine.h" />
+    <ClInclude Include="FrameWork\src\Engine\EngineComponentrRegistration.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\CameraSystem.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\ConstantBuffer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\DescriptorHeap.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\DescriptorHeapAllocator.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\FrameRenderData.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\GpuBufferLayouts.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\IndexBuffer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\LightTypes.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\PipelineState.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\RenderData.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\Renderer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\RenderPipeline.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\RenderSystem.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\RenderTemplateFactory.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\RootSignature.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\ShaderLibrary.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\SpriteUtility.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\VertexBuffer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Graphics\VertexTypes.h" />
+    <ClInclude Include="FrameWork\src\Engine\Input\Controller.h" />
+    <ClInclude Include="FrameWork\src\Engine\Input\InputManager.h" />
+    <ClInclude Include="FrameWork\src\Engine\Input\keyboard.h" />
+    <ClInclude Include="FrameWork\src\Engine\Model\AssimpLoader.h" />
+    <ClInclude Include="FrameWork\src\Engine\Physics\CollisionData.h" />
+    <ClInclude Include="FrameWork\src\Engine\Physics\CollisionSystem.h" />
+    <ClInclude Include="FrameWork\src\Engine\Resource\GpuTexture.h" />
+    <ClInclude Include="FrameWork\src\Engine\Resource\MeshGPU.h" />
+    <ClInclude Include="FrameWork\src\Engine\Resource\MeshManager.h" />
+    <ClInclude Include="FrameWork\src\Engine\Resource\Texture.h" />
+    <ClInclude Include="FrameWork\src\Engine\Resource\TextureManager.h" />
+    <ClInclude Include="FrameWork\src\Engine\Scene\ComponentRegistry.h" />
+    <ClInclude Include="FrameWork\src\Engine\Scene\SceneBase.h" />
+    <ClInclude Include="FrameWork\src\Engine\Scene\SceneLoader.h" />
+    <ClInclude Include="FrameWork\src\Engine\Scene\SceneManager.h" />
+    <ClInclude Include="FrameWork\src\Engine\UI\Canvas.h" />
+    <ClInclude Include="FrameWork\src\Engine\UI\UIimage.h" />
+    <ClInclude Include="FrameWork\src\Engine\UI\UIRenderer.h" />
+    <ClInclude Include="FrameWork\src\Engine\Window\WindowInfo.h" />
+    <ClInclude Include="Game\GameCode\SampleScene.h" />
+    <ClInclude Include="Game\GameCode\TestBehavior.h" />
+    <ClInclude Include="Game\src\App\App.h" />
+    <ClInclude Include="Game\src\main.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\PixelShader\MeshPS.hlsl">
