@@ -59,25 +59,25 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\kamka\Desktop\101Engine\build\bin\Debug\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\bin\Debug\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">101Editor.dir\Debug\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">101Editor</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\kamka\Desktop\101Engine\build\bin\Release\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\bin\Release\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">101Editor.dir\Release\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">101Editor</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\kamka\Desktop\101Engine\build\bin\MinSizeRel\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\bin\MinSizeRel\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">101Editor.dir\MinSizeRel\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">101Editor</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.exe</TargetExt>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\kamka\Desktop\101Engine\build\bin\RelWithDebInfo\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\bin\RelWithDebInfo\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">101Editor.dir\RelWithDebInfo\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">101Editor</TargetName>
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.exe</TargetExt>
@@ -86,18 +86,20 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ExceptionHandling>Sync</ExceptionHandling>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <MinimalRebuild></MinimalRebuild>
+      <MinimalRebuild>
+      </MinimalRebuild>
       <Optimization>Disabled</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <SupportJustMyCode></SupportJustMyCode>
+      <SupportJustMyCode>
+      </SupportJustMyCode>
       <UseFullPaths>false</UseFullPaths>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NOMINMAX;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -105,10 +107,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;NOMINMAX;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -116,13 +118,13 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>..\lib\Debug\101Framework.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;xaudio2.lib;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\lib\Debug\DirectXTex_Debug.lib;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\lib\Debug\assimp-vc142-mtd.lib;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\lib\Debug\IrrXMLd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\lib\Debug\101Framework.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;xaudio2.lib;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\lib\Debug\DirectXTex_Debug.lib;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\lib\Debug\assimp-vc142-mtd.lib;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\lib\Debug\IrrXMLd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <ImportLibrary>C:/Users/kamka/Desktop/101Engine/build/lib/Debug/101Editor.lib</ImportLibrary>
-      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine/build/bin/Debug/101Editor.pdb</ProgramDataBaseFile>
+      <ImportLibrary>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/lib/Debug/101Editor.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/bin/Debug/101Editor.pdb</ProgramDataBaseFile>
       <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
@@ -131,17 +133,19 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <MinimalRebuild></MinimalRebuild>
+      <MinimalRebuild>
+      </MinimalRebuild>
       <Optimization>MaxSpeed</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <SupportJustMyCode></SupportJustMyCode>
+      <SupportJustMyCode>
+      </SupportJustMyCode>
       <UseFullPaths>false</UseFullPaths>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -151,10 +155,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -162,13 +166,13 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>..\lib\Release\101Framework.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;xaudio2.lib;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\lib\Release\DirectXTex_Release.lib;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\lib\Release\assimp-vc142-mt.lib;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\lib\Release\IrrXML.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\lib\Release\101Framework.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dxguid.lib;xaudio2.lib;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\lib\Release\DirectXTex_Release.lib;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\lib\Release\assimp-vc142-mt.lib;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\lib\Release\IrrXML.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <ImportLibrary>C:/Users/kamka/Desktop/101Engine/build/lib/Release/101Editor.lib</ImportLibrary>
-      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine/build/bin/Release/101Editor.pdb</ProgramDataBaseFile>
+      <ImportLibrary>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/lib/Release/101Editor.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/bin/Release/101Editor.pdb</ProgramDataBaseFile>
       <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
@@ -177,17 +181,19 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <MinimalRebuild></MinimalRebuild>
+      <MinimalRebuild>
+      </MinimalRebuild>
       <Optimization>MinSpace</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <SupportJustMyCode></SupportJustMyCode>
+      <SupportJustMyCode>
+      </SupportJustMyCode>
       <UseFullPaths>false</UseFullPaths>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -197,10 +203,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -213,8 +219,8 @@
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <ImportLibrary>C:/Users/kamka/Desktop/101Engine/build/lib/MinSizeRel/101Editor.lib</ImportLibrary>
-      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine/build/bin/MinSizeRel/101Editor.pdb</ProgramDataBaseFile>
+      <ImportLibrary>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/lib/MinSizeRel/101Editor.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/bin/MinSizeRel/101Editor.pdb</ProgramDataBaseFile>
       <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
@@ -223,18 +229,20 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ExceptionHandling>Sync</ExceptionHandling>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <MinimalRebuild></MinimalRebuild>
+      <MinimalRebuild>
+      </MinimalRebuild>
       <Optimization>MaxSpeed</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <SupportJustMyCode></SupportJustMyCode>
+      <SupportJustMyCode>
+      </SupportJustMyCode>
       <UseFullPaths>false</UseFullPaths>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
       <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -242,10 +250,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\d3dx12;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\DirectX\DirectXTex\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\Assimp\include;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui;C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -258,8 +266,8 @@
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-      <ImportLibrary>C:/Users/kamka/Desktop/101Engine/build/lib/RelWithDebInfo/101Editor.lib</ImportLibrary>
-      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine/build/bin/RelWithDebInfo/101Editor.pdb</ProgramDataBaseFile>
+      <ImportLibrary>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/lib/RelWithDebInfo/101Editor.lib</ImportLibrary>
+      <ProgramDataBaseFile>C:/Users/kamka/Desktop/101Engine developing/101Engine/build/bin/RelWithDebInfo/101Editor.pdb</ProgramDataBaseFile>
       <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
@@ -267,11 +275,11 @@
     </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kamka\Desktop\101Engine\Editor\CMakeLists.txt">
+    <CustomBuild Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\Editor\CMakeLists.txt">
       <UseUtf8Encoding>Always</UseUtf8Encoding>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine/Editor/CMakeLists.txt</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine developing/101Engine/Editor/CMakeLists.txt</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/kamka/Desktop/101Engine -BC:/Users/kamka/Desktop/101Engine/build --check-stamp-file C:/Users/kamka/Desktop/101Engine/build/Editor/CMakeFiles/generate.stamp
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/kamka/Desktop/101Engine developing/101Engine" "-BC:/Users/kamka/Desktop/101Engine developing/101Engine/build" --check-stamp-file "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/Editor/CMakeFiles/generate.stamp"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -280,11 +288,11 @@ exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\kamka\Desktop\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine/Editor/CMakeLists.txt</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine developing/101Engine/Editor/CMakeLists.txt</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/kamka/Desktop/101Engine -BC:/Users/kamka/Desktop/101Engine/build --check-stamp-file C:/Users/kamka/Desktop/101Engine/build/Editor/CMakeFiles/generate.stamp
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/kamka/Desktop/101Engine developing/101Engine" "-BC:/Users/kamka/Desktop/101Engine developing/101Engine/build" --check-stamp-file "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/Editor/CMakeFiles/generate.stamp"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -293,11 +301,11 @@ exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\kamka\Desktop\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
-      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine/Editor/CMakeLists.txt</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine developing/101Engine/Editor/CMakeLists.txt</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/kamka/Desktop/101Engine -BC:/Users/kamka/Desktop/101Engine/build --check-stamp-file C:/Users/kamka/Desktop/101Engine/build/Editor/CMakeFiles/generate.stamp
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/kamka/Desktop/101Engine developing/101Engine" "-BC:/Users/kamka/Desktop/101Engine developing/101Engine/build" --check-stamp-file "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/Editor/CMakeFiles/generate.stamp"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -306,11 +314,11 @@ exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\kamka\Desktop\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
-      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine/Editor/CMakeLists.txt</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/kamka/Desktop/101Engine developing/101Engine/Editor/CMakeLists.txt</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
-"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/kamka/Desktop/101Engine -BC:/Users/kamka/Desktop/101Engine/build --check-stamp-file C:/Users/kamka/Desktop/101Engine/build/Editor/CMakeFiles/generate.stamp
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" "-SC:/Users/kamka/Desktop/101Engine developing/101Engine" "-BC:/Users/kamka/Desktop/101Engine developing/101Engine/build" --check-stamp-file "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/Editor/CMakeFiles/generate.stamp"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -319,31 +327,31 @@ exit /b %1
 :cmDone
 if %errorlevel% neq 0 goto :VCEnd</Command>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(AdditionalInputs)</AdditionalInputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\kamka\Desktop\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\kamka\Desktop\101Engine developing\101Engine\build\Editor\CMakeFiles\generate.stamp</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\Editor\src\EditorApp.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\Editor\src\main.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_draw.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_tables.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_widgets.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_demo.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends\imgui_impl_dx12.cpp" />
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\Editor\src\EditorApp.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\Editor\src\main.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_draw.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_tables.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_widgets.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_demo.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends\imgui_impl_dx12.cpp" />
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends\imgui_impl_win32.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
-    <ProjectReference Include="C:\Users\kamka\Desktop\101Engine\build\ZERO_CHECK.vcxproj">
-      <Project>{4A74358A-9BCB-3177-867D-FABEB937367A}</Project>
+    <ProjectReference Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\build\ZERO_CHECK.vcxproj">
+      <Project>{8F46840E-3B3B-387D-AB53-AFDC11A5014D}</Project>
       <Name>ZERO_CHECK</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>
-    <ProjectReference Include="C:\Users\kamka\Desktop\101Engine\build\FrameWork\101Framework.vcxproj">
-      <Project>{A7F9B8B7-1096-336D-AED0-AE1B9FCF57B1}</Project>
+    <ProjectReference Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\build\FrameWork\101Framework.vcxproj">
+      <Project>{1ECB6365-6CAE-3061-B962-F6972AA8992B}</Project>
       <Name>101Framework</Name>
     </ProjectReference>
   </ItemGroup>

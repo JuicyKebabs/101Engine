@@ -24,9 +24,9 @@ events:
       The output was:
       0
       MSBuild 縺ｮ繝舌・繧ｸ繝ｧ繝ｳ 17.14.40+3e7442088 (.NET Framework)
-      2026/05/19 17:08:42 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
+      2026/05/22 15:49:39 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
       
-      繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdC\\CompilerIdC.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
+      繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdC\\CompilerIdC.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
       PrepareForBuild:
         繝・ぅ繝ｬ繧ｯ繝医Μ "Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
         讒矩\xc2\x80蛹門・蜉帙′譛牙柑縺ｫ縺ｪ縺｣縺ｦ縺・∪縺吶\xc2\x80ゅさ繝ｳ繝代う繝ｩ險ｺ譁ｭ縺ｮ譖ｸ蠑剰ｨｭ螳壹↓縺ｯ繧ｨ繝ｩ繝ｼ髫主ｱ､縺悟渚譏縺輔ｌ縺ｾ縺吶\xc2\x80りｩｳ邏ｰ縺ｫ縺､縺・※縺ｯ縲”ttps://aka.ms/cpp/structured-output 繧貞盾辣ｧ縺励※縺上□縺輔＞縲・
@@ -39,7 +39,7 @@ events:
         CMakeCCompilerId.c
       Link:
         C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:".\\CompilerIdC.exe" /INCREMENTAL:NO /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /PDB:".\\CompilerIdC.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:".\\CompilerIdC.lib" /MACHINE:X64 Debug\\CMakeCCompilerId.obj
-        CompilerIdC.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdC\\CompilerIdC.exe
+        CompilerIdC.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdC\\CompilerIdC.exe
       PostBuildEvent:
         for %%i in (cl.exe) do @echo CMAKE_C_COMPILER=%%~$PATH:i
         :VCEnd
@@ -47,13 +47,13 @@ events:
       FinalizeBuildStatus:
         繝輔ぃ繧､繝ｫ "Debug\\CompilerIdC.tlog\\unsuccessfulbuild" 繧貞炎髯､縺励※縺・∪縺吶\xc2\x80・
         "Debug\\CompilerIdC.tlog\\CompilerIdC.lastbuildstate" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
-      繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdC\\CompilerIdC.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
+      繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdC\\CompilerIdC.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
       
       繝薙Ν繝峨↓謌仙粥縺励∪縺励◆縲・
           0 蛟九・隴ｦ蜻・
           0 繧ｨ繝ｩ繝ｼ
       
-      邨碁℃譎る俣 00:00:00.47
+      邨碁℃譎る俣 00:00:00.83
       
       
       Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CompilerIdC.exe"
@@ -61,7 +61,7 @@ events:
       Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CompilerIdC.vcxproj"
       
       The C compiler identification is MSVC, found in:
-        C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/3.31.6-msvc6/CompilerIdC/CompilerIdC.exe
+        C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/3.31.6-msvc6/CompilerIdC/CompilerIdC.exe
       
   -
     kind: "message-v1"
@@ -79,9 +79,9 @@ events:
       The output was:
       0
       MSBuild 縺ｮ繝舌・繧ｸ繝ｧ繝ｳ 17.14.40+3e7442088 (.NET Framework)
-      2026/05/19 17:08:43 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
+      2026/05/22 15:49:40 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
       
-      繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdCXX\\CompilerIdCXX.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
+      繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdCXX\\CompilerIdCXX.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
       PrepareForBuild:
         繝・ぅ繝ｬ繧ｯ繝医Μ "Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
         讒矩\xc2\x80蛹門・蜉帙′譛牙柑縺ｫ縺ｪ縺｣縺ｦ縺・∪縺吶\xc2\x80ゅさ繝ｳ繝代う繝ｩ險ｺ譁ｭ縺ｮ譖ｸ蠑剰ｨｭ螳壹↓縺ｯ繧ｨ繝ｩ繝ｼ髫主ｱ､縺悟渚譏縺輔ｌ縺ｾ縺吶\xc2\x80りｩｳ邏ｰ縺ｫ縺､縺・※縺ｯ縲”ttps://aka.ms/cpp/structured-output 繧貞盾辣ｧ縺励※縺上□縺輔＞縲・
@@ -94,7 +94,7 @@ events:
         CMakeCXXCompilerId.cpp
       Link:
         C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:".\\CompilerIdCXX.exe" /INCREMENTAL:NO /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /PDB:".\\CompilerIdCXX.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:".\\CompilerIdCXX.lib" /MACHINE:X64 Debug\\CMakeCXXCompilerId.obj
-        CompilerIdCXX.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdCXX\\CompilerIdCXX.exe
+        CompilerIdCXX.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdCXX\\CompilerIdCXX.exe
       PostBuildEvent:
         for %%i in (cl.exe) do @echo CMAKE_CXX_COMPILER=%%~$PATH:i
         :VCEnd
@@ -102,13 +102,13 @@ events:
       FinalizeBuildStatus:
         繝輔ぃ繧､繝ｫ "Debug\\CompilerIdCXX.tlog\\unsuccessfulbuild" 繧貞炎髯､縺励※縺・∪縺吶\xc2\x80・
         "Debug\\CompilerIdCXX.tlog\\CompilerIdCXX.lastbuildstate" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
-      繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdCXX\\CompilerIdCXX.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
+      繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\3.31.6-msvc6\\CompilerIdCXX\\CompilerIdCXX.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
       
       繝薙Ν繝峨↓謌仙粥縺励∪縺励◆縲・
           0 蛟九・隴ｦ蜻・
           0 繧ｨ繝ｩ繝ｼ
       
-      邨碁℃譎る俣 00:00:00.51
+      邨碁℃譎る俣 00:00:00.56
       
       
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
@@ -116,7 +116,7 @@ events:
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.vcxproj"
       
       The CXX compiler identification is MSVC, found in:
-        C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/3.31.6-msvc6/CompilerIdCXX/CompilerIdCXX.exe
+        C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/3.31.6-msvc6/CompilerIdCXX/CompilerIdCXX.exe
       
   -
     kind: "try_compile-v1"
@@ -127,8 +127,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-t3bw7k"
-      binary: "C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-t3bw7k"
+      source: "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-tcb6kr"
+      binary: "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-tcb6kr"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
       CMAKE_C_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -137,40 +137,40 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-t3bw7k'
+        Change Dir: 'C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-tcb6kr'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_ef52c.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_01d88.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild 縺ｮ繝舌・繧ｸ繝ｧ繝ｳ 17.14.40+3e7442088 (.NET Framework)
-        2026/05/19 17:08:44 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
+        2026/05/22 15:49:41 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
         
-        繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-t3bw7k\\cmTC_ef52c.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
+        繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tcb6kr\\cmTC_01d88.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
         PrepareForBuild:
-          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_ef52c.dir\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_01d88.dir\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
           讒矩\xc2\x80蛹門・蜉帙′譛牙柑縺ｫ縺ｪ縺｣縺ｦ縺・∪縺吶\xc2\x80ゅさ繝ｳ繝代う繝ｩ險ｺ譁ｭ縺ｮ譖ｸ蠑剰ｨｭ螳壹↓縺ｯ繧ｨ繝ｩ繝ｼ髫主ｱ､縺悟渚譏縺輔ｌ縺ｾ縺吶\xc2\x80りｩｳ邏ｰ縺ｫ縺､縺・※縺ｯ縲”ttps://aka.ms/cpp/structured-output 繧貞盾辣ｧ縺励※縺上□縺輔＞縲・
-          繝・ぅ繝ｬ繧ｯ繝医Μ "C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-t3bw7k\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
-          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_ef52c.dir\\Debug\\cmTC_ef52c.tlog\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          繝・ぅ繝ｬ繧ｯ繝医Μ "C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tcb6kr\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_01d88.dir\\Debug\\cmTC_01d88.tlog\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
         InitializeBuildStatus:
-          "AlwaysCreate" 縺梧欠螳壹＆繧後◆縺溘ａ "cmTC_ef52c.dir\\Debug\\cmTC_ef52c.tlog\\unsuccessfulbuild" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
-          "cmTC_ef52c.dir\\Debug\\cmTC_ef52c.tlog\\unsuccessfulbuild" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
+          "AlwaysCreate" 縺梧欠螳壹＆繧後◆縺溘ａ "cmTC_01d88.dir\\Debug\\cmTC_01d88.tlog\\unsuccessfulbuild" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          "cmTC_01d88.dir\\Debug\\cmTC_01d88.tlog\\unsuccessfulbuild" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_ef52c.dir\\Debug\\\\" /Fd"cmTC_ef52c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TC /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCCompilerABI.c"
-          Microsoft(R) C/C++ Optimizing Compiler Version 19.44.35225 for x64
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_01d88.dir\\Debug\\\\" /Fd"cmTC_01d88.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TC /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCCompilerABI.c"
+          Microsoft(R) C/C++ Optimizing Compiler Version 19.44.35227 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_ef52c.dir\\Debug\\\\" /Fd"cmTC_ef52c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TC /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCCompilerABI.c"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_01d88.dir\\Debug\\\\" /Fd"cmTC_01d88.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TC /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCCompilerABI.c"
           CMakeCCompilerABI.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-t3bw7k\\Debug\\cmTC_ef52c.exe" /INCREMENTAL /ILK:"cmTC_ef52c.dir\\Debug\\cmTC_ef52c.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-t3bw7k/Debug/cmTC_ef52c.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-t3bw7k/Debug/cmTC_ef52c.lib" /MACHINE:X64  /machine:x64 cmTC_ef52c.dir\\Debug\\CMakeCCompilerABI.obj
-          cmTC_ef52c.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-t3bw7k\\Debug\\cmTC_ef52c.exe
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tcb6kr\\Debug\\cmTC_01d88.exe" /INCREMENTAL /ILK:"cmTC_01d88.dir\\Debug\\cmTC_01d88.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-tcb6kr/Debug/cmTC_01d88.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-tcb6kr/Debug/cmTC_01d88.lib" /MACHINE:X64  /machine:x64 cmTC_01d88.dir\\Debug\\CMakeCCompilerABI.obj
+          cmTC_01d88.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tcb6kr\\Debug\\cmTC_01d88.exe
         FinalizeBuildStatus:
-          繝輔ぃ繧､繝ｫ "cmTC_ef52c.dir\\Debug\\cmTC_ef52c.tlog\\unsuccessfulbuild" 繧貞炎髯､縺励※縺・∪縺吶\xc2\x80・
-          "cmTC_ef52c.dir\\Debug\\cmTC_ef52c.tlog\\cmTC_ef52c.lastbuildstate" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
-        繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-t3bw7k\\cmTC_ef52c.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
+          繝輔ぃ繧､繝ｫ "cmTC_01d88.dir\\Debug\\cmTC_01d88.tlog\\unsuccessfulbuild" 繧貞炎髯､縺励※縺・∪縺吶\xc2\x80・
+          "cmTC_01d88.dir\\Debug\\cmTC_01d88.tlog\\cmTC_01d88.lastbuildstate" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
+        繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tcb6kr\\cmTC_01d88.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
         
         繝薙Ν繝峨↓謌仙粥縺励∪縺励◆縲・
             0 蛟九・隴ｦ蜻・
             0 繧ｨ繝ｩ繝ｼ
         
-        邨碁℃譎る俣 00:00:00.45
+        邨碁℃譎る俣 00:00:00.57
         
       exitCode: 0
   -
@@ -199,7 +199,7 @@ events:
       - "CMakeLists.txt:2 (project)"
     message: |
       Running the C compiler's linker: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.44.35207/bin/HostX64/x64/link.exe" "-v"
-      Microsoft (R) Incremental Linker Version 14.44.35225.0
+      Microsoft (R) Incremental Linker Version 14.44.35227.0
       Copyright (C) Microsoft Corporation.  All rights reserved.
   -
     kind: "try_compile-v1"
@@ -210,8 +210,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-2r05zr"
-      binary: "C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-2r05zr"
+      source: "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-xdckyw"
+      binary: "C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-xdckyw"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -221,40 +221,40 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-2r05zr'
+        Change Dir: 'C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-xdckyw'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_832b5.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_24929.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild 縺ｮ繝舌・繧ｸ繝ｧ繝ｳ 17.14.40+3e7442088 (.NET Framework)
-        2026/05/19 17:08:45 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
+        2026/05/22 15:49:43 縺ｫ繝薙Ν繝峨ｒ髢句ｧ九＠縺ｾ縺励◆縲・
         
-        繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2r05zr\\cmTC_832b5.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
+        繝弱・繝・1 荳翫・繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xdckyw\\cmTC_24929.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ)縲・
         PrepareForBuild:
-          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_832b5.dir\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_24929.dir\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
           讒矩\xc2\x80蛹門・蜉帙′譛牙柑縺ｫ縺ｪ縺｣縺ｦ縺・∪縺吶\xc2\x80ゅさ繝ｳ繝代う繝ｩ險ｺ譁ｭ縺ｮ譖ｸ蠑剰ｨｭ螳壹↓縺ｯ繧ｨ繝ｩ繝ｼ髫主ｱ､縺悟渚譏縺輔ｌ縺ｾ縺吶\xc2\x80りｩｳ邏ｰ縺ｫ縺､縺・※縺ｯ縲”ttps://aka.ms/cpp/structured-output 繧貞盾辣ｧ縺励※縺上□縺輔＞縲・
-          繝・ぅ繝ｬ繧ｯ繝医Μ "C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2r05zr\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
-          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_832b5.dir\\Debug\\cmTC_832b5.tlog\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          繝・ぅ繝ｬ繧ｯ繝医Μ "C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xdckyw\\Debug\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          繝・ぅ繝ｬ繧ｯ繝医Μ "cmTC_24929.dir\\Debug\\cmTC_24929.tlog\\" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
         InitializeBuildStatus:
-          "AlwaysCreate" 縺梧欠螳壹＆繧後◆縺溘ａ "cmTC_832b5.dir\\Debug\\cmTC_832b5.tlog\\unsuccessfulbuild" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
-          "cmTC_832b5.dir\\Debug\\cmTC_832b5.tlog\\unsuccessfulbuild" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
+          "AlwaysCreate" 縺梧欠螳壹＆繧後◆縺溘ａ "cmTC_24929.dir\\Debug\\cmTC_24929.tlog\\unsuccessfulbuild" 繧剃ｽ懈・縺励※縺・∪縺吶\xc2\x80・
+          "cmTC_24929.dir\\Debug\\cmTC_24929.tlog\\unsuccessfulbuild" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_832b5.dir\\Debug\\\\" /Fd"cmTC_832b5.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCXXCompilerABI.cpp"
-          Microsoft(R) C/C++ Optimizing Compiler Version 19.44.35225 for x64
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_24929.dir\\Debug\\\\" /Fd"cmTC_24929.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCXXCompilerABI.cpp"
+          Microsoft(R) C/C++ Optimizing Compiler Version 19.44.35227 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_832b5.dir\\Debug\\\\" /Fd"cmTC_832b5.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCXXCompilerABI.cpp"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_24929.dir\\Debug\\\\" /Fd"cmTC_24929.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-3.31\\Modules\\CMakeCXXCompilerABI.cpp"
           CMakeCXXCompilerABI.cpp
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2r05zr\\Debug\\cmTC_832b5.exe" /INCREMENTAL /ILK:"cmTC_832b5.dir\\Debug\\cmTC_832b5.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-2r05zr/Debug/cmTC_832b5.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-2r05zr/Debug/cmTC_832b5.lib" /MACHINE:X64  /machine:x64 cmTC_832b5.dir\\Debug\\CMakeCXXCompilerABI.obj
-          cmTC_832b5.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2r05zr\\Debug\\cmTC_832b5.exe
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xdckyw\\Debug\\cmTC_24929.exe" /INCREMENTAL /ILK:"cmTC_24929.dir\\Debug\\cmTC_24929.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-xdckyw/Debug/cmTC_24929.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/CMakeScratch/TryCompile-xdckyw/Debug/cmTC_24929.lib" /MACHINE:X64  /machine:x64 cmTC_24929.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_24929.vcxproj -> C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xdckyw\\Debug\\cmTC_24929.exe
         FinalizeBuildStatus:
-          繝輔ぃ繧､繝ｫ "cmTC_832b5.dir\\Debug\\cmTC_832b5.tlog\\unsuccessfulbuild" 繧貞炎髯､縺励※縺・∪縺吶\xc2\x80・
-          "cmTC_832b5.dir\\Debug\\cmTC_832b5.tlog\\cmTC_832b5.lastbuildstate" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
-        繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2r05zr\\cmTC_832b5.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
+          繝輔ぃ繧､繝ｫ "cmTC_24929.dir\\Debug\\cmTC_24929.tlog\\unsuccessfulbuild" 繧貞炎髯､縺励※縺・∪縺吶\xc2\x80・
+          "cmTC_24929.dir\\Debug\\cmTC_24929.tlog\\cmTC_24929.lastbuildstate" 縺ｮ繧ｿ繝・メ 繧ｿ繧ｹ繧ｯ繧貞ｮ溯｡後＠縺ｦ縺・∪縺吶\xc2\x80・
+        繝励Ο繧ｸ繧ｧ繧ｯ繝・"C:\\Users\\kamka\\Desktop\\101Engine developing\\101Engine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xdckyw\\cmTC_24929.vcxproj" (譌｢螳壹・繧ｿ繝ｼ繧ｲ繝・ヨ) 縺ｮ繝薙Ν繝峨′螳御ｺ・＠縺ｾ縺励◆縲・
         
         繝薙Ν繝峨↓謌仙粥縺励∪縺励◆縲・
             0 蛟九・隴ｦ蜻・
             0 繧ｨ繝ｩ繝ｼ
         
-        邨碁℃譎る俣 00:00:00.45
+        邨碁℃譎る俣 00:00:00.53
         
       exitCode: 0
   -
@@ -283,6 +283,6 @@ events:
       - "CMakeLists.txt:2 (project)"
     message: |
       Running the CXX compiler's linker: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.44.35207/bin/HostX64/x64/link.exe" "-v"
-      Microsoft (R) Incremental Linker Version 14.44.35225.0
+      Microsoft (R) Incremental Linker Version 14.44.35227.0
       Copyright (C) Microsoft Corporation.  All rights reserved.
 ...

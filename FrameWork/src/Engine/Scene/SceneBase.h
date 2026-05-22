@@ -46,6 +46,8 @@ public:
 	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }				// Get camera system
 	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
 
+	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
+
 private:
 	std::vector<std::unique_ptr<Actor>> m_actors;			// Object list in the scene
 	std::vector<std::unique_ptr<Actor>> m_addPendingActors;	// Pending objects to be added

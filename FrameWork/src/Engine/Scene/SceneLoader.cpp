@@ -54,4 +54,92 @@ bool SceneLoader::Load(const std::string& filePath, SceneBase* scene, EngineCont
 		dl.intensity = light["intensity"];
 		scene->SetDirectionalLight(dl);
 	}
+
+	// Load actors
+	for (auto& actorJson : j["actors"])
+	{
+		LoadActor(actorJson, scene, nullptr);
+	}
+
+	return true;
+}
+
+// Load an actor (Recursive function to load child actors)
+static void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
+{
+	// Prepare an InitDesc for the actor
+	Actor::InitDesc desc;
+	desc.name = actorJson.value("name", "Actor");
+	desc.isActive = actorJson.value("is_active", true);
+	std::string tagName = actorJson.value("tag", "None");
+	desc.tag = tagName.empty() ? TAG_NONE : TagRegistry::Get().GetId(tagName);
+
+	// Create the actor using the factory
+	Actor* actor = ActorFactory::CreateEmptyActor(desc);
+
+	// Add Transform component
+	if (actorJson.contains("transform"))
+	{
+		auto& t = actorJson["transform"];
+		Transform::ParamDesc tdesc;
+		tdesc.localPosition = {
+			t["position"][0], t["position"][1], t["position"][2],
+		};
+		tdesc.localEulerDeg = {
+			t["rotation"][0], t["rotation"][1], t["rotation"][2],
+		};
+		tdesc.localScale = {
+			t["scale"][0], t["scale"][1], t["scale"][2],
+		};
+		actor->GetComponentByClass<Transform>()->SetParams(tdesc);
+	}
+
+	// Add Built-in ngine components
+	if (actorJson.contains("components"))
+	{
+		for (auto& comp : actorJson["components"])
+		{
+			std::string name = comp.get<std::string>();
+			if (!EngineComponentRegistry::Get().Add(name, actor))
+			{
+				DBG("SceneLoader: Unknown engine component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
+			}
+		}
+	}
+
+	// Add user-defined behavior components
+	if (actorJson.contains("behaviors"))
+	{
+		for (auto& behavior : actorJson["behaviors"])
+		{
+			std::string name = behavior.get<std::string>();
+			Behavior* instance = ComponentRegistry::Get().Create(name);
+			if(instance)
+			{
+				actor->AddComponentInstance(std::unique_ptr<Component>(instance));
+			}
+			else
+			{
+				DBG("SceneLoader: Unknown behavior component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
+			}
+		}
+	}
+
+	// Parent-child relationship
+	if(parent)
+	{
+		parent->SetParent(parent);
+	}
+
+	// Add this actor to the scene
+	scene->AddActor(actor);
+
+	// Recursively load child actors
+	if (actorJson.contains("children"))
+	{
+		for (auto& child : actorJson["children"])
+		{
+			LoadActor(child, scene, actor);
+		}
+	}
 }

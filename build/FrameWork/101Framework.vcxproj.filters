@@ -1,142 +1,145 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Actor\Actor.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Actor\Actor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Actor\ActorFactory.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Actor\ActorFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Audio\Audio.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Audio\Audio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\Camera.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\Collider.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\Collider.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\Component.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\Component.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\MeshRenderer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\MeshRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\RectTransform.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\RectTransform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\RendererComponent.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\RendererComponent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\SpriteRenderer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\SpriteRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Component\Transform.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Component\Transform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Core\Math\Math.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Core\Math\Math.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Core\Path\PathManager.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Core\Path\PathManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Core\Time\Time.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Core\Time\Time.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Engine.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Engine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\CameraSystem.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\CameraSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\ConstantBuffer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\ConstantBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\DescriptorHeap.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\DescriptorHeap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\DescriptorHeapAllocator.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\DescriptorHeapAllocator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\IndexBuffer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\IndexBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\PipelineState.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\PipelineState.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\RenderData.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\RenderData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\RenderSystem.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\RenderSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\RenderTemplateFactory.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\RenderTemplateFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\Renderer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\RootSignature.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\RootSignature.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\ShaderLibrary.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\ShaderLibrary.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\VertexBuffer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\VertexBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Graphics\VertexTypes.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Graphics\VertexTypes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Input\Controller.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Input\Controller.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Input\InputManager.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Input\InputManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Input\keyboard.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Input\keyboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Model\AssimpLoader.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Model\AssimpLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Physics\CollisionData.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Physics\CollisionData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Physics\CollisionSystem.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Physics\CollisionSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Resource\GpuTexture.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Resource\GpuTexture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Resource\MeshGPU.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Resource\MeshGPU.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Resource\MeshManager.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Resource\MeshManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Resource\TextureManager.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Resource\TextureManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Scene\SceneBase.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Scene\SceneBase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\Scene\SceneManager.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Scene\SceneLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\UI\Canvas.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\Scene\SceneManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\FrameWork\src\Engine\UI\UIRenderer.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\UI\Canvas.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\src\Engine\UI\UIRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kamka\Desktop\101Engine\FrameWork\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\FrameWork\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{E1D91E46-E857-39D0-A901-A0F7A30201FF}</UniqueIdentifier>
+      <UniqueIdentifier>{4A143A7C-2BDF-3386-B653-E9E7DCF984C3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

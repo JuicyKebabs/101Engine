@@ -1,40 +1,40 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\Editor\src\EditorApp.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\Editor\src\EditorApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\Editor\src\main.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\Editor\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_draw.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_draw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_tables.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_tables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_widgets.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_widgets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\imgui_demo.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\imgui_demo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends\imgui_impl_dx12.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends\imgui_impl_dx12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\kamka\Desktop\101Engine\third_party\ImGui\backends\imgui_impl_win32.cpp">
+    <ClCompile Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\third_party\ImGui\backends\imgui_impl_win32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="C:\Users\kamka\Desktop\101Engine\Editor\CMakeLists.txt" />
+    <CustomBuild Include="C:\Users\kamka\Desktop\101Engine developing\101Engine\Editor\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
-      <UniqueIdentifier>{E1D91E46-E857-39D0-A901-A0F7A30201FF}</UniqueIdentifier>
+      <UniqueIdentifier>{4A143A7C-2BDF-3386-B653-E9E7DCF984C3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

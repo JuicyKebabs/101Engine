@@ -310,9 +310,6 @@
     <ClInclude Include="FrameWork\src\Engine\Core\Context\Context.h">
       <Filter>FrameWork\src\Engine\Core\Context</Filter>
     </ClInclude>
-    <ClInclude Include="FrameWork\src\Engine\Core\Debug\Debug.h">
-      <Filter>FrameWork\src\Engine\Core\Debug</Filter>
-    </ClInclude>
     <ClInclude Include="FrameWork\src\Engine\Core\Math\Math.h">
       <Filter>FrameWork\src\Engine\Core\Math</Filter>
     </ClInclude>
@@ -459,6 +456,9 @@
     </ClInclude>
     <ClInclude Include="FrameWork\src\Engine\Scene\SceneLoader.h">
       <Filter>FrameWork\src\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameWork\src\Engine\Core\Debug\Debug.h">
+      <Filter>FrameWork\src\Engine\Core\Debug</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
