@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "nlohmann/json.hpp"
 
 //-----------------------------------------------------------------------------
 // SceneLoader class
@@ -7,6 +8,7 @@
 //------------------------------------------------------------------------------
 
 class SceneBase;
+class Actor;
 class EngineContext;
 
 class SceneLoader

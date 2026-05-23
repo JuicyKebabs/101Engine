@@ -1,5 +1,6 @@
 #include "SceneLoader.h"
 #include "Engine/Scene/SceneBase.h"
+#include "Engine/Actor/Actor.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/EngineComponentRegistry.h"
 #include "Engine/Scene/ComponentRegistry.h"
@@ -65,7 +66,7 @@ bool SceneLoader::Load(const std::string& filePath, SceneBase* scene, EngineCont
 }
 
 // Load an actor (Recursive function to load child actors)
-static void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
+void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
 {
 	// Prepare an InitDesc for the actor
 	Actor::InitDesc desc;

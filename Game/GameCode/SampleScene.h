@@ -1,7 +1,6 @@
 #pragma once
 #include "Engine/Scene/SceneBase.h"
 #include "TestBehavior.h"
-
 #include "nlohmann/json.hpp"
 
 // Sample scene class (for testing)
