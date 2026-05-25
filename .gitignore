@@ -369,3 +369,6 @@ build/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+
+# Don't exclude Debug.h
+!FrameWork/src/Engine/Core/Debug/
