@@ -1,4 +1,5 @@
 #include "ShaderLibrary.h"
+#include "Engine/Core/Path/PathManager.h"
 #include <cassert>
 
 // Output compile error messages
@@ -93,9 +94,11 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetPS(PS_FILE_ID fieldID, PS_ENT
 // Get or compile shader
 Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(SHADER_STAGE stage, const ShaderDesc& desc, uint64_t stageDefines, uint64_t commonDefines)
 {
+	std::wstring resolvedFilePath = ResolveShaderPath(desc.filePath);
+
 	// Create shader key
 	ShaderKey key = std::make_tuple(
-		desc.filePath,
+		resolvedFilePath,
 		desc.entryPoint,
 		desc.profile,
 		stageDefines,
@@ -118,7 +121,7 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(SHADER_STAGE 
 	auto macros = BuildMacros(stage, stageDefines, commonDefines);
 
 	HRESULT hr = D3DCompileFromFile(
-		desc.filePath.c_str(),
+		resolvedFilePath.c_str(),
 		macros.data(),
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		desc.entryPoint.c_str(),
@@ -174,4 +177,11 @@ void ShaderLibrary::AppendMacros(std::vector<D3D_SHADER_MACRO>& out, uint64_t de
 			out.push_back({ table[i].name, table[i].value == nullptr ? "1" : table[i].value });
 		}
 	}
+}
+
+std::wstring ShaderLibrary::ResolveShaderPath(const std::wstring& relativePath)
+{
+	std::string narrow(relativePath.begin(), relativePath.end());
+	std::string resolved = PathManager::Resolve(narrow);
+	return std::wstring(resolved.begin(), resolved.end());
 }

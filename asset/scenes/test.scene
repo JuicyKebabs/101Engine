@@ -1,0 +1,24 @@
+{
+    "version": 1,
+    "directional_light": {
+        "direction": [0.5, -1.0, 0.5],
+        "color": [1.0, 1.0, 1.0],
+        "intensity": 1.0
+    },
+    "actors": [
+        {
+            "name": "TestActor",
+            "tag": "Player",
+            "is_active": true,
+            "transform": {
+                "position": [0.0, 0.0, 0.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "scale": [1.0, 1.0, 1.0]
+            },
+            "components": [],
+            "components": ["MeshRenderer"],
+            "behaviors": ["TestBehavior"],
+            "children": []
+        }
+    ]
+}

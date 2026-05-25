@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include "nlohmann/json.hpp"
 
 //-----------------------------------------------------------------------------
 // SceneLoader class
@@ -18,6 +17,4 @@ public:
 
 private:
 	static constexpr int CURRENT_SCENE_VERSION = 1;	// Current scene data version
-
-	static void LoadActor(const nlohmann::json& actorJson, SceneBase* scene, Actor* parent);
 };

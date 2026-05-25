@@ -17,4 +17,13 @@ add_executable(101Editor WIN32
     ${IMGUI_SOURCES}
 )
 
+add_custom_command(TARGET 101Editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc142-mtd.dll>
+        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc142-mt.dll>
+        $<TARGET_FILE_DIR:101Game>
+)
+
 target_link_libraries(101Editor PRIVATE 101Framework)
+
+target_link_options(101Editor PRIVATE /WHOLEARCHIVE:101Framework)

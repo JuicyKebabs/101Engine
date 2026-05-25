@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Component/Behavior.h"
 #include "Engine/Core/Debug/Debug.h"

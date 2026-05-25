@@ -28,5 +28,7 @@ private:
 		std::string str = j.dump(4); // ®Œ`o—Í
 		DBG("%s", str.c_str());
 
+		SceneLoader::Load("asset/scenes/test.scene", this, context);
+
 	};	// Initialization (override)
 };

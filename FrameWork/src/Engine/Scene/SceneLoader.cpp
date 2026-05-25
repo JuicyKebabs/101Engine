@@ -14,6 +14,8 @@
 
 using json = nlohmann::json;
 
+static void LoadActor(const nlohmann::json& actorJson, SceneBase* scene, Actor* parent);
+
 bool SceneLoader::Load(const std::string& filePath, SceneBase* scene, EngineContext& context)
 {
 	// Open the scene file
@@ -104,6 +106,10 @@ void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
 			if (!EngineComponentRegistry::Get().Add(name, actor))
 			{
 				DBG("SceneLoader: Unknown engine component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
+			}
+			else
+			{
+				DBG("SceneLoader: Added engine component '%s'", name.c_str());
 			}
 		}
 	}

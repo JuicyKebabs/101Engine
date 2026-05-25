@@ -12,6 +12,7 @@ target_include_directories(101Framework PUBLIC
     ${CMAKE_SOURCE_DIR}/third_party/Assimp/include
     ${CMAKE_SOURCE_DIR}/third_party/ImGui
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/backends
+    ${CMAKE_SOURCE_DIR}/third_party
 )
 
 target_link_libraries(101Framework PUBLIC

@@ -10,6 +10,7 @@
 #include "Engine/Graphics/CameraSystem.h"
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
+#include "Engine/Scene/SceneLoader.h"
 
 // Scene base class
 // Base class for all scene classes

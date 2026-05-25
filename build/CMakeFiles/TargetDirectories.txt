@@ -1,5 +1,5 @@
-C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/kamka/Desktop/101Engine developing/101Engine/build/CMakeFiles/ZERO_CHECK.dir
-C:/Users/kamka/Desktop/101Engine developing/101Engine/build/FrameWork/CMakeFiles/101Framework.dir
-C:/Users/kamka/Desktop/101Engine developing/101Engine/build/Editor/CMakeFiles/101Editor.dir
-C:/Users/kamka/Desktop/101Engine developing/101Engine/build/Game/CMakeFiles/101Game.dir
+C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/kamka/Desktop/101Engine/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/kamka/Desktop/101Engine/build/FrameWork/CMakeFiles/101Framework.dir
+C:/Users/kamka/Desktop/101Engine/build/Editor/CMakeFiles/101Editor.dir
+C:/Users/kamka/Desktop/101Engine/build/Game/CMakeFiles/101Game.dir

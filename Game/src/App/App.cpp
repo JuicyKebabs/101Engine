@@ -5,6 +5,7 @@
 #include <tchar.h>
 #include "Engine/Input/keyboard.h"
 #include "Engine/Window/WindowInfo.h"
+#include "Engine/EngineComponentrRegistration.h"
 
 #pragma comment(lib, "winmm.lib")
 
