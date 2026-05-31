@@ -49,6 +49,10 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	{// Load from TGA file
 		hr = LoadFromTGAFile(path.c_str(), &meta, img);
 	}
+	else if (ext == L"dds")
+	{// Load from DDS file
+		hr = LoadFromDDSFile(path.c_str(), DDS_FLAGS_NONE, &meta, img);
+	}
 	else
 	{// Load from WIC file
 		hr = LoadFromWICFile(		// Load from WIC file
@@ -380,11 +384,11 @@ void TextureManager::CreateDefaultTexture()
 	paramDesc.srvIndex = srvIndex;			// SRV index (using next free index)
 	paramDesc.path = L"DefaultWhite";		// File path (for identification)
 	paramDesc.meta = TexMetadata{			// Metadata
-		DXGI_FORMAT_R8G8B8A8_UNORM, // Format
-		1,							// Width
-		1,							// Height
-		1,							// Mip levels
-		TEX_DIMENSION_TEXTURE2D		// Dimension
+		.width = 1,								// Width
+		.height = 1,							// Height
+		.mipLevels = 1,							// Mip levels
+		.format = DXGI_FORMAT_R8G8B8A8_UNORM,	// Format
+		.dimension = TEX_DIMENSION_TEXTURE2D	// Dimension
 	};
 	textureData->Initialize(
 		pTexture,

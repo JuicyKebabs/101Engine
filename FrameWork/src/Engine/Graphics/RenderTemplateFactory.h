@@ -3,6 +3,12 @@
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Resource/Texture.h"
 
+//-----------------------------------------------------------------------------------------------------------
+// RenderTemplateFactory.h
+// This class is responsible for creating render templates based on mesh and material descriptions.
+// Render templates are used to store all the necessary static information for rendering each type of object.
+//-----------------------------------------------------------------------------------------------------------
+
 class TextureManager;
 class MeshManager;
 

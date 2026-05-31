@@ -37,7 +37,7 @@ using LayerMask = uint32_t;
 //Collider collision information structure
 struct CollisionInfo
 {
-	Collider* opponent = nullptr;								//opponent collider
+	Collider* opponent = nullptr;						//opponent collider
 	Vector3 contactPoint = { 0.0f, 0.0f, 0.0f };		//collision point
 	Vector3 contactNormal = { 0.0f, 0.0f, 0.0f };		//collision normal
 	Vector3 penetrationDepth = { 0.0f, 0.0f, 0.0f };	//penetration depth

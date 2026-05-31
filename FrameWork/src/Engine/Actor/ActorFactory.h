@@ -28,12 +28,19 @@ public:
 	~ActorFactory() = default;
 
 	// Create an actor of the specified type with the given initialization parameters
-	static Actor* CreateActor(ActorType type, Actor::InitDesc desc) {
+	static Actor* CreateActor(ActorType type, Actor::InitDesc desc) 
+	{
+		// Create a new actor and initialize it
 		Actor* actor = new Actor();
 		actor->Init(desc);
+
+		// Get all function objects for adding necessary components based on the actor type
 		auto it = s_actorComponentMap.find(type);
 		assert(it != s_actorComponentMap.end() && "Actor type not supported");
-		for(const auto& componentAdder : it->second) {
+
+		// Call each function object to add components
+		for(const auto& componentAdder : it->second) 
+		{
 			componentAdder(actor);
 		}
 		return actor;

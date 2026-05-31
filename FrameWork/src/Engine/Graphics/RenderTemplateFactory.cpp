@@ -11,7 +11,6 @@ MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplate(MeshManager& 
 	Model model = LoadModelFromFile(meshInput.modelPath, meshInput.inverseU, meshInput.inverseV);
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
 	return BuildRenderTemplate(meshManager, model, materialDesc);
-
 }
 
 MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(MeshManager& meshManager, TextureManager& textureManager, DEFAULT_MESH mesh, const MaterialInput& materialInput)

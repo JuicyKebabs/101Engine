@@ -82,16 +82,6 @@ public:
 		return ptr;
 	}
 
-	// Add pre-created component instance to the container
-	void AddComponentInstance(std::unique_ptr<Component> component) 
-	{
-		if (!component) return;
-		Component* ptr = component.get();
-		ptr->SetOwner(this);
-		PendingComponent pending{ std::move(component), std::type_index(typeid(*ptr)) };
-		m_pendingComponents.push_back(std::move(pending));
-	}
-
 	// Check if the container has a component of type T
 	template<class T>
 	bool HasComponent() const 
@@ -293,31 +283,33 @@ public:
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
 
 private:
-	bool m_isActive = false;		// Active flag
-	bool m_destroyed = false;		// Flag to check if the actor is marked for destruction
-	bool m_isInitialized = false;	// Flag to check if the actor has been initialized (Init function has been called at least once)
+	// フラグ
+	bool m_isActive = false;		// アクティブフラグ
+	bool m_destroyed = false;		// 破棄フラグ
+	bool m_isInitialized = false;	// 初期化フラグ (Init関数呼び出し済みかどうか)
 
-	TagId m_tag = TAG_NONE; // Object tag
+	// コンポーネントコンテナ
+	std::unordered_map<std::type_index, ComponentBucket> m_components;	// 型IDごと
+	std::vector<Component*> m_componentPtrs;							// イテレーション用
+	std::vector<PendingComponent> m_pendingComponents;					// 追加保留中
 
-	std::unordered_map<std::type_index, ComponentBucket> m_components;	// Component container organized by type
-	std::vector<Component*> m_componentPtrs;							// Component pointer container for easy iteration
-	std::vector<PendingComponent> m_pendingComponents;					// Pending component container
+	// シーンと親子関係
+	SceneBase* m_pOwner = nullptr;	// 所有シーンへのポインタ
+	Actor* m_pParent = nullptr;		// 親アクターへのポインタ (親がいない場合はnullptr)
+	std::vector<Actor*> m_children;	// 子アクター
 
-	SceneBase* m_pOwner = nullptr;		// Pointer to the owning scene
-
-	Actor* m_pParent = nullptr;		// Pointer to the parent actor (nullptr if no parent)
-	std::vector<Actor*> m_children;	// Child actors
-
-	std::string m_name;				// Actor name (for debugging and editor)
+	// その他
+	TagId m_tag = TAG_NONE; // オブジェクトタグ
+	std::string m_name;		// アクター名 (デバッグおよびエディタ用)
 
 private:
 	void AddPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
 	void AddChildActorToScene(std::unique_ptr<Actor> child);
 
-	Actor() = default;			// Hide default constructor, ActorFactory is only allowed to create actors
-	friend class ActorFactory;	// Allow ActorFactory to access private constructor
-
+private:
+	// Hide default constructor and initialization from public, enforce usage of Init function and ActorFactory for creation
+	Actor() = default;			
 	void Init(const InitDesc& desc)
 	{
 		m_isActive = desc.isActive;
@@ -325,4 +317,16 @@ private:
 		m_name = desc.name;
 		m_isInitialized = true;
 	}
+
+	// Add pre-created component instance to the container
+	void AddComponentInstance(std::unique_ptr<Component> component)
+	{
+		if (!component) return;
+		Component* ptr = component.get();
+		ptr->SetOwner(this);
+		PendingComponent pending{ std::move(component), std::type_index(typeid(*ptr)) };
+		m_pendingComponents.push_back(std::move(pending));
+	}
+
+	friend class ActorFactory;	// Allow ActorFactory to access private constructor
 };
