@@ -16,7 +16,7 @@ SceneBase::SceneBase()
 	// Create default camera actor and set it as the main camera actor
 	Actor::InitDesc cameraParamDesc;
 	cameraParamDesc.name = "DefaultCamera";
-	auto defaultCameraActor = AddActor(ActorFactory::CreateActor(ActorType::Camera, cameraParamDesc));
+	auto defaultCameraActor = AddRootActor(ActorFactory::CreateActor(ActorType::Camera, cameraParamDesc));
 	defaultCameraActor->GetComponentByClass<Transform>()->SetParams(Transform::ParamDesc(Vector3{ 0,0,-5 }));
 	auto camera = defaultCameraActor->GetComponentByClass<Camera>();
 	camera->SetParams(Camera::ParamDesc{.window_width = WindowInfo::GetInstance().GetWidth(), .window_height = WindowInfo::GetInstance().GetHeight()});
@@ -37,15 +37,22 @@ void SceneBase::Initialize(EngineContext& context)
 // Post-update (for late update)
 void SceneBase::PreUpdate(float deltaTime)
 {
-	// Add pending actors to the scene
-	for (auto& pendingActor : m_addPendingActors)
+	// Add pending root actors to the scene
+	for (auto& pendingActor : m_addPendingRootActors)
 	{
-		m_actors.push_back(std::move(pendingActor));
+		m_rootActors.push_back(std::move(pendingActor));
 	}
-	m_addPendingActors.clear();
+	m_addPendingRootActors.clear();
+
+	// Add pending actors to the all actors list(including children)
+	for (auto& pendingActor : m_addPendingAllActors)
+	{
+		m_allActors.push_back(pendingActor);
+	}
+	m_addPendingAllActors.clear();
 
 	// Pre update every actor in list
-	for (auto& actor : m_actors)
+	for (auto& actor : m_rootActors)
 	{
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->PreUpdate(deltaTime);
@@ -56,14 +63,14 @@ void SceneBase::PreUpdate(float deltaTime)
 void SceneBase::Update(float deltaTime)
 {	
 	// Update every object in scene
-	for (auto& actor : m_actors)
+	for (auto& actor : m_rootActors)
 	{
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->Update(deltaTime);
 	}
 
 	// Flush transforms of all actors to update world transforms before collision checks
-	for(auto& actor : m_actors)
+	for(auto& actor : m_rootActors)
 	{
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->FlushTransform();
@@ -74,14 +81,14 @@ void SceneBase::Update(float deltaTime)
 void SceneBase::LateUpdate(float deltaTime)
 {
 	// Late update every actor in scene
-	for (auto& actor : m_actors)
+	for (auto& actor : m_rootActors)
 	{
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->LateUpdate(deltaTime);
 	}
 
 	// Flush transforms of all actors again
-	for(auto& actor : m_actors)
+	for(auto& actor : m_rootActors)
 	{
 		if (!actor->IsActive() || actor->IsDestroyed()) continue;
 		actor->FlushTransform();
@@ -99,11 +106,11 @@ void SceneBase::LateUpdate(float deltaTime)
 		m_pCameraSystem->Flush(deltaTime);
 	}
 
-	// Destroy actors from scene
-	m_actors.erase(std::remove_if(m_actors.begin(), m_actors.end(),
-		[](const std::unique_ptr<Actor>& actor) { return actor->IsDestroyed(); }),
-		m_actors.end());
-
+	// Destroy actors from scene( from both root actors list and all actors list)
+	m_rootActors.erase(std::remove_if(m_rootActors.begin(), m_rootActors.end(),
+		[](const std::unique_ptr<Actor>& actor) { return actor->IsDestroyed(); }), m_rootActors.end());
+	m_allActors.erase(std::remove_if(m_allActors.begin(), m_allActors.end(),
+		[](Actor* actor) { return actor->IsDestroyed(); }), m_allActors.end());
 }
 
 // Render

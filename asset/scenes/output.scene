@@ -1,0 +1,71 @@
+{
+    "actors": [
+        {
+            "children": [],
+            "components": [
+                "Camera"
+            ],
+            "is_active": true,
+            "name": "DefaultCamera",
+            "tag": "None",
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    -5.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "children": [],
+            "components": [
+                "MeshRenderer",
+                "TestBehavior"
+            ],
+            "is_active": true,
+            "name": "TestActor",
+            "tag": "Player",
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        }
+    ],
+    "directional_light": {
+        "color": [
+            1.0,
+            1.0,
+            1.0
+        ],
+        "direction": [
+            0.5,
+            -1.0,
+            0.5
+        ],
+        "intensity": 1.0
+    },
+    "version": 1
+}

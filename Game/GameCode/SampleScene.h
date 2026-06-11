@@ -1,5 +1,9 @@
 #pragma once
 #include "Engine/Scene/SceneBase.h"
+
+#include "Engine/Scene/SceneLoader.h"
+#include "Engine/Scene/SceneWriter.h"
+
 #include "TestBehavior.h"
 #include "nlohmann/json.hpp"
 
@@ -29,6 +33,8 @@ private:
 		DBG("%s", str.c_str());
 
 		SceneLoader::Load("asset/scenes/test.scene", this, context);
+
+		SceneWriter::SaveScene("asset/scenes/output.scene", this);
 
 	};	// Initialization (override)
 };

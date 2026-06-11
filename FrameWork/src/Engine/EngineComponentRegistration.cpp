@@ -1,4 +1,5 @@
 #include "Engine/EngineComponentrRegistration.h"
+#include "Engine/Scene/ComponentRegistry.h"
 
 static bool s_init = []() {
     DBG("EngineComponentRegistration.cpp loaded");
@@ -6,12 +7,11 @@ static bool s_init = []() {
     }();
 
 // Built-in engine components registration mactros.
-
-REGISTER_ENGINE_COMPONENT(MeshRenderer)
-REGISTER_ENGINE_COMPONENT(SpriteRenderer)
-REGISTER_ENGINE_COMPONENT(UIRenderer)
-REGISTER_ENGINE_COMPONENT(UIImage)
-REGISTER_ENGINE_COMPONENT(Canvas)
-REGISTER_ENGINE_COMPONENT(Camera)
-REGISTER_ENGINE_COMPONENT(RectTransform)
-REGISTER_ENGINE_COMPONENT(Collider)
+REGISTER_COMPONENT(MeshRenderer)
+REGISTER_COMPONENT(SpriteRenderer)
+REGISTER_COMPONENT(UIRenderer)
+REGISTER_COMPONENT(UIImage)
+REGISTER_COMPONENT(Canvas)
+REGISTER_COMPONENT(Camera)
+REGISTER_COMPONENT(RectTransform)
+REGISTER_COMPONENT(Collider)

@@ -19,6 +19,7 @@ using TagId = uint32_t;
 
 constexpr TagId TAG_NONE = 0;
 
+// Compile-time FNV-1a hash function to calculate tag IDs from string literals
 constexpr TagId CalcTagId(std::string_view str) 
 {
 	TagId hash = 2166136261u; // FNV offset basis
@@ -39,6 +40,7 @@ public:
 		return instance;
 	}
 
+	// Register a tag name and get its corresponding TagId.
 	TagId Register(std::string_view tagName)
 	{
 		TagId id = CalcTagId(tagName);
@@ -46,6 +48,7 @@ public:
 		return id;
 	}
 
+	// Get the TagId for a given tag name.
 	TagId GetId(std::string_view tagName)
 	{
 		TagId id = CalcTagId(tagName);
@@ -56,8 +59,10 @@ public:
 		return id;
 	}
 
+	// Get the tag name for a given TagId.
 	std::string GetName(TagId id) const
 	{
+		if (id == TAG_NONE) return "None";
 		auto it = m_tags.find(id);
 		if (it != m_tags.end()) return it->second;
 		return "UnknownTag";
@@ -65,7 +70,10 @@ public:
 
 private:
 	TagRegistry() = default;
+
+	// Map of TagId to tag name for reverse lookup
 	std::unordered_map<TagId, std::string> m_tags;
 };
 
+// Helper macro to get TagId from a string literal tag name
 #define TAG(name) TagRegistry::Get().GetId(name)
