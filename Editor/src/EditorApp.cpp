@@ -1,55 +1,70 @@
-#pragma once
 #include <windows.h>
 #include <algorithm>
 #include <mmsystem.h>
 #include <tchar.h>
 #include "EditorApp.h"
 #include "Engine/Input/keyboard.h"
+#include "Engine/Input/InputManager.h"
 #include "Engine/Window/WindowInfo.h"
 #include "imgui.h"
 #include "backends/imgui_impl_dx12.h"
 #include "backends/imgui_impl_win32.h"
+#include "EditorScene.h"
+#include "Engine/Actor/ActorFactory.h"
+#include "Engine/Actor/ActorTag.h"
+#include "Engine/Component/Transform.h"
+#include "Engine/Component/Camera.h"
+#include "Engine/Scene/SceneLoader.h"
+#include "Engine/Scene/SceneWriter.h"
+#include "Engine/Core/Debug/Debug.h"
+#include "BehaviorTemplateGenerator.h"
+#include "ProjectBuilder.h"
 
 #pragma comment(lib, "winmm.lib")
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
-	HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-static const int WINDOW_WIDTH = 1280;
+static const int WINDOW_WIDTH  = 1280;
 static const int WINDOW_HEIGHT = 720;
+
+static const char* kDefaultScenePath = "asset/scenes/test.scene";
 
 LRESULT EditorWindowProcedure(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
-		return true;
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
+        return true;
 
-	switch (msg)
-	{
-	case WM_ACTIVATEAPP:
-	case WM_SYSKEYDOWN:
-	case WM_KEYUP:
-	case WM_SYSKEYUP:
-		Keyboard_ProcessMessage(msg, wParam, lParam);
-		break;
-	case WM_KEYDOWN:
-		if (wParam == VK_ESCAPE)
-			SendMessage(hwnd, WM_CLOSE, 0, 0);
-		Keyboard_ProcessMessage(msg, wParam, lParam);
-		break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-	}
-	return DefWindowProc(hwnd, msg, wParam, lParam);
+    switch (msg)
+    {
+    case WM_ACTIVATEAPP:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        Keyboard_ProcessMessage(msg, wParam, lParam);
+        break;
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE)
+            SendMessage(hwnd, WM_CLOSE, 0, 0);
+        Keyboard_ProcessMessage(msg, wParam, lParam);
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
 bool EditorApp::Initialize()
 {
-	CreateMainWindow();	// Create main window
-	PrepareInstance();	// Prepare instance
-	InitInstance();		// Initialize instance
-	InitImGui();		// Initialize ImGui
-	return true;
+    CreateMainWindow();    // Create main window
+    PrepareInstance();     // Prepare instance
+    InitInstance();        // Initialize instance
+    InitImGui();           // Initialize ImGui
+
+    NewScene();            // Start with a fresh scene (MainCamera-tagged DefaultCamera)
+
+    return true;
 }
 
 void EditorApp::Run()
@@ -91,10 +106,17 @@ void EditorApp::Run()
                 float deltaTime = m_timeManager.GetDeltaTime();
                 m_timeManager.Update();
 
+                // ImGui's NewFrame is called before Update so that debug
+                // ImGui windows (e.g. EditorCamera's "Camera Info") can be
+                // drawn from within Update().
+                ImGui_ImplDX12_NewFrame();
+                ImGui_ImplWin32_NewFrame();
+                ImGui::NewFrame();
+
                 Update(deltaTime);
                 Render();
 
-                m_inputManager.Copy();
+                InputManager::GetInstance().Copy();
             }
         }
     } while (msg.message != WM_QUIT);
@@ -107,19 +129,31 @@ void EditorApp::Terminate()
     UnregisterClass(m_wc.lpszClassName, m_wc.hInstance);
 }
 
+// Load a scene from a file path
+void EditorApp::LoadScene(const std::string& filePath)
+{
+    m_pScene = std::make_unique<EditorScene>();
+    m_pScene->Initialize(m_engineContext);
+
+    bool result = SceneLoader::LoadScene(filePath, m_pScene.get(), m_engineContext);
+
+    if (result) DBG("EditorApp: Loaded scene from %s", filePath.c_str());
+    else        DBG("EditorApp: Failed to load scene from %s", filePath.c_str());
+}
+
 void EditorApp::CreateMainWindow()
 {
     HINSTANCE hInst = GetModuleHandle(nullptr);
 
-    m_wc.cbSize = sizeof(WNDCLASSEX);
-    m_wc.style = CS_HREDRAW | CS_VREDRAW;
-    m_wc.lpfnWndProc = (WNDPROC)EditorWindowProcedure;
-    m_wc.hIcon = LoadIcon(hInst, IDI_APPLICATION);
-    m_wc.hCursor = LoadCursor(hInst, IDC_ARROW);
+    m_wc.cbSize        = sizeof(WNDCLASSEX);
+    m_wc.style         = CS_HREDRAW | CS_VREDRAW;
+    m_wc.lpfnWndProc   = (WNDPROC)EditorWindowProcedure;
+    m_wc.hIcon         = LoadIcon(hInst, IDI_APPLICATION);
+    m_wc.hCursor       = LoadCursor(hInst, IDC_ARROW);
     m_wc.hbrBackground = GetSysColorBrush(COLOR_BACKGROUND);
-    m_wc.lpszMenuName = nullptr;
+    m_wc.lpszMenuName  = nullptr;
     m_wc.lpszClassName = _T("101_Editor");
-    m_wc.hInstance = hInst;
+    m_wc.hInstance     = hInst;
 
     RegisterClassEx(&m_wc);
 
@@ -143,16 +177,23 @@ void EditorApp::PrepareInstance()
 {
     WindowInfo::GetInstance().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    m_pEngine = std::make_unique<Engine>();
-    m_pRenderer = std::make_unique<Renderer>();
+    m_pEngine         = std::make_unique<Engine>();
+    m_pRenderer       = std::make_unique<Renderer>();
     m_pTextureManager = std::make_unique<TextureManager>();
-    m_pMeshManager = std::make_unique<MeshManager>();
+    m_pMeshManager    = std::make_unique<MeshManager>();
 
     m_engineContext = {
         m_pRenderer.get(),
         m_pTextureManager.get(),
         m_pMeshManager.get()
     };
+
+    // Editor-only free-fly camera actor (not part of any SceneBase)
+    Actor::InitDesc camDesc;
+    camDesc.name = "EditorCamera";
+    m_pEditorCameraActor.reset(ActorFactory::CreateEmptyActor(camDesc));
+    m_pEditorCamera = m_pEditorCameraActor->AddComponent<EditorCamera>();
+    m_pEditorCamera->Initialize(WINDOW_WIDTH, WINDOW_HEIGHT);
 }
 
 void EditorApp::InitInstance()
@@ -176,7 +217,7 @@ void EditorApp::InitInstance()
     m_pEngine->BeginFrame();
     m_pEngine->RenderEnd();
 
-    m_inputManager.Initialize();
+    InputManager::GetInstance().Initialize();
 }
 
 void EditorApp::InitImGui()
@@ -188,77 +229,151 @@ void EditorApp::InitImGui()
 
     ImGui::StyleColorsDark();
 
-	ImGui_ImplWin32_Init(m_hwnd);
+    ImGui_ImplWin32_Init(m_hwnd);
 
-	auto descriptorHeapAllocator = m_pEngine->GetDescriptorHeapAllocator();
-	uint32_t imguiIndex = descriptorHeapAllocator->AllocateCbvSrvUav();
+    auto descriptorHeapAllocator = m_pEngine->GetDescriptorHeapAllocator();
+    uint32_t imguiIndex = descriptorHeapAllocator->AllocateCbvSrvUav();
 
     ImGui_ImplDX12_Init(
         m_pEngine->GetDevice(),
         Engine::FRAME_BUFFER_COUNT,
         DXGI_FORMAT_R8G8B8A8_UNORM,
         descriptorHeapAllocator->GetCbvSrvUavHeap().GetHeap(),
-		descriptorHeapAllocator->GetCbvSrvUavCpuHandle(imguiIndex),
-		descriptorHeapAllocator->GetCbvSrvUavGpuHandle(imguiIndex)
-	);
+        descriptorHeapAllocator->GetCbvSrvUavCpuHandle(imguiIndex),
+        descriptorHeapAllocator->GetCbvSrvUavGpuHandle(imguiIndex)
+    );
 
     io.Fonts->Build();
 }
 
+// Create a new scene with default settings
+// (a single DefaultCamera actor tagged "MainCamera")
+void EditorApp::NewScene()
+{
+    m_pScene = std::make_unique<EditorScene>();
+    m_pScene->Initialize(m_engineContext);
+
+    Actor::InitDesc cameraDesc;
+    cameraDesc.name = "DefaultCamera";
+    cameraDesc.tag  = ActorTags::MainCamera;
+
+    auto* cameraActor = ActorFactory::CreateActor(ActorType::Camera, cameraDesc);
+    cameraActor->GetComponentByClass<Transform>()->SetParams(
+        Transform::ParamDesc(Vector3{ 0, 0, -5 })
+    );
+    auto* camera = cameraActor->GetComponentByClass<Camera>();
+    camera->SetParams(Camera::ParamDesc{
+        .window_width  = WINDOW_WIDTH,
+        .window_height = WINDOW_HEIGHT
+    });
+    m_pScene->AddRootActor(cameraActor);
+    m_pScene->GetCameraSystem()->SetMainCamera(camera);
+
+    DBG("EditorApp: New scene created.");
+}
+
 void EditorApp::Update(float deltaTime)
 {
-    m_inputManager.Update();
-    m_pRenderer->Update(
-        m_pEngine->GetCurrentBufferIndex(),
-        CameraInfo{
-            Vector3(0.0f, 0.0f, -5.0f),	// position
-            Vector3(0.0f, 0.0f, 1.0f),		// forward
-            Vector3(0.0f, 1.0f, 0.0f),		// up
-            Matrix4x4::CreateLookAt(
-                Vector3(0.0f, 0.0f, -5.0f),
-                Vector3(0.0f, 0.0f, 0.0f),
-                Vector3(0.0f, 1.0f, 0.0f)
-            ),								// viewMatrix
-            Matrix4x4::CreatePerspectiveFov(
-                DegToRad(45.0f),
-                static_cast<float>(WINDOW_WIDTH) / WINDOW_HEIGHT,
-                0.1f,
-                100.0f
-            )								// projMatrix
-		}
-    );
+    InputManager::GetInstance().Update();
+
+    // Update the editor camera actor
+    // (call PreUpdate, Update, and LateUpdate in sequence to update camera component)
+    m_pEditorCameraActor->PreUpdate(deltaTime);
+    m_pEditorCameraActor->Update(deltaTime);
+    m_pEditorCameraActor->LateUpdate(deltaTime);
+
+    // Flush the transform of the editor camera actor
+    m_pEditorCameraActor->FlushTransform();
+
+    // Update the scene
+    // (call PreUpdate, Update, and LateUpdate in sequence to update all actors and components in the scene)
+    if (m_pScene)
+    {
+        m_pScene->PreUpdate(deltaTime);
+        m_pScene->Update(deltaTime);
+        m_pScene->LateUpdate(deltaTime);
+    }
+
+    // Update the renderer with the latest camera information (for rendering this frame)
+    m_pRenderer->Update(m_pEngine->GetCurrentBufferIndex(), m_pEditorCamera->GetCameraInfo());
 }
 
 void EditorApp::Render()
 {
     m_pEngine->BeginFrame();
-	m_pRenderer->BeginFrame(m_pEngine->GetCommandList());
+    m_pRenderer->BeginFrame(m_pEngine->GetCommandList());
 
-	m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
+    m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
+
+    if (m_pScene) m_pScene->OnRender(m_engineContext);
 
     RenderPassTarget backBufferTarget{
         RenderPassTargetType::BackBuffer,
         m_pEngine->GetCurrentBufferIndex()
     };
-	m_pEngine->BeginPass(backBufferTarget);
+    m_pEngine->BeginPass(backBufferTarget);
     m_pRenderer->RenderScreenSpace(m_pEngine->GetCommandList());
     RenderImGui();
-	m_pEngine->EndPass(backBufferTarget);
+    m_pEngine->EndPass(backBufferTarget);
 
-	m_pEngine->RenderEnd();
+    m_pEngine->RenderEnd();
 }
 
 void EditorApp::RenderImGui()
 {
-    ImGui_ImplDX12_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
+    MenuBar::Callbacks callbacks;
 
-	ImGui::ShowDemoWindow();
+    callbacks.onNewScene = [this]()
+    {
+        NewScene();
+    };
+
+    callbacks.onOpenScene = [this]()
+    {
+        LoadScene(kDefaultScenePath);
+    };
+
+    callbacks.onSaveScene = [this]()
+    {
+        if (m_pScene)
+        {
+            if (!SceneWriter::SaveScene(kDefaultScenePath, m_pScene.get()))
+            {
+                DBG("EditorApp: Save failed.");
+            }
+        }
+    };
+
+    callbacks.onBuildGame = []()
+    {
+        ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
+    };
+
+    callbacks.onCreateBehavior = [](const std::string& name)
+    {
+        if (BehaviorTemplateGenerator::Generate(name))
+        {
+            DBG("EditorApp: Generated behavior template '%s'", name.c_str());
+
+            // Newly generated GameCode files only become buildable after a
+            // CMake reconfigure (GLOB_RECURSE picks them up) and a build.
+            // NOTE: 101Editor itself currently does NOT link GameCode, so
+            // newly created components are usable in 101Game but not yet
+            // recognized by ComponentRegistry inside 101Editor.exe. This is
+            // the GameCode hot-reload problem (Stage 2-5 of the hot reload
+            // plan), still pending.
+            ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
+        }
+    };
+
+    m_menuBar.Render(callbacks);
+
+    m_hierarchyPanel.Render(m_pScene.get());
+    m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());
 
     ImGui::Render();
-	ImGui_ImplDX12_RenderDrawData(
-        ImGui::GetDrawData(), 
+    ImGui_ImplDX12_RenderDrawData(
+        ImGui::GetDrawData(),
         m_pEngine->GetCommandList()
     );
 }

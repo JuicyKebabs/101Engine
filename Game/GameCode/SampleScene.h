@@ -32,7 +32,7 @@ private:
 		std::string str = j.dump(4); // ®Œ`o—Í
 		DBG("%s", str.c_str());
 
-		SceneLoader::Load("asset/scenes/test.scene", this, context);
+		SceneLoader::LoadScene("asset/scenes/test.scene", this, context);
 
 		SceneWriter::SaveScene("asset/scenes/output.scene", this);
 

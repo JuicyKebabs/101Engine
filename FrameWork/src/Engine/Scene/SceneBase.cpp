@@ -7,20 +7,18 @@
 #include "Engine/Actor/ActorFactory.h"
 
 // Constructor
+// NOTE: Default camera creation was removed from here.
+//       Responsibility moved to:
+//         - EditorApp::NewScene() (editor: creates a "MainCamera"-tagged DefaultCamera)
+//         - SceneLoader::LoadScene() (sets CameraSystem's main camera from the
+//           actor tagged ActorTags::MainCamera found in the loaded scene file)
+//       SceneWriter::SaveScene() refuses to save if no MainCamera-tagged actor
+//       with a Camera component exists.
 SceneBase::SceneBase()
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>();
 	m_pRenderSystem = std::make_unique<RenderSystem>();
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
-
-	// Create default camera actor and set it as the main camera actor
-	Actor::InitDesc cameraParamDesc;
-	cameraParamDesc.name = "DefaultCamera";
-	auto defaultCameraActor = AddRootActor(ActorFactory::CreateActor(ActorType::Camera, cameraParamDesc));
-	defaultCameraActor->GetComponentByClass<Transform>()->SetParams(Transform::ParamDesc(Vector3{ 0,0,-5 }));
-	auto camera = defaultCameraActor->GetComponentByClass<Camera>();
-	camera->SetParams(Camera::ParamDesc{.window_width = WindowInfo::GetInstance().GetWidth(), .window_height = WindowInfo::GetInstance().GetHeight()});
-	m_pCameraSystem->SetMainCamera(camera);
 }
 
 // Destructor
@@ -61,7 +59,7 @@ void SceneBase::PreUpdate(float deltaTime)
 
 // Update
 void SceneBase::Update(float deltaTime)
-{	
+{
 	// Update every object in scene
 	for (auto& actor : m_rootActors)
 	{
@@ -118,7 +116,17 @@ void SceneBase::OnRender(
 	EngineContext& context
 )
 {
-	auto cameraInfo = *m_pCameraSystem->GetCameraInfo();
+	const auto* pCameraInfo = m_pCameraSystem->GetCameraInfo();
+
+	// Check if main camera exists before rendering.
+	if (!pCameraInfo)
+	{
+		//DBG("SceneBase::OnRender: No main camera set, skipping render.");		
+		return;
+	}
+
+	auto cameraInfo = *pCameraInfo;	// Make a copy of the camera info to pass to the render system (in case the render system needs to modify it for sorting or other purposes)
+
 	m_pRenderSystem->FlushRegisters();
 	m_pRenderSystem->BuildFrameRenderData(cameraInfo);
 	context.pRenderer->SubmitFrameRenderData(m_pRenderSystem->GetFrameRenderData());

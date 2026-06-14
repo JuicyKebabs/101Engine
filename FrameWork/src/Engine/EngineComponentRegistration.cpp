@@ -6,7 +6,7 @@ static bool s_init = []() {
     return true;
     }();
 
-// Built-in engine components registration mactros.
+// Built-in engine components registration macros.
 REGISTER_COMPONENT(MeshRenderer)
 REGISTER_COMPONENT(SpriteRenderer)
 REGISTER_COMPONENT(UIRenderer)

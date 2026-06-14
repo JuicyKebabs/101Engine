@@ -21,18 +21,14 @@ class ComponentRegistry
 public:
 	using Factory = std::function<Component* ()>;	// Factory function type that creates a Component instance
 
-	static ComponentRegistry& Get()
-	{
-		static ComponentRegistry instance;
-		return instance;
-	}
+	static ComponentRegistry& Get();
 
 	// Register a behavior factory with a name and its type index
 	void Register(const std::string& name, Factory factory, std::type_index typeId) 
 	{ 
-		m_factories[name] = factory; 
-		m_typeNames[typeId] = name;
-		DBG("ComponentRegistry: Registered  '%s'", name.c_str());
+		m_factories[name] = factory;
+		DBG("ComponentRegistry: REGISTER name='%s' typeid.name()='%s'", name.c_str(), typeId.name());
+		m_typeNames[typeId.name()] = name;
 	}
 
 	// Create a component instance by name from the registry
@@ -77,13 +73,12 @@ public:
 	// Get name of a component by its type index
 	std::string GetNameByTypeIndex(std::type_index typeId) const
 	{
-		auto it = m_typeNames.find(typeId);
+		auto it = m_typeNames.find(typeId.name());
 		if (it == m_typeNames.end())
 		{
 			DBG("ComponentRegistry: No name found for component type index '%s'", typeId.name());
 			return "";
 		}
-
 		return it->second;
 	}
 
@@ -94,7 +89,7 @@ private:
 	std::unordered_map<std::string, Factory> m_factories;
 
 	// Map of component type indices to their registered names
-	std::unordered_map<std::type_index, std::string> m_typeNames;
+	std::unordered_map<std::string, std::string> m_typeNames;
 };
 
 

@@ -13,7 +13,7 @@ class EngineContext;
 class SceneLoader
 {
 public:
-	static bool Load(const std::string& filePath, SceneBase* scene, EngineContext& context);
+	static bool LoadScene(const std::string& filePath, SceneBase* scene, EngineContext& context);
 
 private:
 	static constexpr int CURRENT_SCENE_VERSION = 1;	// Current scene data version

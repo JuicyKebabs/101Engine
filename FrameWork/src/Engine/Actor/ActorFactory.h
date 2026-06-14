@@ -28,23 +28,15 @@ public:
 	~ActorFactory() = default;
 
 	// Create an actor of the specified type with the given initialization parameters
-	static Actor* CreateActor(ActorType type, Actor::InitDesc desc) 
-	{
-		// Create a new actor and initialize it
-		Actor* actor = new Actor();
-		actor->Init(desc);
-
-		// Get all function objects for adding necessary components based on the actor type
-		auto it = s_actorComponentMap.find(type);
-		assert(it != s_actorComponentMap.end() && "Actor type not supported");
-
-		// Call each function object to add components
-		for(const auto& componentAdder : it->second) 
-		{
-			componentAdder(actor);
-		}
-		return actor;
-	}
+	// NOTE: Implementation moved to ActorFactory.cpp.
+	// Reason: when this was an inline function defined in the header, callers in
+	// 101Editor.exe inlined a direct reference to the private static
+	// s_actorComponentMap data symbol, whose definition lives inside
+	// 101Framework.dll. WINDOWS_EXPORT_ALL_SYMBOLS does not reliably export
+	// private static const data members, causing LNK2001 in 101Editor.
+	// Keeping the implementation in the .cpp confines all references to
+	// s_actorComponentMap to 101Framework.dll itself.
+	static Actor* CreateActor(ActorType type, Actor::InitDesc desc);
 
 	// Create an empty actor with only a Transform component (common for all actors)
 	static Actor* CreateEmptyActor(Actor::InitDesc desc)

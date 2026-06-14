@@ -31,7 +31,7 @@ const CameraInfo* CameraSystem::GetCameraInfo() const
 		return &m_pMainCamera->GetCameraInfo();
 	}
 	else {
-		DBG("CameraSystem::GetCameraInfo() - No main camera set. Returning null pointer.\n");
+		//DBG("CameraSystem::GetCameraInfo() - No main camera set. Returning null pointer.\n");
 		return nullptr;
 	}
 }

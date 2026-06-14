@@ -20,6 +20,33 @@
                 "TestBehavior"
             ],
             "children": []
+        },
+        {
+            "children": [],
+            "components": [
+                "Camera"
+            ],
+            "is_active": true,
+            "name": "DefaultCamera",
+            "tag": "None",
+            "transform": {
+                "position": [
+                    0.0,
+                    0.0,
+                    -5.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
         }
+
     ]
 }
