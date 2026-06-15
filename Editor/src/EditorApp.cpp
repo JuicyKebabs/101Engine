@@ -57,6 +57,17 @@ LRESULT EditorWindowProcedure(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 bool EditorApp::Initialize()
 {
+	// Load the game code DLL at startup. This is needed to recognize GameCode-defined
+    m_hGameCodeDll = LoadLibraryA("GameCode.dll");
+    if (!m_hGameCodeDll)
+    {
+        DBG("EditorApp: Failed to load GameCode.dll (error %lu)", GetLastError());
+    }
+    else
+    {
+        DBG("EditorApp: GameCode.dll loaded successfully");
+    }
+
     CreateMainWindow();    // Create main window
     PrepareInstance();     // Prepare instance
     InitInstance();        // Initialize instance
@@ -127,6 +138,13 @@ void EditorApp::Terminate()
     ShutdownImGui();
     m_pEngine->Terminate();
     UnregisterClass(m_wc.lpszClassName, m_wc.hInstance);
+
+	// Free the game code DLL on shutdown
+    if (m_hGameCodeDll)
+    {
+        FreeLibrary(m_hGameCodeDll);
+        m_hGameCodeDll = nullptr;
+    }
 }
 
 // Load a scene from a file path

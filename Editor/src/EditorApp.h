@@ -67,6 +67,8 @@ private:
     InspectorPanel m_inspectorPanel;
     MenuBar m_menuBar;
 
+	HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
+
 private:
     EditorApp() = default;
 

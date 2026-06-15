@@ -28,7 +28,7 @@
             ],
             "is_active": true,
             "name": "DefaultCamera",
-            "tag": "None",
+            "tag": "MainCamera",
             "transform": {
                 "position": [
                     0.0,

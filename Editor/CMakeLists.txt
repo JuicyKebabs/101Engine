@@ -32,4 +32,10 @@ add_custom_command(TARGET 101Editor POST_BUILD
         $<TARGET_FILE_DIR:101Editor>
 )
 
-target_link_libraries(101Editor PRIVATE 101Framework)
+target_link_libraries(101Editor PRIVATE 101Framework GameCode)
+
+add_custom_command(TARGET 101Editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:GameCode>
+        $<TARGET_FILE_DIR:101Editor>
+)
