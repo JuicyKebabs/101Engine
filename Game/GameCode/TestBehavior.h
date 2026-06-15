@@ -16,4 +16,4 @@ public:
     }
 };
 
-REGISTER_COMPONENT(TestBehavior)
+REGISTER_GAME_COMPONENT(TestBehavior)

@@ -20,6 +20,10 @@
 #include "BehaviorTemplateGenerator.h"
 #include "ProjectBuilder.h"
 
+
+
+#include "Engine/Scene/ComponentRegistry.h"
+
 #pragma comment(lib, "winmm.lib")
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
@@ -366,6 +370,11 @@ void EditorApp::RenderImGui()
     {
         ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
     };
+
+    callbacks.onTest = []()
+        {
+			ComponentRegistry::Get().UnregisterAllGameComponents();
+        };
 
     callbacks.onCreateBehavior = [](const std::string& name)
     {

@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <typeindex>
 #include "Engine/Component/Component.h"
@@ -29,6 +30,40 @@ public:
 		m_factories[name] = factory;
 		DBG("ComponentRegistry: REGISTER name='%s' typeid.name()='%s'", name.c_str(), typeId.name());
 		m_typeNames[typeId.name()] = name;
+	}
+
+	// Specialized registration function for components defined in GameCode.dll
+	void RegisterGameComponent(const std::string& name, Factory factory, std::type_index typeId)
+	{
+		Register(name, factory, typeId);
+		m_gameComponentNames.insert(name);
+		DBG("ComponentRegistry: REGISTERED GameCode component '%s'", name.c_str());
+	}
+
+	// Unregister all components that were registered from GameCode.dll (used for hot-reloading)
+	void UnregisterAllGameComponents()
+	{
+		for (const auto& name : m_gameComponentNames)
+		{
+			m_factories.erase(name);
+
+			// Delete from type names map as well
+			for (auto it = m_typeNames.begin(); it != m_typeNames.end(); )
+			{
+				if (it->second == name)
+				{
+					it = m_typeNames.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+
+			DBG("ComponentRegistry: UNREGISTERED GameCode component '%s'", name.c_str());
+		}
+
+		m_gameComponentNames.clear();
 	}
 
 	// Create a component instance by name from the registry
@@ -90,6 +125,9 @@ private:
 
 	// Map of component type indices to their registered names
 	std::unordered_map<std::string, std::string> m_typeNames;
+
+	// Set of component names registered from GameCode.dll (used for hot-reloading)
+	std::unordered_set <std::string> m_gameComponentNames;
 };
 
 
@@ -105,3 +143,15 @@ private:
         );                                                              \
         return true;                                                    \
     }();
+
+// Helper macro to register a component class defined in GameCode.dll (for hot-reloading support)
+// Usage: Place REGISTER_GAME_COMPONENT(YourComponentClass) in the .h file of your component class defined in GameCode.dll
+#define REGISTER_GAME_COMPONENT(ClassName)                                   \
+	static bool _reg_##ClassName = [](){                                \
+		ComponentRegistry::Get().RegisterGameComponent(                              \
+			#ClassName,                                                 \
+			[](){ return static_cast<Component*>(new ClassName()); },   \
+			std::type_index(typeid(ClassName))                          \
+		);                                                              \
+		return true;                                                    \
+	}();
