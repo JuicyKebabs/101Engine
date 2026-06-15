@@ -11,8 +11,8 @@ public:
         std::function<void()> onOpenScene;
         std::function<void()> onSaveScene;
         std::function<void()> onBuildGame;
+		std::function<void()> onReloadGameCode;
         std::function<void(const std::string&)> onCreateBehavior;
-		std::function<void()> onTest;
     };
 
     void Render(const Callbacks& callbacks);

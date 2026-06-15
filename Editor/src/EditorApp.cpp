@@ -19,9 +19,6 @@
 #include "Engine/Core/Debug/Debug.h"
 #include "BehaviorTemplateGenerator.h"
 #include "ProjectBuilder.h"
-
-
-
 #include "Engine/Scene/ComponentRegistry.h"
 
 #pragma comment(lib, "winmm.lib")
@@ -139,16 +136,46 @@ void EditorApp::Run()
 
 void EditorApp::Terminate()
 {
-    ShutdownImGui();
-    m_pEngine->Terminate();
-    UnregisterClass(m_wc.lpszClassName, m_wc.hInstance);
-
-	// Free the game code DLL on shutdown
+	// Destroy the scene while the game code DLL is still loaded
+    m_hierarchyPanel.ClearSelection();
+    m_pScene.reset();
+    ComponentRegistry::Get().UnregisterAllGameComponents();
     if (m_hGameCodeDll)
     {
         FreeLibrary(m_hGameCodeDll);
         m_hGameCodeDll = nullptr;
     }
+
+	// Terminate editor related resources
+    ShutdownImGui();
+    m_pEngine->Terminate();
+    UnregisterClass(m_wc.lpszClassName, m_wc.hInstance);
+}
+
+// Create a new scene with default settings
+// (a single DefaultCamera actor tagged "MainCamera")
+void EditorApp::NewScene()
+{
+    m_pScene = std::make_unique<EditorScene>();
+    m_pScene->Initialize(m_engineContext);
+
+    Actor::InitDesc cameraDesc;
+    cameraDesc.name = "DefaultCamera";
+    cameraDesc.tag = ActorTags::MainCamera;
+
+    auto* cameraActor = ActorFactory::CreateActor(ActorType::Camera, cameraDesc);
+    cameraActor->GetComponentByClass<Transform>()->SetParams(
+        Transform::ParamDesc(Vector3{ 0, 0, -5 })
+    );
+    auto* camera = cameraActor->GetComponentByClass<Camera>();
+    camera->SetParams(Camera::ParamDesc{
+        .window_width = WINDOW_WIDTH,
+        .window_height = WINDOW_HEIGHT
+        });
+    m_pScene->AddRootActor(cameraActor);
+    m_pScene->GetCameraSystem()->SetMainCamera(camera);
+
+    DBG("EditorApp: New scene created.");
 }
 
 // Load a scene from a file path
@@ -161,6 +188,82 @@ void EditorApp::LoadScene(const std::string& filePath)
 
     if (result) DBG("EditorApp: Loaded scene from %s", filePath.c_str());
     else        DBG("EditorApp: Failed to load scene from %s", filePath.c_str());
+}
+
+// Hot reload: rebuild GameCode.dll and reload it without restarting the Editor.
+//
+// Order of operations matters for safety:
+//   1. Save the current scene (so we can reconstruct it afterwards)
+//   2. Destroy the scene while the OLD GameCode.dll is still loaded,
+//      so any GameCode-owned component destructors are still valid.
+//   3. Remove GameCode-side factories from ComponentRegistry. Their
+//      std::function objects point into the old DLL's code, which is
+//      about to disappear.
+//   4. FreeLibrary the old DLL. This also releases the file lock on
+//      GameCode.dll so the build below can overwrite it.
+//   5. Rebuild GameCode.dll.
+//   6. LoadLibrary the new DLL. Its static initializers run here,
+//      re-registering all REGISTER_GAME_COMPONENT components.
+//   7. Reconstruct the scene from the saved snapshot. SceneLoader's
+//      AddToActor calls now resolve through the new DLL's factories.
+//
+// If the build or load fails, the scene is still restored from the
+// snapshot (just without GameCode components), so nothing is lost -
+// fix the code and try again.
+void EditorApp::ReloadGameCode()
+{
+	// 1. Save the current scene to a temporary file
+	static const char* kHotReloadScenePath = "asset/scenes/_hotreload_temp.scene";   // file path for hot-reload snapshot
+
+    if (!m_pScene)
+    {// In case of empty scene
+        DBG("EditorApp: ReloadGameCode - no active scene, aborting.");
+        return;
+    }
+
+    if (!SceneWriter::SaveScene(kHotReloadScenePath, m_pScene.get()))
+    {// In case of save failure
+        DBG("EditorApp: ReloadGameCode - failed to save scene snapshot, aborting reload.");
+        return;
+    }
+
+	// 2. Destroy the current scene while the old DLL is still loaded
+	m_hierarchyPanel.ClearSelection();   // Clear selection to avoid dangling pointers to a selected actor
+	m_pScene->Finalize();
+	m_pScene.reset();
+
+	// 3. Unregister GameCode-side factories from ComponentRegistry
+	ComponentRegistry::Get().UnregisterAllGameComponents();
+
+    // 4. Free the old DLL
+    if (m_hGameCodeDll)
+    {
+        FreeLibrary(m_hGameCodeDll);
+        m_hGameCodeDll = nullptr;
+        DBG("EditorApp: Unloaded old GameCode.dll");
+	}
+
+    // 5. Rebuild GameCode.dll
+    if (ProjectBuilder::Build("GameCode", "Debug"))
+    {
+		// 6. Load the new DLL
+		m_hGameCodeDll = LoadLibraryA("GameCode.dll");
+        if (m_hGameCodeDll)
+        {
+            DBG("EditorApp: ReloadGameCode - GameCode.dll reloaded successfully.");
+        }
+        else
+        {
+            DBG("EditorApp: ReloadGameCode - LoadLibrary failed (error %lu)", GetLastError());
+        }
+	}
+    else
+    {
+        DBG("EditorApp: ReloadGameCode - build failed. Scene will be restored without GameCode components.");
+    }
+
+	// 7. Reconstruct the scene from the saved snapshot
+	LoadScene(kHotReloadScenePath);
 }
 
 void EditorApp::CreateMainWindow()
@@ -268,32 +371,6 @@ void EditorApp::InitImGui()
     io.Fonts->Build();
 }
 
-// Create a new scene with default settings
-// (a single DefaultCamera actor tagged "MainCamera")
-void EditorApp::NewScene()
-{
-    m_pScene = std::make_unique<EditorScene>();
-    m_pScene->Initialize(m_engineContext);
-
-    Actor::InitDesc cameraDesc;
-    cameraDesc.name = "DefaultCamera";
-    cameraDesc.tag  = ActorTags::MainCamera;
-
-    auto* cameraActor = ActorFactory::CreateActor(ActorType::Camera, cameraDesc);
-    cameraActor->GetComponentByClass<Transform>()->SetParams(
-        Transform::ParamDesc(Vector3{ 0, 0, -5 })
-    );
-    auto* camera = cameraActor->GetComponentByClass<Camera>();
-    camera->SetParams(Camera::ParamDesc{
-        .window_width  = WINDOW_WIDTH,
-        .window_height = WINDOW_HEIGHT
-    });
-    m_pScene->AddRootActor(cameraActor);
-    m_pScene->GetCameraSystem()->SetMainCamera(camera);
-
-    DBG("EditorApp: New scene created.");
-}
-
 void EditorApp::Update(float deltaTime)
 {
     InputManager::GetInstance().Update();
@@ -371,10 +448,10 @@ void EditorApp::RenderImGui()
         ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
     };
 
-    callbacks.onTest = []()
-        {
-			ComponentRegistry::Get().UnregisterAllGameComponents();
-        };
+    callbacks.onReloadGameCode = [this]()
+    {
+        ReloadGameCode();
+    };
 
     callbacks.onCreateBehavior = [](const std::string& name)
     {
@@ -382,13 +459,6 @@ void EditorApp::RenderImGui()
         {
             DBG("EditorApp: Generated behavior template '%s'", name.c_str());
 
-            // Newly generated GameCode files only become buildable after a
-            // CMake reconfigure (GLOB_RECURSE picks them up) and a build.
-            // NOTE: 101Editor itself currently does NOT link GameCode, so
-            // newly created components are usable in 101Game but not yet
-            // recognized by ComponentRegistry inside 101Editor.exe. This is
-            // the GameCode hot-reload problem (Stage 2-5 of the hot reload
-            // plan), still pending.
             ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
         }
     };

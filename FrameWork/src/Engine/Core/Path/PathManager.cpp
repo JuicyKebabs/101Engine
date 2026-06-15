@@ -3,6 +3,11 @@
 
 namespace fs = std::filesystem;
 
+// Definitions of the static data members declared in PathManager.h.
+// A single instance lives inside 101Framework.dll.
+std::string PathManager::s_projectRoot;
+bool PathManager::s_initialized = false;
+
 // Initialize
 bool PathManager::Initialize(const std::string& exepath)
 {
@@ -40,4 +45,19 @@ std::string PathManager::Resolve(const std::string& relativePath)
 		return relativePath;
 	}
 	return (fs::path(s_projectRoot) / relativePath).string();
+}
+
+std::string PathManager::GetProjectRoot()
+{
+	if (!s_initialized)
+	{
+		DBG("Error: PathManager is not initialized.");
+		return "";
+	}
+	return s_projectRoot;
+}
+
+bool PathManager::IsInitialized()
+{
+	return s_initialized;
 }

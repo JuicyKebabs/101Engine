@@ -25,9 +25,9 @@ void MenuBar::Render(const Callbacks& callbacks)
                 if (callbacks.onBuildGame) callbacks.onBuildGame();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Test: Unregister Game Components"))
+            if (ImGui::MenuItem("Reload GameCode"))
             {
-                if (callbacks.onTest) callbacks.onTest();
+                if (callbacks.onReloadGameCode) callbacks.onReloadGameCode();
             }
             ImGui::EndMenu();
         }

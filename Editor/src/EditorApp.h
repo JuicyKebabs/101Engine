@@ -17,6 +17,10 @@
 #include "HierarchyPanel.h"
 #include "InspectorPanel.h"
 #include "MenuBar.h"
+//--------------------------------------------
+// EditorApp class
+// The main application class for the editor.
+//--------------------------------------------
 
 class EditorApp
 {
@@ -37,8 +41,9 @@ public:
     void Terminate();
 
     // Scene management
-    void NewScene();
-    void LoadScene(const std::string& filePath);
+	void NewScene();                                // Create a new scene with default settings
+	void LoadScene(const std::string& filePath);    // Load a scene from a file
+	void ReloadGameCode();                          // For hot-reloading game code DLL
 
 private:
     HWND m_hwnd = nullptr;
