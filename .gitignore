@@ -380,3 +380,13 @@ cmake_install.cmake
 
 # Don't exclude Debug.h
 !FrameWork/src/Engine/Core/Debug/
+
+# Don't exclude files in third_party folder
+!third_party/**/x64/
+!third_party/**/x64/**
+!third_party/**/Debug/
+!third_party/**/Debug/**
+!third_party/**/Release/
+!third_party/**/Release/**
+!third_party/**/*.lib
+!third_party/**/*.dll
