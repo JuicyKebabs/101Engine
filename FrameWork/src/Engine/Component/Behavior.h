@@ -1,5 +1,6 @@
 #pragma once
 #include "Component.h"
+#include "Engine/Scene/ComponentRegistry.h"
 #include <vector>
 #include <memory>
 

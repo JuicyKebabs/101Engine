@@ -50,6 +50,14 @@ Generated\ Files/
 TestResult.xml
 nunit-*.xml
 
+# Created by CMake
+build/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+CMakeFiles/
+*.stamp.depend
+
 # Build Results of an ATL Project
 [Dd]ebugPS/
 [Rr]eleasePS/

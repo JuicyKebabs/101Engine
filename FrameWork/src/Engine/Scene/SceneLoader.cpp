@@ -2,9 +2,10 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Actor/ActorFactory.h"
-#include "Engine/Actor/EngineComponentRegistry.h"
+#include "Engine/Actor/ActorTag.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Component/Camera.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Core/Path/PathManager.h"
@@ -16,7 +17,8 @@ using json = nlohmann::json;
 
 static void LoadActor(const nlohmann::json& actorJson, SceneBase* scene, Actor* parent);
 
-bool SceneLoader::Load(const std::string& filePath, SceneBase* scene, EngineContext& context)
+// Load a scene from a file
+bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene, EngineContext& context)
 {
 	// Open the scene file
 	std::string fullPath = PathManager::Resolve(filePath);
@@ -64,6 +66,31 @@ bool SceneLoader::Load(const std::string& filePath, SceneBase* scene, EngineCont
 		LoadActor(actorJson, scene, nullptr);
 	}
 
+	// Pending actors (added via AddRootActor/AddActor above) must be flushed into
+	// m_rootActors / m_allActors before we can search for the main camera below.
+	scene->FlushPendingActors();
+
+	// Set main camera: find the actor tagged "MainCamera" and register its
+	// Camera component with the CameraSystem.
+	for (auto& actor : scene->GetAllActors())
+	{
+		if (actor->GetTag() == ActorTags::MainCamera)
+		{
+			auto* camera = actor->GetComponentByClass<Camera>();
+			if (camera)
+			{
+				scene->GetCameraSystem()->SetMainCamera(camera);
+				DBG("SceneLoader: Main camera set to '%s'", actor->GetName().c_str());
+			}
+			break;
+		}
+	}
+
+	if (!scene->GetCameraSystem()->GetMainCamera())
+	{
+		DBG("SceneLoader: Warning - No main camera found in scene.");
+	}
+
 	return true;
 }
 
@@ -77,57 +104,49 @@ void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
 	std::string tagName = actorJson.value("tag", "None");
 	desc.tag = tagName.empty() ? TAG_NONE : TagRegistry::Get().GetId(tagName);
 
-	// Create the actor using the factory
+	// Create the actor(with only Transform component)
 	Actor* actor = ActorFactory::CreateEmptyActor(desc);
 
 	// Add Transform component
 	if (actorJson.contains("transform"))
 	{
 		auto& t = actorJson["transform"];
-		Transform::ParamDesc tdesc;
-		tdesc.localPosition = {
+
+		Transform::ParamDesc tdesc;	// Prepare a ParamDesc for the Transform component
+
+		// Set transform parameters from JSON
+		tdesc.localPosition =
+		{// Local position
 			t["position"][0], t["position"][1], t["position"][2],
 		};
-		tdesc.localEulerDeg = {
+		tdesc.localEulerDeg =
+		{// Local rotation (Euler angles in degrees)
 			t["rotation"][0], t["rotation"][1], t["rotation"][2],
 		};
-		tdesc.localScale = {
+		tdesc.localScale =
+		{// Local scale
 			t["scale"][0], t["scale"][1], t["scale"][2],
 		};
+
+		// Get the Transform component and set its parameters
 		actor->GetComponentByClass<Transform>()->SetParams(tdesc);
 	}
 
-	// Add Built-in ngine components
+	// Add components to the actor
 	if (actorJson.contains("components"))
 	{
 		for (auto& comp : actorJson["components"])
 		{
-			std::string name = comp.get<std::string>();
-			if (!EngineComponentRegistry::Get().Add(name, actor))
-			{
-				DBG("SceneLoader: Unknown engine component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
-			}
-			else
-			{
-				DBG("SceneLoader: Added engine component '%s'", name.c_str());
-			}
-		}
-	}
+			std::string name = comp.get<std::string>();	// Get component name from JSON
 
-	// Add user-defined behavior components
-	if (actorJson.contains("behaviors"))
-	{
-		for (auto& behavior : actorJson["behaviors"])
-		{
-			std::string name = behavior.get<std::string>();
-			Behavior* instance = ComponentRegistry::Get().Create(name);
-			if(instance)
+			// Use the ComponentRegistry to create and add the component to the actor
+			if (!ComponentRegistry::Get().AddToActor(name, actor))
 			{
-				actor->AddComponentInstance(std::unique_ptr<Component>(instance));
+				DBG("SceneLoader: Unknown component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
 			}
 			else
 			{
-				DBG("SceneLoader: Unknown behavior component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
+				DBG("SceneLoader: Added component '%s'", name.c_str());
 			}
 		}
 	}
@@ -135,11 +154,11 @@ void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
 	// Parent-child relationship
 	if(parent)
 	{
-		parent->SetParent(parent);
+		actor->SetParent(parent);
 	}
 
 	// Add this actor to the scene
-	scene->AddActor(actor);
+	scene->AddRootActor(actor);
 
 	// Recursively load child actors
 	if (actorJson.contains("children"))

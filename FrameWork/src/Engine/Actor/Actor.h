@@ -7,6 +7,13 @@
 #include "Engine/Component/Transform.h"
 #include "Engine/Actor/ActorTag.h"
 
+//-----------------------------------------------------------------------------
+// Actor class
+// This class represents all entities in the game world. 
+// It contains components that define its behavior and properties,.
+// This can have a hierarchical relationship with other actors (parent-child).
+//-----------------------------------------------------------------------------
+
 // Forward declaration
 class ActorFactory;
 class Renderer;
@@ -59,7 +66,13 @@ public:
 	bool IsActive() const { return m_isActive; }					// Get active status
 	bool IsInitialized() const { return m_isInitialized; }			// Check if the actor has been initialized (Init function has been called at least once)
 	Actor* GetParent() const { return m_pParent; }					// Get parent actor
+	const std::string& GetName() const { return m_name; }			// Get actor name
+
+	// Get all descendant actors (recursive)
 	std::vector<Actor*> GetChildren() const;
+
+	// Get only the direct children of this actor (non-recursive)
+	std::vector<Actor*> GetDirectChildren() const;
 
 	// Add a component of type T to the container
 	template<class T, class... Args>
@@ -78,6 +91,27 @@ public:
 		T* ptr = component.get();
 		component->SetOwner(this);
 		PendingComponent pending{ std::move(component), std::type_index(typeid(T)) };
+		m_pendingComponents.push_back(std::move(pending));
+		return ptr;
+	}
+
+	// Add a pre-created component instance to the container.
+	// Used by ComponentRegistry::AddToActor, where the concrete type is only
+	// known at runtime (created via a Factory function returning Component*).
+	//
+	// NOTE (recovery): in the lost Editor work, a ComponentPolicy-based
+	// duplicate-prevention check (for UniqueRequired-style components such as
+	// Transform/Camera) was reportedly added to this overload so that
+	// InspectorPanel's "Add Component" text field couldn't attach duplicates.
+	// The exact implementation wasn't captured in chat, so this restored
+	// version is the pre-policy-check baseline (known working, used by
+	// SceneLoader/SceneWriter). Re-add the duplicate check here if desired.
+	Component* AddComponent(std::unique_ptr<Component> component)
+	{
+		if (!component) return nullptr;
+		Component* ptr = component.get();
+		ptr->SetOwner(this);
+		PendingComponent pending{ std::move(component), std::type_index(typeid(*ptr)) };
 		m_pendingComponents.push_back(std::move(pending));
 		return ptr;
 	}
@@ -266,6 +300,27 @@ public:
 		return result;
 	}
 
+	// Get all component type IDs currently attached to this actor
+	std::vector<std::type_index> GetComponentsTypeIds() const
+	{
+		std::vector<std::type_index> result;
+		for(auto& [typeId, bucket] : m_components)
+		{
+			if (!bucket.instances.empty())
+			{
+				result.push_back(typeId);
+			}
+		}
+		for(auto& pending : m_pendingComponents)
+		{
+			if (std::find(result.begin(), result.end(), pending.typeId) == result.end())
+			{
+				result.push_back(pending.typeId);
+			}
+		}
+		return result;
+	}
+
 	// Add a child actor
 	template<class T, class... Args>
 	T* AddChild(Args&&... args) {
@@ -274,8 +329,8 @@ public:
 		auto child = std::make_unique<T>(std::forward<Args>(args)...);
 		T* ptr = child.get();
 		ptr->SetParent(this);
-		m_children.push_back(ptr);
-		AddChildActorToScene(std::move(child));
+		m_children.push_back(std::move(child));
+		AddChildActorToScene(ptr);
 		return ptr;
 	}
 
@@ -283,29 +338,29 @@ public:
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
 
 private:
-	// フラグ
-	bool m_isActive = false;		// アクティブフラグ
-	bool m_destroyed = false;		// 破棄フラグ
-	bool m_isInitialized = false;	// 初期化フラグ (Init関数呼び出し済みかどうか)
+	// Flags
+	bool m_isActive = false;		// Active flag
+	bool m_destroyed = false;		// Destroyed flag
+	bool m_isInitialized = false;	// Initialization flag (whether Init function has been called at least once)
 
-	// コンポーネントコンテナ
-	std::unordered_map<std::type_index, ComponentBucket> m_components;	// 型IDごと
-	std::vector<Component*> m_componentPtrs;							// イテレーション用
-	std::vector<PendingComponent> m_pendingComponents;					// 追加保留中
+	// Component storage
+	std::unordered_map<std::type_index, ComponentBucket> m_components;	// Main storage of components, organized by type
+	std::vector<Component*> m_componentPtrs;							// For iteration
+	std::vector<PendingComponent> m_pendingComponents;					// Pending additions
 
-	// シーンと親子関係
-	SceneBase* m_pOwner = nullptr;	// 所有シーンへのポインタ
-	Actor* m_pParent = nullptr;		// 親アクターへのポインタ (親がいない場合はnullptr)
-	std::vector<Actor*> m_children;	// 子アクター
+	// Hierarchy
+	SceneBase* m_pOwner = nullptr;					// Owning scene pointer
+	Actor* m_pParent = nullptr;						// Parent actor pointer
+	std::vector<std::unique_ptr<Actor>> m_children;	// Child actors
 
-	// その他
-	TagId m_tag = TAG_NONE; // オブジェクトタグ
-	std::string m_name;		// アクター名 (デバッグおよびエディタ用)
+	// Other
+	TagId m_tag = TAG_NONE; // Object tag
+	std::string m_name;		// Actor name (for debugging and editor)
 
 private:
 	void AddPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
-	void AddChildActorToScene(std::unique_ptr<Actor> child);
+	void AddChildActorToScene(Actor* child);
 
 private:
 	// Hide default constructor and initialization from public, enforce usage of Init function and ActorFactory for creation
@@ -316,16 +371,6 @@ private:
 		m_tag = desc.tag;
 		m_name = desc.name;
 		m_isInitialized = true;
-	}
-
-	// Add pre-created component instance to the container
-	void AddComponentInstance(std::unique_ptr<Component> component)
-	{
-		if (!component) return;
-		Component* ptr = component.get();
-		ptr->SetOwner(this);
-		PendingComponent pending{ std::move(component), std::type_index(typeid(*ptr)) };
-		m_pendingComponents.push_back(std::move(pending));
 	}
 
 	friend class ActorFactory;	// Allow ActorFactory to access private constructor

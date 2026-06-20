@@ -1,5 +1,4 @@
 #include "Actor.h"
-#include "d3dx12.h"
 #include <DirectXMath.h>
 #include "Engine/Engine.h"
 #include "Engine/Graphics/Renderer.h"
@@ -8,9 +7,6 @@
 #include "Engine/Component/Behavior.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Core/Math/Math.h"
-
-using namespace DirectX;
-
 
 // Destructor
 Actor::~Actor()
@@ -23,7 +19,8 @@ void Actor::PreUpdate(float deltaTime)
 	AddPendingComponents();
 
 	// Post-update all components
-	for (const auto& component : m_componentPtrs) {
+	for (const auto& component : m_componentPtrs) 
+	{
 		// If the component has not been started, call OnStart and mark it as started
 		if (!component->IsStarted()) { 
 			component->OnStart(); 
@@ -46,7 +43,8 @@ void Actor::LateUpdate(float deltaTime)
 {
 	// Late update all components
 	std::vector<Component*> destroyedComponents;
-	for (const auto& component : m_componentPtrs) {
+	for (const auto& component : m_componentPtrs) 
+	{
 		if (component->IsDestroyed()) 
 		{
 			destroyedComponents.push_back(component);
@@ -56,7 +54,8 @@ void Actor::LateUpdate(float deltaTime)
 	}
 
 	// Remove components marked for destruction
-	for (auto& destroyed : destroyedComponents) {
+	for (auto& destroyed : destroyedComponents) 
+	{
 		RemoveDestroyedComponents(destroyed);
 	}
 }
@@ -73,12 +72,24 @@ bool Actor::IsDestroyed()
 	return m_destroyed;
 }
 
+// Get direct child actors (non-recursive)
+std::vector<Actor*> Actor::GetDirectChildren() const
+{
+	std::vector<Actor*> result;
+	for (const auto& child : m_children) 
+	{
+		result.push_back(child.get());
+	}
+	return result;
+}
+
 // Get child actors by recursively traversing the hierarchy
 std::vector<Actor*> Actor::GetChildren() const
 {
 	std::vector<Actor*> result;
-	for (auto& child : m_children) {
-		result.push_back(child);
+	for (auto& child : m_children) 
+	{
+		result.push_back(child.get());
 		auto childChildren = child->GetChildren();
 		result.insert(result.end(), childChildren.begin(), childChildren.end());
 	}
@@ -92,6 +103,7 @@ void Actor::FlushTransform()
 	if (pTransform) pTransform->UpdateGeometry();
 }
 
+// Update collider transforms to match the current world transform of the actor
 void Actor::FlushColliderTransforms()
 {
 	auto colliders = GetComponentsByClass<Collider>();
@@ -117,26 +129,30 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	component->OnDestroy();
 
 	auto mapIt = m_components.find(std::type_index(typeid(*component)));
-	if (mapIt != m_components.end()) {
+	if (mapIt != m_components.end()) 
+	{
 		auto& instances = mapIt->second.instances;
 		auto instance = std::find_if(instances.begin(), instances.end(), [component](const std::unique_ptr<Component>& instance) {
 			return instance.get() == component;
 			});
-		if (instance != instances.end()) {
+		if (instance != instances.end()) 
+		{
 			instances.erase(instance);
 		}
 	}
 
 	auto ptrIt = std::find(m_componentPtrs.begin(), m_componentPtrs.end(), component);
-	if (ptrIt != m_componentPtrs.end()) {
+	if (ptrIt != m_componentPtrs.end()) 
+	{
 		m_componentPtrs.erase(ptrIt);
 	}
 }
 
 // Add a child actor to the scene
-void Actor::AddChildActorToScene(std::unique_ptr<Actor> child)
+void Actor::AddChildActorToScene(Actor* child)
 {
-	if (m_pOwner) {
-		m_pOwner->AddActorToPending(std::move(child));
+	if (m_pOwner) 
+	{
+		m_pOwner->AddActor(child);
 	}
 }

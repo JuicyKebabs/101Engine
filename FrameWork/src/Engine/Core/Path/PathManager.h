@@ -1,6 +1,11 @@
 #pragma once
 #include <string>
 #include <filesystem>
+//----------------------------------------------------------------------------------------------------------------------
+// PathManager class
+// This class is responsible for managing file paths in the project.
+// All function's definitions are in PathManager.cpp to make sure other dlls can access the original data (not a copy)
+//----------------------------------------------------------------------------------------------------------------------
 
 class PathManager
 {
@@ -12,10 +17,11 @@ public:
 	// Resolve relative path to absolute path
 	static std::string Resolve(const std::string& relativePath);
 
-	static std::string GetProjectRoot() { return s_projectRoot; }
-	static bool IsInitialized() { return s_initialized; }
+	// Getters
+	static std::string GetProjectRoot();
+	static bool IsInitialized();
 
 private:
-	static inline  std::string s_projectRoot;	// Project root directory path
-	static inline  bool s_initialized = false;	// Initialization flag
+	static std::string s_projectRoot;	// Project root directory path
+	static bool s_initialized;			// Initialization flag
 };

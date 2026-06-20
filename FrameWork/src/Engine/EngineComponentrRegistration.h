@@ -1,6 +1,5 @@
 #pragma once
 #include "Engine/Actor/Actor.h"
-#include "Engine/Actor/EngineComponentRegistry.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/UI/UIRenderer.h"

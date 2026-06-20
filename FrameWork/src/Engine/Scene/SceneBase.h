@@ -30,28 +30,70 @@ public:
 	void OnRender(EngineContext& context);		// Render
 	void Finalize();							// Finalize
 
-	// Add an actor
-	Actor* AddActor(Actor* actor) {
+	// Add an root actor
+	Actor* AddRootActor(Actor* actor)
+	{
 		if (!actor) return nullptr;
 		actor->SetOwner(this);
-		m_actors.push_back(std::unique_ptr<Actor>(actor));
+		m_addPendingRootActors.push_back(std::unique_ptr<Actor>(actor));
+		m_addPendingAllActors.push_back(actor);
 		return actor;
 	}
 
-	void AddActorToPending(std::unique_ptr<Actor> actor) {
+	// Add an actor to the scene (can be used for child actors that are not owned by the scene)
+	Actor* AddActor(Actor* actor)
+	{
+		if (!actor) return nullptr;
 		actor->SetOwner(this);
-		m_addPendingActors.push_back(std::move(actor));
+		m_addPendingAllActors.push_back(actor);
+		return actor;
 	}
 
+	// Get root actors (actors without parents, owned by the scene)
+	std::vector<Actor*> GetRootActors() const
+	{
+		std::vector<Actor*> rootActorPtrs;
+		for (const auto& actor : m_rootActors) {
+			rootActorPtrs.push_back(actor.get());
+		}
+		return rootActorPtrs;
+	}
+
+	// Get all actors in the scene (including children)
+	std::vector<Actor*> GetAllActors() const { return m_allActors; }
+
+	// Move all pending actors (root + flat list) into the active containers.
+	// Must be called before iterating GetRootActors()/GetAllActors() outside of
+	// the normal PreUpdate loop (e.g. SceneWriter::SaveScene, SceneLoader after load).
+	void FlushPendingActors()
+	{
+		for (auto& pendingActor : m_addPendingRootActors)
+		{
+			m_rootActors.push_back(std::move(pendingActor));
+		}
+		m_addPendingRootActors.clear();
+
+		for (auto* pendingActor : m_addPendingAllActors)
+		{
+			m_allActors.push_back(pendingActor);
+		}
+		m_addPendingAllActors.clear();
+	}
+
+	// Getters for systems
 	RenderSystem* GetRenderSystem() const { return m_pRenderSystem.get(); }				// Get render system
 	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }				// Get camera system
 	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
 
+	// Setters and getters for directional light
 	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
+	DirectionalLight GetDirectionalLight() const { return m_directionalLight; }				// Get directional light
 
 private:
-	std::vector<std::unique_ptr<Actor>> m_actors;			// Object list in the scene
-	std::vector<std::unique_ptr<Actor>> m_addPendingActors;	// Pending objects to be added
+	std::vector<std::unique_ptr<Actor>> m_rootActors;			// Root actors (actors without parents, owned by the scene)
+	std::vector<Actor*> m_allActors;							// Raw pointer array of all actors in the scene (including children)
+	std::vector<std::unique_ptr<Actor>> m_addPendingRootActors;	// Pending root actors to be added (owned by the scene)
+	std::vector<Actor*> m_addPendingAllActors;					// Raw pointer array of pending objects to be added (including children)
 
 	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;		// Render system
 	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;		// Camera system

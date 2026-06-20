@@ -1,3 +1,5 @@
+# Editor
+
 set(IMGUI_SOURCES
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_draw.cpp
@@ -19,11 +21,21 @@ add_executable(101Editor WIN32
 
 add_custom_command(TARGET 101Editor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc142-mtd.dll>
-        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc142-mt.dll>
-        $<TARGET_FILE_DIR:101Game>
+        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc143-mtd.dll>
+        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc143-mt.dll>
+        $<TARGET_FILE_DIR:101Editor>
 )
 
-target_link_libraries(101Editor PRIVATE 101Framework)
+add_custom_command(TARGET 101Editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:101Framework>
+        $<TARGET_FILE_DIR:101Editor>
+)
 
-target_link_options(101Editor PRIVATE /WHOLEARCHIVE:101Framework)
+target_link_libraries(101Editor PRIVATE 101Framework GameCode)
+
+add_custom_command(TARGET 101Editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:GameCode>
+        $<TARGET_FILE_DIR:101Editor>
+)
