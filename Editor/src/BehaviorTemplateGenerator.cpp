@@ -12,6 +12,7 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
         return false;
     }
 
+	// Directory and file paths
     std::string baseDir = PathManager::Resolve("Game/GameCode");
     std::string headerPath = baseDir + "/" + className + ".h";
     std::string sourcePath = baseDir + "/" + className + ".cpp";
@@ -59,7 +60,7 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
 
         source << "#include \"" << className << ".h\"\n";
         source << "#include \"Engine/Scene/ComponentRegistry.h\"\n\n";
-        source << "REGISTER_COMPONENT(" << className << ")\n\n";
+        source << "REGISTER_GAME_COMPONENT(" << className << ")\n\n";
         source << "void " << className << "::Start() {}\n";
         source << "void " << className << "::PreUpdate() {}\n";
         source << "void " << className << "::Update() {}\n";

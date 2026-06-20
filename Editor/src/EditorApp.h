@@ -43,7 +43,7 @@ public:
     // Scene management
 	void NewScene();                                // Create a new scene with default settings
 	void LoadScene(const std::string& filePath);    // Load a scene from a file
-	void ReloadGameCode();                          // For hot-reloading game code DLL
+	void ReloadGameCode(bool reconfigure);          // For hot-reloading game code DLL
 
 private:
     HWND m_hwnd = nullptr;

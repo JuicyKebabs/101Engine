@@ -1,10 +1,12 @@
 #pragma once
 #include "Engine/Component/Camera.h"
-
-// EditorCamera
+//----------------------------------------------------------------------
+// EditorCamera class
 // A Camera subclass used only by EditorApp's free-fly editor camera.
 // Not part of any scene file (the Actor that owns this is held outside
-// SceneBase by EditorApp, see m_pEditorCameraActor).
+//SceneBase by EditorApp, see m_pEditorCameraActor).
+//----------------------------------------------------------------------
+
 class EditorCamera : public Camera
 {
 public:

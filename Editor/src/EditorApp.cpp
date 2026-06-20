@@ -18,6 +18,7 @@
 #include "Engine/Scene/SceneWriter.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "BehaviorTemplateGenerator.h"
+#include "ClassTemplateGenerator.h"
 #include "ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
 
@@ -156,9 +157,14 @@ void EditorApp::Terminate()
 // (a single DefaultCamera actor tagged "MainCamera")
 void EditorApp::NewScene()
 {
+    // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
+    m_hierarchyPanel.ClearSelection();
+
+	// Create a new scene instance and initialize it
     m_pScene = std::make_unique<EditorScene>();
     m_pScene->Initialize(m_engineContext);
 
+	// Create a default camera actor and set it as the main camera in the scene's camera system
     Actor::InitDesc cameraDesc;
     cameraDesc.name = "DefaultCamera";
     cameraDesc.tag = ActorTags::MainCamera;
@@ -181,9 +187,14 @@ void EditorApp::NewScene()
 // Load a scene from a file path
 void EditorApp::LoadScene(const std::string& filePath)
 {
+    // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
+    m_hierarchyPanel.ClearSelection();
+
+	// Create a new scene instance and initialize it
     m_pScene = std::make_unique<EditorScene>();
     m_pScene->Initialize(m_engineContext);
 
+	// Load the scene data from file
     bool result = SceneLoader::LoadScene(filePath, m_pScene.get(), m_engineContext);
 
     if (result) DBG("EditorApp: Loaded scene from %s", filePath.c_str());
@@ -210,7 +221,7 @@ void EditorApp::LoadScene(const std::string& filePath)
 // If the build or load fails, the scene is still restored from the
 // snapshot (just without GameCode components), so nothing is lost -
 // fix the code and try again.
-void EditorApp::ReloadGameCode()
+void EditorApp::ReloadGameCode(bool reconfigure)
 {
 	// 1. Save the current scene to a temporary file
 	static const char* kHotReloadScenePath = "asset/scenes/_hotreload_temp.scene";   // file path for hot-reload snapshot
@@ -244,7 +255,11 @@ void EditorApp::ReloadGameCode()
 	}
 
     // 5. Rebuild GameCode.dll
-    if (ProjectBuilder::Build("GameCode", "Debug"))
+	bool buildSucceeded = reconfigure 
+		? ProjectBuilder::ReconfigureAndBuild("GameCode", "Debug")   // Reconfigure + Build
+		: ProjectBuilder::Build("GameCode", "Debug");                // Build without Reconfigure
+
+    if (buildSucceeded)
     {
 		// 6. Load the new DLL
 		m_hGameCodeDll = LoadLibraryA("GameCode.dll");
@@ -448,18 +463,24 @@ void EditorApp::RenderImGui()
         ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
     };
 
-    callbacks.onReloadGameCode = [this]()
+    callbacks.onReloadGameCode = [this](bool reconfigure)
     {
-        ReloadGameCode();
+        ReloadGameCode(reconfigure);
     };
 
-    callbacks.onCreateBehavior = [](const std::string& name)
+    callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
     {
-        if (BehaviorTemplateGenerator::Generate(name))
-        {
-            DBG("EditorApp: Generated behavior template '%s'", name.c_str());
+			// Generate the new script files
+        bool generated = isBehavior
+			? BehaviorTemplateGenerator::Generate(name) // Behavior class
+			: ClassTemplateGenerator::Generate(name);   // Regular class
 
-            ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
+        if (generated)
+        {
+            DBG("EditorApp: Generated %s template '%s'",
+                isBehavior ? "Behavior" : "class", name.c_str());
+
+			ReloadGameCode(true);   // Reconfigure and build to pick up the new behavior
         }
     };
 

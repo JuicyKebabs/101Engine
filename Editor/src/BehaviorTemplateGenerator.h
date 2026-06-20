@@ -1,5 +1,11 @@
 #pragma once
 #include <string>
+//-----------------------------------------------------------------------
+// BehaviorTemplateGenerator class
+// This utility class generates a pair of .h/.cpp files with boilerplate
+// code for a new Behavior subclass with the given name, and places them
+// under Game/GameCode/.
+//-----------------------------------------------------------------------
 
 class BehaviorTemplateGenerator
 {

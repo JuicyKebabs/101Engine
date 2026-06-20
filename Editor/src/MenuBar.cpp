@@ -5,6 +5,7 @@ void MenuBar::Render(const Callbacks& callbacks)
 {
     if (ImGui::BeginMainMenuBar())
     {
+		// File menu for scene management (new/open/save)
         if (ImGui::BeginMenu("File"))
         {
             if (ImGui::MenuItem("New Scene"))
@@ -19,25 +20,37 @@ void MenuBar::Render(const Callbacks& callbacks)
             {
                 if (callbacks.onSaveScene) callbacks.onSaveScene();
             }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Build Game"))
+            ImGui::EndMenu();
+        }
+
+		// Assets menu for creating new assets like behaviors
+        if (ImGui::BeginMenu("Assets"))
+        {
+            if (ImGui::MenuItem("Create Script..."))
             {
-                if (callbacks.onBuildGame) callbacks.onBuildGame();
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Reload GameCode"))
-            {
-                if (callbacks.onReloadGameCode) callbacks.onReloadGameCode();
+                m_showCreateScriptPopup = true;
+                m_newScriptNameBuffer[0] = '\0';
+                m_createAsBehavior = true;
             }
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Assets"))
+		// Build menu for building the game and hot-reloading game code
+        if (ImGui::BeginMenu("Build"))
         {
-            if (ImGui::MenuItem("Create Behavior..."))
+            if (ImGui::MenuItem("Build Game"))
             {
-                m_showCreateBehaviorPopup = true;
-                m_newBehaviorNameBuffer[0] = '\0';
+                if (callbacks.onBuildGame) callbacks.onBuildGame();
+            }
+            if (ImGui::MenuItem("Reload GameCode"))
+            {
+                // Build without reconfigure
+                if (callbacks.onReloadGameCode) callbacks.onReloadGameCode(false);
+            }
+            if (ImGui::MenuItem("Reload GameCode (with Reconfigure)"))
+            {
+                // Build with reconfigure
+                if (callbacks.onReloadGameCode) callbacks.onReloadGameCode(true);
             }
             ImGui::EndMenu();
         }
@@ -45,30 +58,51 @@ void MenuBar::Render(const Callbacks& callbacks)
         ImGui::EndMainMenuBar();
     }
 
-    if (m_showCreateBehaviorPopup)
+	// Handle the Create Script popup
+    if (m_showCreateScriptPopup)
     {
-        ImGui::OpenPopup("Create Behavior");
-        m_showCreateBehaviorPopup = false;
+        ImGui::OpenPopup("Create Script");
+        m_showCreateScriptPopup = false;
     }
 
-    if (ImGui::BeginPopupModal("Create Behavior", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	// The popup is modal, so it will block interaction with the rest of the UI until closed.
+    if (ImGui::BeginPopupModal("Create Script", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ImGui::Text("Class Name:");
-        ImGui::InputText("##NewBehaviorName", m_newBehaviorNameBuffer, sizeof(m_newBehaviorNameBuffer));
+        ImGui::InputText("##NewScriptName", m_newScriptNameBuffer, sizeof(m_newScriptNameBuffer));
+
+        ImGui::Separator();
+        ImGui::Text("Type:");
+
+		// Radio button to create Behavior Component
+        if (ImGui::RadioButton("Behavior Component", m_createAsBehavior))
+        {
+            m_createAsBehavior = true;
+        }
+        ImGui::SameLine();
+
+		// Radio button to create Plain Class
+        if (ImGui::RadioButton("Plain Class", !m_createAsBehavior))
+        {
+            m_createAsBehavior = false;
+        }
 
         ImGui::Separator();
 
+		// Create button triggers the callback to create the script
         if (ImGui::Button("Create", ImVec2(120, 0)))
         {
-            std::string name = m_newBehaviorNameBuffer;
-            if (!name.empty() && callbacks.onCreateBehavior)
+            std::string name = m_newScriptNameBuffer;
+            if (!name.empty() && callbacks.onCreateScript)
             {
-                callbacks.onCreateBehavior(name);
+                callbacks.onCreateScript(name, m_createAsBehavior);
             }
             ImGui::CloseCurrentPopup();
         }
         ImGui::SetItemDefaultFocus();
         ImGui::SameLine();
+
+		// Cancel button just closes the popup without doing anything
         if (ImGui::Button("Cancel", ImVec2(120, 0)))
         {
             ImGui::CloseCurrentPopup();

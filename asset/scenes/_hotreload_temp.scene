@@ -3,35 +3,8 @@
         {
             "children": [],
             "components": [
-                "MeshRenderer",
-                "TestBehavior",
-                "Collider"
-            ],
-            "is_active": true,
-            "name": "TestActor",
-            "tag": "Player",
-            "transform": {
-                "position": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "rotation": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "scale": [
-                    1.0,
-                    1.0,
-                    1.0
-                ]
-            }
-        },
-        {
-            "children": [],
-            "components": [
-                "Camera"
+                "Camera",
+                "Controller"
             ],
             "is_active": true,
             "name": "DefaultCamera",
@@ -62,9 +35,9 @@
             1.0
         ],
         "direction": [
-            0.5,
             -1.0,
-            0.5
+            -1.0,
+            0.0
         ],
         "intensity": 1.0
     },
