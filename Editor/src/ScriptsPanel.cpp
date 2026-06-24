@@ -98,28 +98,30 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 				"Those components will be lost after deletion.");
 			ImGui::Separator();
 		}
-		else
-		{// If the script is not in use, ask for confirmation
-			ImGui::Text("Delete '%s' (.h and .cpp)?", m_pendingDeleteName.c_str());
-			ImGui::Text("This action cannot be undone.");
-			ImGui::Separator();
 
-			// Delete button
-			if (ImGui::Button("Delete", ImVec2(120, 0)))
-			{
-				if (callbacks.onDelete) callbacks.onDelete(m_pendingDeleteName);
-				ImGui::CloseCurrentPopup();
-			}
+		// If the script is not in use, ask for confirmation
+		ImGui::Text("Delete '%s' (.h and .cpp)?", m_pendingDeleteName.c_str());
+		ImGui::Text("This action cannot be undone.");
+		ImGui::Separator();
 
-			ImGui::SetItemDefaultFocus();
-			ImGui::SameLine();
+		// Delete button(Red)
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+		if (ImGui::Button("Delete", ImVec2(120, 0)))
+		{
+			if (callbacks.onDelete) callbacks.onDelete(m_pendingDeleteName);
+			ImGui::CloseCurrentPopup();
+		}
 
-			// Cancel button
-			if (ImGui::Button("Cancel", ImVec2(120, 0)))
-			{
-				m_pendingDeleteName.clear();
-				ImGui::CloseCurrentPopup();
-			}
+		ImGui::PopStyleColor(2);
+		ImGui::SameLine();
+
+		// Cancel button
+		if (ImGui::Button("Cancel", ImVec2(120, 0)))
+		{
+			m_pendingDeleteName.clear();
+			m_inUseByScene = false;
+			ImGui::CloseCurrentPopup();
 		}
 
 		ImGui::EndPopup();
