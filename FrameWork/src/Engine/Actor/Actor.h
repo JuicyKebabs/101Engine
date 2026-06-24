@@ -150,6 +150,11 @@ public:
 		return result;
 	}
 
+	// Check if the container has a component by name
+	bool HasComponentByName(const std::string& name) const
+	{
+	}
+
 	// Get a component of type T from the container by class type
 	template <class T>
 	std::type_index GetComponentTypeId() const

@@ -146,9 +146,9 @@ private:
 
 // Helper macro to register a component class defined in GameCode.dll (for hot-reloading support)
 // Usage: Place REGISTER_GAME_COMPONENT(YourComponentClass) in the .h file of your component class defined in GameCode.dll
-#define REGISTER_GAME_COMPONENT(ClassName)                                   \
+#define REGISTER_GAME_COMPONENT(ClassName)                              \
 	static bool _reg_##ClassName = [](){                                \
-		ComponentRegistry::Get().RegisterGameComponent(                              \
+		ComponentRegistry::Get().RegisterGameComponent(                 \
 			#ClassName,                                                 \
 			[](){ return static_cast<Component*>(new ClassName()); },   \
 			std::type_index(typeid(ClassName))                          \

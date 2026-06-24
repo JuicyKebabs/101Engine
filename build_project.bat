@@ -1,1 +1,1 @@
-"C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe" --build "C:\Users\kamka\Desktop\101Engine/build" --target GameCode --config Debug > "C:\Users\kamka\Desktop\101Engine/cmake_build.log" 2>&1
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build "C:\Users\kamka\Desktop\101Engine/build" --target GameCode --config Debug -- /p:BuildProjectReferences=false > "C:\Users\kamka\Desktop\101Engine/cmake_build.log" 2>&1
