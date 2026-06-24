@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <mmsystem.h>
 #include <tchar.h>
+#include <shellapi.h> 
 #include "EditorApp.h"
 #include "Engine/Input/keyboard.h"
 #include "Engine/Input/InputManager.h"
@@ -21,6 +22,7 @@
 #include "ClassTemplateGenerator.h"
 #include "ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
+#include "Engine/Core/Path/PathManager.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -255,9 +257,9 @@ void EditorApp::ReloadGameCode(bool reconfigure)
 	}
 
     // 5. Rebuild GameCode.dll
-	bool buildSucceeded = reconfigure 
-		? ProjectBuilder::ReconfigureAndBuild("GameCode", "Debug")   // Reconfigure + Build
-		: ProjectBuilder::Build("GameCode", "Debug");                // Build without Reconfigure
+	// Don't rebuild dependencies (e.g. 101Framework)
+    (void)reconfigure;
+    bool buildSucceeded = ProjectBuilder::BuildGameCodeForHotReload("Debug");
 
     if (buildSucceeded)
     {
@@ -279,6 +281,44 @@ void EditorApp::ReloadGameCode(bool reconfigure)
 
 	// 7. Reconstruct the scene from the saved snapshot
 	LoadScene(kHotReloadScenePath);
+}
+
+void EditorApp::DeleteScript(const std::string& name)
+{
+	namespace fs = std::filesystem;
+
+	// Construct the paths for the header and source files
+	std::string baseDir = PathManager::Resolve("Game/GameCode/");
+    std::string headerPath = baseDir + name + ".h";
+    std::string sorthePath = baseDir + name + ".cpp";
+
+	bool deletedAny = false;
+
+	// Delete the header file if it exists
+    if (fs::exists(headerPath))
+    {
+        fs::remove(headerPath);
+        DBG("EditorApp: Deleted script header %s", headerPath.c_str());
+        deletedAny = true;
+    }
+
+	// Delete the source file if it exists
+	if (fs::exists(sorthePath))
+	{
+		fs::remove(sorthePath);
+		DBG("EditorApp: Deleted script source %s", sorthePath.c_str());
+		deletedAny = true;
+	}
+
+	// If neither file was found, log a message and return(Don't attempt to rebuild the project)
+    if (!deletedAny)
+    {
+        DBG("EditorApp: No files found for script '%s'", name.c_str());
+        return;
+    }
+
+    // Reconfigure and rebuild the project to reflect the deletion of the script files
+	ReloadGameCode(true); 
 }
 
 void EditorApp::CreateMainWindow()
@@ -435,56 +475,84 @@ void EditorApp::Render()
 
 void EditorApp::RenderImGui()
 {
-    MenuBar::Callbacks callbacks;
-
-    callbacks.onNewScene = [this]()
+	// Render the MenuBar with its callbacks
     {
-        NewScene();
-    };
+        MenuBar::Callbacks callbacks;
 
-    callbacks.onOpenScene = [this]()
-    {
-        LoadScene(kDefaultScenePath);
-    };
-
-    callbacks.onSaveScene = [this]()
-    {
-        if (m_pScene)
-        {
-            if (!SceneWriter::SaveScene(kDefaultScenePath, m_pScene.get()))
+        callbacks.onNewScene = [this]()
             {
-                DBG("EditorApp: Save failed.");
-            }
-        }
-    };
+                NewScene();
+            };
 
-    callbacks.onBuildGame = []()
+        callbacks.onOpenScene = [this]()
+            {
+                LoadScene(kDefaultScenePath);
+            };
+
+        callbacks.onSaveScene = [this]()
+            {
+                if (m_pScene)
+                {
+                    if (!SceneWriter::SaveScene(kDefaultScenePath, m_pScene.get()))
+                    {
+                        DBG("EditorApp: Save failed.");
+                    }
+                }
+            };
+
+        callbacks.onBuildGame = []()
+            {
+                ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
+            };
+
+        callbacks.onReloadGameCode = [this](bool reconfigure)
+            {
+                ReloadGameCode(reconfigure);
+            };
+
+        callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
+            {
+                // Generate the new script files
+                bool generated = isBehavior
+                    ? BehaviorTemplateGenerator::Generate(name) // Behavior class
+                    : ClassTemplateGenerator::Generate(name);   // Regular class
+
+                if (generated)
+                {
+                    DBG("EditorApp: Generated %s template '%s'",
+                        isBehavior ? "Behavior" : "class", name.c_str());
+
+                    ReloadGameCode(true);   // Reconfigure and build to pick up the new behavior
+                }
+            };
+
+        m_menuBar.Render(callbacks);
+    }
+
+	// Render the Scripts panel with its callbacks
     {
-        ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
-    };
+        ScriptsPanel::Callbacks scriptCallbacks;
 
-    callbacks.onReloadGameCode = [this](bool reconfigure)
-    {
-        ReloadGameCode(reconfigure);
-    };
+        // Delete a script
+        scriptCallbacks.onDelete = [this](const std::string& name)
+            {
+                DeleteScript(name);
+            };
 
-    callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
-    {
-			// Generate the new script files
-        bool generated = isBehavior
-			? BehaviorTemplateGenerator::Generate(name) // Behavior class
-			: ClassTemplateGenerator::Generate(name);   // Regular class
+		// Open a script file in the default editor
+        scriptCallbacks.onOpen = [](const std::string& name)
+            {
+                std::string headerPath = PathManager::Resolve("Game/GameCode/" + name + ".h");
+                ShellExecuteA(
+                    nullptr, "open",
+                    headerPath.c_str(),
+                    nullptr, nullptr, SW_SHOWNORMAL
+                );
+                DBG("EditorApp: Opening %s in default editor", name.c_str());
+            };
 
-        if (generated)
-        {
-            DBG("EditorApp: Generated %s template '%s'",
-                isBehavior ? "Behavior" : "class", name.c_str());
-
-			ReloadGameCode(true);   // Reconfigure and build to pick up the new behavior
-        }
-    };
-
-    m_menuBar.Render(callbacks);
+        m_scriptsPanel.Render(scriptCallbacks, m_pScene.get());
+    }
 
     m_hierarchyPanel.Render(m_pScene.get());
     m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());

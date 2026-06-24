@@ -3,8 +3,7 @@
         {
             "children": [],
             "components": [
-                "Camera",
-                "Controller"
+                "Camera"
             ],
             "is_active": true,
             "name": "DefaultCamera",
