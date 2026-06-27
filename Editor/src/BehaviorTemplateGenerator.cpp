@@ -46,7 +46,8 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
         header << "    void Update() override;\n";
         header << "    void LateUpdate() override;\n";
         header << "    void Destroy() override;\n";
-        header << "};\n";
+        header << "};\n\n";
+        header << "REGISTER_GAME_COMPONENT(" << className << ")\n";
     }
 
     // Generate .cpp
@@ -60,7 +61,6 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
 
         source << "#include \"" << className << ".h\"\n";
         source << "#include \"Engine/Scene/ComponentRegistry.h\"\n\n";
-        source << "REGISTER_GAME_COMPONENT(" << className << ")\n\n";
         source << "void " << className << "::Start() {}\n";
         source << "void " << className << "::PreUpdate() {}\n";
         source << "void " << className << "::Update() {}\n";

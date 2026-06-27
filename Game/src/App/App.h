@@ -28,6 +28,8 @@ private:
 	void operator=(const App&) = delete;	// Assignment operator disabled
 
 private:
+	HMODULE m_hGameCodeDll = nullptr;	// Game code DLL handle
+
 	std::unique_ptr<Engine> m_pEngine = nullptr;					// DirectX12 engine pointer
 	std::unique_ptr<Renderer> m_pRenderer = nullptr;				// Renderer pointer
 	std::unique_ptr<SceneManager> m_pSceneManager = nullptr;		// Scene manager pointer
@@ -57,6 +59,8 @@ public:
 
 private:
 	App() = default;	// Constructor
+
+	void LoadGameCode();	// Load game code DLL
 
 	void CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc);	// Create main window
 	void PrepareInstance();								// Prepare instance

@@ -21,13 +21,7 @@ class AudioManager
 public:
 	static constexpr int AUDIO_MAX = 100; //Å‘å“¯Ä¶”
 public:
-	static AudioManager& GetInstance()
-	{
-		if(!m_instance){
-			m_instance = std::unique_ptr<AudioManager>(new AudioManager());
-		}
-		return *m_instance;
-	}
+	static AudioManager& GetInstance();
 
 	AudioManager(const AudioManager&) = delete;
 	AudioManager& operator=(const AudioManager&) = delete;
@@ -54,7 +48,7 @@ public:
 	}
 
 private:
-	static inline std::unique_ptr<AudioManager> m_instance;
+	static std::unique_ptr<AudioManager> m_instance;
 
 	IXAudio2* m_pXaudio{};
 	IXAudio2MasteringVoice* m_pMasteringVoice{};

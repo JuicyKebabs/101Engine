@@ -51,6 +51,8 @@ App* App::GetInstance()
 // Initialization
 bool App::Initialize()
 {
+	LoadGameCode();	// Load game code DLL
+
 	CreateMainWindow(hwnd, wc);	// Create main window
 
 	PrepareInstance(); // Prepare instance
@@ -135,10 +137,32 @@ void App::Run()
 // Termination
 void App::Terminate()
 {
-	m_pEngine->Terminate();			// DirectX12 engine termination
+	m_pEngine->Terminate();		// DirectX12 engine termination
 	m_audioManager.Terminate();	// Audio manager termination
 
 	UnregisterClass(wc.lpszClassName, wc.hInstance);	// Unregister window class
+
+	// Unload game code DLL
+	if (m_hGameCodeDll)
+	{
+		FreeLibrary(m_hGameCodeDll);
+		m_hGameCodeDll = nullptr;
+	}
+}
+
+// Load game code DLL
+void App::LoadGameCode()
+{
+	m_hGameCodeDll = LoadLibrary(_T("GameCode.dll"));	// Load GameCode.dll
+
+	if (!m_hGameCodeDll)
+	{
+		DBG("Failed to load GameCode.dll");
+	}
+	else
+	{
+		DBG("Successfully loaded GameCode.dll");
+	}
 }
 
 // Create main window

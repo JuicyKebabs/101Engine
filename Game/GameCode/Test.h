@@ -10,3 +10,5 @@ public:
     void LateUpdate() override;
     void Destroy() override;
 };
+
+REGISTER_GAME_COMPONENT(Test)

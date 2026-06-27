@@ -8,6 +8,4 @@
 // SceneLoader::LoadScene() (reads actors from a .scene JSON file).
 class EditorScene : public SceneBase
 {
-private:
-    void InitializeOverride(EngineContext& context) override {}
 };

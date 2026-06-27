@@ -1,6 +1,5 @@
 #include "App/App.h"
 #include "Engine/Core/Path/PathManager.h"
-#include "SampleScene.h"
 #include <objbase.h>
 
 //‚¿‚á‚¿‚Ì‚¿‚á‚í‚¢‚¢‚Õ‚ë‚®‚ç‚Ý‚ñ‚®
@@ -34,8 +33,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// This will be removed after data driven scene management is implemented
 	//===========================================================================
 	auto* sm = app->GetSceneManager();
-	sm->RegisterSceneFile("GameScene", "asset/scenes/test.scene");	// Register test scene
-	sm->SetInitialScene("GameScene");								// Set initial scene
+	sm->RegisterSceneFile("test", "asset/scenes/test.scene");		// Register test scene
+	sm->RegisterSceneFile("output", "asset/scenes/output.scene");	// Register test scene
+	sm->SetInitialScene("test");									// Set initial scene
 	app->InitSceneManager();										// Initialize scene manager
 
 	// Run application

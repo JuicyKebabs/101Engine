@@ -1,6 +1,17 @@
 ﻿#include "InputManager.h"
 #include "Keyboard.h"
 
+std::unique_ptr<InputManager> InputManager::m_instance;
+
+InputManager& InputManager::GetInstance()
+{
+	if (!m_instance)
+	{
+		m_instance.reset(new InputManager());
+	}
+	return *m_instance;
+}
+
 //初期化
 void InputManager::Initialize()
 {

@@ -7,7 +7,7 @@
             ],
             "is_active": true,
             "name": "DefaultCamera",
-            "tag": "None",
+            "tag": "MainCamera",
             "transform": {
                 "position": [
                     0.0,
@@ -30,7 +30,7 @@
             "children": [],
             "components": [
                 "MeshRenderer",
-                "TestBehavior"
+                "Test"
             ],
             "is_active": true,
             "name": "TestActor",

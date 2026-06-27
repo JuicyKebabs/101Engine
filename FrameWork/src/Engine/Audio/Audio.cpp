@@ -5,6 +5,17 @@
 using namespace DirectX;
 #include "audio.h"
 
+std::unique_ptr<AudioManager> AudioManager::m_instance;
+
+AudioManager& AudioManager::GetInstance()
+{
+	if (!m_instance)
+	{
+		m_instance.reset(new AudioManager());
+	}
+	return *m_instance;
+}
+
 void AudioManager::InitAudio()
 {
 	// XAudioê∂ê¨

@@ -22,4 +22,9 @@ public:
 	virtual void Update() {};
 	virtual void LateUpdate() {};
 	virtual void Destroy() {};
+
+protected:
+
+	// Helper function to change the scene from within a behavior component
+	void ChangeScene(const std::string& sceneName);
 };

@@ -83,12 +83,7 @@ public:
 	void Copy();		//キー情報コピー
 
 	//シングルトンパターン
-	static InputManager& GetInstance(){
-		if(!m_instance){
-			m_instance = std::unique_ptr<InputManager>(new InputManager());
-		}
-		return *m_instance;
-	}
+	static InputManager& GetInstance();
 
 	//ゲッター
 	const InputInfo& GetInputInfo() const;	//入力情報構造体取得
@@ -99,7 +94,7 @@ public:
 	void StopAllControllerVibrations(); //全コントローラー振動停止
 
 private:
-	static inline std::unique_ptr<InputManager> m_instance;	//シングルトンインスタンス
+	static std::unique_ptr<InputManager> m_instance;	//シングルトンインスタンス
 	InputInfo m_inputInfo{};	//入力情報構造体
 	Controller m_controller;	//コントローラー管理クラス
 
