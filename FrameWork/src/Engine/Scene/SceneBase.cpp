@@ -3,17 +3,11 @@
 #include "Engine/Input/InputManager.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
+#include "Engine/Scene/SceneManager.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/ActorFactory.h"
 
 // Constructor
-// NOTE: Default camera creation was removed from here.
-//       Responsibility moved to:
-//         - EditorApp::NewScene() (editor: creates a "MainCamera"-tagged DefaultCamera)
-//         - SceneLoader::LoadScene() (sets CameraSystem's main camera from the
-//           actor tagged ActorTags::MainCamera found in the loaded scene file)
-//       SceneWriter::SaveScene() refuses to save if no MainCamera-tagged actor
-//       with a Camera component exists.
 SceneBase::SceneBase()
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>();
@@ -29,7 +23,6 @@ SceneBase::~SceneBase()
 // Initialization
 void SceneBase::Initialize(EngineContext& context)
 {
-	InitializeOverride(context);
 }
 
 // Post-update (for late update)

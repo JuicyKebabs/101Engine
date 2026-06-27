@@ -30,13 +30,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	if (!app->Initialize()) return -1;
 
 	//===========================================================================
-	// Initialize scene with sample scene for testing
-	// Tihs will be removed after data driven scene management is implemented
+	// Initialize scene with test scene by json file for testing
+	// This will be removed after data driven scene management is implemented
 	//===========================================================================
 	auto* sm = app->GetSceneManager();
-	sm->RegisterScene("SampleScene", std::make_unique<SampleScene>());	// Register sample scene
-	sm->SetInitialScene("SampleScene");									// Set initial scene
-	app->InitSceneManager();											// Initialize scene manager
+	sm->RegisterSceneFile("GameScene", "asset/scenes/test.scene");	// Register test scene
+	sm->SetInitialScene("GameScene");								// Set initial scene
+	app->InitSceneManager();										// Initialize scene manager
 
 	// Run application
 	app->Run();

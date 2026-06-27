@@ -12,6 +12,15 @@
 #include "Engine/Physics/CollisionSystem.h"
 #include "Engine/Scene/SceneLoader.h"
 
+//----------------------------------------------------------------------------------------
+// SceneBase class
+// This class represents a base of scene
+// Scene has a list of root actors and all actors in the scene
+// This also has systems which are used to process the core functionalities of the scene
+//----------------------------------------------------------------------------------------
+
+class SceneManager;	// Forward declaration of SceneManager class
+
 // Scene base class
 // Base class for all scene classes
 class SceneBase
@@ -89,6 +98,9 @@ public:
 	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
 	DirectionalLight GetDirectionalLight() const { return m_directionalLight; }				// Get directional light
 
+	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager	
+	SceneManager* GetSceneManager() const { return m_pSceneManager; }						// Get scene manager
+
 private:
 	std::vector<std::unique_ptr<Actor>> m_rootActors;			// Root actors (actors without parents, owned by the scene)
 	std::vector<Actor*> m_allActors;							// Raw pointer array of all actors in the scene (including children)
@@ -99,9 +111,8 @@ private:
 	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;		// Camera system
 	std::unique_ptr<CollisionSystem> m_pCollisionSystem = nullptr;	// Collision system
 
+	SceneManager* m_pSceneManager = nullptr;	// Pointer to the scene manager (used for scene switching)
+
 protected:
 	DirectionalLight m_directionalLight;	// Directional light
-
-private:
-	virtual void InitializeOverride(EngineContext& context) = 0;	// Initialization (override in derived class)
 };

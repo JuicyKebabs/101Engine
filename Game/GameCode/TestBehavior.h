@@ -7,12 +7,12 @@ class TestBehavior : public Behavior
 public:
     void Start() override
     {
-        //DBG("TestBehavior::Start()");
+        DBG("TestBehavior::Start()");
     }
 
     void Update() override
     {
-        //DBG("TestBehavior::Update()");
+        DBG("TestBehavior::Update()");
     }
 };
 

@@ -1,4 +1,6 @@
 #include "SceneManager.h"
+#include "SceneLoader.h"
+#include "Engine/Core/Path/PathManager.h"
 #include "Engine/Graphics/Renderer.h"
 #include "Engine/Input/InputManager.h"
 #include "Engine/Resource/TextureManager.h"
@@ -16,9 +18,23 @@ SceneManager::~SceneManager()
 {
 }
 
+// Register a scene created in code
 void SceneManager::RegisterScene(const std::string& name, std::unique_ptr<SceneBase> scene)
 {
 	m_sceneElements.push_back({ name, std::move(scene) });
+}
+
+// Register a scene from a JSON file
+void SceneManager::RegisterSceneFile(const std::string& name, const std::string& jsonPath)
+{
+	// Scene pointer is not created in this function
+	// Scene will be created when the scene is changed, using the JSON file
+
+	SceneElement elem;
+	elem.name = name;
+	elem.jsonPath = jsonPath;
+	m_sceneElements.push_back(std::move(elem));
+	DBG("SceneManager: Registered scene file '%s' -> '%s'", name.c_str(), jsonPath.c_str());
 }
 
 void SceneManager::SetInitialScene(const std::string& name)
@@ -30,9 +46,13 @@ void SceneManager::SetInitialScene(const std::string& name)
 void SceneManager::Initialize(EngineContext& context)
 {
 	m_context = context;
-	m_pCurrentScene = GetSceneBase(m_currentSceneName);	// Get current scene class pointer
-	// Initialize current scene
-	m_pCurrentScene->Initialize(context);
+
+	// Note : 
+	// The name of the initial scene must be set by the parameter of json file which define whole game data.
+	// But such kind of json file is not implemented yet, 
+	// so the initial scene name is set by SetInitialScene() function for now.
+
+	ChangeScene(m_currentSceneName);	// Change to the initial scene
 }
 
 // Pre-update
@@ -68,7 +88,7 @@ void SceneManager::Finalize()
 void SceneManager::ReserveChangeScene(const std::string& newScene)
 {
 	m_sceneChangeReserved = true;	// Set scene change reservation flag
-	m_reservedSceneName = newScene;		// Save reserved scene
+	m_reservedSceneName = newScene;	// Save reserved scene
 }
 
 // Submit draw requests
@@ -80,35 +100,75 @@ void SceneManager::OnRender()
 // Change scene
 void SceneManager::ChangeScene(const std::string& next)
 {
+	// Get the next scene element
+	SceneElement* pNextElem = GetSceneElement(next);
+	if (!pNextElem)
+	{
+		DBG("SceneManager: Scene '%s' not found", next.c_str());
+		return;
+	}
+
 	// Finalize current scene
-	m_pCurrentScene->Finalize();
-
-	// Switch to the next scene
-	m_sceneChangeReserved = false;						// Reset scene change reservation flag
-	m_reservedSceneName.clear();						// Reset reserved scene
-	m_currentSceneName = next;							// Update current scene
-	m_pCurrentScene = GetSceneBase(m_currentSceneName);	// Get scene class pointer
-
-	// Scene change initialization
 	if (m_pCurrentScene)
 	{
-		m_pCurrentScene->Initialize(m_context);
+		m_pCurrentScene->Finalize();	// Finalize current scene
+		m_pCurrentScene = nullptr;		// Reset current scene pointer
+	}
+
+	// Switch to the next scene
+	m_sceneChangeReserved = false;	// Reset scene change reservation flag
+	m_reservedSceneName.clear();	// Reset reserved scene
+	m_currentSceneName = next;		// Update current scene
+
+	// Switch to the next scene
+	if(!pNextElem->jsonPath.empty())
+	{// If the next scene is registerd with json file, load the scene from the json file
+
+		// Initialize new scene
+		pNextElem->pSceneBase = std::make_unique<SceneBase>();
+		pNextElem->pSceneBase->Initialize(m_context);
+
+		// Load scene from JSON file
+		std::string fullPath = PathManager::Resolve(pNextElem->jsonPath);
+		if (!SceneLoader::LoadScene(fullPath, pNextElem->pSceneBase.get(), m_context))
+		{
+			DBG("SceneManager: Failed to load scene from '%s'", fullPath.c_str());
+		}
 	}
 	else
-	{
-		DBG("Error: Scene '%s' not found. Unable to change scene.", m_currentSceneName.c_str());
+	{// If the next scene is registerd with code, use the scene pointer directly
+		m_pCurrentScene = pNextElem->pSceneBase.get();
+		if (!m_pCurrentScene)
+		{
+			DBG("SceneManager: Scene '%s' is not initialized.", next.c_str());
+			return;
+		}
 	}
+
+	// Set the current scene pointer
+	m_pCurrentScene = pNextElem->pSceneBase.get();
+
+	// Set the scene manager for the current scene
+	if (m_pCurrentScene)
+	{
+		m_pCurrentScene->SetSceneManager(this);
+	}
+
+	m_currentSceneName = next;
+	DBG("SceneManager: Changed to scene '%s'", next.c_str());
 }
 
-SceneBase* SceneManager::GetSceneBase(const std::string& name)
+SceneElement* SceneManager::GetSceneElement(const std::string& name)
 {
 	for(auto& element : m_sceneElements)
 	{
 		if (element.name == name)
 		{
-			return element.pSceneBase.get();
+			return &element;
 		}
 	}
+	DBG("Error: Scene element '%s' not found.", name.c_str());
+
 	return nullptr;
 }
 

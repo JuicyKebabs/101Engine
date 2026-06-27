@@ -4,7 +4,7 @@
             "children": [],
             "components": [
                 "Camera",
-                "Controller"
+                "TestBehavior"
             ],
             "is_active": true,
             "name": "DefaultCamera",

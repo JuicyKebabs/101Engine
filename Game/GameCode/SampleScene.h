@@ -15,26 +15,26 @@ public:
 	~SampleScene() = default;	// Destructor
 
 private:
-	void InitializeOverride(EngineContext& context) override {
-		if (ComponentRegistry::Get().Has("TestBehavior"))
-		{
-			DBG("TestBehavior is registered!");
-		}
-		else
-		{
-			DBG("TestBehavior is NOT registered.");
-		}
+	//void InitializeOverride(EngineContext& context) override {
+	//	if (ComponentRegistry::Get().Has("TestBehavior"))
+	//	{
+	//		DBG("TestBehavior is registered!");
+	//	}
+	//	else
+	//	{
+	//		DBG("TestBehavior is NOT registered.");
+	//	}
 
 
-		nlohmann::json j;
-		j["version"] = 1;
-		j["name"] = "test";
-		std::string str = j.dump(4); // 整形出力
-		DBG("%s", str.c_str());
+	//	nlohmann::json j;
+	//	j["version"] = 1;
+	//	j["name"] = "test";
+	//	std::string str = j.dump(4); // 整形出力
+	//	DBG("%s", str.c_str());
 
-		SceneLoader::LoadScene("asset/scenes/test.scene", this, context);
+	//	SceneLoader::LoadScene("asset/scenes/test.scene", this, context);
 
-		SceneWriter::SaveScene("asset/scenes/output.scene", this);
+	//	SceneWriter::SaveScene("asset/scenes/output.scene", this);
 
-	};	// Initialization (override)
+	//};	// Initialization (override)
 };
