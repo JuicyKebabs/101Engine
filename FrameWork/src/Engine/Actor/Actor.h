@@ -53,6 +53,20 @@ public:
 
 	void Destroy();		// Mark actor as destroyed
 	bool IsDestroyed();	// Check if actor is destroyed
+	void OnDestroy()
+	{
+		// Delete child actors recursively
+		for(auto it = m_children.begin(); it != m_children.end(); ++it)
+		{
+			(*it)->OnDestroy();
+			it = m_children.erase(it);
+		}
+
+		for(auto& component : m_componentPtrs)
+		{
+			component->OnDestroy();
+		}
+	}
 
 	// Setters
 	void SetOwner(SceneBase* ownerScene) { m_pOwner = ownerScene; }	// Set owning scene
@@ -151,9 +165,7 @@ public:
 	}
 
 	// Check if the container has a component by name
-	bool HasComponentByName(const std::string& name) const
-	{
-	}
+	bool HasComponentByName(const std::string& name) const;
 
 	// Get a component of type T from the container by class type
 	template <class T>

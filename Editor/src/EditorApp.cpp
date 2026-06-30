@@ -461,10 +461,13 @@ void EditorApp::Render()
 
     if (m_pScene) m_pScene->OnRender(m_engineContext);
 
-    RenderPassTarget backBufferTarget{
-        RenderPassTargetType::BackBuffer,
-        m_pEngine->GetCurrentBufferIndex()
-    };
+    RenderPassTarget sceneTarget{ RenderPassTargetType::ColorDepth, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
+    m_pEngine->BeginPass(sceneTarget);
+    uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
+    m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
+    m_pEngine->EndPass(sceneTarget);
+
+    RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };
     m_pEngine->BeginPass(backBufferTarget);
     m_pRenderer->RenderScreenSpace(m_pEngine->GetCommandList());
     RenderImGui();
@@ -554,7 +557,36 @@ void EditorApp::RenderImGui()
         m_scriptsPanel.Render(scriptCallbacks, m_pScene.get());
     }
 
-    m_hierarchyPanel.Render(m_pScene.get());
+	// Render the Hierarchy panel with its callbacks
+    {
+		HierarchyPanel::Callbacks hierarchyCallbacks;
+
+		// Callback for creating and adding a new actor in the scene
+        hierarchyCallbacks.onCreateActor = [this](const std::string& name)
+            {
+                if (m_pScene)
+                {
+                    Actor::InitDesc desc;
+                    desc.name = name;
+                    auto* newActor = ActorFactory::CreateEmptyActor(desc);
+                    m_pScene->AddRootActor(newActor);
+					DBG("EditorApp: Created new actor '%s' in scene", name.c_str());
+                }
+			};
+
+		// Callback for deleting an actor from the scene
+        hierarchyCallbacks.onDeleteActor = [this](Actor* actor)
+            {
+                if (m_pScene)
+                {
+					m_pScene->RemoveActor(actor);
+					DBG("EditorApp: Deleted actor '%s' from scene", actor ? actor->GetName().c_str() : "Unknown");
+                }
+			};
+
+        m_hierarchyPanel.Render(m_pScene.get(), hierarchyCallbacks);
+    }
+
     m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());
 
     ImGui::Render();

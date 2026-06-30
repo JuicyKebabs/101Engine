@@ -97,11 +97,22 @@ void SceneBase::LateUpdate(float deltaTime)
 		m_pCameraSystem->Flush(deltaTime);
 	}
 
-	// Destroy actors from scene( from both root actors list and all actors list)
-	m_rootActors.erase(std::remove_if(m_rootActors.begin(), m_rootActors.end(),
-		[](const std::unique_ptr<Actor>& actor) { return actor->IsDestroyed(); }), m_rootActors.end());
 	m_allActors.erase(std::remove_if(m_allActors.begin(), m_allActors.end(),
 		[](Actor* actor) { return actor->IsDestroyed(); }), m_allActors.end());
+
+	// Remove destroyed actors from the scene with
+	for (auto it = m_rootActors.begin(); it != m_rootActors.end(); )
+	{
+		if ((*it)->IsDestroyed())
+		{
+			(*it)->OnDestroy();
+			it = m_rootActors.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
 }
 
 // Render

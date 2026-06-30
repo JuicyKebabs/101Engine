@@ -58,6 +58,26 @@ public:
 		return actor;
 	}
 
+	// Remove an actor from the scene (mark it for destruction)
+	void RemoveActor(Actor* actor)
+	{
+		if (!actor) return;
+		actor->Destroy();
+	}
+
+	// Remove an actor from the scene by name
+	void RemoveActor(const std::string& name)
+	{
+		// Dstroy the actor with the given name in the scene (if it exists)
+		for(auto it = m_allActors.begin(); it != m_allActors.end(); ++it)
+		{
+			if ((*it)->GetName() == name)
+			{
+				(*it)->Destroy();
+			}
+		}
+	}
+
 	// Get root actors (actors without parents, owned by the scene)
 	std::vector<Actor*> GetRootActors() const
 	{

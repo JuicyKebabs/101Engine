@@ -7,6 +7,7 @@
 #include "Engine/Component/Behavior.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Core/Math/Math.h"
+#include "Engine/Scene/ComponentRegistry.h"
 
 // Destructor
 Actor::~Actor()
@@ -81,6 +82,22 @@ std::vector<Actor*> Actor::GetDirectChildren() const
 		result.push_back(child.get());
 	}
 	return result;
+}
+
+// Check if the actor has a component by name
+bool Actor::HasComponentByName(const std::string& name) const
+{
+	if (name.empty()) return false;
+
+	for (const auto& typeId : GetComponentsTypeIds()) 
+	{
+		if(ComponentRegistry::Get().GetNameByTypeIndex(typeId) == name) 
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 // Get child actors by recursively traversing the hierarchy

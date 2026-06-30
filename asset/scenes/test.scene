@@ -3,8 +3,7 @@
         {
             "children": [],
             "components": [
-                "Camera",
-                "TestBehavior"
+                "Camera"
             ],
             "is_active": true,
             "name": "DefaultCamera",
