@@ -382,6 +382,8 @@ cmake_install.cmake
 !FrameWork/src/Engine/Core/Debug/
 
 # Don't exclude files in third_party folder
+!third_party/**/bin/
+!third_party/**/bin/**
 !third_party/**/x64/
 !third_party/**/x64/**
 !third_party/**/Debug/
