@@ -277,35 +277,35 @@ enum class BillboardType
 };
 
 //=======================================================================================================
-//メッシュ・モデルデータ構造体
+// Mesh and Model related data structures
 //=======================================================================================================
-//メッシュデータ構造体
+// Mesh data structure
 struct Mesh
 {
-	std::vector<Vertex> vertices;		//頂点データ配列
-	size_t vertexCount = 0;				//頂点数
-	std::vector<uint32_t> indices;		//インデックスデータ配列
-	size_t indexCount = 0;				//インデックス数
-	std::wstring texPath;				//テクスチャのファイル名
-	DirectX::XMFLOAT4 materialColor		//材質色(RGBA)
+	std::vector<Vertex> vertices;	// Vertex data array
+	size_t vertexCount = 0;			// Vertex count
+	std::vector<uint32_t> indices;	// Index data array
+	size_t indexCount = 0;			// Index count
+	std::wstring texPath;			// Texture file name
+	Vector4 materialColor			// Material color (RGBA)
 	{
-		1.0f,	//拡散反射色R
-		1.0f,	//拡散反射色G
-		1.0f,	//拡散反射色B
-		1.0f	//拡散反射色A
+		1.0f,	// Diffuse color R
+		1.0f,	// Diffuse color G
+		1.0f,	// Diffuse color B
+		1.0f	// Diffuse color A
 	};
-	Vector3 boundsCenter{};				//バウンディングスフィアの中心座標(ソート用)
-	float boundsRadius = 0.0f;			//バウンディングスフィアの半径(ソート用)
-	NodeAnimationAsset nodeAnimAsset{};	// ノードアニメーション資産
+	Vector3 boundsCenter{};				// Bounding sphere center (for sorting)
+	float boundsRadius = 0.0f;			// Bounding sphere radius (for sorting)
+	NodeAnimationAsset nodeAnimAsset{};	// Node animation asset
 };
 
 // Bone data structure
 struct Bone
 {
-	std::wstring name;				// Bone name
-	int parentIndex = -1;			// Parent bone index (-1 if root)
-	DirectX::XMMATRIX offset;		// Offset matrix
-	int nodeIndex = -1;				// Node index in the model's node hierarchy
+	std::wstring name;			// Bone name
+	int parentIndex = -1;		// Parent bone index (-1 if root)
+	DirectX::XMMATRIX offset;	// Offset matrix
+	int nodeIndex = -1;			// Node index in the model's node hierarchy
 };
 
 // Skeleton data structure
@@ -322,7 +322,7 @@ struct AnimationClip
 	float ticksPerSecond; // Ticks per second
 };
 
-using Model = std::vector<Mesh>;	//モデルデータ構造体(複数のメッシュからなるモデル)
+using Model = std::vector<Mesh>;	// Model is a collection of meshes
 
 //mesh type enumeration
 enum class DEFAULT_MESH
@@ -388,10 +388,10 @@ static const Vertex CubeVertices[24] =
 	{{-0.5, -0.5, -0.5}, {-1,0,0}, {0,1}, {0,0,1}, {1,1,1,1}},	//頂点7
 
 	// +Y
-	{{-0.5,  0.5, -0.5}, {0,1,0}, {0,0}, {1,0,0}, {1,1,1,1}},		//頂点4
-	{{ 0.5,  0.5, -0.5}, {0,1,0}, {1,0}, {1,0,0}, {1,1,1,1}},		//頂点5
-	{{ 0.5,  0.5,  0.5}, {0,1,0}, {1,1}, {1,0,0}, {1,1,1,1}},		//頂点1
-	{{-0.5,  0.5,  0.5}, {0,1,0}, {0,1}, {1,0,0}, {1,1,1,1}},		//頂点0
+	{{-0.5,  0.5, -0.5}, {0,1,0}, {0,0}, {1,0,0}, {1,1,1,1}},	//頂点4
+	{{ 0.5,  0.5, -0.5}, {0,1,0}, {1,0}, {1,0,0}, {1,1,1,1}},	//頂点5
+	{{ 0.5,  0.5,  0.5}, {0,1,0}, {1,1}, {1,0,0}, {1,1,1,1}},	//頂点1
+	{{-0.5,  0.5,  0.5}, {0,1,0}, {0,1}, {1,0,0}, {1,1,1,1}},	//頂点0
 
 	// -Y
 	{{-0.5, -0.5,  0.5}, {0,-1,0}, {0,0}, {1,0,0}, {1,1,1,1}},	//頂点3

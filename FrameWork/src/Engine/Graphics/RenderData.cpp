@@ -1,6 +1,6 @@
 #include "RenderData.h"
 #include <cmath>
-#include "Engine/Model/AssimpLoader.h"
+#include "Engine/Resource/AssimpLoader.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>

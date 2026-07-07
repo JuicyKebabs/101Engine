@@ -1,7 +1,7 @@
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
-#include "Engine/Model/AssimpLoader.h"
+#include "Engine/Resource/AssimpLoader.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -80,7 +80,7 @@ MeshRenderTemplate RenderTemplateFactory::BuildRenderTemplate(MeshManager& meshM
 	// Create a render template for each mesh in the model
 	for (auto& mesh : model) {
 		SubmeshRenderTemplate sub;
-		sub.meshDesc.gpuHandle = meshManager.CreateMesh(mesh);
+		sub.meshDesc.meshHandle = meshManager.CreateMeshHandle(mesh);
 		sub.meshDesc.baseVertex = 0;
 		sub.meshDesc.startIndex = 0;
 		sub.meshDesc.boundsCenter = mesh.boundsCenter;

@@ -2,6 +2,7 @@
 #include <vector>
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Resource/Texture.h"
+#include "Engine/Resource/MeshHandle.h"
 
 //-----------------------------------------------------------------------------------------------------------
 // RenderTemplateFactory.h
@@ -15,11 +16,11 @@ class MeshManager;
 // Mesh description structure
 struct MeshDesc
 {
-	MeshGPU* gpuHandle = nullptr;	// Mesh data
-	UINT startIndex = 0;			// Start index
-	UINT baseVertex = 0;			// Base vertex
-	Vector3 boundsCenter{ 0,0,0 };	// Bounding sphere center for sorting
-	float boundsRadius = 0.0f;		// Bounding sphere radius for sorting
+	MeshHandle meshHandle = InvalidMeshHandle;	// Mesh handle
+	UINT startIndex = 0;						// Start index
+	UINT baseVertex = 0;						// Base vertex
+	Vector3 boundsCenter{ 0,0,0 };				// Bounding sphere center for sorting
+	float boundsRadius = 0.0f;					// Bounding sphere radius for sorting
 };
 
 // Material description structure
