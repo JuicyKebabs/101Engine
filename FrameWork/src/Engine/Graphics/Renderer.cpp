@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include "Engine/Resource/TextureManager.h"
+#include "Engine/Resource/MeshManager.h"
 #include "Engine/Resource/MeshGpu.h"
 #include "Engine/Graphics/ShaderLibrary.h"
 #include "Engine/Core/Math/Math.h"
@@ -9,6 +10,7 @@
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Window/WindowInfo.h"
 #include "Engine/Graphics/GpuBufferLayouts.h"
+#include "Engine/Graphics/PipelineState.h"
 
 using namespace DirectX;
 
@@ -317,7 +319,12 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCB[itemIndex]->GetAddress());
 
 	// Set mesh data
-	auto meshGPU = item.meshDesc.gpuHandle;
+	auto meshGPU = MeshManager::GetInstance()->GetMeshGPU(item.meshDesc.meshHandle);
+	if (meshGPU == nullptr)
+	{
+		DBG("MeshGPU is null\n");
+		return;
+	}
 	auto vbv = meshGPU->GetVertexBuffer()->GetView();
 	auto ibv = meshGPU->GetIndexBuffer()->GetView();
 	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
@@ -354,7 +361,12 @@ void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, con
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshForShadowCB[itemIndex]->GetAddress());
 
 	// Set mesh data
-	auto meshGPU = item.meshDesc.gpuHandle;
+	auto meshGPU = MeshManager::GetInstance()->GetMeshGPU(item.meshDesc.meshHandle);
+	if (meshGPU == nullptr)
+	{
+		DBG("MeshGPU is null\n");
+		return;
+	}
 	auto vbv = meshGPU->GetVertexBuffer()->GetView();
 	auto ibv = meshGPU->GetIndexBuffer()->GetView();
 	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
