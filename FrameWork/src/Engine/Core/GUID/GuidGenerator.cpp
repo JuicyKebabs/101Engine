@@ -1,6 +1,6 @@
 #include "GuidGenerator.h"
 
-Guid GuidGenarator::Generat()
+Guid GuidGenerator::Generate()
 {
 	Guid g;
 	CoCreateGuid(&g.value); // Generate a new GUID using the Windows API
