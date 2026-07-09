@@ -5,6 +5,7 @@
 
 #include "Engine/Engine.h"
 #include "Engine/Graphics/Renderer.h"
+#include "Engine/Resource/AssetManager.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Input/InputManager.h"
@@ -52,6 +53,10 @@ private:
 
     std::unique_ptr<Engine> m_pEngine;
     std::unique_ptr<Renderer> m_pRenderer;
+
+
+	std::unique_ptr<AssetManager> m_pAssetManager;
+
     std::unique_ptr<TextureManager> m_pTextureManager;
     std::unique_ptr<MeshManager> m_pMeshManager;
 

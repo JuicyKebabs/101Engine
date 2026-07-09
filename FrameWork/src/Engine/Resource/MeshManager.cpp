@@ -2,10 +2,13 @@
 #include "Engine/Resource/AssimpLoader.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Graphics/RenderData.h"
+#include "Engine/Graphics/RenderTemplateFactory.h"
+#include "Engine/Core/Debug/Debug.h"
 
 void MeshManager::Initialize(ID3D12Device* pDevice)
 {
 	m_pDevice = pDevice;
+	CreateErrorMesh();
 }
 
 const std::vector<MeshHandle>& MeshManager::LoadModel(const std::wstring& path)
@@ -69,4 +72,28 @@ std::wstring MeshManager::GetSourcePath(MeshHandle handle)
 	auto it = m_sorurcePathes.find(handle);
 	if (it != m_sorurcePathes.end()) return it->second;
 	return L"";
+}
+
+void MeshManager::CreateErrorMesh()
+{
+	// Create cube mesh for error mesh
+	Model cubeModel = RenderTemplateFactory::LoadDefaultModel(DEFAULT_MESH::CUBE);
+	if (!cubeModel.empty())
+	{
+		DBG("MeshManager: Failed to create error mesh (default cube model is empty).");
+		return;
+	}
+
+	m_errorMeshHandle = CreateMeshHandle(cubeModel[0]);	// Store mesh and handle
+
+	// Load texture for error mesh
+	TextureHandle errorTex = TextureManager::GetInstance()->LoadTexture(L"asset/texture/error_checker.png");
+	
+	// Store material info for error mesh
+	MeshMaterialInfo materialInfo;
+	materialInfo.textureHandle = errorTex = errorTex;
+	materialInfo.materialColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+	m_materials[m_errorMeshHandle] = materialInfo;
+
+	DBG("MeshManager: Error mesh created (handle=%u).", m_errorMeshHandle);
 }
