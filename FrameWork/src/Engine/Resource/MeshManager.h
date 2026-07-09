@@ -51,7 +51,8 @@ public:
 	// Get the source path of a mesh handle(for debbuging or serialization purposes)
 	std::wstring GetSourcePath(MeshHandle handle);
 
-	MeshHandle GetErrorMeshHandle() const { return InvalidMeshHandle; }
+	// Get the handle for the error mesh (used when a mesh fails to load)
+	MeshHandle GetErrorMeshHandle() const { return m_errorMeshHandle; }
 
 private:
 
@@ -60,7 +61,11 @@ private:
 	std::unordered_map<MeshHandle, std::wstring> m_sorurcePathes;				// Mesh handle to source path mapping
 	std::unordered_map<MeshHandle, MeshMaterialInfo> m_materials;				// Mesh handle to material info mapping
 
-	MeshHandle m_nextMeshHandle = 0;	// Next available mesh handle
+	MeshHandle m_nextMeshHandle = 0;					// Next available mesh handle
+	MeshHandle m_errorMeshHandle = InvalidMeshHandle;	// Handle for the error mesh
 
 	ID3D12Device* m_pDevice = nullptr;	// Pointer to the device
+
+private:
+	void CreateErrorMesh();	// Create a default error mesh
 };

@@ -19,6 +19,7 @@ void TextureManager::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* 
 	m_pDescriptorHeapAllocator = pDescriptorHeapAllocator;	// Save descriptor heap allocator
 
 	CreateDefaultTexture();
+	CreateErrorTexture();
 }
 
 // Load SRV from file
@@ -37,7 +38,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if(path.empty())
 	{
 		OutputDebugStringW(L"[TextureManager] Empty path provided.\n");
-		return m_defaultTextureHandle;
+		return m_errorTextureHandle;
 	}
 
 	auto ext = FileExtension(path);	// Get file extension
@@ -67,7 +68,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if (FAILED(hr))
 	{
 		OutputDebugStringW((L"[TextureManager] Failed to load: " + path + L"\n").c_str());
-		return m_defaultTextureHandle;
+		return m_errorTextureHandle;
 	}
 
 	// Get image data
@@ -77,7 +78,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if (imageCount == 0)
 	{
 		OutputDebugStringW((L"[TextureManager] No image data: " + path + L"\n").c_str());
-		return m_defaultTextureHandle;
+		return m_errorTextureHandle;
 	}
 
 	// Create texture resource
@@ -167,7 +168,7 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	if (images == nullptr || count == 0)
 	{
 		DBG("[TextureManager] No image data in ScratchImage\n");
-		return m_defaultTextureHandle;
+		return m_errorTextureHandle;
 	}
 
 	// Register as pending texture upload
@@ -322,12 +323,6 @@ SrvIndex TextureManager::GetTextureSrvIndex(TextureHandle handle) const
 	return m_defaultTextureHandle; // Return default texture index if not found
 }
 
-// Get default white texture index
-uint32_t TextureManager::GetDefaultTextureSrvIndex() const
-{
-	return m_defaultTextureHandle;
-}
-
 // Create default texture
 void TextureManager::CreateDefaultTexture()
 {
@@ -353,7 +348,96 @@ void TextureManager::CreateDefaultTexture()
 	);
 
 	// Create upload buffer for default texture
-	std::vector<uint32_t> defaultPixel = { 0xFFF000FF }; // Pink pixel data (RGBA)
+	std::vector<uint32_t> defaultPixel = { 0xFFFFFFFF }; // White pixel data (RGBA)
+	const UINT64 uploadBufferSize = GetRequiredIntermediateSize( // Get upload buffer size
+		pTexture.Get(),				 // Texture resource
+		0,							 // First subresource
+		1							 // Mip levels
+	);
+	auto uploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD); // Heap properties (upload)
+	auto uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize); // Buffer resource descriptor
+	ComPtr<ID3D12Resource> pUploadBuffer;	// Upload buffer
+	m_pDevice->CreateCommittedResource(	// Create resource
+		&uploadHeapProps,					// Heap properties
+		D3D12_HEAP_FLAG_NONE,				// Heap flags
+		&uploadBufferDesc,					// Resource descriptor
+		D3D12_RESOURCE_STATE_GENERIC_READ,	// Initial resource state
+		nullptr,							// Optimized clear value
+		IID_PPV_ARGS(&pUploadBuffer)		// Resource to create
+	);
+
+	// Create shader resource view
+	auto srvIndex = CreateSrv(
+		pTexture.Get(),					// Texture resource
+		DXGI_FORMAT_R8G8B8A8_UNORM		// Format
+	);
+
+	const uint32_t defaultTextureHandle = m_nextTextureHandle;	// Default texture handle (using next free index)
+	auto textureData = std::make_unique<Texture>();	// Texture data
+	Texture::ParamDesc paramDesc = {};		// Texture initialization descriptor
+	paramDesc.handle = defaultTextureHandle;	// Texture handle (using reserved index)
+	paramDesc.srvIndex = srvIndex;			// SRV index (using next free index)
+	paramDesc.path = L"DefaultWhite";		// File path (for identification)
+	paramDesc.meta = TexMetadata{			// Metadata
+		.width = 1,								// Width
+		.height = 1,							// Height
+		.mipLevels = 1,							// Mip levels
+		.format = DXGI_FORMAT_R8G8B8A8_UNORM,	// Format
+		.dimension = TEX_DIMENSION_TEXTURE2D	// Dimension
+	};
+	textureData->Initialize(
+		pTexture,
+		paramDesc
+	);
+
+	m_textures[defaultTextureHandle] = std::move(textureData);	// Keep texture resource alive
+	m_defaultTextureHandle = defaultTextureHandle;				// Store default texture handle
+	m_nextTextureHandle++;										// Increment next free index
+
+	// Register as pending texture upload
+	PendingTextureUpload pending = {};	// Pending texture upload
+	pending.textureHandle = defaultTextureHandle;	// Texture resource
+	pending.uploadBuffer = pUploadBuffer;			// Upload buffer
+
+	// Prepare owned data for upload
+	pending.ownedData.resize(sizeof(uint32_t));	// Resize owned data to hold pixel data
+	memcpy(pending.ownedData.data(), defaultPixel.data(), sizeof(uint32_t)); // Copy pixel data to owned data
+
+	// Set subresource data for upload
+	D3D12_SUBRESOURCE_DATA subresource = {};		// Subresource data
+	subresource.pData = pending.ownedData.data();	// Pixel data
+	subresource.RowPitch = sizeof(uint32_t);		// Row pitch
+	subresource.SlicePitch = sizeof(uint32_t);		// Slice pitch
+	pending.subresources.push_back(subresource);	// Subresource data
+
+	m_pendingUploads.push_back(std::move(pending)); // Add to array
+}
+
+void TextureManager::CreateErrorTexture()
+{
+	// Create a 1x1 pink texture	
+// Create texture resource
+	ComPtr<ID3D12Resource> pTexture;	// Texture resource
+	CD3DX12_RESOURCE_DESC texDesc = CD3DX12_RESOURCE_DESC::Tex2D(	// Texture resource descriptor
+		DXGI_FORMAT_R8G8B8A8_UNORM,			// Format (RGBA8)
+		1,									// Width
+		1,									// Height
+		1,									// Array size
+		1									// Mip levels
+	);
+
+	auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT); // Heap properties (default)
+	m_pDevice->CreateCommittedResource(	// Create resource
+		&heapProps,						// Heap properties
+		D3D12_HEAP_FLAG_NONE,			// Heap flags
+		&texDesc,						// Resource descriptor
+		D3D12_RESOURCE_STATE_COPY_DEST, // Initial resource state
+		nullptr,						// Optimized clear value
+		IID_PPV_ARGS(&pTexture)			// Resource to create
+	);
+
+	// Create upload buffer for default texture
+	std::vector<uint32_t> defaultPixel = { 0xFFFF00FF }; // Pink pixel data (RGBA)
 	const UINT64 uploadBufferSize = GetRequiredIntermediateSize( // Get upload buffer size
 		pTexture.Get(),				 // Texture resource
 		0,							 // First subresource

@@ -60,7 +60,9 @@ public:
 
 	Texture* GetTexture(TextureHandle handle) const;			// Get texture by handle
 	SrvIndex GetTextureSrvIndex(TextureHandle handle) const;	// Get SRV index for a specific texture
-	TextureHandle GetDefaultTextureSrvIndex() const;	// Get default texture index
+
+	TextureHandle GetDefaultTextureHandle() const { return m_defaultTextureHandle; }	// Get default texture index
+	TextureHandle GetErrorTextureHandle() const { return m_errorTextureHandle; }		// Get error texture index
 
 private:
 	// Texture management
@@ -70,11 +72,13 @@ private:
 	std::vector<PendingTextureUpload> m_pendingUploads;						// Array of pending texture uploads
 	TextureHandle m_nextTextureHandle = 0;									// Next texture handle to assign
 
-	TextureHandle m_defaultTextureHandle = 0;	// Default texture handle (reserved index)
+	TextureHandle m_defaultTextureHandle = InvalidTextureHandle;	// Default texture handle
+	TextureHandle m_errorTextureHandle = InvalidTextureHandle;		// Error texture handle
 
 	ID3D12Device* m_pDevice = nullptr;								// Device
 	DescriptorHeapAllocator* m_pDescriptorHeapAllocator = nullptr;	// Descriptor heap allocator for SRV management
 
 private:
 	void CreateDefaultTexture();	// Create default texture
+	void CreateErrorTexture();		// Create error texture
 };
