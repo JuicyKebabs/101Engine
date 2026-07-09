@@ -14,7 +14,6 @@
 // Uploads mesh data to the GPU and keeps track of loaded meshes and materials
 //-----------------------------------------------------------------------------
 
-
 // Structure to hold material information linked to a mesh
 struct MeshMaterialInfo
 {
@@ -51,6 +50,8 @@ public:
 
 	// Get the source path of a mesh handle(for debbuging or serialization purposes)
 	std::wstring GetSourcePath(MeshHandle handle);
+
+	MeshHandle GetErrorMeshHandle() const { return InvalidMeshHandle; }
 
 private:
 

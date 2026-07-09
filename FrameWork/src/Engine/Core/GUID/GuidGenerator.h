@@ -6,8 +6,8 @@
 // This class is  responsible for generating globally unique identifiers (GUIDs) using the Windows API.
 //-----------------------------------------------------------------------------------------------------
 
-class GuidGenarator
+class GuidGenerator
 {
 public:
-	static Guid Generat();
+	static Guid Generate();
 };

@@ -3,6 +3,13 @@
 #include <string>
 #include <optional>
 
+//----------------------------------------------------------------
+// Meta file is a JSON file that stores GUID for each asset files 
+// to ensure that the same asset file always has the same GUID.
+// This file is created when an new asset is loaded.
+// AssetManager calls these functions to manage .meta files.
+//----------------------------------------------------------------
+
 namespace MetaFile
 {
 	// Trying to load .meta file
