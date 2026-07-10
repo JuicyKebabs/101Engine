@@ -61,11 +61,11 @@ private:
 	// Scans root directory recursively and creates or resolves a GUID
 	// for each asset file via .meta sidecar file.
 	// No asset is loaded at this time, only the catalog is built.
-	void ScanAssetDirectry(const std::string& rootDir);
+	void ScanAssetDirectory(const std::string& rootDir);
 
 	// Resolve the GUID for a given path.
 	// Prepare new .meta file if it doesn't exist, otherwise load the existing .meta file.
-	Guid ResolveGuidForpath(const std::string& filePath);
+	Guid ResolveGuidForPath(const std::string& filePath);
 
 	// Deteremine asset type based on the file extension.
 	AssetType DetermineAssetType(const std::string& extension);

@@ -6,6 +6,7 @@
 #include "Engine/Input/keyboard.h"
 #include "Engine/Window/WindowInfo.h"
 #include "Engine/EngineComponentrRegistration.h"
+#include "Engine/Core/Path/PathManager.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -238,6 +239,9 @@ void App::InitInstance()
 
 	// Get device
 	auto pDevice = m_pEngine->GetDevice();
+
+	// Initialize asset manager
+	m_assetManager.Initialize(PathManager::Resolve("asset"));
 
 	// Initialize texture management class
 	m_pTextureManager->Initialize(

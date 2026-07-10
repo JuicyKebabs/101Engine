@@ -21,10 +21,10 @@ static std::wstring ToWideString(const std::string& str)
 void AssetManager::Initialize(const std::string& projectDir)
 {
 	m_assetRoot = projectDir;
-	ScanAssetDirectry(projectDir);
+	ScanAssetDirectory(projectDir);
 }
 
-void AssetManager::ScanAssetDirectry(const std::string& rootDir)
+void AssetManager::ScanAssetDirectory(const std::string& rootDir)
 {
 	m_catalog.clear();
 	m_pathToId.clear();
@@ -48,7 +48,7 @@ void AssetManager::ScanAssetDirectry(const std::string& rootDir)
 		if (type == AssetType::Unknown) continue;	// Skip unknown asset types
 
 		// Resolve or create a GUID for the asset file
-		Guid id = ResolveGuidForpath(path.string());
+		Guid id = ResolveGuidForPath(path.string());
 
 		// Get the relative path of the asset file with respect to the root directory
 		std::string relativePath = fs::relative(path, rootDir).generic_string();
@@ -67,7 +67,7 @@ void AssetManager::ScanAssetDirectry(const std::string& rootDir)
 	DBG("AssetManager: Scanned '%s', found %zu assets.", rootDir.c_str(), m_catalog.size());
 }
 
-Guid AssetManager::ResolveGuidForpath(const std::string& filePath)
+Guid AssetManager::ResolveGuidForPath(const std::string& filePath)
 {
 	// Return the existing GUID if the .meta file exists
 	if (auto existing = MetaFile::TryLoad(filePath))
@@ -150,7 +150,7 @@ TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
 	if (!entryPtr || entryPtr->type != AssetType::Texture)
 	{
 		DBG("AssetManager: GetTextureHandle - unknown or non-texture asset, using error texture.");
-		return InvalidTextureHandle;
+		return TextureManager::GetInstance()->GetErrorTextureHandle();
 	}
 
 	std::wstring fullPath = ToWideString(m_assetRoot + "/" + entryPtr->relativePath);

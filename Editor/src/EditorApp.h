@@ -55,7 +55,7 @@ private:
     std::unique_ptr<Renderer> m_pRenderer;
 
 
-	std::unique_ptr<AssetManager> m_pAssetManager;
+	AssetManager& m_assetManager = AssetManager::GetInstance();
 
     std::unique_ptr<TextureManager> m_pTextureManager;
     std::unique_ptr<MeshManager> m_pMeshManager;

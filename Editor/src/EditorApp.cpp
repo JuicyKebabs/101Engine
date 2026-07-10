@@ -382,17 +382,11 @@ void EditorApp::InitInstance()
 
     auto pDevice = m_pEngine->GetDevice();
 
-    m_pTextureManager->Initialize(
-        pDevice,
-        m_pEngine->GetDescriptorHeapAllocator()
-    );
+	m_assetManager.Initialize(PathManager::Resolve("asset"));
+    m_pTextureManager->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator());
     m_pMeshManager->Initialize(pDevice);
     m_pEngine->InitBindings(m_pTextureManager.get());
-    m_pRenderer->Initialize(
-        pDevice,
-        m_pEngine->GetDescriptorHeapAllocator(),
-        m_pTextureManager.get()
-    );
+    m_pRenderer->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator(), m_pTextureManager.get());
 
     m_pEngine->BeginFrame();
     m_pEngine->RenderEnd();

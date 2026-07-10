@@ -5,6 +5,7 @@
 #include "Engine/Component/Camera.h"
 #include "Engine/Scene/SceneManager.h"
 #include "Engine/Input/InputManager.h"
+#include "Engine/Resource/AssetManager.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Audio/Audio.h"
@@ -33,6 +34,7 @@ private:
 	std::unique_ptr<Engine> m_pEngine = nullptr;					// DirectX12 engine pointer
 	std::unique_ptr<Renderer> m_pRenderer = nullptr;				// Renderer pointer
 	std::unique_ptr<SceneManager> m_pSceneManager = nullptr;		// Scene manager pointer
+	AssetManager& m_assetManager = AssetManager::GetInstance();		// Asset Manager reference
 	std::unique_ptr<TextureManager> m_pTextureManager = nullptr;	// Texture manager pointer
 	std::unique_ptr<MeshManager> m_pMeshManager = nullptr;			// Mesh manager pointer
 

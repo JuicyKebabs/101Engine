@@ -2,6 +2,7 @@
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
+#include "Engine/Core/GUID/Guid.h"
 
 struct MeshRendererProxy
 {
@@ -30,14 +31,20 @@ public:
 		SetName(desc.name);
 	}
 
+	// Set mesh asset for this renderer through AssetManager
+	// For de-serialization and inspector manipulation, this function
+	void SetAsset(const Guid& assetId);
+
 	// Getters
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
 	const MeshRendererProxy& GetRenderProxy();
-	bool IsConfigured() const override { return !m_templates.empty(); }	// Check if the renderer has been configured with necessary resources (at least one render template)
+	bool IsConfigured() const override { return !m_templates.empty(); }
+	const Guid& GetAssetId() const { return m_assetId; }
 
 private:
 	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn
 	MeshRendererProxy m_proxy;						// Cached render proxy for this component
+	Guid m_assetId;									// Mesh asset ID for this renderer
 
 private:
 	// Override functions for component lifecycle

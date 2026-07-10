@@ -2,6 +2,27 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Resource/AssetManager.h" 
+#include "Engine/Resource/MeshManager.h" 
+
+void MeshRenderer::SetAsset(const Guid& assetId)
+{
+	m_assetId = assetId;
+
+	// Get mesh handle stored in AssetManager using the assetId
+	MeshHandle meshHandle = AssetManager::GetInstance().GetMeshHandle(assetId);
+	SubmeshRenderTemplate templateDesc;
+	templateDesc.meshDesc.meshHandle = meshHandle;
+
+	// Get material info from MeshManager using the mesh handle
+	auto materialInfo = MeshManager::GetInstance()->GetMeshMaterialInfo(meshHandle);
+	templateDesc.materialDesc.textureHandle = materialInfo.textureHandle;
+	templateDesc.materialDesc.baseColor = materialInfo.materialColor;
+
+	// Set the render template for this renderer
+	m_templates = { templateDesc };
+	m_isProxyDirty = true;
+}
 
 void MeshRenderer::OnStartOverride()
 {
