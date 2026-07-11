@@ -78,7 +78,7 @@ void MeshManager::CreateErrorMesh()
 {
 	// Create cube mesh for error mesh
 	Model cubeModel = RenderTemplateFactory::LoadDefaultModel(DEFAULT_MESH::CUBE);
-	if (!cubeModel.empty())
+	if (cubeModel.empty())
 	{
 		DBG("MeshManager: Failed to create error mesh (default cube model is empty).");
 		return;

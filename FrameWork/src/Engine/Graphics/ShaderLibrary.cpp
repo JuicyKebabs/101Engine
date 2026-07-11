@@ -179,9 +179,27 @@ void ShaderLibrary::AppendMacros(std::vector<D3D_SHADER_MACRO>& out, uint64_t de
 	}
 }
 
+static std::wstring MultiByteToWide(const std::string& str)
+{
+	if (str.empty()) return std::wstring();
+	int len = MultiByteToWideChar(CP_ACP, 0, str.c_str(), (int)str.size(), nullptr, 0);
+	std::wstring result(len, 0);
+	MultiByteToWideChar(CP_ACP, 0, str.c_str(), (int)str.size(), result.data(), len);
+	return result;
+}
+
+static std::string WideToMultiByte(const std::wstring& wstr)
+{
+	if (wstr.empty()) return std::string();
+	int len = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
+	std::string result(len, 0);
+	WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), (int)wstr.size(), result.data(), len, nullptr, nullptr);
+	return result;
+}
+
 std::wstring ShaderLibrary::ResolveShaderPath(const std::wstring& relativePath)
 {
-	std::string narrow(relativePath.begin(), relativePath.end());
+	std::string narrow = WideToMultiByte(relativePath);
 	std::string resolved = PathManager::Resolve(narrow);
-	return std::wstring(resolved.begin(), resolved.end());
+	return MultiByteToWide(resolved);
 }
