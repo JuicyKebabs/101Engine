@@ -10,6 +10,11 @@
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "RenderData.h"
 
+//-------------------------------------------------------------------------
+// ShaderLibrary
+// This class manages the loading and caching of vertex and pixel shaders.
+//-------------------------------------------------------------------------
+
 // Shader stage enumeration
 enum class SHADER_STAGE
 {
@@ -46,20 +51,19 @@ struct ShaderDesc
 
 // Vertex shader file tables
 static const std::wstring VS_FILE_TABLE[] = {
-    L"shader\\VertexShader\\MeshVS.hlsl",
-    L"shader\\VertexShader\\SpriteVS.hlsl",
-    L"shader\\VertexShader\\UIVS.hlsl",
-    L"shader\\VertexShader\\ShadowVS.hlsl",
-    L"shader\\VertexShader\\PostEffectVS.hlsl",
+    L"shader\\compiled\\VertexShader\\MeshVS.cso",
+    L"shader\\compiled\\VertexShader\\SpriteVS.cso",
+    L"shader\\compiled\\VertexShader\\UIVS.cso",
+    L"shader\\compiled\\VertexShader\\ShadowVS.cso",
+    L"shader\\compiled\\VertexShader\\PostEffectVS.cso",
 };
 // Pixel shader file tables
 static const std::wstring PS_FILE_TABLE[] = {
-    L"shader\\PixelShader\\MeshPS.hlsl",
-    L"shader\\PixelShader\\SpritePS.hlsl",
-    L"shader\\PixelShader\\UIPS.hlsl",
-    L"shader\\PixelShader\\PostEffectPS.hlsl",
-};
-//  Vertex shader entry point tables
+    L"shader\\compiled\\PixelShader\\MeshPS.cso",
+    L"shader\\compiled\\PixelShader\\SpritePS.cso",
+    L"shader\\compiled\\PixelShader\\UIPS.cso",
+    L"shader\\compiled\\PixelShader\\PostEffectPS.cso",
+};//  Vertex shader entry point tables
 static const std::string VS_ENTRY_TABLE[] = {
     "main",
 };

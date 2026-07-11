@@ -12,6 +12,12 @@ std::wstring FileExtension(const std::wstring& path)
 	return fsPath.extension().wstring().substr(1); // Remove leading dot from extension and return
 }
 
+TextureManager* TextureManager::GetInstance()
+{
+	static TextureManager instance;
+	return &instance;
+}
+
 // Initialization
 void TextureManager::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator)
 {

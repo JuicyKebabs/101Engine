@@ -28,11 +28,7 @@ public:
 	~TextureManager() {};	// Destructor
 
 	// Get singleton instance
-	static TextureManager* GetInstance()
-	{
-		static TextureManager instance;
-		return &instance;
-	}
+	static TextureManager* GetInstance();
 
 	// Copying is prohibited
 	TextureManager(const TextureManager&) = delete;

@@ -15,7 +15,8 @@ public:
 	static bool Initialize(const std::string& exepath);
 
 	// Resolve relative path to absolute path
-	static std::string Resolve(const std::string& relativePath);
+	static std::string Resolve(const std::string& relativePath);	// narrow string version
+	static std::wstring ResolveW(const std::string& relativePath);	// wide string version
 
 	// Getters
 	static std::string GetProjectRoot();
