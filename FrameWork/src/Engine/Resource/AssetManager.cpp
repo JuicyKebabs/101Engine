@@ -18,15 +18,11 @@ static std::wstring ToWideString(const std::string& str)
 	return result;
 }
 
-AssetManager& AssetManager::GetInstance()
-{
-	static AssetManager instance;
-	return instance;
-}
-
-void AssetManager::Initialize(const std::string& projectDir)
+void AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager, MeshManager* pMeshManager)
 {
 	m_assetRoot = projectDir;
+	m_pTextureManager = pTextureManager;
+	m_pMeshManager = pMeshManager;
 	ScanAssetDirectory(projectDir);
 }
 
@@ -129,16 +125,16 @@ MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 	if (!entryPtr || entryPtr->type != AssetType::Mesh)
 	{
 		DBG("AssetManager: GetMeshHandle - unknown or non-mesh asset, using error mesh.");
-		return MeshManager::GetInstance()->GetErrorMeshHandle();
+		return m_pMeshManager->GetErrorMeshHandle();
 	}
 
 	// Load mesh
 	std::wstring fullPath = ToWideString(m_assetRoot + "/" + entryPtr->relativePath);
-	auto& handles = MeshManager::GetInstance()->LoadModel(fullPath);
+	auto& handles = m_pMeshManager->LoadModel(fullPath);
 
 	// If no handles were returned, use the error mesh handle; otherwise, use the first handle
 	MeshHandle handle = handles.empty()
-		? MeshManager::GetInstance()->GetErrorMeshHandle() 
+		? m_pMeshManager->GetErrorMeshHandle() 
 		: handles[0];
 
 	// Cache the loaded mesh handle
@@ -148,19 +144,21 @@ MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 
 TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
 {
+	// Return cached handle if the texture has already been loaded
 	auto cashed = m_loadedTextures.find(guid);
-	if (cashed != m_loadedTextures.end()) return cashed->second; // Return cached handle if already loaded
+	if (cashed != m_loadedTextures.end()) return cashed->second;
 
 	const AssetEntry* entryPtr = GetAssetEntry(guid);
 
 	if (!entryPtr || entryPtr->type != AssetType::Texture)
 	{
 		DBG("AssetManager: GetTextureHandle - unknown or non-texture asset, using error texture.");
-		return TextureManager::GetInstance()->GetErrorTextureHandle();
+		return m_pTextureManager->GetErrorTextureHandle();
 	}
 
+	// If the texture has not been loaded yet, load it and cache the handle and return it
 	std::wstring fullPath = ToWideString(m_assetRoot + "/" + entryPtr->relativePath);
-	TextureHandle handle = TextureManager::GetInstance()->LoadTexture(fullPath);
+	TextureHandle handle = m_pTextureManager->LoadTexture(fullPath);
 	m_loadedTextures[guid] = handle;
 	return handle;
 }

@@ -82,6 +82,18 @@ void SceneManager::LateUpdate(float deltaTime)
 // Finalization
 void SceneManager::Finalize()
 {
+	// Finalize the current scene
+	if (m_pCurrentScene)
+	{
+		m_pCurrentScene->Finalize();
+	}
+
+	// Release all scene elements
+	for (auto& element : m_sceneElements)
+	{
+		element.pSceneBase.reset();
+	}
+	m_pCurrentScene = nullptr;
 }
 
 // Scene change reservation

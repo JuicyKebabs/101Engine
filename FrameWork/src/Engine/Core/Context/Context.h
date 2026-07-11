@@ -4,14 +4,16 @@
 class Renderer;					// Renderer
 class TextureManager;			// Texture manager
 class MeshManager;				// Mesh manager
+class AssetManager;				// Asset manager
 class CollisionSystem;			// Collision manager
 
 // Engine context structure
 struct EngineContext
 {
-	Renderer* pRenderer = nullptr;									// Pointer to the renderer
-	TextureManager* pTextureManager = nullptr;						// Pointer to the texture manager
-	MeshManager* pMeshManager = nullptr;							// Pointer to the mesh manager
+	Renderer* pRenderer = nullptr;				// Pointer to the renderer
+	TextureManager* pTextureManager = nullptr;	// Pointer to the texture manager
+	MeshManager* pMeshManager = nullptr;		// Pointer to the mesh manager
+	AssetManager* pAssetManager = nullptr;		// Pointer to the asset manager
 };
 
 // Frame context structure

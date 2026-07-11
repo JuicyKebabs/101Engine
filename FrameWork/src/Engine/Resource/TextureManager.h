@@ -24,19 +24,8 @@ struct PendingTextureUpload
 class TextureManager
 {
 public:
-	TextureManager() {};	// Constructor
-	~TextureManager() {};	// Destructor
-
-	// Get singleton instance
-	static TextureManager* GetInstance();
-
-	// Copying is prohibited
-	TextureManager(const TextureManager&) = delete;
-	TextureManager& operator=(const TextureManager&) = delete;
-
-	// Move semantics are allowed
-	TextureManager(TextureManager&&) noexcept = default;
-	TextureManager& operator=(TextureManager&&) noexcept = default;
+	TextureManager() = default;		// Constructor
+	~TextureManager() = default;	// Destructor
 
 	void Initialize(	// Initialization
 		ID3D12Device* pDevice,	// Device

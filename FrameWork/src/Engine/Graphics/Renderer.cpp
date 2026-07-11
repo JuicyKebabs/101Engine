@@ -14,34 +14,33 @@
 
 using namespace DirectX;
 
-//デストラクタ
 Renderer::~Renderer()
 {
 	m_psoMap.clear();
 }
 
-Renderer* Renderer::GetInstance()
-{
-	static Renderer instance;
-	return &instance;
-}
-
-//初期化
-void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager)
+// Initialization
+void Renderer::Initialize(
+	ID3D12Device* pDevice, 
+	DescriptorHeapAllocator* pDescriptorHeapAllocator, 
+	TextureManager* pTextureManager,
+	MeshManager* pMeshManager
+)
 {
 	m_pDevice = pDevice;
 	m_pDescriptorHeapAllocator = pDescriptorHeapAllocator;
 	m_pTextureManager = pTextureManager;
+	m_pMeshManager = pMeshManager;
 
-	m_directionalLight = {}; //初期化
+	m_directionalLight = {};
 
-	//ルートシグネチャの生成
+	// Create root signature
 	m_pRootSignature = std::make_unique<RootSignature>(m_pDevice);
 
-	//シェーダーライブラリの生成
+	// Create shader library
 	m_pShaderLibrary = std::make_unique<ShaderLibrary>();
 
-	//ベーシックPSOの生成
+	// Create default PSO
 	PSOKey defaultKey{};
 	m_pDefaultPSO = CreatePipelineStateObject(defaultKey);
 
@@ -49,18 +48,18 @@ void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescr
 	m_shadowFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
 
-	//ポストプロセス用PSOキーの設定
+	// Prepare post-processing PSO key
 	PreparePostProcessKey();
-	//シャドウマップ用PSOキーの設定
+	// Prepare shadow map PSO key
 	PrepareShadowMapKey();
 }
 
-//更新
+// Update
 void Renderer::Update(UINT currentBackBufferIndex, const CameraInfo& info)
 {
 }
 
-//フレーム開始
+// Begin frame
 void Renderer::BeginFrame(ID3D12GraphicsCommandList* p_commandList)
 {
 	// Set descriptor heaps
@@ -325,7 +324,7 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCB[itemIndex]->GetAddress());
 
 	// Set mesh data
-	auto meshGPU = MeshManager::GetInstance()->GetMeshGPU(item.meshDesc.meshHandle);
+	auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
 	if (meshGPU == nullptr)
 	{
 		DBG("MeshGPU is null\n");
@@ -367,7 +366,7 @@ void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, con
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshForShadowCB[itemIndex]->GetAddress());
 
 	// Set mesh data
-	auto meshGPU = MeshManager::GetInstance()->GetMeshGPU(item.meshDesc.meshHandle);
+	auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
 	if (meshGPU == nullptr)
 	{
 		DBG("MeshGPU is null\n");

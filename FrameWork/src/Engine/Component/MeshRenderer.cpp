@@ -10,12 +10,12 @@ void MeshRenderer::SetAsset(const Guid& assetId)
 	m_assetId = assetId;
 
 	// Get mesh handle stored in AssetManager using the assetId
-	MeshHandle meshHandle = AssetManager::GetInstance().GetMeshHandle(assetId);
+	MeshHandle meshHandle = GetEngineContext()->pAssetManager->GetMeshHandle(assetId);
 	SubmeshRenderTemplate templateDesc;
 	templateDesc.meshDesc.meshHandle = meshHandle;
 
 	// Get material info from MeshManager using the mesh handle
-	auto materialInfo = MeshManager::GetInstance()->GetMeshMaterialInfo(meshHandle);
+	auto materialInfo = GetEngineContext()->pMeshManager->GetMeshMaterialInfo(meshHandle);
 	templateDesc.materialDesc.textureHandle = materialInfo.textureHandle;
 	templateDesc.materialDesc.baseColor = materialInfo.materialColor;
 

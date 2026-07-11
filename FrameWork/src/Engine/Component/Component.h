@@ -4,6 +4,7 @@
 
 // Forward declaration
 class Actor;
+struct EngineContext;
 
 // Component class 
 class Component
@@ -28,6 +29,9 @@ public:
 	bool IsStarted() const { return m_started; }				// Check if the component has been started
 	void MarkForDestruction() { m_destroyed = true; }			// Mark the component for destruction
 	bool IsDestroyed() const { return m_destroyed; }			// Check if the component is marked for destruction
+
+protected:
+	EngineContext* GetEngineContext() const;	// Get the engine context from the owning actor's scene
 
 private:
 	Actor* m_pOwner = nullptr;		// Pointer to the owning actor

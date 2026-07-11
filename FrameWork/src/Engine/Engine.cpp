@@ -2,7 +2,6 @@
 #include "Engine/Resource/TextureManager.h"
 
 using namespace DirectX;
-using namespace std;
 
 bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeight)
 {
@@ -291,7 +290,7 @@ void Engine::CreateDevice()
 // Create the descriptor heap allocator
 void Engine::CreateDescriptorHeapAllocator()
 {
-	m_pDescriptorHeapAllocator = make_unique<DescriptorHeapAllocator>(m_pDevice.Get());
+	m_pDescriptorHeapAllocator = std::make_unique<DescriptorHeapAllocator>(m_pDevice.Get());
 	m_pDescriptorHeapAllocator->Initialize();
 }
 
@@ -478,7 +477,7 @@ void Engine::CreateBackBuffers()
 void Engine::CreateBuiltinRenderTargets()
 {
 	for(auto& target : m_builtinRenderTargets) {
-		target = make_unique<GpuTexture>();
+		target = std::make_unique<GpuTexture>();
 	}
 
 	CreatePostProcessRenderTarget();
