@@ -115,29 +115,16 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(SHADER_STAGE 
 
 	// Compile shader
 	Microsoft::WRL::ComPtr<ID3DBlob> shaderBlob;
-	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+	HRESULT hr = D3DReadFileToBlob(resolvedFilePath.c_str(), shaderBlob.GetAddressOf());
 
-	// Build macros for compilation
-	auto macros = BuildMacros(stage, stageDefines, commonDefines);
-
-	HRESULT hr = D3DCompileFromFile(
-		resolvedFilePath.c_str(),
-		macros.data(),
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		desc.entryPoint.c_str(),
-		desc.profile.c_str(),
-		GetCompileFlags(),
-		0,
-		shaderBlob.GetAddressOf(),
-		errorBlob.GetAddressOf()
-	);
-
-	if(FAILED(hr) || !shaderBlob)
+	if (FAILED(hr) || !shaderBlob)
 	{
-		OutputCompileError(errorBlob.Get(), desc.filePath.c_str());
+		wchar_t msg[512];
+		swprintf_s(msg, L"[ShaderLibrary] Failed to load compiled shader: %s (HRESULT=0x%08X)\n",
+			resolvedFilePath.c_str(), hr);
+		OutputDebugStringW(msg);
 		return {};
 	}
-
 	// Cache the compiled shader
 	m_shaderCache.emplace(key, shaderBlob);
 	return shaderBlob;

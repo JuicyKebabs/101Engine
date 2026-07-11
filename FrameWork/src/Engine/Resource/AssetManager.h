@@ -38,11 +38,7 @@ struct AssetEntry
 class AssetManager
 {
 public:
-	static AssetManager& GetInstance()
-	{
-		static AssetManager instance;
-		return instance;
-	}
+	static AssetManager& GetInstance();
 
 	// Initialize the AssetManager with the project directory
 	void Initialize(const std::string& projectDir);

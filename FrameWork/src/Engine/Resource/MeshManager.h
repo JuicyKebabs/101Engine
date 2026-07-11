@@ -29,11 +29,7 @@ public:
 	~MeshManager() = default;	// Destructor
 
 	// Get singleton instance
-	static MeshManager* GetInstance()
-	{
-		static MeshManager instance;
-		return &instance;
-	}
+	static MeshManager* GetInstance();
 
 	void Initialize(ID3D12Device* pDevice);	// Initialize
 

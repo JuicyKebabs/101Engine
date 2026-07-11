@@ -31,11 +31,7 @@ public:
 	~Renderer();	// Destructor
 
 	// Get singleton instance
-	static Renderer* GetInstance()
-	{
-		static Renderer instance;
-		return &instance;
-	}
+	static Renderer* GetInstance();
 
 	void Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager);	// Initialization
 	void Update(UINT currentBackBufferIndex, const CameraInfo& info);															// Update

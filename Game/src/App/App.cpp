@@ -240,9 +240,6 @@ void App::InitInstance()
 	// Get device
 	auto pDevice = m_pEngine->GetDevice();
 
-	// Initialize asset manager
-	m_assetManager.Initialize(PathManager::Resolve("asset"));
-
 	// Initialize texture management class
 	m_pTextureManager->Initialize(
 		pDevice,								// Device
@@ -253,6 +250,9 @@ void App::InitInstance()
 	m_pMeshManager->Initialize(
 		pDevice	// Device
 	);
+
+	// Initialize asset manager
+	m_assetManager.Initialize(PathManager::Resolve("asset"));
 
 	// Initialize engine bindings
 	m_pEngine->InitBindings(m_pTextureManager.get());

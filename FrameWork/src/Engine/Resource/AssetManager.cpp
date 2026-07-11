@@ -18,6 +18,12 @@ static std::wstring ToWideString(const std::string& str)
 	return result;
 }
 
+AssetManager& AssetManager::GetInstance()
+{
+	static AssetManager instance;
+	return instance;
+}
+
 void AssetManager::Initialize(const std::string& projectDir)
 {
 	m_assetRoot = projectDir;

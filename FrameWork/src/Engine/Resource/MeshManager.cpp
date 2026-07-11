@@ -3,7 +3,14 @@
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
+#include "Engine/Core/Path/PathManager.h"
 #include "Engine/Core/Debug/Debug.h"
+
+MeshManager* MeshManager::GetInstance()
+{
+	static MeshManager instance;
+	return &instance;
+}
 
 void MeshManager::Initialize(ID3D12Device* pDevice)
 {
@@ -44,6 +51,8 @@ const std::vector<MeshHandle>& MeshManager::LoadModel(const std::wstring& path)
 		// Store the handle in the handles vector
 		handles.push_back(handle);
 	}
+
+	return m_loadedModels.emplace(path, std::move(handles)).first->second;
 }
 
 MeshHandle MeshManager::CreateMeshHandle(Mesh& src)
@@ -87,11 +96,11 @@ void MeshManager::CreateErrorMesh()
 	m_errorMeshHandle = CreateMeshHandle(cubeModel[0]);	// Store mesh and handle
 
 	// Load texture for error mesh
-	TextureHandle errorTex = TextureManager::GetInstance()->LoadTexture(L"asset/texture/error_checker.png");
-	
+	TextureHandle errorTex = TextureManager::GetInstance()->LoadTexture(PathManager::ResolveW("asset/texture/error_checker.png"));
+
 	// Store material info for error mesh
 	MeshMaterialInfo materialInfo;
-	materialInfo.textureHandle = errorTex = errorTex;
+	materialInfo.textureHandle = errorTex;
 	materialInfo.materialColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 	m_materials[m_errorMeshHandle] = materialInfo;
 

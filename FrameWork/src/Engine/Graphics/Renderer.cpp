@@ -20,6 +20,12 @@ Renderer::~Renderer()
 	m_psoMap.clear();
 }
 
+Renderer* Renderer::GetInstance()
+{
+	static Renderer instance;
+	return &instance;
+}
+
 //初期化
 void Renderer::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager)
 {

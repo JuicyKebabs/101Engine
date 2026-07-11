@@ -47,6 +47,17 @@ std::string PathManager::Resolve(const std::string& relativePath)
 	return (fs::path(s_projectRoot) / relativePath).string();
 }
 
+std::wstring PathManager::ResolveW(const std::string& relativePath)
+{
+	std::string resolved = Resolve(relativePath);
+
+	if (resolved.empty()) return std::wstring();
+	int len = MultiByteToWideChar(CP_ACP, 0, resolved.c_str(), (int)resolved.size(), nullptr, 0);
+	std::wstring result(len, 0);
+	MultiByteToWideChar(CP_ACP, 0, resolved.c_str(), (int)resolved.size(), result.data(), len);
+	return result;
+}
+
 std::string PathManager::GetProjectRoot()
 {
 	if (!s_initialized)
