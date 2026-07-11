@@ -361,6 +361,7 @@ void EditorApp::PrepareInstance()
     m_pRenderer       = std::make_unique<Renderer>();
     m_pTextureManager = std::make_unique<TextureManager>();
     m_pMeshManager    = std::make_unique<MeshManager>();
+	m_pAssetManager   = std::make_unique<AssetManager>();
 
     m_engineContext = {
         m_pRenderer.get(),
@@ -382,11 +383,11 @@ void EditorApp::InitInstance()
 
     auto pDevice = m_pEngine->GetDevice();
 
-	m_assetManager.Initialize(PathManager::Resolve("asset"));
     m_pTextureManager->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator());
-    m_pMeshManager->Initialize(pDevice);
+    m_pMeshManager->Initialize(pDevice, m_pTextureManager.get());
+	m_pAssetManager->Initialize(PathManager::GetProjectRoot(), m_pTextureManager.get(), m_pMeshManager.get());
     m_pEngine->InitBindings(m_pTextureManager.get());
-    m_pRenderer->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator(), m_pTextureManager.get());
+    m_pRenderer->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator(), m_pTextureManager.get(), m_pMeshManager.get());
 
     m_pEngine->BeginFrame();
     m_pEngine->RenderEnd();

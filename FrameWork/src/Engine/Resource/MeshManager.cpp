@@ -6,15 +6,10 @@
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Core/Debug/Debug.h"
 
-MeshManager* MeshManager::GetInstance()
-{
-	static MeshManager instance;
-	return &instance;
-}
-
-void MeshManager::Initialize(ID3D12Device* pDevice)
+void MeshManager::Initialize(ID3D12Device* pDevice, TextureManager* pTextureManager)
 {
 	m_pDevice = pDevice;
+	m_pTextureManager = pTextureManager;
 	CreateErrorMesh();
 }
 
@@ -44,7 +39,7 @@ const std::vector<MeshHandle>& MeshManager::LoadModel(const std::wstring& path)
 		materialInfo.materialColor = mesh.materialColor;
 		if (!mesh.texPath.empty())
 		{
-			materialInfo.textureHandle = TextureManager::GetInstance()->LoadTexture(mesh.texPath); 
+			materialInfo.textureHandle = m_pTextureManager->LoadTexture(mesh.texPath); 
 		}
 		m_materials[handle] = materialInfo;
 
@@ -96,7 +91,7 @@ void MeshManager::CreateErrorMesh()
 	m_errorMeshHandle = CreateMeshHandle(cubeModel[0]);	// Store mesh and handle
 
 	// Load texture for error mesh
-	TextureHandle errorTex = TextureManager::GetInstance()->LoadTexture(PathManager::ResolveW("asset/texture/error_checker.png"));
+	TextureHandle errorTex = m_pTextureManager->LoadTexture(PathManager::ResolveW("asset/texture/error_checker.png"));
 
 	// Store material info for error mesh
 	MeshMaterialInfo materialInfo;

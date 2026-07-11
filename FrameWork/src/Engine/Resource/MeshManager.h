@@ -14,6 +14,8 @@
 // Uploads mesh data to the GPU and keeps track of loaded meshes and materials
 //-----------------------------------------------------------------------------
 
+class TextureManager;	// Forward declaration of TextureManager
+
 // Structure to hold material information linked to a mesh
 struct MeshMaterialInfo
 {
@@ -28,10 +30,7 @@ public:
 	MeshManager() = default;	// Constructor
 	~MeshManager() = default;	// Destructor
 
-	// Get singleton instance
-	static MeshManager* GetInstance();
-
-	void Initialize(ID3D12Device* pDevice);	// Initialize
+	void Initialize(ID3D12Device* pDevice, TextureManager* pTextureManager);	// Initialize
 
 	// Load a model from a file and return its mesh handles
 	// If the model is already loaded, it returns the existing handles
@@ -60,7 +59,8 @@ private:
 	MeshHandle m_nextMeshHandle = 0;					// Next available mesh handle
 	MeshHandle m_errorMeshHandle = InvalidMeshHandle;	// Handle for the error mesh
 
-	ID3D12Device* m_pDevice = nullptr;	// Pointer to the device
+	ID3D12Device* m_pDevice = nullptr;				// Pointer to the device
+	TextureManager* m_pTextureManager = nullptr;	// Pointer to the texture manager
 
 private:
 	void CreateErrorMesh();	// Create a default error mesh

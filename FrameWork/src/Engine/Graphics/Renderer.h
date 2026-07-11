@@ -22,18 +22,22 @@
 
 // Forward declaration
 struct CameraInfo;
+class TextureManager;
+class MeshManager;
 
 // Renderer class
 class Renderer
 {
 public:
-	Renderer() {};	// Constructor
-	~Renderer();	// Destructor
+	Renderer() = default;	// Constructor
+	~Renderer();			// Destructor
 
-	// Get singleton instance
-	static Renderer* GetInstance();
-
-	void Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* pDescriptorHeapAllocator, TextureManager* pTextureManager);	// Initialization
+	void Initialize(	// Initialization
+		ID3D12Device* pDevice, 
+		DescriptorHeapAllocator* pDescriptorHeapAllocator,
+		TextureManager* pTextureManager,
+		MeshManager* pMeshManager
+	);
 	void Update(UINT currentBackBufferIndex, const CameraInfo& info);															// Update
 	
 	void BeginFrame(ID3D12GraphicsCommandList* p_commandList);	// Begin frame (set root signature, descriptor heaps, etc.)
@@ -53,6 +57,7 @@ private:
 	ID3D12Device* m_pDevice = nullptr;								// Device
 	DescriptorHeapAllocator* m_pDescriptorHeapAllocator = nullptr;	// Descriptor heap allocator
 	TextureManager* m_pTextureManager = nullptr;					// Texture manager
+	MeshManager* m_pMeshManager = nullptr;							// Mesh manager
 
 	// Pipeline State Object related
 	std::unordered_map<PSOKey, std::shared_ptr<PipelineState>, PSOKeyHash> m_psoMap;	// PSO map

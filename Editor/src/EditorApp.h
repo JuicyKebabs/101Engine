@@ -53,12 +53,9 @@ private:
 
     std::unique_ptr<Engine> m_pEngine;
     std::unique_ptr<Renderer> m_pRenderer;
-
-
-	AssetManager& m_assetManager = AssetManager::GetInstance();
-
     std::unique_ptr<TextureManager> m_pTextureManager;
     std::unique_ptr<MeshManager> m_pMeshManager;
+	std::unique_ptr<AssetManager> m_pAssetManager;
 
 	InputManager& m_inputManager = InputManager::GetInstance();
     TimeManager& m_timeManager = TimeManager::GetInstance();

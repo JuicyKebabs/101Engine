@@ -10,7 +10,6 @@
 #include "Engine/Graphics/CameraSystem.h"
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
-#include "Engine/Scene/SceneLoader.h"
 
 //----------------------------------------------------------------------------------------
 // SceneBase class
@@ -109,17 +108,17 @@ public:
 		m_addPendingAllActors.clear();
 	}
 
-	// Getters for systems
+	// Setters
+	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
+	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager	
+
+	// Getters
 	RenderSystem* GetRenderSystem() const { return m_pRenderSystem.get(); }				// Get render system
 	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }				// Get camera system
 	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
-
-	// Setters and getters for directional light
-	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
-	DirectionalLight GetDirectionalLight() const { return m_directionalLight; }				// Get directional light
-
-	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager	
-	SceneManager* GetSceneManager() const { return m_pSceneManager; }						// Get scene manager
+	DirectionalLight GetDirectionalLight() const { return m_directionalLight; }			// Get directional light
+	SceneManager* GetSceneManager() const { return m_pSceneManager; }					// Get scene manager
+	EngineContext* GetEngineContext() const { return m_pEngineContext; }				// Get engine context
 
 private:
 	std::vector<std::unique_ptr<Actor>> m_rootActors;			// Root actors (actors without parents, owned by the scene)
@@ -132,6 +131,8 @@ private:
 	std::unique_ptr<CollisionSystem> m_pCollisionSystem = nullptr;	// Collision system
 
 	SceneManager* m_pSceneManager = nullptr;	// Pointer to the scene manager (used for scene switching)
+
+	EngineContext* m_pEngineContext = nullptr;	// Pointer to the engine context (used for accessing engine systems)
 
 protected:
 	DirectionalLight m_directionalLight;	// Directional light

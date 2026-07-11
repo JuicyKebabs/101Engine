@@ -14,6 +14,10 @@
 // Provide functions to load asset when it gets requested.
 //------------------------------------------------------------------------------------
 
+// Forward declarations
+class TextureManager;
+class MeshManager;
+
 enum class AssetType
 {
 	Mesh,
@@ -38,10 +42,15 @@ struct AssetEntry
 class AssetManager
 {
 public:
-	static AssetManager& GetInstance();
+	AssetManager() = default;
+	~AssetManager() = default;
 
 	// Initialize the AssetManager with the project directory
-	void Initialize(const std::string& projectDir);
+	void Initialize(
+		const std::string& projectDir,
+		TextureManager* pTextureManager,
+		MeshManager* pMeshManager
+	);
 
 	// Lookup functions to retrieve asset entries by path or GUID
 	const AssetEntry* GetAssetEntryByPath(const std::string& relativePath) const;
@@ -52,8 +61,20 @@ public:
 	TextureHandle GetTextureHandle(const Guid& guid);
 
 private:
-	AssetManager() = default;
+	std::unordered_map<Guid, AssetEntry> m_catalog;		// GUID -> Entry (Subscribe without loading)
+	std::unordered_map<std::string, Guid> m_pathToId;	// Path -> GUID (Reverse lookup)
 
+	// Lazy-load cache for each asset type
+	std::unordered_map<Guid, MeshHandle>    m_loadedMeshes;	// Lazy-load cache
+	std::unordered_map<Guid, TextureHandle> m_loadedTextures;	// Lazy-load cache
+
+	std::string m_assetRoot;	// Root directory for assets
+
+	// References to necessary engine systems for asset loading
+	TextureManager* m_pTextureManager = nullptr;
+	MeshManager* m_pMeshManager = nullptr;
+
+private:
 	// Scans root directory recursively and creates or resolves a GUID
 	// for each asset file via .meta sidecar file.
 	// No asset is loaded at this time, only the catalog is built.
@@ -65,13 +86,4 @@ private:
 
 	// Deteremine asset type based on the file extension.
 	AssetType DetermineAssetType(const std::string& extension);
-
-	std::unordered_map<Guid, AssetEntry> m_catalog;		// GUID -> Entry (Subscribe without loading)
-	std::unordered_map<std::string, Guid> m_pathToId;	// Path -> GUID (Reverse lookup)
-
-	// Lazy-load cache for each asset type
-	std::unordered_map<Guid, MeshHandle>    m_loadedMeshes;	// Lazy-load cache
-	std::unordered_map<Guid, TextureHandle> m_loadedTextures;	// Lazy-load cache
-
-	std::string m_assetRoot;	// Root directory for assets
 };

@@ -7,6 +7,7 @@
 #include "Engine/Window/WindowInfo.h"
 #include "Engine/EngineComponentrRegistration.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Engine/Scene/ComponentRegistry.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -138,17 +139,19 @@ void App::Run()
 // Termination
 void App::Terminate()
 {
-	m_pEngine->Terminate();		// DirectX12 engine termination
-	m_audioManager.Terminate();	// Audio manager termination
+	m_pSceneManager->Finalize();
+	ComponentRegistry::Get().UnregisterAllGameComponents();
 
-	UnregisterClass(wc.lpszClassName, wc.hInstance);	// Unregister window class
-
-	// Unload game code DLL
 	if (m_hGameCodeDll)
 	{
 		FreeLibrary(m_hGameCodeDll);
 		m_hGameCodeDll = nullptr;
 	}
+
+	m_pEngine->Terminate();		// DirectX12 engine termination
+	m_audioManager.Terminate();	// Audio manager termination
+
+	UnregisterClass(wc.lpszClassName, wc.hInstance);
 }
 
 // Load game code DLL
@@ -218,6 +221,7 @@ void App::PrepareInstance()
 	m_pSceneManager = std::make_unique<SceneManager>();
 	m_pTextureManager = std::make_unique<TextureManager>();
 	m_pMeshManager = std::make_unique<MeshManager>();	
+	m_pAssetManager = std::make_unique<AssetManager>();
 
 	// Set up engine context structure
 	m_engineContext = {
@@ -248,11 +252,16 @@ void App::InitInstance()
 
 	// Initialize mesh management class
 	m_pMeshManager->Initialize(
-		pDevice	// Device
+		pDevice,				// Device
+		m_pTextureManager.get()	// Texture manager
 	);
 
 	// Initialize asset manager
-	m_assetManager.Initialize(PathManager::Resolve("asset"));
+	m_pAssetManager->Initialize(
+		PathManager::Resolve("asset"),
+		m_pTextureManager.get(),
+		m_pMeshManager.get()
+		);
 
 	// Initialize engine bindings
 	m_pEngine->InitBindings(m_pTextureManager.get());
@@ -261,7 +270,8 @@ void App::InitInstance()
 	m_pRenderer->Initialize(
 		pDevice,									// Device
 		m_pEngine->GetDescriptorHeapAllocator(),	// Descriptor heap allocator
-		m_pTextureManager.get()						// Texture manager
+		m_pTextureManager.get(),					// Texture manager
+		m_pMeshManager.get()						// Mesh manager
 	);
 
 	// Initialize rendering

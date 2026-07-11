@@ -23,6 +23,7 @@ SceneBase::~SceneBase()
 // Initialization
 void SceneBase::Initialize(EngineContext& context)
 {
+	m_pEngineContext = &context;
 }
 
 // Post-update (for late update)
