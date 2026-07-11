@@ -2,22 +2,6 @@
 #include "Engine/Core/Path/PathManager.h"
 #include <cassert>
 
-// Output compile error messages
-static inline void OutputCompileError(ID3DBlob* errorBlob, const wchar_t* file)
-{
-	if (!errorBlob) return;
-
-	const char* msg = static_cast<const char*>(errorBlob->GetBufferPointer());
-	if (!msg) return;
-
-	OutputDebugStringW(L"[ShaderLibrary] Compile failed: ");
-	OutputDebugStringW(file);
-	OutputDebugStringW(L"\n");
-
-	OutputDebugStringA(msg);
-	OutputDebugStringA("\n");
-}
-
 static UINT GetCompileFlags()
 {
 	UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
