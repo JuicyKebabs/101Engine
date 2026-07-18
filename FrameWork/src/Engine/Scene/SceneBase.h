@@ -4,12 +4,14 @@
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Actor/Actor.h"
+#include "Engine/Actor/ActorPool.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Graphics/CameraSystem.h"
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
+
 
 //----------------------------------------------------------------------------------------
 // SceneBase class
@@ -21,7 +23,6 @@
 class SceneManager;	// Forward declaration of SceneManager class
 
 // Scene base class
-// Base class for all scene classes
 class SceneBase
 {
 public:
@@ -38,74 +39,86 @@ public:
 	void OnRender(EngineContext& context);		// Render
 	void Finalize();							// Finalize
 
-	// Add an root actor
-	Actor* AddRootActor(Actor* actor)
+	// Add an actor to the scene
+	Actor* AddRootActor(std::unique_ptr<Actor> actor)
 	{
 		if (!actor) return nullptr;
 		actor->SetOwner(this);
-		m_addPendingRootActors.push_back(std::unique_ptr<Actor>(actor));
-		m_addPendingAllActors.push_back(actor);
-		return actor;
+		ActorHandle handle = m_actorPool.Register(std::move(actor));
+		return m_actorPool.Resolve(handle);
 	}
 
-	// Add an actor to the scene (can be used for child actors that are not owned by the scene)
-	Actor* AddActor(Actor* actor)
+	// Add a child actor to the scene
+	// Called by Actor::AddChildActor to add a child actor to the scene
+	Actor* AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle)
 	{
 		if (!actor) return nullptr;
 		actor->SetOwner(this);
-		m_addPendingAllActors.push_back(actor);
-		return actor;
+		ActorHandle handle = m_actorPool.Register(std::move(actor));
+		Actor* ptr = m_actorPool.Resolve(handle);
+		if (ptr) ptr->SetParentHandle(parentHandle);
+		return ptr;
 	}
 
 	// Remove an actor from the scene (mark it for destruction)
-	void RemoveActor(Actor* actor)
+	// Actual release happens at the end of the LateUpdate via ActorPool::CollectGarbage
+	void RemoveActor(Actor* actor, bool cascadeToChildren = true)
 	{
 		if (!actor) return;
+
+		if (cascadeToChildren)
+		{
+			// Recursively remove all children of the actor
+			auto children = actor->GetDirectChildren();
+			for (auto* child : children)
+			{
+				RemoveActor(child, true);
+			}
+		}
+
 		actor->Destroy();
 	}
 
 	// Remove an actor from the scene by name
 	void RemoveActor(const std::string& name)
 	{
-		// Dstroy the actor with the given name in the scene (if it exists)
-		for(auto it = m_allActors.begin(); it != m_allActors.end(); ++it)
-		{
-			if ((*it)->GetName() == name)
+		std::vector<Actor*> targets;
+		m_actorPool.ForEach([&](Actor* actor) {
+			if (actor->GetName() == name)
 			{
-				(*it)->Destroy();
+				targets.push_back(actor);
 			}
+			});
+
+		for (Actor* actor : targets)
+		{
+			RemoveActor(actor, /*cascadeToChildren=*/true);
 		}
 	}
+
+	Actor* ResolveActor(ActorHandle handle) const { return m_actorPool.Resolve(handle); }	// Resolve an actor handle to an actor pointer
+
+	ActorPool& GetActorPool() { return m_actorPool; }	// Get actor pool
 
 	// Get root actors (actors without parents, owned by the scene)
 	std::vector<Actor*> GetRootActors() const
 	{
-		std::vector<Actor*> rootActorPtrs;
-		for (const auto& actor : m_rootActors) {
-			rootActorPtrs.push_back(actor.get());
-		}
-		return rootActorPtrs;
+		std::vector<Actor*> result;
+		m_actorPool.ForEach([&](Actor* actor) {
+				if (actor->GetParentHandle().IsNull())
+				{
+					result.push_back(actor);
+				}
+			});
+		return result;
 	}
 
 	// Get all actors in the scene (including children)
-	std::vector<Actor*> GetAllActors() const { return m_allActors; }
-
-	// Move all pending actors (root + flat list) into the active containers.
-	// Must be called before iterating GetRootActors()/GetAllActors() outside of
-	// the normal PreUpdate loop (e.g. SceneWriter::SaveScene, SceneLoader after load).
-	void FlushPendingActors()
+	std::vector<Actor*> GetAllActors() const
 	{
-		for (auto& pendingActor : m_addPendingRootActors)
-		{
-			m_rootActors.push_back(std::move(pendingActor));
-		}
-		m_addPendingRootActors.clear();
-
-		for (auto* pendingActor : m_addPendingAllActors)
-		{
-			m_allActors.push_back(pendingActor);
-		}
-		m_addPendingAllActors.clear();
+		std::vector<Actor*> result;
+		m_actorPool.ForEach([&](Actor* actor) { result.push_back(actor); });
+		return result;
 	}
 
 	// Setters
@@ -121,10 +134,7 @@ public:
 	EngineContext* GetEngineContext() const { return m_pEngineContext; }				// Get engine context
 
 private:
-	std::vector<std::unique_ptr<Actor>> m_rootActors;			// Root actors (actors without parents, owned by the scene)
-	std::vector<Actor*> m_allActors;							// Raw pointer array of all actors in the scene (including children)
-	std::vector<std::unique_ptr<Actor>> m_addPendingRootActors;	// Pending root actors to be added (owned by the scene)
-	std::vector<Actor*> m_addPendingAllActors;					// Raw pointer array of pending objects to be added (including children)
+	ActorPool m_actorPool;	// Actor pool (used for allocating actors)
 
 	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;		// Render system
 	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;		// Camera system

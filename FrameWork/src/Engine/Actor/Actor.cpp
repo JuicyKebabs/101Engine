@@ -1,5 +1,5 @@
 #include "Actor.h"
-#include <DirectXMath.h>
+#include "ActorPool.h"
 #include "Engine/Engine.h"
 #include "Engine/Graphics/Renderer.h"
 #include "Engine/Graphics/RenderData.h"
@@ -73,13 +73,66 @@ bool Actor::IsDestroyed()
 	return m_destroyed;
 }
 
+// Called from ActorPool::CollectGarbage before the actor is released.
+void Actor::OnDestroy()
+{
+	// Detach from parent (no alive actor can access this actor anymore)
+	SetParentHandle(ActorHandle::Null());
+
+	for (auto& component : m_componentPtrs)
+	{
+		component->OnDestroy();
+	}
+}
+
+void Actor::SetParentHandle(ActorHandle parentHandle)
+{
+	if (m_parentHandle == parentHandle) return;
+
+	// Detach from current parent, if any.
+	if (!m_parentHandle.IsNull() && m_pOwner)
+	{
+		Actor* oldParent = m_pOwner->ResolveActor(m_parentHandle);
+		if (oldParent)
+		{
+			auto& siblings = oldParent->m_childHandles;
+			siblings.erase(
+				std::remove(siblings.begin(), siblings.end(), m_handle),
+				siblings.end());
+		}
+	}
+
+	m_parentHandle = parentHandle;
+
+	// Attach to new parent, if any.
+	if (!m_parentHandle.IsNull() && m_pOwner)
+	{
+		Actor* newParent = m_pOwner->ResolveActor(m_parentHandle);
+		if (newParent)
+		{
+			newParent->m_childHandles.push_back(m_handle);
+		}
+	}
+}
+
+Actor* Actor::GetParent() const
+{
+	if (m_parentHandle.IsNull() || !m_pOwner) return nullptr;
+	return m_pOwner->ResolveActor(m_parentHandle);
+}
+
 // Get direct child actors (non-recursive)
 std::vector<Actor*> Actor::GetDirectChildren() const
 {
 	std::vector<Actor*> result;
-	for (const auto& child : m_children) 
+	if (!m_pOwner) return result;
+
+	for (const auto& handle : m_childHandles)
 	{
-		result.push_back(child.get());
+		if (Actor* child = m_pOwner->ResolveActor(handle))
+		{
+			result.push_back(child);
+		}
 	}
 	return result;
 }
@@ -104,12 +157,15 @@ bool Actor::HasComponentByName(const std::string& name) const
 std::vector<Actor*> Actor::GetChildren() const
 {
 	std::vector<Actor*> result;
-	for (auto& child : m_children) 
+
+	// Get direct children and recursively get their children
+	for (Actor* child : GetDirectChildren())
 	{
-		result.push_back(child.get());
-		auto childChildren = child->GetChildren();
-		result.insert(result.end(), childChildren.begin(), childChildren.end());
+		result.push_back(child);
+		auto grandChildren = child->GetChildren();
+		result.insert(result.end(), grandChildren.begin(), grandChildren.end());
 	}
+
 	return result;
 }
 
@@ -118,6 +174,11 @@ void Actor::FlushTransform()
 {
 	auto pTransform = GetComponentByClass<Transform>();
 	if (pTransform) pTransform->UpdateGeometry();
+
+	for (Actor* child : GetDirectChildren())
+	{
+		child->FlushTransform();
+	}
 }
 
 // Update collider transforms to match the current world transform of the actor
@@ -125,6 +186,11 @@ void Actor::FlushColliderTransforms()
 {
 	auto colliders = GetComponentsByClass<Collider>();
 	for (auto& collider : colliders) collider->Flush();
+
+	for (Actor* child : GetDirectChildren())
+	{
+		child->FlushColliderTransforms();
+	}
 }
 
 // Add pending components to the main component container
@@ -165,11 +231,13 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	}
 }
 
-// Add a child actor to the scene
-void Actor::AddChildActorToScene(Actor* child)
+// Add a child actor of type T to this actor
+template<class T, class... Args>
+T* Actor::AddChild(Args&&... args)
 {
-	if (m_pOwner) 
-	{
-		m_pOwner->AddActor(child);
-	}
+	static_assert(std::is_base_of_v<Actor, T>, "AddChild<T>: T must derive from Actor");
+	if (!m_pOwner) return nullptr;
+
+	auto child = std::make_unique<T>(std::forward<Args>(args)...);
+	return static_cast<T*>(m_pOwner->AddChildActor(std::move(child), m_handle));
 }

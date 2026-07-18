@@ -29,63 +29,43 @@ void SceneBase::Initialize(EngineContext& context)
 // Post-update (for late update)
 void SceneBase::PreUpdate(float deltaTime)
 {
-	// Add pending root actors to the scene
-	for (auto& pendingActor : m_addPendingRootActors)
-	{
-		m_rootActors.push_back(std::move(pendingActor));
-	}
-	m_addPendingRootActors.clear();
-
-	// Add pending actors to the all actors list(including children)
-	for (auto& pendingActor : m_addPendingAllActors)
-	{
-		m_allActors.push_back(pendingActor);
-	}
-	m_addPendingAllActors.clear();
-
-	// Pre update every actor in list
-	for (auto& actor : m_rootActors)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed()) continue;
+	m_actorPool.ForEach([deltaTime](Actor* actor) {
+		if (!actor->IsActive() || actor->IsDestroyed()) return;
 		actor->PreUpdate(deltaTime);
-	}
+		});
 }
 
 // Update
 void SceneBase::Update(float deltaTime)
 {
-	// Update every object in scene
-	for (auto& actor : m_rootActors)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed()) continue;
+	m_actorPool.ForEach([deltaTime](Actor* actor) {
+		if (!actor->IsActive() || actor->IsDestroyed()) return;
 		actor->Update(deltaTime);
-	}
+		});
 
-	// Flush transforms of all actors to update world transforms before collision checks
-	for(auto& actor : m_rootActors)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed()) continue;
+	// Flush transforms recursively from root actors
+	m_actorPool.ForEach([this](Actor* actor) {
+		if (!actor->IsActive() || actor->IsDestroyed()) return;
+		if (!actor->GetParentHandle().IsNull()) return;	// only recurse from roots to maintain correct order
 		actor->FlushTransform();
-	}
+		});
 }
 
 // Late update
 void SceneBase::LateUpdate(float deltaTime)
 {
-	// Late update every actor in scene
-	for (auto& actor : m_rootActors)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed()) continue;
+	m_actorPool.ForEach([deltaTime](Actor* actor) {
+		if (!actor->IsActive() || actor->IsDestroyed()) return;
 		actor->LateUpdate(deltaTime);
-	}
+		});
 
-	// Flush transforms of all actors again
-	for(auto& actor : m_rootActors)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed()) continue;
+	// Flush transforms/collider
+	m_actorPool.ForEach([this](Actor* actor) {
+		if (!actor->IsActive() || actor->IsDestroyed()) return;
+		if (!actor->GetParentHandle().IsNull()) return;
 		actor->FlushTransform();
 		actor->FlushColliderTransforms();
-	}
+		});
 
 	// Check colliders
 	m_pCollisionSystem->CheckColliders();
@@ -98,22 +78,17 @@ void SceneBase::LateUpdate(float deltaTime)
 		m_pCameraSystem->Flush(deltaTime);
 	}
 
-	m_allActors.erase(std::remove_if(m_allActors.begin(), m_allActors.end(),
-		[](Actor* actor) { return actor->IsDestroyed(); }), m_allActors.end());
-
-	// Remove destroyed actors from the scene with
-	for (auto it = m_rootActors.begin(); it != m_rootActors.end(); )
-	{
-		if ((*it)->IsDestroyed())
+	// Release all actors marked for destruction after everything is done 
+	// (to avoid dangling references)
+	// Child actors have already been marked for destruction 
+	// after their parent was marked for destruction.
+	m_actorPool.ForEach([](Actor* actor) {
+		if (actor->IsDestroyed())
 		{
-			(*it)->OnDestroy();
-			it = m_rootActors.erase(it);
+			actor->OnDestroy();
 		}
-		else
-		{
-			++it;
-		}
-	}
+		});
+	m_actorPool.CollectGarbage();
 }
 
 // Render

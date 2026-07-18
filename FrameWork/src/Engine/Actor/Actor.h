@@ -6,6 +6,7 @@
 #include "Engine/Component/ComponentPolicy.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Actor/ActorTag.h"
+#include "Engine/Actor/ActorHandle.h"
 
 //-----------------------------------------------------------------------------
 // Actor class
@@ -53,39 +54,34 @@ public:
 
 	void Destroy();		// Mark actor as destroyed
 	bool IsDestroyed();	// Check if actor is destroyed
-	void OnDestroy()
-	{
-		// Delete child actors recursively
-		for(auto it = m_children.begin(); it != m_children.end(); ++it)
-		{
-			(*it)->OnDestroy();
-			it = m_children.erase(it);
-		}
-
-		for(auto& component : m_componentPtrs)
-		{
-			component->OnDestroy();
-		}
-	}
+	void OnDestroy();
 
 	// Setters
-	void SetOwner(SceneBase* ownerScene) { m_pOwner = ownerScene; }	// Set owning scene
-	void SetTag(TagId tag) { m_tag = tag; }						// Set object tag
-	void SetActive(bool isActive) { m_isActive = isActive; }		// Set active flag
-	void SetParent(Actor* parent) { m_pParent = parent; }			// Set parent actor
+	void SetHandle(ActorHandle handle) { m_handle = handle; }
+	void SetOwner(SceneBase* ownerScene) { m_pOwner = ownerScene; }
+	void SetTag(TagId tag) { m_tag = tag; }
+	void SetActive(bool isActive) { m_isActive = isActive; }
 
 	// Getters
-	SceneBase* GetOwner() const { return m_pOwner; }				// Get owning scene
-	TagId GetTag() const { return m_tag; }						// Get object tag
-	bool IsActive() const { return m_isActive; }					// Get active status
-	bool IsInitialized() const { return m_isInitialized; }			// Check if the actor has been initialized (Init function has been called at least once)
-	Actor* GetParent() const { return m_pParent; }					// Get parent actor
-	const std::string& GetName() const { return m_name; }			// Get actor name
+	ActorHandle GetHandle() const { return m_handle; }
+	SceneBase* GetOwner() const { return m_pOwner; }
+	TagId GetTag() const { return m_tag; }
+	bool IsActive() const { return m_isActive; }
+	bool IsInitialized() const { return m_isInitialized; }
+	const std::string& GetName() const { return m_name; }
 
-	// Get all descendant actors (recursive)
+	// Parent handle
+	void SetParentHandle(ActorHandle parent);
+	ActorHandle GetParentHandle() const { return m_parentHandle; }
+
+	// Get the parent actor pointer (via ActorPool)
+	Actor* GetParent() const;
+
+	// Get all descendant actors
+	std::vector<ActorHandle> GetChildrenHandles() const { return m_childHandles; }
 	std::vector<Actor*> GetChildren() const;
 
-	// Get only the direct children of this actor (non-recursive)
+	// Get only the direct children of this actor
 	std::vector<Actor*> GetDirectChildren() const;
 
 	// Add a component of type T to the container
@@ -340,16 +336,7 @@ public:
 
 	// Add a child actor
 	template<class T, class... Args>
-	T* AddChild(Args&&... args) {
-		static_assert(std::is_base_of_v<Actor, T>, "AddChild<T>: T must derive from Actor");
-		if (!m_pOwner) return nullptr;
-		auto child = std::make_unique<T>(std::forward<Args>(args)...);
-		T* ptr = child.get();
-		ptr->SetParent(this);
-		m_children.push_back(std::move(child));
-		AddChildActorToScene(ptr);
-		return ptr;
-	}
+	T* AddChild(Args&&... args);
 
 	void FlushTransform();			// Update world transform of this actor and all child actors;
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
@@ -366,9 +353,10 @@ private:
 	std::vector<PendingComponent> m_pendingComponents;					// Pending additions
 
 	// Hierarchy
-	SceneBase* m_pOwner = nullptr;					// Owning scene pointer
-	Actor* m_pParent = nullptr;						// Parent actor pointer
-	std::vector<std::unique_ptr<Actor>> m_children;	// Child actors
+	ActorHandle m_handle;						// Unique handle for this actor
+	SceneBase* m_pOwner = nullptr;				// Owning scene pointer
+	ActorHandle m_parentHandle = {};			// Parent actor handle
+	std::vector<ActorHandle> m_childHandles;	// Child actor handles
 
 	// Other
 	TagId m_tag = TAG_NONE; // Object tag

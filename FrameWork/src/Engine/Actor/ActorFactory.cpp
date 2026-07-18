@@ -17,10 +17,10 @@ const std::unordered_map<ActorType, std::vector<std::function<void(Actor*)>>> Ac
 };
 
 // Create an actor of the specified type with the given initialization parameters
-Actor* ActorFactory::CreateActor(ActorType type, Actor::InitDesc desc)
+std::unique_ptr<Actor> ActorFactory::CreateActor(ActorType type, Actor::InitDesc desc)
 {
 	// Create a new actor and initialize it
-	Actor* actor = new Actor();
+	auto actor = std::unique_ptr<Actor>(new Actor());
 	actor->Init(desc);
 
 	// Get all function objects for adding necessary components based on the actor type
@@ -30,7 +30,7 @@ Actor* ActorFactory::CreateActor(ActorType type, Actor::InitDesc desc)
 	// Call each function object to add components
 	for (const auto& componentAdder : it->second)
 	{
-		componentAdder(actor);
+		componentAdder(actor.get());
 	}
 	return actor;
 }

@@ -15,7 +15,7 @@
 
 using json = nlohmann::json;
 
-static void LoadActor(const nlohmann::json& actorJson, SceneBase* scene, Actor* parent);
+static void LoadActor(const nlohmann::json& actorJson, SceneBase* scene, ActorHandle parentHandle);
 
 // Load a scene from a file
 bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene, EngineContext& context)
@@ -63,12 +63,8 @@ bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene, Engin
 	// Load actors
 	for (auto& actorJson : j["actors"])
 	{
-		LoadActor(actorJson, scene, nullptr);
+		LoadActor(actorJson, scene, ActorHandle::Null());
 	}
-
-	// Pending actors (added via AddRootActor/AddActor above) must be flushed into
-	// m_rootActors / m_allActors before we can search for the main camera below.
-	scene->FlushPendingActors();
 
 	// Set main camera: find the actor tagged "MainCamera" and register its
 	// Camera component with the CameraSystem.
@@ -95,7 +91,7 @@ bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene, Engin
 }
 
 // Load an actor (Recursive function to load child actors)
-void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
+void LoadActor(const json& actorJson, SceneBase* scene, ActorHandle parentHandle)
 {
 	// Prepare an InitDesc for the actor
 	Actor::InitDesc desc;
@@ -105,7 +101,8 @@ void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
 	desc.tag = tagName.empty() ? TAG_NONE : TagRegistry::Get().GetId(tagName);
 
 	// Create the actor(with only Transform component)
-	Actor* actor = ActorFactory::CreateEmptyActor(desc);
+	auto actorOwned = ActorFactory::CreateEmptyActor(desc);
+	Actor* actor = actorOwned.get();
 
 	// Add Transform component
 	if (actorJson.contains("transform"))
@@ -152,20 +149,16 @@ void LoadActor(const json& actorJson, SceneBase* scene, Actor* parent)
 	}
 
 	// Parent-child relationship
-	if(parent)
-	{
-		actor->SetParent(parent);
-	}
-
-	// Add this actor to the scene
-	scene->AddRootActor(actor);
+	Actor* registered = parentHandle.IsNull() 
+		? scene->AddRootActor(std::move(actorOwned)) 
+		: scene->AddChildActor(std::move(actorOwned), parentHandle);
 
 	// Recursively load child actors
 	if (actorJson.contains("children"))
 	{
 		for (auto& child : actorJson["children"])
 		{
-			LoadActor(child, scene, actor);
+			LoadActor(child, scene, registered->GetHandle());
 		}
 	}
 }

@@ -18,9 +18,6 @@ static json SerializeActor(Actor* actor);
 // Save a scene to a file
 bool SceneWriter::SaveScene(const std::string& filePath, SceneBase* scene)
 {
-	// Ensure all pending actors are added to the scene before serialization
-	scene->FlushPendingActors();
-
 	// Check if the scene has a main camera before attempting to save
 	bool hasMainCamera = false;
 	for (auto& actor : scene->GetAllActors())

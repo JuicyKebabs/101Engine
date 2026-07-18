@@ -309,7 +309,7 @@ void App::Update()
 // Draw
 void App::Render()
 {
-	// Start rendering
+	 Start rendering
 	m_pEngine->BeginFrame();
 	m_pRenderer->BeginFrame(m_pEngine->GetCommandList());
 

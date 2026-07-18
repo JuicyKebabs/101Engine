@@ -171,16 +171,16 @@ void EditorApp::NewScene()
     cameraDesc.name = "DefaultCamera";
     cameraDesc.tag = ActorTags::MainCamera;
 
-    auto* cameraActor = ActorFactory::CreateActor(ActorType::Camera, cameraDesc);
-    cameraActor->GetComponentByClass<Transform>()->SetParams(
+    auto cameraActorOwned = ActorFactory::CreateActor(ActorType::Camera, cameraDesc);
+    cameraActorOwned->GetComponentByClass<Transform>()->SetParams(
         Transform::ParamDesc(Vector3{ 0, 0, -5 })
     );
-    auto* camera = cameraActor->GetComponentByClass<Camera>();
+    auto* camera = cameraActorOwned->GetComponentByClass<Camera>();
     camera->SetParams(Camera::ParamDesc{
         .window_width = WINDOW_WIDTH,
         .window_height = WINDOW_HEIGHT
         });
-    m_pScene->AddRootActor(cameraActor);
+    m_pScene->AddRootActor(std::move(cameraActorOwned));
     m_pScene->GetCameraSystem()->SetMainCamera(camera);
 
     DBG("EditorApp: New scene created.");
@@ -372,7 +372,7 @@ void EditorApp::PrepareInstance()
     // Editor-only free-fly camera actor (not part of any SceneBase)
     Actor::InitDesc camDesc;
     camDesc.name = "EditorCamera";
-    m_pEditorCameraActor.reset(ActorFactory::CreateEmptyActor(camDesc));
+    m_pEditorCameraActor = ActorFactory::CreateEmptyActor(camDesc);
     m_pEditorCamera = m_pEditorCameraActor->AddComponent<EditorCamera>();
     m_pEditorCamera->Initialize(WINDOW_WIDTH, WINDOW_HEIGHT);
 }
@@ -563,8 +563,8 @@ void EditorApp::RenderImGui()
                 {
                     Actor::InitDesc desc;
                     desc.name = name;
-                    auto* newActor = ActorFactory::CreateEmptyActor(desc);
-                    m_pScene->AddRootActor(newActor);
+                    auto newActor = ActorFactory::CreateEmptyActor(desc);
+                    m_pScene->AddRootActor(std::move(newActor));
 					DBG("EditorApp: Created new actor '%s' in scene", name.c_str());
                 }
 			};

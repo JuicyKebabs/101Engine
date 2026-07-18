@@ -36,12 +36,12 @@ public:
 	// private static const data members, causing LNK2001 in 101Editor.
 	// Keeping the implementation in the .cpp confines all references to
 	// s_actorComponentMap to 101Framework.dll itself.
-	static Actor* CreateActor(ActorType type, Actor::InitDesc desc);
+	static std::unique_ptr<Actor> CreateActor(ActorType type, Actor::InitDesc desc);
 
 	// Create an empty actor with only a Transform component (common for all actors)
-	static Actor* CreateEmptyActor(Actor::InitDesc desc)
+	static std::unique_ptr<Actor> CreateEmptyActor(Actor::InitDesc desc)
 	{
-		Actor* actor = new Actor();
+		auto actor = std::unique_ptr<Actor>(new Actor());
 		actor->Init(desc);
 		actor->AddComponent<Transform>();
 		return actor;
