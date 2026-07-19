@@ -18,16 +18,17 @@ public:
 	// Take ownership of actor from Factroy and return a handle for it.
 	ActorHandle Register(std::unique_ptr<Actor> actor);
 
-	// marks the actor for destruction(for deferred destruction)
+	// Mark the actor for deferred destruction. The actor remains resolvable
+	// until CollectGarbage() so references stay stable for the current frame.
 	void Destroy(ActorHandle);
 
 	// Resolve a handle to its Actor pointer.
-	// Check if the generation is same and the actor is not pending destruction.
+	// Check that the generation matches and the slot still owns an actor.
 	Actor* Resolve(ActorHandle handle) const;
 
 	bool IsValid(ActorHandle handle) const;
 
-	// Releases Actor marked for destruction at the end of the frame.
+	// Calls OnDestroy and releases actors marked for destruction at frame end.
 	// Generation for destroyed Actor is incremented to avoid dangling references.
 	void CollectGarbage();
 
@@ -42,7 +43,7 @@ private:
 	{
 		std::unique_ptr<Actor> actor;	// The actor instance in this slot
 		uint32_t generation = 0;		// Generation counter for this slot, incremented on destruction
-		bool pendingDestroy;			// Flag indicating if the actor is marked for destruction
+		bool pendingDestroy = false;	// Flag indicating if the actor is marked for destruction
 	};
 
 	std::vector<Slot> m_slots;				// The pool of actor slots

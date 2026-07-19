@@ -64,10 +64,16 @@ void Actor::LateUpdate(float deltaTime)
 // Mark as actor as destroyed
 void Actor::Destroy()
 {
-	m_destroyed = true;
+	if (m_destroyed) return;
+	if (m_pOwner)
+	{
+		// SceneBase owns hierarchy policy and keeps Actor/ActorPool state in sync.
+		m_pOwner->RemoveActor(this, /*cascadeToChildren=*/true);
+		return;
+	}
 
-	// Also mark this actor in the ActorPool for destruction
-	m_pOwner->GetActorPool().Destroy(m_handle);
+	// An unregistered actor has no pool to notify.
+	m_destroyed = true;
 }
 
 // Check if actor is destroyed
@@ -85,6 +91,10 @@ void Actor::OnDestroy()
 	for (auto& component : m_componentPtrs)
 	{
 		component->OnDestroy();
+	}
+	for (auto& pending : m_pendingComponents)
+	{
+		pending.instance->OnDestroy();
 	}
 }
 
@@ -234,13 +244,8 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	}
 }
 
-// Add a child actor of type T to this actor
-template<class T, class... Args>
-T* Actor::AddChild(Args&&... args)
+Actor* Actor::AddChildToScene(std::unique_ptr<Actor> child)
 {
-	static_assert(std::is_base_of_v<Actor, T>, "AddChild<T>: T must derive from Actor");
-	if (!m_pOwner) return nullptr;
-
-	auto child = std::make_unique<T>(std::forward<Args>(args)...);
-	return static_cast<T*>(m_pOwner->AddChildActor(std::move(child), m_handle));
+	if (!m_pOwner || !child) return nullptr;
+	return m_pOwner->AddChildActor(std::move(child), m_handle);
 }

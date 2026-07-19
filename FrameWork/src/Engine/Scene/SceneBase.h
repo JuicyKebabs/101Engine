@@ -64,19 +64,28 @@ public:
 	// Actual release happens at the end of the LateUpdate via ActorPool::CollectGarbage
 	void RemoveActor(Actor* actor, bool cascadeToChildren = true)
 	{
-		if (!actor) return;
+		if (!actor || actor->GetOwner() != this || actor->IsDestroyed()) return;
 
+		auto children = actor->GetDirectChildren();
 		if (cascadeToChildren)
 		{
 			// Recursively remove all children of the actor
-			auto children = actor->GetDirectChildren();
 			for (auto* child : children)
 			{
 				RemoveActor(child, true);
 			}
 		}
+		else
+		{
+			// A surviving child must not retain a handle to a deleted parent.
+			for (auto* child : children)
+			{
+				child->SetParentHandle(ActorHandle::Null());
+			}
+		}
 
-		actor->Destroy();
+		actor->MarkForDestruction();
+		m_actorPool.Destroy(actor->GetHandle());
 	}
 
 	// Remove an actor from the scene by name

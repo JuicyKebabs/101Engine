@@ -3,6 +3,8 @@
 
 ActorHandle ActorPool::Register(std::unique_ptr<Actor> actor)
 {
+	if (!actor) return ActorHandle::Null();
+
 	uint32_t index;
 
 	if (!m_freeIndices.empty())
@@ -55,6 +57,7 @@ void ActorPool::CollectGarbage()
 		Slot& slot = m_slots[i];
 		if (!slot.pendingDestroy || !slot.actor) continue;
 
+		slot.actor->OnDestroy();
 		slot.actor.reset();	// Release the actor instance
 		slot.generation++;	// Increment generation to invalidate old handles
 		slot.pendingDestroy = false;
@@ -66,8 +69,9 @@ void ActorPool::ForEach(const std::function<void(Actor*)>& fn) const
 {
 	// NOTE : Do not exclude actors that are pending destruction
 	// to make Collector::CollectGarbage() has a responsibility to clean up the actors.
-	// Save size of the pool to avoid issues if the pool is modified during iteration
-	size_t count = Count();
+	// Snapshot the slot count. Actors registered by the callback are processed
+	// from the next traversal, and holes do not hide later live slots.
+	size_t count = m_slots.size();
 	for (size_t i = 0; i < count; ++i)
 	{
 		if (m_slots[i].actor)

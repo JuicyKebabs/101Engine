@@ -336,7 +336,12 @@ public:
 
 	// Add a child actor
 	template<class T, class... Args>
-	T* AddChild(Args&&... args);
+	T* AddChild(Args&&... args)
+	{
+		static_assert(std::is_base_of_v<Actor, T>, "AddChild<T>: T must derive from Actor");
+		auto child = std::make_unique<T>(std::forward<Args>(args)...);
+		return static_cast<T*>(AddChildToScene(std::move(child)));
+	}
 
 	void FlushTransform();			// Update world transform of this actor and all child actors;
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
@@ -365,7 +370,8 @@ private:
 private:
 	void AddPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
-	void AddChildActorToScene(Actor* child);
+	Actor* AddChildToScene(std::unique_ptr<Actor> child);
+	void MarkForDestruction() { m_destroyed = true; }
 
 private:
 	// Hide default constructor and initialization from public, enforce usage of Init function and ActorFactory for creation
@@ -379,4 +385,5 @@ private:
 	}
 
 	friend class ActorFactory;	// Allow ActorFactory to access private constructor
+	friend class SceneBase;		// SceneBase coordinates hierarchy-aware destruction
 };

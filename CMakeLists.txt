@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(101Engine)
 
+include(CTest)
+
 # Stage1: 101FrameworkをDLL化したため、ランタイムライブラリを動的(/MD, /MDd)に変更
 # Debug   -> MultiThreadedDebugDLL (/MDd)
 # Release -> MultiThreadedDLL      (/MD)
@@ -16,3 +18,7 @@ add_subdirectory(Framework)
 add_subdirectory(Game/GameCode)
 add_subdirectory(Editor)
 add_subdirectory(Game)
+
+if(BUILD_TESTING)
+    add_subdirectory(Tests)
+endif()

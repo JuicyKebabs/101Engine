@@ -78,17 +78,8 @@ void SceneBase::LateUpdate(float deltaTime)
 		m_pCameraSystem->Flush(deltaTime);
 	}
 
-	// Release all actors marked for destruction after everything is done 
-	// (to avoid dangling references)
-	// Child actors have already been marked for destruction 
-	// after their parent was marked for destruction.
-	m_actorPool.ForEach([this](Actor* actor) {
-		if (actor->IsDestroyed())
-		{
-			actor->OnDestroy();
-			m_actorPool.Destroy(actor->GetHandle());
-		}
-		});
+	// ActorPool owns the final OnDestroy + release step. All hierarchy-aware
+	// destruction requests have already been marked through RemoveActor().
 	m_actorPool.CollectGarbage();
 }
 
