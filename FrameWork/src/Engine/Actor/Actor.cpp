@@ -65,6 +65,9 @@ void Actor::LateUpdate(float deltaTime)
 void Actor::Destroy()
 {
 	m_destroyed = true;
+
+	// Also mark this actor in the ActorPool for destruction
+	m_pOwner->GetActorPool().Destroy(m_handle);
 }
 
 // Check if actor is destroyed

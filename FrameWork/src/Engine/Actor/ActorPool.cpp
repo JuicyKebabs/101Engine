@@ -64,18 +64,15 @@ void ActorPool::CollectGarbage()
 
 void ActorPool::ForEach(const std::function<void(Actor*)>& fn) const
 {
-	for (const auto& slot : m_slots)
+	// NOTE : Do not exclude actors that are pending destruction
+	// to make Collector::CollectGarbage() has a responsibility to clean up the actors.
+	// Save size of the pool to avoid issues if the pool is modified during iteration
+	size_t count = Count();
+	for (size_t i = 0; i < count; ++i)
 	{
-		// NOTE : Do not exclude actors that are pending destruction
-		// to make Collector::CollectGarbage() has a responsibility to clean up the actors.
-		// Save size of the pool to avoid issues if the pool is modified during iteration
-		size_t count = Count();
-		for (size_t i = 0; i < count; ++i)
+		if (m_slots[i].actor)
 		{
-			if (m_slots[i].actor)
-			{
-				fn(m_slots[i].actor.get());
-			}
+			fn(m_slots[i].actor.get());
 		}
 	}
 }

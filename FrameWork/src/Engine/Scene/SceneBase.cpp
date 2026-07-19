@@ -82,10 +82,11 @@ void SceneBase::LateUpdate(float deltaTime)
 	// (to avoid dangling references)
 	// Child actors have already been marked for destruction 
 	// after their parent was marked for destruction.
-	m_actorPool.ForEach([](Actor* actor) {
+	m_actorPool.ForEach([this](Actor* actor) {
 		if (actor->IsDestroyed())
 		{
 			actor->OnDestroy();
+			m_actorPool.Destroy(actor->GetHandle());
 		}
 		});
 	m_actorPool.CollectGarbage();
