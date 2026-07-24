@@ -4,7 +4,7 @@
 
 void SceneViewPanel::Render(D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle)
 {
-	if (ImGui::Begin("Scene"))
+	if (!ImGui::Begin("Scene"))
 	{
 		m_isHovered = false;
 		m_isFocused = false;
@@ -57,7 +57,7 @@ void SceneViewPanel::Render(D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle)
 
 	// Render the image using the ImGui::Image function, passing in the texture handle and the calculated size
 	ImGui::Image(
-		reinterpret_cast<ImTextureID>(sceneTextureHandle.ptr),
+		static_cast<ImTextureID>(sceneTextureHandle.ptr),
 		{ imageWidth, imageHeight },
 		{ 0.0f, 0.0f },
 		{ 1.0f, 1.0f });

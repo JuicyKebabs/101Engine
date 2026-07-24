@@ -18,4 +18,9 @@ public:
 private:
 	bool m_isHovered = false;
 	bool m_isFocused = false;
+
+	ImVec2 m_viewportSize = { 0.0f, 0.0f };
+	ImVec2 m_imageMin = { 0.0f, 0.0f };
+	ImVec2 m_imageMax = { 0.0f, 0.0f };
+	bool m_isViewportResized = false;
 };

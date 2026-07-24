@@ -644,26 +644,28 @@ void EditorApp::RenderImGui()
 
     m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());
 
+	// Render scene view panel with the scene's color render target
+	// Get the scene color render target from the engine
+	GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
+    
+    if (sceneColor)
+    {
+		// Get the SRV index of the scene color render target and its GPU descriptor handle
+		const uint32_t srvIndex = sceneColor->GetSrvIndex();
+
+		// Get the GPU descriptor handle for the SRV
+		const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
+
+		// Render the scene view panel with the scene color render target
+        m_sceneViewPanel.Render(gpuHandle);
+    }
+
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(
         ImGui::GetDrawData(),
         m_pEngine->GetCommandList()
     );
 
-
-
-	// Render scene view panel with the scene's color render target
-
-	GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-    
-    if (sceneColor)
-    {
-		const uint32_t srvIndex = sceneColor->GetSrvIndex();
-
-		const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
-
-        m_sceneViewPanel.Render(gpuHandle);
-    }
 }
 
 void EditorApp::ShutdownImGui()
