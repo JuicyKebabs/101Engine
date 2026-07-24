@@ -1,7 +1,14 @@
 #pragma once
-#include <DirectXMath.h>
+#include <optional>
 #include "Component.h"
+#include "Engine/Core/GUID/Guid.h"
 #include "Engine/Core/Math/Math.h"
+
+//------------------------------------------------------------------------------
+// Camera class
+// A component that represents a camera in the scene. 
+// It can follow an actor, look at a target, and has configurable lens settings.
+//------------------------------------------------------------------------------
 
 class Actor;
 
@@ -61,8 +68,8 @@ struct CameraPose
 struct CameraLens
 {
 	float fov = DirectX::XM_PIDIV2 * 1.1f;											// Vertical field of view (in radians)
-	float width = 0.0f;																// screen width
-	float height = 0.0f;															// screen height
+	float width = 1.0f;																// screen width
+	float height = 1.0f;															// screen height
 	float nearZ = 0.1f;																// Near clipping plane distance
 	float farZ = 150.0f;															// Far clipping plane distance
 	PROJECTION_TYPE projectionType = PROJECTION_TYPE::PROJECTION_TYPE_PERSPECTIVE;	// Projection type (perspective or orthographic)
@@ -74,8 +81,8 @@ class Camera : public Component
 public:
 	struct ParamDesc
 	{
-		uint32_t window_width = 0.0f;
-		uint32_t window_height = 0.0f;
+		uint32_t window_width = 1;
+		uint32_t window_height = 1;
 		std::string name = "Camera";
 	};
 
@@ -86,6 +93,7 @@ public:
 		m_cameraLens.width = desc.window_width;
 		m_cameraLens.height = desc.window_height;
 		SetName(desc.name);
+		m_isCameraInfoDirty = true;
 	}
 
 	void OnStartOverride() override;
@@ -102,8 +110,20 @@ public:
 	void SetCameraRig(const CameraRig& rig) { m_cameraRig = rig; m_isCameraInfoDirty = true; }				// Set camera rig settings
 	void SetCameraLens(const CameraLens& lens) { m_cameraLens = lens; m_isCameraInfoDirty = true; }			// Set camera lens settings
 	void SetCameraPose(const CameraPose& pose) { m_cameraPose = pose; m_isCameraInfoDirty = true; }			// Set camera camera pose (position and rotation)
-	void SetTargetActor(Actor* target) { m_pTargetActor = target; m_isCameraInfoDirty = true; }				// Set target actor for follow/rotation (if applicable)
-	void SetFollowTarget(Actor* target) { m_pFollowActor = target; m_isCameraInfoDirty = true; }			// Set follow target actor (if applicable)
+	
+	// Set target actor for follow/rotation (if applicable)
+	void SetTargetActor(Actor* target)
+	{ 
+		m_pTargetActor = target; 
+		m_pendingTargetActorGuid.reset();
+		m_isCameraInfoDirty = true; 
+	}
+	void SetFollowTarget(Actor* target)
+	{ 
+		m_pFollowActor = target; 
+		m_pendingFollowActorGuid.reset();
+		m_isCameraInfoDirty = true; 
+	}
 
 	CAMERA_FOLLOW_MODE GetFollowMode() const { return m_followMode; }		// Get follow mode
 	CAMERA_ROTATION_MODE GetRotationMode() const { return m_rotationMode; }	// Get rotation mode
@@ -112,6 +132,11 @@ public:
 	CameraLens GetCameraLens() const { return m_cameraLens; }				// Get camera lens settings
 
 	void SetAsMainCamera();	// Set this camera as the main camera in the scene (if applicable)
+
+	// Serialization and deserialization methods
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
+	bool ResolveReferences(SceneBase& scene) override;
 
 private:
 	CAMERA_FOLLOW_MODE m_followMode = CAMERA_FOLLOW_MODE::FOLLOW_MODE_OWNER;				// Follow mode (default: follow owner)
@@ -129,6 +154,9 @@ private:
 	bool m_isCameraInfoDirty = true;				// Flag to indicate if camera information needs to be rebuilt
 	uint64_t m_followingTransformGeneration = -1;	// Generation of the transform component that the camera is currently following(used to detect changes in the transform)
 	uint64_t m_rotatingTransformGeneration = -1;	// Generation of the transform component that the camera is currently rotating with(used to detect changes in the transform)
+
+	std::optional<Guid> m_pendingTargetActorGuid;
+	std::optional<Guid> m_pendingFollowActorGuid;
 
 private:
 	CameraInfo RebuildCameraInfo();			// Rebuild camera information

@@ -244,7 +244,7 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	}
 }
 
-Actor* Actor::AddChildToScene(std::unique_ptr<Actor> child)
+Actor* Actor::AddChild(std::unique_ptr<Actor> child)
 {
 	if (!m_pOwner || !child) return nullptr;
 	return m_pOwner->AddChildActor(std::move(child), m_handle);

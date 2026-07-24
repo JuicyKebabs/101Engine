@@ -1,7 +1,10 @@
+#include <cmath>
 #include "Collider.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Core/Serialization/JsonMath.h"
+#include "nlohmann/json.hpp"
 
 void Collider::OnStartOverride()
 {
@@ -31,7 +34,6 @@ void Collider::PreUpdateOverride(float deltaTime)
 {
 }
 
-//コライダー変換更新
 void Collider::UpdateOverride(float deltaTime)
 {
 }
@@ -52,10 +54,8 @@ void Collider::Flush()
 	RefreshWorldTransform();
 }
 
-//コライダー更新
 void Collider::UpdateCollider(Vector3 ownerScale)
 {
-	//各種コライダー更新
 	switch (m_type)
 	{
 	case ColliderType::None:
@@ -75,10 +75,8 @@ void Collider::UpdateCollider(Vector3 ownerScale)
 	}
 }
 
-//軸平行境界ボックス更新
 void Collider::UpdateAABB()
 {
-	//現在のAABB更新
 	switch (m_type)
 	{
 	case ColliderType::BOX:
@@ -93,152 +91,18 @@ void Collider::UpdateAABB()
 	default:
 		break;
 	}
-
-	//SweptAABB計算
+	
+	// Update the swept AABB for continuous collision detection
 	MakeSweptAABB();
 }
 
-//前回の状態保存
 void Collider::SetPreviousState()
 {
-	
-
-	m_previousBoxCollider = m_currentBoxCollider;			//前回のボックスコライダー保存
-	m_previousSphereCollider = m_currentSphereCollider;		//前回の球コライダー保存
-	m_previousCapsuleCollider = m_currentCapsuleCollider;	//前回のカプセルコライダー保存
-	m_previousAABB = m_currentAABB;							//前回のAABB保存
-	m_worldTransformPrevious = m_worldTransformCurrent;
-}
-
-//コライダータイプ取得
-ColliderType Collider::GetType() const
-{
-	return m_type;
-}
-
-//衝突レイヤー取得
-CollisionLayer Collider::GetLayer() const
-{
-	return m_layer;
-}
-
-//衝突レイヤーマスク取得
-LayerMask Collider::GetLayerMask() const
-{
-	return m_layerMask;
-}
-
-//トリガーフラグ取得
-bool Collider::IsTrigger() const
-{
-	return m_isTrigger;
-}
-
-//SWEPT軸平行境界ボックス取得
-const AABB& Collider::GetSewptAABB() const
-{
-	return m_sweptAABB;
-}
-
-//現在のボックスコライダー取得
-const BoxCollider& Collider::GetCurrentBoxCollider() const
-{
-	return m_currentBoxCollider;
-}
-
-//前回のボックスコライダー取得
-const BoxCollider& Collider::GetPreviousBoxCollider() const
-{
-	return m_previousBoxCollider;
-}
-
-//現在の球コライダー取得
-const SphereCollider& Collider::GetCurrentSphereCollider() const
-{
-	return m_currentSphereCollider;
-}
-
-//前回の球コライダー取得
-const SphereCollider& Collider::GetPreviousSphereCollider() const
-{
-	return m_previousSphereCollider;
-}
-
-//現在のカプセルコライダー取得
-const CapsuleCollider& Collider::GetCurrentCapsuleCollider() const
-{
-	return m_currentCapsuleCollider;
-}
-
-//前回のカプセルコライダー取得
-const CapsuleCollider& Collider::GetPreviousCapsuleCollider() const
-{
-	return m_previousCapsuleCollider;
-}
-
-//ワールド行列の取得
-Matrix4x4 Collider::GetWorldMatrix() const
-{
-	return Matrix4x4::CreateTRS(m_worldTransformCurrent.position, m_worldTransformCurrent.rotation, m_worldTransformCurrent.scale);
-}
-
-//所有者オブジェクトのタグ取得
-TagId Collider::GetOwnerTag() const
-{
-	return m_ownerTag;
-}
-
-//衝突情報配列取得
-std::vector<CollisionInfo>& Collider::GetCollisionInfos()
-{
-	return m_collisionInfos;
-}
-
-//衝突検知フラグ取得
-bool Collider::isDetected() const
-{
-	return m_isDetected;
-}
-
-//デリートフラグ
-bool Collider::deleteFlag() const
-{
-	return m_deleteFlag;
-}
-
-//アクティブフラグ取得
-bool Collider::isActive() const
-{
-	return m_isActive;
-}
-
-const Transform3D& Collider::GetWorldTransformCurrent() const
-{
-	return m_worldTransformCurrent;
-}
-
-const Transform3D& Collider::GetWorldTransformPrevious() const
-{
-	return m_worldTransformPrevious;
-}
-
-//衝突検知フラグ設定
-void Collider::SetDetected(bool flag)
-{
-	m_isDetected = flag;
-}
-
-//デリートフラグ設定
-void Collider::SetDeleteFlag(bool flag)
-{
-	m_deleteFlag = flag;
-}
-
-//アクティブフラグ設定
-void Collider::SetActive(bool flag)
-{
-	m_isActive = flag;
-	m_isDirty = true;
+		m_previousBoxCollider = m_currentBoxCollider;			// Save previous box collider
+	m_previousSphereCollider = m_currentSphereCollider;		// Save previous sphere collider
+	m_previousCapsuleCollider = m_currentCapsuleCollider;	// Save previous capsule collider
+	m_previousAABB = m_currentAABB;							// Save previous AABB
+	m_worldTransformPrevious = m_worldTransformCurrent;		// Save previous world transform
 }
 
 void Collider::ChackIfTransformChanged()
@@ -283,12 +147,12 @@ void Collider::RefreshWorldTransform()
 	m_isDirty = false;
 }
 
-//コライダー更新関数
 void Collider::UpdateBoxCollider(Vector3 ownerScale)
 {
-	m_currentBoxCollider.center = m_worldTransformCurrent.position;	//ボックスコライダー中心点更新
+	// Update box collider center position
+	m_currentBoxCollider.center = m_worldTransformCurrent.position;
 
-	//スケール反映
+	// Reflect scale
 	m_currentBoxCollider.scale =
 	{
 		ownerScale.x * m_localTransform.scale.x,
@@ -296,16 +160,16 @@ void Collider::UpdateBoxCollider(Vector3 ownerScale)
 		ownerScale.z * m_localTransform.scale.z
 	};
 
-	//コライダーサイズ更新
+	// Update world transform scale
 	m_worldTransformCurrent.scale = m_currentBoxCollider.scale;
 }
 
-//球コライダー更新
 void Collider::UpdateSphereCollider(Vector3 ownerScale)
 {
-	m_currentSphereCollider.center = m_worldTransformCurrent.position;	//球コライダー中心点更新
+	// Update sphere collider center position
+	m_currentSphereCollider.center = m_worldTransformCurrent.position;
 
-	//スケール反映
+	// Reflect scale
 	Vector3 scale =
 	{
 		ownerScale.x * m_localTransform.scale.x,
@@ -313,63 +177,66 @@ void Collider::UpdateSphereCollider(Vector3 ownerScale)
 		ownerScale.z * m_localTransform.scale.z
 	};
 
-
-	const float diamiter = (std::max)(scale.x, (std::max)(scale.y, scale.z));	//直径(水平方向の最大値)
-	const float radius = diamiter / 2.0f;										//半径
+	// Calculate diameter and radius
+	const float diamiter = (std::max)(scale.x, (std::max)(scale.y, scale.z));
+	const float radius = diamiter / 2.0f;
 
 	m_worldTransformCurrent.scale = { diamiter, diamiter, diamiter };
 
-	//球コライダーサイズ更新
-	m_currentSphereCollider.radius = radius;				//球コライダー半径更新
+	// Update sphere collider radius
+	m_currentSphereCollider.radius = radius;
 }
 
-//カプセルコライダー更新
 void Collider::UpdateCapsuleCollider(Vector3 ownerScale)
 {
-	//スケール反映
+	// Reflect scale
 	const Vector3 scale = 
 	{
 		ownerScale.x * m_localTransform.scale.x,
 		ownerScale.y * m_localTransform.scale.y,
 		ownerScale.z * m_localTransform.scale.z
 	};
-	const float diamiter = (std::max)(scale.x, scale.z);				//直径(水平方向の最大値)
-	const float radius = diamiter / 2.0f;								//半径
-	const float capusleHeight = scale.y;								//カプセル高さ
-	const float cylHeight = (std::max)(0.0f, capusleHeight - diamiter);	//円柱部分の高さ(負の値にならないようにする)
 
-	//カプセルサイズ更新
-	m_currentCapsuleCollider.radius = radius;					//カプセルコライダー半径更新
-	m_currentCapsuleCollider.cylHeight = cylHeight;				//カプセルコライダー高さ更新
-	float halfHeight = cylHeight * 0.5f;					//シリンダーの半分の高さ
+	// Calculate diameter, radius, and heights
+	const float diamiter = (std::max)(scale.x, scale.z);
+	const float radius = diamiter / 2.0f;
+	const float capusleHeight = scale.y;
+	const float cylHeight = (std::max)(0.0f, capusleHeight - diamiter);
 
+	// Update capsule collider parameters
+	m_currentCapsuleCollider.radius = radius;		// Update capsule collider radius
+	m_currentCapsuleCollider.cylHeight = cylHeight;	// Update capsule collider height
+	float halfHeight = cylHeight * 0.5f;			// Half of the cylinder height
+
+	// Calculate the rotated axis based on the current world rotation
 	Vector3 rotatedAxis = m_worldTransformCurrent.rotation.RotateVector3(Vector3::Up()).Normalized();
 	Vector3 pA = m_worldTransformCurrent.position + rotatedAxis * halfHeight;
 	Vector3 pB = m_worldTransformCurrent.position - rotatedAxis * halfHeight;
 
+	// Update capsule collider endpoints
 	m_currentCapsuleCollider.pointA = pA;
 	m_currentCapsuleCollider.pointB = pB;
 
-	//コライダーサイズ更新
+	// Update world transform scale
 	m_worldTransformCurrent.scale ={ diamiter, capusleHeight, diamiter};
 }
 
-//軸平行境界ボックス更新(ボックスコライダー用)
 void Collider::UpdateAABBBox()
 {
-	//ボックスコライダー情報取得
+	// Calculate the center and half sizes of the box collider
 	const Vector3 center = m_worldTransformCurrent.position;
 	const Vector3 scale = m_worldTransformCurrent.scale;
 	const float halfX = scale.x * 0.5f;
 	const float halfY = scale.y * 0.5f;
 	const float halfZ = scale.z * 0.5f;
 
+	// Calculate the rotation matrix from the current world rotation
 	Matrix4x4 R = Matrix4x4::CreateFromQuaternion(m_worldTransformCurrent.rotation);
 	Vector4 xAxis = R.GetCol(0);
 	Vector4 yAxis = R.GetCol(1);
 	Vector4 zAxis = R.GetCol(2);
 
-	//AABB半分のサイズ計算
+	// Calculate half sizes of the AABB
 	float aabbHalfX =
 		fabsf(xAxis.x) * halfX +
 		fabsf(yAxis.x) * halfY +
@@ -383,7 +250,7 @@ void Collider::UpdateAABBBox()
 		fabsf(yAxis.z) * halfY +
 		fabsf(zAxis.z) * halfZ;
 
-	//AABB更新
+	// Update the current AABB min and max points
 	m_currentAABB.min = {
 		center.x - aabbHalfX,
 		center.y - aabbHalfY,
@@ -396,7 +263,6 @@ void Collider::UpdateAABBBox()
 	};
 }
 
-//軸平行境界ボックス更新(球コライダー用)
 void Collider::UpdateAABBSphere()
 {
 	const float radius = m_currentSphereCollider.radius;
@@ -415,7 +281,6 @@ void Collider::UpdateAABBSphere()
 	};
 }
 
-//軸平行境界ボックス更新(カプセルコライダー用)
 void Collider::UpdateAABBCapsule()
 {
 	const float radius = m_currentCapsuleCollider.radius;
@@ -433,7 +298,6 @@ void Collider::UpdateAABBCapsule()
 	};
 }
 
-//SweptAABB作成関数
 void Collider::MakeSweptAABB()
 {
 	AABB s{};
@@ -446,4 +310,139 @@ void Collider::MakeSweptAABB()
 	s.max.z = (std::max)(m_previousAABB.max.z, m_currentAABB.max.z);
 
 	m_sweptAABB = s;
+}
+
+bool Collider::Serialize(nlohmann::json& outJson) const
+{
+	if (!Component::Serialize(outJson)) return false;
+
+	outJson["center"] = JsonMath::ToJson(m_localTransform.position);
+	outJson["rotation"] = JsonMath::ToJson(m_localTransform.rotation);
+	outJson["scale"] =JsonMath::ToJson(m_localTransform.scale);
+
+	outJson["type"] = static_cast<int>(m_type);
+	outJson["layer"] = static_cast<int>(m_layer);
+	outJson["isTrigger"] = m_isTrigger;
+
+	return true;
+}
+
+bool Collider::Deserialize(const nlohmann::json& json)
+{
+	if (!json.is_object()) return false;
+
+	// Check for required fields
+	if (!json.contains("name")		||
+		!json.contains("center")	||
+		!json.contains("rotation")	||
+		!json.contains("scale")		||
+		!json.contains("type")		||
+		!json.contains("layer")		||
+		!json.contains("isTrigger"))
+	{
+		return false;
+	}
+
+	// Validate field types
+	if (!json["name"].is_string()			||
+		!json["type"].is_number_integer()	||
+		!json["layer"].is_number_integer()	||
+		!json["isTrigger"].is_boolean())
+	{
+		return false;
+	}
+
+	ParamDesc parsedDesc;
+
+	int parsedType = 0;
+	int parsedLayer = 0;
+
+	// Attempt to parse the fields and handle any exceptions
+	try
+	{
+		parsedDesc.name = json["name"].get<std::string>();
+		parsedType = json["type"].get<int>();
+		parsedLayer = json["layer"].get<int>();
+		parsedDesc.isTrigger = json["isTrigger"].get<bool>();
+	}
+	catch (const nlohmann::json::exception&)
+	{
+		return false;
+	}
+
+	// Validate parsed type
+	if (!JsonMath::TryRead(json["center"], parsedDesc.localCenter)		||
+		!JsonMath::TryRead(json["rotation"],parsedDesc.localRotation)	||
+		!JsonMath::TryRead(json["scale"],parsedDesc.localScale))
+	{
+		return false;
+	}
+
+	// Validate enum range for ColliderType
+	constexpr int kColliderTypeMin = static_cast<int>(ColliderType::BOX);
+	constexpr int kColliderTypeMax = static_cast<int>(ColliderType::None);
+
+	if (parsedType < kColliderTypeMin ||
+		parsedType > kColliderTypeMax)
+	{
+		return false;
+	}
+
+	// Validate enum range for CollisionLayer
+	constexpr int kCollisionLayerMin = static_cast<int>(CollisionLayer::Default);
+	constexpr int kCollisionLayerMax = static_cast<int>(CollisionLayer::MAX_LAYER);
+
+	if (parsedLayer < kCollisionLayerMin ||
+		parsedLayer >= kCollisionLayerMax)
+	{
+		return false;
+	}
+
+	// Validate vector finiteness for center and scale
+	const auto isFiniteVector3 =
+		[](const Vector3& value)
+		{
+			return std::isfinite(value.x) &&
+				std::isfinite(value.y) &&
+				std::isfinite(value.z);
+		};
+
+	if (!isFiniteVector3(parsedDesc.localCenter) ||
+		!isFiniteVector3(parsedDesc.localScale))
+	{
+		return false;
+	}
+
+	if (parsedDesc.localScale.x <= 0.0f ||
+		parsedDesc.localScale.y <= 0.0f ||
+		parsedDesc.localScale.z <= 0.0f)
+	{
+		return false;
+	}
+
+	// Validate quaternion finiteness and non-zero length for rotation
+	const float rotationLengthSq = parsedDesc.localRotation.LengthSq();
+
+	if (!std::isfinite(rotationLengthSq) ||
+		rotationLengthSq <= 0.000001f)
+	{
+		return false;
+	}
+
+	// Set the parsed values to the output parameter
+	parsedDesc.localRotation = parsedDesc.localRotation.Normalized();
+	parsedDesc.type = static_cast<ColliderType>(parsedType);
+	parsedDesc.layer = static_cast<CollisionLayer>(parsedLayer);
+
+	SetParams(parsedDesc);
+
+	// Reset old member variables to default values
+	m_collisionInfos.clear();
+	m_isDetected = false;
+	m_deleteFlag = false;
+	m_isActive = true;
+	m_transformGeneration = static_cast<uint64_t>(-1);
+	m_isDirty = true;
+
+	return true;
 }

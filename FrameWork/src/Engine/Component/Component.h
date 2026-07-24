@@ -1,9 +1,11 @@
 #pragma once
 #include <string>
 #include <memory>
+#include "nlohmann/json.hpp"
 
 // Forward declaration
 class Actor;
+class SceneBase;
 struct EngineContext;
 
 // Component class 
@@ -12,7 +14,7 @@ class Component
 
 public:
 	Component() = default;
-	~Component() = default;
+	virtual ~Component() = default;
 
 	void OnStart() { OnStartOverride(); MarkAsStarted(); }													// Call OnStartOverride if not already started
 	void PreUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) PreUpdateOverride(deltaTime); }	// Call PreUpdateOverride if started and not destroyed
@@ -30,6 +32,10 @@ public:
 	void MarkForDestruction() { m_destroyed = true; }			// Mark the component for destruction
 	bool IsDestroyed() const { return m_destroyed; }			// Check if the component is marked for destruction
 
+	// Serialization and deserialization methods for saving and loading component state
+	virtual bool Serialize(nlohmann::json& outJson) const;
+	virtual bool Deserialize(const nlohmann::json& json);
+	virtual bool ResolveReferences(SceneBase& scene);
 protected:
 	EngineContext* GetEngineContext() const;	// Get the engine context from the owning actor's scene
 

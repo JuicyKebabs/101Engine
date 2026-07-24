@@ -34,6 +34,7 @@ struct Guid
 	// String conversion methods
 	std::string ToString() const;
 	static Guid FromString(const std::string& str);
+	static bool TryParse(const std::string& str, Guid& outGuid);
 };
 
 // Hash function for using Guid as a key in unordered containers

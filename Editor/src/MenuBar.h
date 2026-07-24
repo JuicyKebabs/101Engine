@@ -15,9 +15,16 @@ public:
         std::function<void()> onNewScene;
         std::function<void()> onOpenScene;
         std::function<void()> onSaveScene;
+
+        std::function<void()> onUndo;
+        std::function<void()> onRedo;
+
         std::function<void()> onBuildGame;
-		std::function<void(bool)> onReloadGameCode;
+        std::function<void(bool)> onReloadGameCode;
         std::function<void(const std::string&, bool isBehavior)> onCreateScript;
+
+        bool canUndo = false;
+        bool canRedo = false;
     };
 
     void Render(const Callbacks& callbacks);

@@ -30,7 +30,7 @@ public:
 
 	// Calls OnDestroy and releases actors marked for destruction at frame end.
 	// Generation for destroyed Actor is incremented to avoid dangling references.
-	void CollectGarbage();
+	std::vector<ActorHandle> CollectGarbage();
 
 	// Iterate all available actors in the pool and apply a function to them.
 	// Used by ScaneBase for Actor iteration.

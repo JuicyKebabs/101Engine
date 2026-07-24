@@ -1,5 +1,4 @@
 #pragma once
-#include <DirectXMath.h>
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
 
@@ -9,10 +8,10 @@ class Transform : public Component
 public:
 	struct ParamDesc
 	{
-		Vector3 localPosition = Vector3::Zero();	// Local position relative to parent
-		Vector3 localEulerDeg = Vector3::Zero();	// Local rotation in Euler angles
-		Vector3 localScale = Vector3::One();		// Local scale relative to parent
-		std::string name = "Transform";				// Component name (optional, can be used for debugging or identification)
+		Vector3 localPosition = Vector3::Zero();			// Local position relative to parent
+		Quaternion localRotation = Quaternion::Identity();	// Local rotation relative to parent
+		Vector3 localScale = Vector3::One();				// Local scale relative to parent
+		std::string name = "Transform";						// Component name (optional, can be used for debugging or identification)
 	};
 
 public:
@@ -20,9 +19,10 @@ public:
 	virtual ~Transform() = default;
 	void SetParams(const ParamDesc& desc) {
 		m_localTransform.position = desc.localPosition;
-		m_localTransform.rotation = Quaternion::CreateFromEulerDeg(desc.localEulerDeg);
+		m_localTransform.rotation = desc.localRotation;
 		m_localTransform.scale = desc.localScale;
 		SetName(desc.name);
+		MarkDirty();
 	}
 
 	// Overrides
@@ -93,6 +93,10 @@ public:
 
 	virtual void UpdateGeometry();			// Update world transform based on local transform and parent's world transform
 	uint64_t GetWorldGeneration() const;	// Get world transform generation counter (incremented every time world transform is updated)
+
+	// Serialization and deserialization
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
 
 protected:
 	Transform3D m_localTransform{};	// Local transform data (position, rotation, scale)
