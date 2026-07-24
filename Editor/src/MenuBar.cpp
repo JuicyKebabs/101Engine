@@ -23,6 +23,35 @@ void MenuBar::Render(const Callbacks& callbacks)
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Edit"))
+        {
+            if (ImGui::MenuItem(
+                "Undo",
+                nullptr,
+                false,
+                callbacks.canUndo))
+            {
+                if (callbacks.onUndo)
+                {
+                    callbacks.onUndo();
+                }
+            }
+
+            if (ImGui::MenuItem(
+                "Redo",
+                nullptr,
+                false,
+                callbacks.canRedo))
+            {
+                if (callbacks.onRedo)
+                {
+                    callbacks.onRedo();
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+
 		// Assets menu for creating new assets like behaviors
         if (ImGui::BeginMenu("Assets"))
         {

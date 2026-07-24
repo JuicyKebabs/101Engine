@@ -80,7 +80,18 @@ void SceneBase::LateUpdate(float deltaTime)
 
 	// ActorPool owns the final OnDestroy + release step. All hierarchy-aware
 	// destruction requests have already been marked through RemoveActor().
-	m_actorPool.CollectGarbage();
+	const auto collectedHandle =  m_actorPool.CollectGarbage();
+
+	// Remove collected actors from the guid map
+	for (const ActorHandle& handle : collectedHandle)
+	{
+		auto it = m_actorHandleGuidMap.find(handle);
+		if (it != m_actorHandleGuidMap.end())
+		{
+			m_actorGuidMap.erase(it->second);
+			m_actorHandleGuidMap.erase(it);
+		}
+	}
 }
 
 // Render
@@ -110,4 +121,85 @@ void SceneBase::OnRender(
 void SceneBase::Finalize()
 {
 	m_pCollisionSystem->ClearColliders();
+}
+
+Actor* SceneBase::AddRootActor(std::unique_ptr<Actor> actor)
+{
+	return RegisterActor(std::move(actor), ActorHandle::Null());
+}
+
+Actor* SceneBase::AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle)
+{
+	// Parent handle must be valid for a child actor
+	if (parentHandle.IsNull()) return nullptr;
+
+	return RegisterActor(std::move(actor), parentHandle);
+}
+
+Actor* SceneBase::RegisterActor(
+	std::unique_ptr<Actor> actor,
+	ActorHandle parentHandle
+)
+{
+	if (!actor) return nullptr;
+
+	Guid guid = actor->GetGuid();
+
+	// Check if the actor's Guid is valid
+	if (!guid.IsValid())
+	{
+		DBG("SceneBase::RegisterActor: Actor has an invalid Guid.");
+		return nullptr;
+	}
+
+	// Check if the actor's Guid is already registered
+	if (m_actorGuidMap.find(guid) != m_actorGuidMap.end())
+	{
+		DBG("SceneBase::RegisterActor: Duplicate Actor Guid: %s", guid.ToString().c_str());
+		return nullptr;
+	}
+
+	// Check if the parent handle is valid (if not null)
+	if (!parentHandle.IsNull() && !m_actorPool.IsValid(parentHandle))
+	{
+		DBG("SceneBase::RegisterActor: Parent handle is invalid.");
+		return nullptr;
+	}
+
+	// Check if the parent actor is pending destruction
+	if (!parentHandle.IsNull())
+	{
+		Actor* parent = m_actorPool.Resolve(parentHandle);
+		if (!parent || parent->IsDestroyed())
+		{
+			DBG("SceneBase::RegisterActor: Parent is pending destruction.");
+			return nullptr;
+		}
+	}
+
+	// Set this scene as the owner of the actor
+	actor->SetOwner(this);
+
+	// Register the actor in the ActorPool
+	const ActorHandle handle = m_actorPool.Register(std::move(actor));
+	if (handle.IsNull())
+	{
+		DBG("SceneBase::RegisterActor: Failed to register actor in ActorPool.");
+		return nullptr;
+	}
+
+	// Register handle and guid in the maps
+	m_actorGuidMap.emplace(guid, handle);
+	m_actorHandleGuidMap.emplace(handle, guid);
+
+	// Resolve the actor pointer from the handle
+	Actor* registered = m_actorPool.Resolve(handle);
+
+	// Set the parent handle if provided
+	if (registered && !parentHandle.IsNull())
+	{
+		registered->SetParentHandle(parentHandle);
+	}
+
+	return registered;
 }

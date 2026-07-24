@@ -92,7 +92,7 @@ namespace
 		Check(scene.ResolveActor(parentHandle) != nullptr && scene.ResolveActor(childHandle) != nullptr,
 			"Cascaded actors remain resolvable until collection");
 
-		scene.GetActorPool().CollectGarbage();
+		scene.LateUpdate(0.0f);
 		Check(scene.ResolveActor(parentHandle) == nullptr, "Collected parent handle is invalid");
 		Check(scene.ResolveActor(childHandle) == nullptr, "Collected child handle is invalid");
 	}
@@ -110,7 +110,7 @@ namespace
 		Check(!child->IsDestroyed(), "Non-cascading removal preserves the child");
 		Check(child->GetParentHandle().IsNull(), "Preserved child becomes a root actor");
 
-		scene.GetActorPool().CollectGarbage();
+		scene.LateUpdate(0.0f);
 		Check(scene.ResolveActor(parentHandle) == nullptr, "Non-cascading parent is collected");
 		Check(scene.ResolveActor(childHandle) == child, "Preserved child remains valid");
 	}

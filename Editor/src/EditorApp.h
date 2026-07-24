@@ -13,12 +13,15 @@
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
+#include "Command/EditorCommandHistory.h"
 
 #include "EditorCamera.h"
 #include "HierarchyPanel.h"
 #include "InspectorPanel.h"
 #include "MenuBar.h"
 #include "ScriptsPanel.h"
+#include "SceneViewPanel.h"
+
 //--------------------------------------------
 // EditorApp class
 // The main application class for the editor.
@@ -65,6 +68,8 @@ private:
     // The scene currently being edited
     std::unique_ptr<SceneBase> m_pScene;
 
+	EditorCommandHistory m_commandHistory;  // Command history for undo/redo
+
     // Editor-only free-fly camera. Kept outside SceneBase so it is never
     // written to / read from .scene files.
     std::unique_ptr<Actor> m_pEditorCameraActor;
@@ -73,6 +78,7 @@ private:
     // Panels
     HierarchyPanel m_hierarchyPanel;
     InspectorPanel m_inspectorPanel;
+    SceneViewPanel m_sceneViewPanel;
     MenuBar m_menuBar;
 	ScriptsPanel m_scriptsPanel;
 

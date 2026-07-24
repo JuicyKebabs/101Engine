@@ -36,6 +36,7 @@ public:
 		m_pivot = desc.pivot;
 		m_size = desc.size;
 		SetName(desc.name);
+		MarkDirty(); 
 	}
 
 	void UpdateGeometry() override;	// Update the geometry of the RectTransform based on its properties (anchored position, pivot, size delta)
@@ -50,7 +51,11 @@ public:
 	AnchorMode GetAnchorMode() const { return m_anchorMode; }					// Get the anchor mode
 	const Vector2& GetAnchoredPosition() const { return m_anchoredPosition; }	// Get the anchored position
 	const Vector2& GetPivot() const { return m_pivot; }							// Get the pivot
-	const Vector2& GetSize() const { return m_size; }						// Get the size delta
+	const Vector2& GetSize() const { return m_size; }							// Get the size delta
+
+	// Serialization and deserialization methods for
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
 
 private:
 	AnchorMode m_anchorMode = AnchorMode::MiddleCenter;	// Anchor mode (determines how the anchored position is calculated)

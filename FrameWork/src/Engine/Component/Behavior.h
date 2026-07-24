@@ -23,6 +23,17 @@ public:
 	virtual void LateUpdate() {};
 	virtual void Destroy() {};
 
+	bool Serialize(nlohmann::json& outJson) const override
+	{
+		outJson = nlohmann::json::object();
+		return true;
+	}
+
+	bool Deserialize(const nlohmann::json& json) override
+	{
+		return json.is_object();
+	}
+
 protected:
 
 	// Helper function to change the scene from within a behavior component

@@ -13,15 +13,32 @@
 
 using json = nlohmann::json;
 
-static json SerializeActor(Actor* actor);
+static bool SerializeActor(
+	Actor* actor,
+	SceneBase* scene,
+	json& outJson
+);
 
 // Save a scene to a file
 bool SceneWriter::SaveScene(const std::string& filePath, SceneBase* scene)
 {
+	// Check if the scene pointer is valid before proceeding
+	if (!scene)
+	{
+		DBG("SceneWriter: Save failed - Scene is null.");
+		return false;
+	}
+
 	// Check if the scene has a main camera before attempting to save
 	bool hasMainCamera = false;
 	for (auto& actor : scene->GetAllActors())
 	{
+		// Check if the actor is valid and not destroyed before checking for the main camera
+		if (!actor || actor->IsDestroyed())
+		{
+			continue;
+		}
+
 		if (actor->GetTag() == ActorTags::MainCamera)
 		{
 			if (actor->HasComponent<Camera>())
@@ -41,7 +58,7 @@ bool SceneWriter::SaveScene(const std::string& filePath, SceneBase* scene)
 	json j;
 
 	// Version
-	j["version"] = CURRENT_VERSION;
+	j["version"] = CURRENT_SCENE_VERSION;
 
 	// Directional light
 	const auto& dl = scene->GetDirectionalLight();
@@ -51,11 +68,24 @@ bool SceneWriter::SaveScene(const std::string& filePath, SceneBase* scene)
 		{"intensity", dl.intensity}
 	};
 
-	// Actors (only root actors are serialized here; child actors will be serialized recursively as part of their parents)
 	j["actors"] = json::array();
-	for(auto& actor : scene->GetRootActors())
+	for(auto& actor : scene->GetAllActors())
 	{
-		j["actors"].push_back(SerializeActor(actor));
+		// Check if the actor is valid and not destroyed before serializing
+		if (!actor || actor->IsDestroyed())
+		{
+			continue;
+		}
+
+		// Serialize the actor and add it to the JSON array
+		json actorJson;
+		if (!SerializeActor(actor, scene, actorJson))
+		{
+			DBG("SceneWriter: Failed to serialize an actor.");
+			return false;
+		}
+
+		j["actors"].push_back(std::move(actorJson));
 	}
 
 	// Resolve the full path for the output file and open it for writing
@@ -75,60 +105,100 @@ bool SceneWriter::SaveScene(const std::string& filePath, SceneBase* scene)
 	return true;
 }
 
-static json SerializeActor(Actor* actor)
+static bool SerializeActor(Actor* actor, SceneBase* scene, json& outJson)
 {
+	if (!actor)
+	{
+		DBG("SceneWriter::SerializeActor: Actor is null.");
+		return false;
+	}
+
 	json j;
+
+	// Get the actor's GUID and check if it's valid
+	const Guid& actorGuid = actor->GetGuid();
+	if (!actorGuid.IsValid())
+	{
+		DBG(
+			"SceneWriter::SerializeActor: Actor '%s' has an invalid Guid.",
+			actor->GetName().c_str());
+		return false;
+	}
+
+	// Save the actor's GUID as a string in the JSON object
+	j["actorId"] = actorGuid.ToString();
+
+
+	// Get parent actor's GUID if it exists
+	const ActorHandle parentHandle = actor->GetParentHandle();
+	if (parentHandle.IsNull())
+	{
+		j["parentId"] = nullptr; // No parent
+	}
+	else
+	{
+		Actor* parent = scene->ResolveActor(parentHandle);
+
+		// Check if parent actor is exists
+		if (!parent)
+		{
+			DBG(
+				"SceneWriter::SerializeActor: Parent of Actor '%s' cannot be resolved.",
+				actor->GetName().c_str());
+			return false;
+		}
+
+		// Check if parent actor's GUID is valid
+		if (!parent->GetGuid().IsValid())
+		{
+			DBG(
+				"SceneWriter::SerializeActor: Parent of Actor '%s' has an invalid Guid.",
+				actor->GetName().c_str());
+			return false;
+		}
+
+		// Save the parent actor's GUID as a string in the JSON object
+		j["parentId"] = parent->GetGuid().ToString();
+	}
 
 	// Basic properties
 	j["name"] = actor->GetName();								// Actor name
 	j["is_active"] = actor->IsActive();							// Active status
 	j["tag"] = TagRegistry::Get().GetName(actor->GetTag());		// Tag name
 
-	// Transform component
-	auto* t = actor->GetComponentByClass<Transform>();
-	if (t)
-	{
-		// Get local transform properties
-		Vector3 pos = t->GetLocalPosition();
-		Vector3 rot = t->GetLocalRotationEulerDeg();
-		Vector3 scale = t->GetLocalScale();
-
-		// Serialize transform as a nested object
-		j["transform"] = {
-			{"position", { pos.x, pos.y, pos.z }},
-			{"rotation", { rot.x, rot.y, rot.z }},
-			{"scale",    { scale.x, scale.y, scale.z }}
-		};
-	}
-
 	// Components
 	j["components"] = json::array();
-	auto typeIds = actor->GetComponentsTypeIds();
-	for(auto& typeId : typeIds)
+
+	for (Component* component : actor->GetAllComponents())
 	{
-		// Skip transform component
-		if (typeId == std::type_index(typeid(Transform))) continue;
+		if (!component || component->IsDestroyed()) continue;
 
-		// Get the registered name for the component type index
-		std::string name = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
+		// Get the type index and name of the component from the registry
+		const std::type_index typeId(typeid(*component));
+		const std::string typeName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
 
-		// Check if a registered name was found and add it to the components array
-		if (!name.empty())
+		if (typeName.empty())
 		{
-			j["components"].push_back(name);
+			DBG("SceneWriter: No registered name found for component type '%s'.", typeId.name());
+			return false;
 		}
-		 else
+
+		// Serialize the component's data into a JSON object
+		json componentData;
+		if (!component->Serialize(componentData))
 		{
-			DBG("SceneWriter: No registered name found for component type index '%s'", typeId.name());
+			DBG("SceneWriter: Failed to serialize component '%s' on actor '%s'.", typeName.c_str(), actor->GetName().c_str());
+			return false;
 		}
+
+		// Create a JSON object for the component with its type and serialized data
+		json componentRecord;
+		componentRecord["type"] = typeName;
+		componentRecord["data"] = std::move(componentData);
+
+		j["components"].push_back(std::move(componentRecord));
 	}
 
-	// Child actors (recursively serialize children)
-	j["children"] = json::array();
-	for(auto& child : actor->GetDirectChildren())
-	{
-		j["children"].push_back(SerializeActor(child));
-	}
-
-	return j;
+	outJson = std::move(j);
+	return true;
 }

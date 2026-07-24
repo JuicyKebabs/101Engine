@@ -3,10 +3,16 @@
 #include <utility>
 #include "UIRenderer.h"
 
+//----------------------------------------------------------------
+// Canvas class
+// A component that manages a collection of UIRenderer components
+//----------------------------------------------------------------
+
 class Canvas : public Component
 {
 public:
-	struct ParamDesc {
+	struct ParamDesc 
+	{
 		UINT sortOrder = 0;
 		bool isVisible = true;
 		std::string name = "Canvas";
@@ -15,7 +21,8 @@ public:
 public:
 	Canvas() = default;
 	~Canvas() = default;
-	void Init(const ParamDesc& desc = ParamDesc()) {
+	void SetParams(const ParamDesc& desc = ParamDesc()) 
+	{
 		m_sortOrder = desc.sortOrder;
 		m_isVisible = desc.isVisible;
 		SetName(desc.name);
@@ -30,14 +37,20 @@ public:
 	UINT GetSortOrder() const { return m_sortOrder; }
 
 	// UIRenderer management
-	void RegisterUIRenderer(UIRenderer* ui) {
+	void RegisterUIRenderer(UIRenderer* ui) 
+	{
 		if (ui) {
 			m_uiList.push_back(ui);
 		}
 	}
 	void UnregisterUIRenderer(UIRenderer* ui) {
+
 		m_uiList.erase(std::remove(m_uiList.begin(), m_uiList.end(), ui), m_uiList.end());
 	}
+
+	// Serialization and deserialization methods
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
 
 private:
 	std::vector<UIRenderer*> m_uiList;
@@ -50,7 +63,8 @@ private:
 	void PreUpdateOverride(float deltaTime) override {};
 	void UpdateOverride(float deltaTime) override {};
 	void LateUpdateOverride(float deltaTime) override {};
-	void OnDestroyOverride() override {
+	void OnDestroyOverride() override 
+	{
 		for(auto* ui : m_uiList) if(ui) ui->OnCanvasDestroyed();
 	};
 };

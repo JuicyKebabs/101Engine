@@ -36,22 +36,52 @@ public:
 	// private static const data members, causing LNK2001 in 101Editor.
 	// Keeping the implementation in the .cpp confines all references to
 	// s_actorComponentMap to 101Framework.dll itself.
-	static std::unique_ptr<Actor> CreateActor(ActorType type, Actor::InitDesc desc);
+	static std::unique_ptr<Actor> CreateActor(
+		ActorType type, 
+		const Actor::InitDesc& desc
+	);
+
+	// Restore an existing actor with its persisted Guid.
+	static std::unique_ptr<Actor> RestoreActor(
+		ActorType type,
+		const Actor::InitDesc& desc,
+		const Guid& guid
+	);
 
 	// Create an empty actor with only a Transform component (common for all actors)
-	static std::unique_ptr<Actor> CreateEmptyActor(Actor::InitDesc desc)
-	{
-		auto actor = std::unique_ptr<Actor>(new Actor());
-		actor->Init(desc);
-		actor->AddComponent<Transform>();
-		return actor;
-	}
+	static std::unique_ptr<Actor> CreateEmptyActor(const Actor::InitDesc& desc);
+
+	// Restore an empty actor with only a Transform component and a persisted Guid.
+	static std::unique_ptr<Actor> RestoreEmptyActor(
+		const Actor::InitDesc& desc,
+		const Guid& guid
+	);
+
+	// Create am actor with no components, used for deserialization of actors from scene files.
+	static std::unique_ptr<Actor> RestoreActorShell(
+		const Actor::InitDesc& desc,
+		const Guid& guid
+	);
+
+private:
+	// Map of actor types to their necessary components.
+	static const std::unordered_map<ActorType, std::vector<std::function<void(Actor*)>>> s_actorComponentMap;
 
 private:
 	// Adding component of type T to the actor
 	template<typename T>
 	static std::function<void(Actor*)> Adder() { return [](Actor* actor) { actor->AddComponent<T>(); }; }
 
-	// Map of actor types to their necessary components.
-	static const std::unordered_map<ActorType, std::vector<std::function<void(Actor*)>>> s_actorComponentMap;
+	// Internal implementation of CreateActor, used by both CreateActor and RestoreActor
+	static std::unique_ptr<Actor> CreateActorInternal(
+		ActorType type,
+		const Actor::InitDesc& desc,
+		const Guid& guid
+	);
+
+	// Internal implementation of CreateEmptyActor, used by both CreateEmptyActor and RestoreEmptyActor
+	static std::unique_ptr<Actor> CreateEmptyActorInternal(
+		const Actor::InitDesc& desc,
+		const Guid& guid
+	);
 };

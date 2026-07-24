@@ -1,7 +1,9 @@
 #pragma once
+#include <optional>
 #include "UIRenderer.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Core/Math/Math.h"
+#include "Engine/Core/GUID/Guid.h"
 
 class UIImage : public UIRenderer
 {
@@ -16,6 +18,7 @@ public:
 		Vector2 uvOffset{ 0,0 };			// UV offset for texture mapping
 		bool flipX = false;					// Flip flag for X axis (false for normal, true for flipped)
 		bool flipY = false;					// Flip flag for Y axis (false for normal, true for flipped)
+		bool isVisible = true;				// Visibility flag for this UI element
 		std::string name = "UIImage";		// Component name (optional, can be used for debugging or identification)
 	};
 
@@ -23,14 +26,31 @@ public:
 	UIImage() = default;
 	~UIImage() = default;
 	void SetParams(const ParamDesc& desc) {
-		m_pCanvas = desc.pCanvas;
+		SetCanvas(desc.pCanvas);
 		m_renderTemplate = desc.renderTemplate;
-		m_order = desc.order;
-		m_color = desc.color;
-		m_uvScale = desc.uvScale;
-		m_uvOffset = desc.uvOffset;
-		m_flipX = desc.flipX;
-		m_flipY = desc.flipY;
+		m_textureAssetId = {};
+		m_pendingTextureAssetId.reset();
+		SetOrder(desc.order);
+		SetColor(desc.color);
+		SetVisible(desc.isVisible);
+		SetUVScale(desc.uvScale);
+		SetUVOffset(desc.uvOffset);
+		SetFlipX(desc.flipX);
+		SetFlipY(desc.flipY);
 		SetName(desc.name);
+		m_isProxyDirty = true;
 	}
+
+	// Setters and getters for texture asset
+	bool SetTextureAsset(const Guid& assetId);
+	const Guid& GetTextureAssetId() const { return m_textureAssetId; }
+
+	// Serialization and deserialization methods
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
+	bool ResolveReferences(SceneBase& scene) override;
+
+private:
+	Guid m_textureAssetId;							// Guid of the texture asset
+	std::optional<Guid> m_pendingTextureAssetId;	// Optional Guid of the texture asset to be loaded
 };

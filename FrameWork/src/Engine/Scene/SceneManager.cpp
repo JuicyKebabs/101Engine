@@ -142,7 +142,7 @@ void SceneManager::ChangeScene(const std::string& next)
 
 		// Load scene from JSON file
 		std::string fullPath = PathManager::Resolve(pNextElem->jsonPath);
-		if (!SceneLoader::LoadScene(fullPath, pNextElem->pSceneBase.get(), m_context))
+		if (!SceneLoader::LoadScene(fullPath, pNextElem->pSceneBase.get()))
 		{
 			DBG("SceneManager: Failed to load scene from '%s'", fullPath.c_str());
 		}

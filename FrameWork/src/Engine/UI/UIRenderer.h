@@ -1,7 +1,9 @@
 #pragma once
+#include <optional>
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Core/GUID/Guid.h"
 
 class Canvas;
 
@@ -38,8 +40,17 @@ public:
 	bool IsVisible() const override;
 	bool IsConfigured() const override { return !m_renderTemplate.empty(); }	// Check if the renderer has been configured with necessary resources (at least one render template)
 
+	void SetCanvas(Canvas* canvas);
+	void SetOrder(UINT order) { m_order = order; m_isProxyDirty = true; }
+
+	Canvas* GetCanvas() const { return m_pCanvas; }
 	UINT GetCanvasOrder() const;
 	void OnCanvasDestroyed() { m_pCanvas = nullptr; }
+
+	// Serialization and deserialization methods
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
+	bool ResolveReferences(SceneBase& scene) override;
 
 protected:
 	UIRenderTemplate m_renderTemplate;	// Render template containing static rendering information for this UI element
@@ -51,6 +62,8 @@ protected:
 	Vector2 m_uvOffset{ 0,0 };		// UV offset for texture mapping
 	bool m_flipX = false;			// Flip flag for X axis (false for normal, true for flipped)
 	bool m_flipY = false;			// Flip flag for Y axis (false for normal, true for flipped)
+
+	std::optional<Guid> m_pendingCanvasActorId;	// Optional Guid of the canvas actor to which this UI element should be registered (used for deferred registration if the canvas is not yet available)
 
 private:
 	// Override functions for component lifecycle

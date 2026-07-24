@@ -7,6 +7,7 @@ static bool s_init = []() {
     }();
 
 // Built-in engine components registration macros.
+REGISTER_COMPONENT(Transform)
 REGISTER_COMPONENT(MeshRenderer)
 REGISTER_COMPONENT(SpriteRenderer)
 REGISTER_COMPONENT(UIRenderer)

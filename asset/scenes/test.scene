@@ -1,12 +1,13 @@
 {
     "actors": [
         {
-            "children": [],
+            "actorId": "{E3D19224-EB1A-4B5A-9709-1F517FF58EA5}",
             "components": [
                 "Camera"
             ],
             "is_active": true,
             "name": "DefaultCamera",
+            "parentId": null,
             "tag": "MainCamera",
             "transform": {
                 "position": [
@@ -27,10 +28,13 @@
             }
         },
         {
-            "children": [],
-            "components": [],
+            "actorId": "{13EC3C80-1F3A-4181-BF21-7B7FB08E39E7}",
+            "components": [
+                "Collider"
+            ],
             "is_active": true,
             "name": "test",
+            "parentId": null,
             "tag": "None",
             "transform": {
                 "position": [
@@ -64,5 +68,5 @@
         ],
         "intensity": 1.0
     },
-    "version": 1
+    "version": 2
 }

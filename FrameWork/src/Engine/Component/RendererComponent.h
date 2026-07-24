@@ -2,6 +2,11 @@
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
 
+//-------------------------------------------------------
+// RendererComponent class
+// Base class for all renderer components in the engine
+// ------------------------------------------------------
+
 // Common render proxy structure for draw packets (Specific renderer component has this structure with additional fields as needed)
 struct CommonRendererProxy
 {
@@ -29,6 +34,10 @@ public:
 	Vector4 GetColor() const { return m_color; }
 	virtual bool IsVisible() const { return m_isVisible; }
 	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources
+
+	// Serialization and deserialization methods
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
 
 protected:
 	Vector4 m_color{ 1,1,1,1 };		// Color for rendering (can be used to tint the rendered object)

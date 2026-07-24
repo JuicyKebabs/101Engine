@@ -23,6 +23,7 @@
 #include "ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Command/CreateActorCommand.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -141,6 +142,10 @@ void EditorApp::Terminate()
 {
 	// Destroy the scene while the game code DLL is still loaded
     m_hierarchyPanel.ClearSelection();
+
+    // Clear the command history
+    m_commandHistory.Clear();
+
     m_pScene.reset();
     ComponentRegistry::Get().UnregisterAllGameComponents();
     if (m_hGameCodeDll)
@@ -162,6 +167,9 @@ void EditorApp::NewScene()
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
 
+	// Clear the command history
+	m_commandHistory.Clear();
+
 	// Create a new scene instance and initialize it
     m_pScene = std::make_unique<EditorScene>();
     m_pScene->Initialize(m_engineContext);
@@ -173,7 +181,9 @@ void EditorApp::NewScene()
 
     auto cameraActorOwned = ActorFactory::CreateActor(ActorType::Camera, cameraDesc);
     cameraActorOwned->GetComponentByClass<Transform>()->SetParams(
-        Transform::ParamDesc(Vector3{ 0, 0, -5 })
+		Transform::ParamDesc{
+			.localPosition = { 0, 0, -5 }
+		}
     );
     auto* camera = cameraActorOwned->GetComponentByClass<Camera>();
     camera->SetParams(Camera::ParamDesc{
@@ -192,12 +202,15 @@ void EditorApp::LoadScene(const std::string& filePath)
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
 
+    // Clear the command history
+    m_commandHistory.Clear();
+
 	// Create a new scene instance and initialize it
     m_pScene = std::make_unique<EditorScene>();
     m_pScene->Initialize(m_engineContext);
 
 	// Load the scene data from file
-    bool result = SceneLoader::LoadScene(filePath, m_pScene.get(), m_engineContext);
+    bool result = SceneLoader::LoadScene(filePath, m_pScene.get());
 
     if (result) DBG("EditorApp: Loaded scene from %s", filePath.c_str());
     else        DBG("EditorApp: Failed to load scene from %s", filePath.c_str());
@@ -242,7 +255,8 @@ void EditorApp::ReloadGameCode(bool reconfigure)
 
 	// 2. Destroy the current scene while the old DLL is still loaded
 	m_hierarchyPanel.ClearSelection();   // Clear selection to avoid dangling pointers to a selected actor
-	m_pScene->Finalize();
+    m_commandHistory.Clear();            // Clear the command history
+    m_pScene->Finalize();
 	m_pScene.reset();
 
 	// 3. Unregister GameCode-side factories from ComponentRegistry
@@ -457,14 +471,16 @@ void EditorApp::Render()
     if (m_pScene) m_pScene->OnRender(m_engineContext);
 
     RenderPassTarget sceneTarget{ RenderPassTargetType::ColorDepth, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
+    
+	// Render the scene to the shadow map render target first
     m_pEngine->BeginPass(sceneTarget);
     uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
     m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
     m_pEngine->EndPass(sceneTarget);
 
+	// Render the scene to the scene color render target
     RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };
     m_pEngine->BeginPass(backBufferTarget);
-    m_pRenderer->RenderScreenSpace(m_pEngine->GetCommandList());
     RenderImGui();
     m_pEngine->EndPass(backBufferTarget);
 
@@ -498,6 +514,35 @@ void EditorApp::RenderImGui()
                 }
             };
 
+        callbacks.onUndo = [this]()
+            {
+				// Avoid dangling pointers to a selected actor that may be deleted by the undo operation
+                m_hierarchyPanel.ClearSelection();
+
+                if (m_commandHistory.Undo())
+                {
+                    DBG("EditorApp: Undo succeeded.");
+                }
+                else
+                {
+                    DBG("EditorApp: Undo failed.");
+                }
+            };
+
+        callbacks.onRedo = [this]()
+            {
+                m_hierarchyPanel.ClearSelection();
+
+                if (m_commandHistory.Redo())
+                {
+                    DBG("EditorApp: Redo succeeded.");
+                }
+                else
+                {
+                    DBG("EditorApp: Redo failed.");
+                }
+            };
+
         callbacks.onBuildGame = []()
             {
                 ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
@@ -523,6 +568,9 @@ void EditorApp::RenderImGui()
                     ReloadGameCode(true);   // Reconfigure and build to pick up the new behavior
                 }
             };
+
+        callbacks.canUndo = m_commandHistory.CanUndo();
+        callbacks.canRedo = m_commandHistory.CanRedo();
 
         m_menuBar.Render(callbacks);
     }
@@ -559,15 +607,27 @@ void EditorApp::RenderImGui()
 		// Callback for creating and adding a new actor in the scene
         hierarchyCallbacks.onCreateActor = [this](const std::string& name)
             {
-                if (m_pScene)
+                if (!m_pScene) return;
+
+                Actor::InitDesc desc;
+                desc.name = name;
+
+                const bool succeeded = m_commandHistory.Execute(
+                    std::make_unique<CreateActorCommand>(m_pScene.get(), desc)
+                );
+
+                if (succeeded)
                 {
-                    Actor::InitDesc desc;
-                    desc.name = name;
-                    auto newActor = ActorFactory::CreateEmptyActor(desc);
-                    m_pScene->AddRootActor(std::move(newActor));
-					DBG("EditorApp: Created new actor '%s' in scene", name.c_str());
+                    DBG(
+                        "EditorApp: Created new actor '%s' through command history.",
+                        name.c_str());
                 }
-			};
+                else
+                {
+                    DBG(
+                        "EditorApp: Failed to create actor '%s'.",
+                        name.c_str());
+                }			};
 
 		// Callback for deleting an actor from the scene
         hierarchyCallbacks.onDeleteActor = [this](Actor* actor)
@@ -589,6 +649,21 @@ void EditorApp::RenderImGui()
         ImGui::GetDrawData(),
         m_pEngine->GetCommandList()
     );
+
+
+
+	// Render scene view panel with the scene's color render target
+
+	GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
+    
+    if (sceneColor)
+    {
+		const uint32_t srvIndex = sceneColor->GetSrvIndex();
+
+		const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
+
+        m_sceneViewPanel.Render(gpuHandle);
+    }
 }
 
 void EditorApp::ShutdownImGui()

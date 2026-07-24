@@ -7,6 +7,7 @@
 #include "Engine/Component/Transform.h"
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Actor/ActorHandle.h"
+#include "Engine/Core/GUID/Guid.h"
 
 //-----------------------------------------------------------------------------
 // Actor class
@@ -63,6 +64,7 @@ public:
 	void SetActive(bool isActive) { m_isActive = isActive; }
 
 	// Getters
+	const Guid& GetGuid() const { return m_guid; }
 	ActorHandle GetHandle() const { return m_handle; }
 	SceneBase* GetOwner() const { return m_pOwner; }
 	TagId GetTag() const { return m_tag; }
@@ -334,14 +336,31 @@ public:
 		return result;
 	}
 
-	// Add a child actor
-	template<class T, class... Args>
-	T* AddChild(Args&&... args)
+	std::vector<Component*> GetAllComponents()
 	{
-		static_assert(std::is_base_of_v<Actor, T>, "AddChild<T>: T must derive from Actor");
-		auto child = std::make_unique<T>(std::forward<Args>(args)...);
-		return static_cast<T*>(AddChildToScene(std::move(child)));
+		std::vector<Component*> result;
+		for (auto& [typeId, bucket] : m_components)
+		{
+			for (auto& instance : bucket.instances)
+			{
+				if (instance && !instance->IsDestroyed())
+				{
+					result.push_back(instance.get());
+				}
+			}
+		}
+		for (auto& pending : m_pendingComponents)
+		{
+			if (pending.instance && !pending.instance->IsDestroyed())
+			{
+				result.push_back(pending.instance.get());
+			}
+		}
+		return result;
 	}
+
+	// Add a child actor
+	Actor* AddChild(std::unique_ptr<Actor> child);
 
 	void FlushTransform();			// Update world transform of this actor and all child actors;
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
@@ -358,6 +377,7 @@ private:
 	std::vector<PendingComponent> m_pendingComponents;					// Pending additions
 
 	// Hierarchy
+	Guid m_guid;								// Unique identifier for this actor
 	ActorHandle m_handle;						// Unique handle for this actor
 	SceneBase* m_pOwner = nullptr;				// Owning scene pointer
 	ActorHandle m_parentHandle = {};			// Parent actor handle
@@ -370,7 +390,6 @@ private:
 private:
 	void AddPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
-	Actor* AddChildToScene(std::unique_ptr<Actor> child);
 	void MarkForDestruction() { m_destroyed = true; }
 
 private:
@@ -383,6 +402,8 @@ private:
 		m_name = desc.name;
 		m_isInitialized = true;
 	}
+
+	void SetGuid(const Guid& guid) { m_guid = guid; }	// Set the actor's GUID (used by ActorFactory)
 
 	friend class ActorFactory;	// Allow ActorFactory to access private constructor
 	friend class SceneBase;		// SceneBase coordinates hierarchy-aware destruction

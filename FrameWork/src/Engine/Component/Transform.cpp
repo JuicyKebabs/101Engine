@@ -1,7 +1,7 @@
 #include "Transform.h"
 #include "Engine/Actor/Actor.h"
-
-using namespace DirectX;
+#include "Engine/Core/Serialization/JsonMath.h"
+#include "nlohmann/json.hpp"
 
 // Called when the component is initialized
 void Transform::OnStartOverride()
@@ -341,4 +341,56 @@ void Transform::UpdateGeometry()
 uint64_t Transform::GetWorldGeneration() const
 {
 	return m_worldGeneration;
+}
+
+bool Transform::Serialize(nlohmann::json& outJson) const
+{
+	outJson = {
+		{
+			"name", GetName()
+		},
+		{
+			"position", JsonMath::ToJson(GetLocalPosition())
+		},
+		{
+			"rotation", JsonMath::ToJson(GetLocalRotationQuat())
+		},
+		{
+			"scale", JsonMath::ToJson(GetLocalScale())
+		}
+	};
+
+	return true;
+}
+
+bool Transform::Deserialize(const nlohmann::json& json)
+{
+	if (!json.is_object()) return false;
+	if (!json.contains("position") || !json.contains("rotation") || !json.contains("scale") || !json.contains("name"))
+	{
+		return false;
+	}
+
+	ParamDesc desc;
+
+	// Read name from JSON if it exists, otherwise use the current name
+	if (json.contains("name"))
+	{
+		if (!json["name"].is_string()) return false;
+
+		desc.name = json["name"].get<std::string>();
+	}
+	else
+	{
+		desc.name = GetName();
+	}
+
+	// Read position, rotation, scale, and name from JSON
+	if (!JsonMath::TryRead(json["position"], desc.localPosition)) return false;
+	if (!JsonMath::TryRead(json["rotation"], desc.localRotation)) return false;
+	if (!JsonMath::TryRead(json["scale"], desc.localScale)) return false;
+
+	SetParams(desc);	// Set the parameters from the deserialized values
+
+	return true;
 }

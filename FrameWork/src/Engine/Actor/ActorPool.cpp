@@ -8,12 +8,12 @@ ActorHandle ActorPool::Register(std::unique_ptr<Actor> actor)
 	uint32_t index;
 
 	if (!m_freeIndices.empty())
-	{
+	{// Reuse a free slot if available
 		index = m_freeIndices.back();
 		m_freeIndices.pop_back();
 	}
 	else
-	{
+	{// No free slots, create a new one
 		index = static_cast<uint32_t>(m_slots.size());
 		m_slots.push_back({ nullptr, 0, false });
 	}
@@ -50,12 +50,16 @@ bool ActorPool::IsValid(ActorHandle handle) const
 		&& m_slots[handle.index].actor != nullptr;
 }
 
-void ActorPool::CollectGarbage()
+std::vector<ActorHandle> ActorPool::CollectGarbage()
 {
+	std::vector<ActorHandle> collectedHandles;
+
 	for (size_t i = 0; i < m_slots.size(); ++i)
 	{
 		Slot& slot = m_slots[i];
 		if (!slot.pendingDestroy || !slot.actor) continue;
+
+		collectedHandles.push_back({ static_cast<uint32_t>(i), slot.generation });
 
 		slot.actor->OnDestroy();
 		slot.actor.reset();	// Release the actor instance
@@ -63,6 +67,8 @@ void ActorPool::CollectGarbage()
 		slot.pendingDestroy = false;
 		m_freeIndices.push_back(static_cast<uint32_t>(i));
 	}
+
+	return collectedHandles;
 }
 
 void ActorPool::ForEach(const std::function<void(Actor*)>& fn) const

@@ -1,9 +1,16 @@
 #pragma once
+#include <optional>
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Core/GUID/Guid.h"
+
+//---------------------------------------------------
+// SpriteRenderer class
+// A component for rendering 2D sprites in the scene
+//---------------------------------------------------
 
 struct SpriteRendererProxy
 {
@@ -36,7 +43,8 @@ public:
 	~SpriteRenderer() = default;
 	void SetParams(const ParamDesc& desc) {
 		m_template = desc.renderTemplate;
-		m_isProxyDirty = true;
+		m_textureAssetId = {};
+		m_pendingTextureAssetId.reset();
 		SetUVScale(desc.uvScale);
 		SetUVOffset(desc.uvOffset);
 		SetPivot(desc.pivot);
@@ -46,13 +54,22 @@ public:
 		SetColor(desc.color);
 		SetVisible(desc.visible);
 		SetName(desc.name);
+		m_isProxyDirty = true;
 	}
+
+	bool SetTextureAsset(const Guid& assetId);							// Set the texture asset for this sprite through AssetManager
+	const Guid& GetTextureAssetId() const { return m_textureAssetId; }	// Get the asset ID of the texture used for this sprite
 
 	// Setters
 	void SetUVScale(const Vector2& uvScale) { m_uvScale = uvScale; m_isProxyDirty = true; }
 	void SetUVOffset(const Vector2& uvOffset) { m_uvOffset = uvOffset; m_isProxyDirty = true; }
 	void SetPivot(const Vector2& pivot) { m_pivot = pivot; m_isProxyDirty = true; }
-	void SetBillboardType(BillboardType type) { m_billboardType = type; m_isProxyDirty = true; }
+	void SetBillboardType(BillboardType type) 
+	{
+		m_billboardType = type;
+		m_template.billboardType = type;
+		m_isProxyDirty = true;
+	}
 	void SetFlipX(bool flip) { m_flipX = flip; m_isProxyDirty = true; }
 	void SetFlipY(bool flip) { m_flipY = flip; m_isProxyDirty = true; }
 
@@ -67,6 +84,11 @@ public:
 	bool IsFlipY() const { return m_flipY; }
 	bool IsConfigured() const override { return m_template.materialDesc.textureHandle != InvalidTextureHandle; }	// Check if the render template is valid (has a texture)
 
+	// Serialization and deserialization methods
+	bool Serialize(nlohmann::json& outJson) const override;
+	bool Deserialize(const nlohmann::json& json) override;
+	bool ResolveReferences(SceneBase& scene) override;
+
 private:
 	Vector2 m_uvScale{ 1,1 };								// UV scale for texture mapping
 	Vector2 m_uvOffset{ 0,0 };								// UV offset for texture mapping
@@ -77,6 +99,9 @@ private:
 
 	SpriteRenderTemplate m_template;	// Render template for this sprite (contains the texture and billboard type)
 	SpriteRendererProxy m_proxy;		// Cached render proxy for this component (used for rendering)
+
+	Guid m_textureAssetId;							// Asset ID of the texture used for this sprite
+	std::optional<Guid> m_pendingTextureAssetId;	// Optional pending asset ID for the texture (used during deserialization to resolve references)
 
 private:
 	// Override functions for component lifecycle
