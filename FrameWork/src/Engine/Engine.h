@@ -40,9 +40,12 @@ enum class RenderPassTargetType
 
 // Render pass target structure (used to specify the render target for rendering)
 struct RenderPassTarget
-{                              
-	RenderPassTargetType type;
-	uint32_t index;	// For BackBuffer, this is the buffer index; for Builtin, this is the built-in render target index
+{
+	static constexpr uint32_t InvalidIndex = UINT32_MAX;
+
+	RenderPassTargetType type = RenderPassTargetType::BackBuffer;
+	uint32_t colorIndex = InvalidIndex;	// For BackBuffer, this is the buffer index; for Builtin, this is the built-in render target index
+	uint32_t depthIndex = InvalidIndex;	
 };
 
 // Back buffer render target structure
@@ -64,6 +67,7 @@ public:
 	{
 		ShadowMap = 0,	// Shadow map render target
 		SceneColor,		// Main render target for the scene
+		SceneDepth,		// Depth render target for the scene
 		//BloomA,
 		//BloomB,
 		//MotionBlur,
@@ -97,6 +101,9 @@ public:
 	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return m_pDescriptorHeapAllocator.get(); }	// Get descriptor heap allocator
 	GpuTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
 
+	// Resize the scene render targets (color and depth) to the specified width and height
+	bool ResizeSceneRenderTargets(UINT width, UINT height);
+
 private:
 	// Window related
 	HWND hwnd = nullptr;		// Window handle
@@ -108,22 +115,20 @@ private:	// DirectX12 related
 	ComPtr<ID3D12CommandQueue> m_pCommandQueue;									// Command queue
 	ComPtr<IDXGISwapChain4> m_pSwapChain;										// Swap chain
 
-	HANDLE m_fenceEvent = nullptr;				// Fence event handle
-	ComPtr<ID3D12Fence> m_pFence;				// Fence
-	UINT64 m_fenceValue[FRAME_BUFFER_COUNT]{};	// Fence values
+	ComPtr<ID3D12Fence> m_pFence;	// Fence
+	HANDLE m_fenceEvent = nullptr;	// Fence event handle
+	uint64_t m_nextFenceValue = 1;	// Next fence value
 
 	D3D12_VIEWPORT m_viewport{};	// Viewport
 	D3D12_RECT m_scissorRect{};		// Scissor rectangle
 
 private:	// Rendering related
-	UINT m_FrameBufferWidth = 0;		// Frame buffer width
-	UINT m_FrameBufferHeight = 0;		// Frame buffer height
+	UINT m_frameBufferWidth = 0;		// Frame buffer width
+	UINT m_frameBufferHeight = 0;		// Frame buffer height
 	UINT m_currentBackBufferIndex = 0;	// Current back buffer index
 
 	// Resource management
 	BackBufferRenderTarget m_backBuffers[FRAME_BUFFER_COUNT];															// Back buffers
-	ComPtr<ID3D12Resource> m_pDepthStencilBuffer = nullptr;																// Depth stencil buffer (only one is needed)
-	uint32_t m_depthStencilDsvIndex = UINT32_MAX;																		// DSV index for the depth stencil buffer
 	std::array< std::unique_ptr<GpuTexture>, static_cast<size_t>(BuiltinRenderTarget::Count)> m_builtinRenderTargets{};	// Built-in render target handles (post-processing, bloom, motion blur, etc.)
 	std::unique_ptr<DescriptorHeapAllocator> m_pDescriptorHeapAllocator;												// Descriptor heap allocator (for CBV/SRV/UAV, RTV, DSV)	
 	RenderTargetHandle m_nextRenderTargetHandle = static_cast<RenderTargetHandle>(BuiltinRenderTarget::Count);			// Next render target handle to assign
@@ -143,9 +148,9 @@ private:	// Internal functions
 	void CreateScissorRect();				// Scissor rectangle creation
 	void CreateBackBuffers();				// Back buffer creation
 	void CreateBuiltinRenderTargets();		// Built-in render target creation (post-processing, bloom, motion blur, etc.)
-	void CreateDepthStencil();				// Depth stencil creation
 
 	// Built-in render target creation functions
+	void CreateSceneDepthRenderTarget();	// Scene depth render target creation
 	void CreateShadowMapRenderTarget();		// Shadow map render target creation
 	void CreatePostProcessRenderTarget();	// Post-processing render target creation
 

@@ -320,20 +320,35 @@ void App::Render()
 	m_pSceneManager->OnRender();
 
 	// Render the shadow depth on map
-	RenderPassTarget shadowTarget{ RenderPassTargetType::DepthOnly, static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap) };
+	RenderPassTarget shadowTarget
+	{
+		RenderPassTargetType::DepthOnly,
+		RenderPassTarget::InvalidIndex,
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
+	};	
 	m_pEngine->BeginPass(shadowTarget);
 	m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
 	m_pEngine->EndPass(shadowTarget);
 
 	// Render the scene to the main render target
-	RenderPassTarget sceneTarget{ RenderPassTargetType::ColorDepth, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
+	RenderPassTarget sceneTarget
+	{
+		RenderPassTargetType::ColorDepth,
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
+	};
 	m_pEngine->BeginPass(sceneTarget);
 	uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
 	m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
 	m_pEngine->EndPass(sceneTarget);
 
 	// Draw for back buffer
-	RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };
+	RenderPassTarget backBufferTarget
+	{
+		RenderPassTargetType::BackBuffer,
+		m_pEngine->GetCurrentBufferIndex(),
+		RenderPassTarget::InvalidIndex
+	};	
 	m_pEngine->BeginPass(backBufferTarget);
 	m_pRenderer->RenderFullScreenPass(m_pEngine->GetCommandList(), m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor));
 	m_pRenderer->RenderScreenSpace(m_pEngine->GetCommandList());
