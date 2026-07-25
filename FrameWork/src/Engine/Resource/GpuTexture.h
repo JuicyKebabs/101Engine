@@ -5,10 +5,19 @@
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine//Graphics/DescriptorHeapAllocator.h"
 
+//-----------------------------------------------------------------------------------------------------
+// GpuTexture class
+// This class is responsible for managing a GPU texture resource in DirectX 12.
+// It provides functionality for creating, transitioning, and accessing the texture resource.
+// The instance of this class can be a various types of GPU resources listed in the ResourceState enum,
+// such as render targets, depth-stencil buffers, shader resources, and unordered access views.
+// ----------------------------------------------------------------------------------------------------
+
 class GpuTexture
 {
 public:
-	enum class ResourceState{
+	enum class ResourceState
+	{
 		Common,
 		RenderTarget,
 		DepthWrite,
@@ -16,7 +25,8 @@ public:
 		UnorderedAccess,
 	};
 
-	static D3D12_RESOURCE_STATES ConvertToD3D12State(ResourceState state) {
+	static D3D12_RESOURCE_STATES ConvertToD3D12State(ResourceState state) 
+	{
 		switch (state)
 		{
 		case GpuTexture::ResourceState::Common:
@@ -41,7 +51,8 @@ public:
 		}
 	}
 
-	enum class ColorFormat {
+	enum class ColorFormat 
+	{
 		UNKNOWN = 0,
 		RGBA8,
 		RGBA16F,
@@ -51,7 +62,8 @@ public:
 		R24_UNORM_X8_TYPELESS,
 	};
 
-	static DXGI_FORMAT ConvertToDXGIColorFormat(ColorFormat format) {
+	static DXGI_FORMAT ConvertToDXGIColorFormat(ColorFormat format) 
+	{
 		switch (format)
 		{
 		case GpuTexture::ColorFormat::UNKNOWN:
@@ -82,14 +94,16 @@ public:
 		}
 	}
 	
-	enum class DepthFormat {
+	enum class DepthFormat 
+	{
 		UNKNOWN = 0,
 		D16_UNORM,
 		D24F,
 		D32F,
 	};
 
-	static DXGI_FORMAT ConvertToDXGIDepthFormat(DepthFormat format) {
+	static DXGI_FORMAT ConvertToDXGIDepthFormat(DepthFormat format) 
+	{
 		switch (format)
 		{
 		case GpuTexture::DepthFormat::UNKNOWN:
@@ -111,7 +125,9 @@ public:
 		}
 	}
 
-	struct ParamDesc {
+	// Parameters for creating a GpuTexture resource.
+	struct ParamDesc 
+	{
 		UINT width = 0;
 		UINT height = 0;
 
@@ -129,12 +145,21 @@ public:
 		bool useUAV = false;
 	};
 
-public:
 	GpuTexture() = default;
 	~GpuTexture() = default;
 
 	void Initialize(ID3D12Device* device, DescriptorHeapAllocator* allocator, const ParamDesc& desc);
 	void TransitionToState(ID3D12GraphicsCommandList* cmdList, ResourceState newState);
+
+	// Resize the texture to a new width and height. 
+	// This will release the existing resource and create a new one.
+	bool Resize(
+		ID3D12Device* device,
+		DescriptorHeapAllocator* allocator,
+		UINT newWidth,
+		UINT newHeight
+	);
+
 
 	ID3D12Resource* GetResource() const { return m_pResource.Get(); }
 	ResourceState GetState() const { return m_currentState; }
@@ -150,13 +175,15 @@ public:
 	uint32_t GetUavIndex() { assert(m_uavIndex != UINT32_MAX && "GpuTexture: UAV index is not set"); return m_uavIndex; }
 
 private:
-	ComPtr<ID3D12Resource> m_pResource = nullptr;
+	ComPtr<ID3D12Resource> m_pResource = nullptr;	// The underlying GPU resource for the texture.
 
+	// Indices for the descriptors in the descriptor heap.
 	uint32_t m_rtvIndex = UINT32_MAX;
 	uint32_t m_dsvIndex = UINT32_MAX;
 	uint32_t m_srvIndex = UINT32_MAX;
 	uint32_t m_uavIndex = UINT32_MAX;
 
+	// Buffer dimensions and formats for the texture.
 	UINT m_width = 0;
 	UINT m_height = 0;
 
@@ -167,4 +194,28 @@ private:
 
 	DepthFormat m_depthFormat = DepthFormat::D32F;
 	float m_clearDepth = 1.0f;
+
+	// Store the creation information
+	ParamDesc m_desc{};
+	bool m_isInitialized = false;
+
+private:
+
+	// Helper functions to create the GPU resource based on the provided parameters.
+
+	bool CreateResource(
+		ID3D12Device* device,
+		const ParamDesc& desc,
+		ComPtr<ID3D12Resource>& outResource,
+		ColorFormat& outColorFormat
+	) const;
+
+	void AllocateDescriptors(DescriptorHeapAllocator* allocator);
+
+	void CreateViews(
+		ID3D12Device* device,
+		DescriptorHeapAllocator* allocator
+	);
+
+	void ApplyDesc(const ParamDesc& desc);
 };

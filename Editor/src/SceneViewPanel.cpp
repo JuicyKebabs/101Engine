@@ -1,10 +1,14 @@
 #include <algorithm>
+#include <cmath>
 #include "SceneViewPanel.h"
 #include "imgui.h"
 
-void SceneViewPanel::Render(D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle)
+void SceneViewPanel::Render(
+	D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
+	UINT textureWidth, UINT textureHeight
+)
 {
-	if (ImGui::Begin("Scene"))
+	if (!ImGui::Begin("Scene"))
 	{
 		m_isHovered = false;
 		m_isFocused = false;
@@ -19,17 +23,33 @@ void SceneViewPanel::Render(D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle)
 	// Get the available size of the content region in the ImGui window
 	const ImVec2 availableSize = ImGui::GetContentRegionAvail();
 
-	if (availableSize.x <= 0.0f ||
-		availableSize.y <= 0.0f ||
-	sceneTextureHandle.ptr == 0)
+	if (availableSize.x <= 0.0f		||
+		availableSize.y <= 0.0f		||
+		sceneTextureHandle.ptr == 0	||
+		textureWidth == 0			||
+		textureHeight == 0
+		)
 	{
 		ImGui::End();
 		return;
 	}
 
+	// Calculate the requested width and height of the viewport based on the available size
+	const UINT requestedWidth = static_cast<UINT>(std::max(1.0f, std::floor(availableSize.x)));
+	const UINT requestedHeight = static_cast<UINT>(std::max(1.0f, std::floor(availableSize.y)));
+	
+	// Store the previous width and height of the viewport for comparison
+	const UINT previousWidth = static_cast<UINT>(m_viewportSize.x);
+	const UINT previousHeight = static_cast<UINT>(m_viewportSize.y);
+
+	if (requestedWidth != previousWidth || requestedHeight != previousHeight)
+	{
+		m_viewportSize = {static_cast<float>(requestedWidth), static_cast<float>(requestedHeight)};
+		m_isViewportResized = true;
+	}
+
 	// Resolution of the source texture 
-	// (currently fixed at 1280x720, but this could be made dynamic in the future)
-	constexpr float sourceAspect = 1280.0f / 720.0f;
+	const float sourceAspect = static_cast<float>(textureWidth) / static_cast<float>(textureHeight);
 
 	// Calculate the size of the image based on width and the aspect ratio of the source texture
 	float imageWidth = availableSize.x;
@@ -57,10 +77,34 @@ void SceneViewPanel::Render(D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle)
 
 	// Render the image using the ImGui::Image function, passing in the texture handle and the calculated size
 	ImGui::Image(
-		reinterpret_cast<ImTextureID>(sceneTextureHandle.ptr),
+		static_cast<ImTextureID>(sceneTextureHandle.ptr),
 		{ imageWidth, imageHeight },
 		{ 0.0f, 0.0f },
 		{ 1.0f, 1.0f });
 
+	// Store the minimum and maximum coordinates of the image in the ImGui window for later use
+	m_imageMin = ImGui::GetItemRectMin();
+	m_imageMax = ImGui::GetItemRectMax();
+
 	ImGui::End();
+}
+
+bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)
+{
+	if (!m_isViewportResized) return false;
+
+	const UINT width = static_cast<UINT>(m_viewportSize.x);
+	const UINT height = static_cast<UINT>(m_viewportSize.y);
+
+	if (width == 0 || height == 0)
+	{
+		m_isViewportResized = false;
+		return false;
+	}
+
+	outWidth = width;
+	outHeight = height;
+
+	m_isViewportResized = false;
+	return true;
 }

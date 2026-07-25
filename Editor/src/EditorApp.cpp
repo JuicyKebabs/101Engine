@@ -439,6 +439,9 @@ void EditorApp::Update(float deltaTime)
 {
     InputManager::GetInstance().Update();
 
+	// Handle any pending resize requests for the scene view panel
+    ApplySceneViewResizeRequest();
+
     // Update the editor camera actor
     // (call PreUpdate, Update, and LateUpdate in sequence to update camera component)
     m_pEditorCameraActor->PreUpdate(deltaTime);
@@ -470,16 +473,27 @@ void EditorApp::Render()
 
     if (m_pScene) m_pScene->OnRender(m_engineContext);
 
-    RenderPassTarget sceneTarget{ RenderPassTargetType::ColorDepth, static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor) };
+	// Render the scene to the scene color render target (not directly to the back buffer)
+    RenderPassTarget sceneTarget
+    { 
+        RenderPassTargetType::ColorDepth, 
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
+    };
     
-	// Render the scene to the shadow map render target first
     m_pEngine->BeginPass(sceneTarget);
     uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
     m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
     m_pEngine->EndPass(sceneTarget);
 
-	// Render the scene to the scene color render target
-    RenderPassTarget backBufferTarget{ RenderPassTargetType::BackBuffer, m_pEngine->GetCurrentBufferIndex() };
+	// Render the scene color render target to the back buffer (screen) for display
+    RenderPassTarget backBufferTarget
+    {
+        RenderPassTargetType::BackBuffer,
+        m_pEngine->GetCurrentBufferIndex(),
+        RenderPassTarget::InvalidIndex
+    };
+
     m_pEngine->BeginPass(backBufferTarget);
     RenderImGui();
     m_pEngine->EndPass(backBufferTarget);
@@ -489,181 +503,201 @@ void EditorApp::Render()
 
 void EditorApp::RenderImGui()
 {
-	// Render the MenuBar with its callbacks
-    {
-        MenuBar::Callbacks callbacks;
-
-        callbacks.onNewScene = [this]()
-            {
-                NewScene();
-            };
-
-        callbacks.onOpenScene = [this]()
-            {
-                LoadScene(kDefaultScenePath);
-            };
-
-        callbacks.onSaveScene = [this]()
-            {
-                if (m_pScene)
-                {
-                    if (!SceneWriter::SaveScene(kDefaultScenePath, m_pScene.get()))
-                    {
-                        DBG("EditorApp: Save failed.");
-                    }
-                }
-            };
-
-        callbacks.onUndo = [this]()
-            {
-				// Avoid dangling pointers to a selected actor that may be deleted by the undo operation
-                m_hierarchyPanel.ClearSelection();
-
-                if (m_commandHistory.Undo())
-                {
-                    DBG("EditorApp: Undo succeeded.");
-                }
-                else
-                {
-                    DBG("EditorApp: Undo failed.");
-                }
-            };
-
-        callbacks.onRedo = [this]()
-            {
-                m_hierarchyPanel.ClearSelection();
-
-                if (m_commandHistory.Redo())
-                {
-                    DBG("EditorApp: Redo succeeded.");
-                }
-                else
-                {
-                    DBG("EditorApp: Redo failed.");
-                }
-            };
-
-        callbacks.onBuildGame = []()
-            {
-                ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
-            };
-
-        callbacks.onReloadGameCode = [this](bool reconfigure)
-            {
-                ReloadGameCode(reconfigure);
-            };
-
-        callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
-            {
-                // Generate the new script files
-                bool generated = isBehavior
-                    ? BehaviorTemplateGenerator::Generate(name) // Behavior class
-                    : ClassTemplateGenerator::Generate(name);   // Regular class
-
-                if (generated)
-                {
-                    DBG("EditorApp: Generated %s template '%s'",
-                        isBehavior ? "Behavior" : "class", name.c_str());
-
-                    ReloadGameCode(true);   // Reconfigure and build to pick up the new behavior
-                }
-            };
-
-        callbacks.canUndo = m_commandHistory.CanUndo();
-        callbacks.canRedo = m_commandHistory.CanRedo();
-
-        m_menuBar.Render(callbacks);
-    }
-
-	// Render the Scripts panel with its callbacks
-    {
-        ScriptsPanel::Callbacks scriptCallbacks;
-
-        // Delete a script
-        scriptCallbacks.onDelete = [this](const std::string& name)
-            {
-                DeleteScript(name);
-            };
-
-		// Open a script file in the default editor
-        scriptCallbacks.onOpen = [](const std::string& name)
-            {
-                std::string headerPath = PathManager::Resolve("Game/GameCode/" + name + ".h");
-                ShellExecuteA(
-                    nullptr, "open",
-                    headerPath.c_str(),
-                    nullptr, nullptr, SW_SHOWNORMAL
-                );
-                DBG("EditorApp: Opening %s in default editor", name.c_str());
-            };
-
-        m_scriptsPanel.Render(scriptCallbacks, m_pScene.get());
-    }
-
-	// Render the Hierarchy panel with its callbacks
-    {
-		HierarchyPanel::Callbacks hierarchyCallbacks;
-
-		// Callback for creating and adding a new actor in the scene
-        hierarchyCallbacks.onCreateActor = [this](const std::string& name)
-            {
-                if (!m_pScene) return;
-
-                Actor::InitDesc desc;
-                desc.name = name;
-
-                const bool succeeded = m_commandHistory.Execute(
-                    std::make_unique<CreateActorCommand>(m_pScene.get(), desc)
-                );
-
-                if (succeeded)
-                {
-                    DBG(
-                        "EditorApp: Created new actor '%s' through command history.",
-                        name.c_str());
-                }
-                else
-                {
-                    DBG(
-                        "EditorApp: Failed to create actor '%s'.",
-                        name.c_str());
-                }			};
-
-		// Callback for deleting an actor from the scene
-        hierarchyCallbacks.onDeleteActor = [this](Actor* actor)
-            {
-                if (m_pScene)
-                {
-					m_pScene->RemoveActor(actor);
-					DBG("EditorApp: Deleted actor '%s' from scene", actor ? actor->GetName().c_str() : "Unknown");
-                }
-			};
-
-        m_hierarchyPanel.Render(m_pScene.get(), hierarchyCallbacks);
-    }
-
-    m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());
+    RenderMenuBar();
+    RenderScriptsPanel();
+    RenderHierarchyPanel();
+    RenderInspectorPanel();
+    RenderSceneViewPanel();
 
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(
         ImGui::GetDrawData(),
         m_pEngine->GetCommandList()
     );
+}
 
+void EditorApp::RenderMenuBar()
+{
+    MenuBar::Callbacks callbacks;
 
+    callbacks.onNewScene = [this]()
+        {
+            NewScene();
+        };
 
-	// Render scene view panel with the scene's color render target
+    callbacks.onOpenScene = [this]()
+        {
+            LoadScene(kDefaultScenePath);
+        };
 
-	GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-    
-    if (sceneColor)
-    {
-		const uint32_t srvIndex = sceneColor->GetSrvIndex();
+    callbacks.onSaveScene = [this]()
+        {
+            if (m_pScene &&
+                !SceneWriter::SaveScene(kDefaultScenePath, m_pScene.get()))
+            {
+                DBG("EditorApp: Save failed.");
+            }
+        };
 
-		const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
+    callbacks.onUndo = [this]()
+        {
+            // Undo may delete the selected actor.
+            m_hierarchyPanel.ClearSelection();
 
-        m_sceneViewPanel.Render(gpuHandle);
-    }
+            if (m_commandHistory.Undo())
+            {
+                DBG("EditorApp: Undo succeeded.");
+            }
+            else
+            {
+                DBG("EditorApp: Undo failed.");
+            }
+        };
+
+    callbacks.onRedo = [this]()
+        {
+            m_hierarchyPanel.ClearSelection();
+
+            if (m_commandHistory.Redo())
+            {
+                DBG("EditorApp: Redo succeeded.");
+            }
+            else
+            {
+                DBG("EditorApp: Redo failed.");
+            }
+        };
+
+    callbacks.onBuildGame = []()
+        {
+            ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
+        };
+
+    callbacks.onReloadGameCode = [this](bool reconfigure)
+        {
+            ReloadGameCode(reconfigure);
+        };
+
+    callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
+        {
+            const bool generated = isBehavior
+                ? BehaviorTemplateGenerator::Generate(name)
+                : ClassTemplateGenerator::Generate(name);
+
+            if (generated)
+            {
+                DBG("EditorApp: Generated %s template '%s'",
+                    isBehavior ? "Behavior" : "class", name.c_str());
+
+                ReloadGameCode(true);
+            }
+        };
+
+    callbacks.canUndo = m_commandHistory.CanUndo();
+    callbacks.canRedo = m_commandHistory.CanRedo();
+
+    m_menuBar.Render(callbacks);
+}
+
+void EditorApp::RenderScriptsPanel()
+{
+    ScriptsPanel::Callbacks callbacks;
+
+    callbacks.onDelete = [this](const std::string& name)
+        {
+            DeleteScript(name);
+        };
+
+    callbacks.onOpen = [](const std::string& name)
+        {
+            const std::string headerPath =
+                PathManager::Resolve("Game/GameCode/" + name + ".h");
+
+            ShellExecuteA(
+                nullptr,
+                "open",
+                headerPath.c_str(),
+                nullptr,
+                nullptr,
+                SW_SHOWNORMAL
+            );
+
+            DBG("EditorApp: Opening %s in default editor", name.c_str());
+        };
+
+    m_scriptsPanel.Render(callbacks, m_pScene.get());
+}
+
+void EditorApp::RenderHierarchyPanel()
+{
+    HierarchyPanel::Callbacks callbacks;
+
+    callbacks.onCreateActor = [this](const std::string& name)
+        {
+            if (!m_pScene) return;
+
+            Actor::InitDesc desc;
+            desc.name = name;
+
+            const bool succeeded = m_commandHistory.Execute(
+                std::make_unique<CreateActorCommand>(m_pScene.get(), desc)
+            );
+
+            if (succeeded)
+            {
+                DBG(
+                    "EditorApp: Created new actor '%s' through command history.",
+                    name.c_str()
+                );
+            }
+            else
+            {
+                DBG(
+                    "EditorApp: Failed to create actor '%s'.",
+                    name.c_str()
+                );
+            }
+        };
+
+    callbacks.onDeleteActor = [this](Actor* actor)
+        {
+            if (!m_pScene || !actor) return;
+
+            const std::string actorName = actor->GetName();
+            m_pScene->RemoveActor(actor);
+            DBG(
+                "EditorApp: Deleted actor '%s' from scene",
+                actorName.c_str()
+            );
+        };
+
+    m_hierarchyPanel.Render(m_pScene.get(), callbacks);
+}
+
+void EditorApp::RenderInspectorPanel()
+{
+    m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());
+}
+
+void EditorApp::RenderSceneViewPanel()
+{
+    GpuTexture* sceneColor =
+        m_pEngine->GetBuiltinRenderTarget(
+            Engine::BuiltinRenderTarget::SceneColor
+        );
+
+    if (!sceneColor) return;
+
+    const uint32_t srvIndex = sceneColor->GetSrvIndex();
+    const auto gpuHandle =
+        m_pEngine->GetDescriptorHeapAllocator()
+            ->GetCbvSrvUavGpuHandle(srvIndex);
+
+    m_sceneViewPanel.Render(
+        gpuHandle,
+        sceneColor->GetWidth(),
+        sceneColor->GetHeight()
+    );
 }
 
 void EditorApp::ShutdownImGui()
@@ -671,4 +705,22 @@ void EditorApp::ShutdownImGui()
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+}
+
+void EditorApp::ApplySceneViewResizeRequest()
+{
+	UINT width = 0, height = 0;
+
+	// Check if the scene view panel has requested a resize of the render target
+    if (!m_sceneViewPanel.ConsumeResizeRequest(width, height)) return;
+    
+	// Resize the scene render targets (color and depth) to the new width and height
+    if (!m_pEngine->ResizeSceneRenderTargets(width, height)) return;
+
+	// Update the editor camera's lens parameters
+	CameraLens lens = m_pEditorCamera->GetCameraLens();
+	lens.width = static_cast<float>(width);
+	lens.height = static_cast<float>(height);
+
+	m_pEditorCamera->SetCameraLens(lens);
 }

@@ -95,5 +95,12 @@ private:
     void Update(float deltaTime);
     void Render();
     void RenderImGui();
+    void RenderMenuBar();
+    void RenderScriptsPanel();
+    void RenderHierarchyPanel();
+    void RenderInspectorPanel();
+    void RenderSceneViewPanel();
     void ShutdownImGui();
+
+	void ApplySceneViewResizeRequest();
 };
