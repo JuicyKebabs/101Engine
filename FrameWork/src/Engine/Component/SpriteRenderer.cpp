@@ -111,9 +111,23 @@ bool SpriteRenderer::SetTextureAsset(const Guid& assetId)
 
 const SpriteRendererProxy& SpriteRenderer::GetRenderProxy(const CameraInfo& cameraInfo)
 {
+	auto owner = GetOwner();
+	auto transform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+
+	if (transform && m_transformGeneration != transform->GetWorldGeneration())
+	{
+		m_isProxyDirty = true;
+	}
+
+	if (m_billboardType != BillboardType::None)
+	{
+		m_isProxyDirty = true;
+	}
+
 	if (m_isProxyDirty)
 	{
 		RebuildRenderProxy(cameraInfo);
+		if (transform) m_transformGeneration = transform->GetWorldGeneration();
 		m_isProxyDirty = false;
 	}
 	return m_proxy;
@@ -341,7 +355,13 @@ bool SpriteRenderer::ResolveReferences(SceneBase& scene)
 	// Get the asset entry for the pending texture asset ID and check if it is a valid texture asset
 	const Guid& assetId = *m_pendingTextureAssetId;
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-	if (!assetEntry || assetEntry->type != AssetType::Texture) return false;
+	if (!assetEntry || assetEntry->type != AssetType::Texture)
+	{
+		m_template = {};
+		m_textureAssetId = {};
+		m_isProxyDirty = true;
+		return true;
+	}
 
 	// Attempt to set the texture asset using the resolved asset ID
 	return SetTextureAsset(assetId);

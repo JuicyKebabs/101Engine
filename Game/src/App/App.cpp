@@ -227,7 +227,8 @@ void App::PrepareInstance()
 	m_engineContext = {
 		m_pRenderer.get(),
 		m_pTextureManager.get(),
-		m_pMeshManager.get()
+		m_pMeshManager.get(),
+		m_pAssetManager.get()
 	};
 }
 

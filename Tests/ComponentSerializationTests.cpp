@@ -9,6 +9,10 @@
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
+#include "Engine/Core/Context/Context.h"
+#include "Engine/Resource/AssetManager.h"
+#include "Engine/Resource/MeshManager.h"
+#include "Engine/Resource/TextureManager.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIImage.h"
@@ -621,8 +625,8 @@ namespace
 		MeshRenderer restored;
 		Check(restored.Deserialize(serialized),
 			"MeshRenderer accepts a valid deferred asset Guid");
-		Check(!restored.GetAssetId().IsValid() && !restored.IsConfigured(),
-			"MeshRenderer does not create runtime resources during Deserialize");
+		Check(restored.GetAssetId() == assetId && !restored.IsConfigured(),
+			"MeshRenderer exposes its pending asset without creating runtime resources");
 
 		nlohmann::json restoredJson;
 		restored.Serialize(restoredJson);
@@ -682,6 +686,43 @@ namespace
 			"Failed MeshRenderer resolution retains the pending asset Guid");
 	}
 
+	void TestMeshRendererMissingAssetIsRecoverable()
+	{
+		const Guid missingAssetId = GuidGenerator::Generate();
+
+		AssetManager assetManager;
+		MeshManager meshManager;
+		EngineContext context{
+			.pMeshManager = &meshManager,
+			.pAssetManager = &assetManager
+		};
+
+		SceneBase scene;
+		scene.Initialize(context);
+
+		auto actorOwned = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "MissingMeshOwner"));
+		MeshRenderer* renderer = actorOwned->AddComponent<MeshRenderer>();
+		scene.AddRootActor(std::move(actorOwned));
+
+		nlohmann::json serialized;
+		renderer->Serialize(serialized);
+		serialized["meshAssetId"] = missingAssetId.ToString();
+
+		Check(renderer->Deserialize(serialized),
+			"MeshRenderer accepts a missing asset Guid as a deferred reference");
+		Check(renderer->ResolveReferences(scene),
+			"Missing mesh asset does not fail scene reference restoration");
+		Check(renderer->GetAssetId() == missingAssetId &&
+			!renderer->IsConfigured(),
+			"Missing mesh asset remains visible to the inspector without runtime templates");
+
+		nlohmann::json unresolvedJson;
+		renderer->Serialize(unresolvedJson);
+		Check(unresolvedJson["meshAssetId"] == missingAssetId.ToString(),
+			"Recoverable missing mesh reference survives serialization");
+	}
+
 	void TestMeshRendererSetParamsClearsAssetAssociation()
 	{
 		const Guid assetId = GuidGenerator::Generate();
@@ -734,8 +775,8 @@ namespace
 		SpriteRenderer restored;
 		Check(restored.Deserialize(serialized),
 			"SpriteRenderer accepts a valid deferred texture Guid");
-		Check(!restored.GetTextureAssetId().IsValid() && !restored.IsConfigured(),
-			"SpriteRenderer does not create runtime resources during Deserialize");
+		Check(restored.GetTextureAssetId() == textureAssetId && !restored.IsConfigured(),
+			"SpriteRenderer exposes its pending texture without creating runtime resources");
 
 		nlohmann::json restoredJson;
 		restored.Serialize(restoredJson);
@@ -822,6 +863,36 @@ namespace
 		renderer->Serialize(unresolvedJson);
 		Check(unresolvedJson["textureAssetId"] == textureAssetId.ToString(),
 			"Failed SpriteRenderer resolution retains the pending texture Guid");
+	}
+
+	void TestSpriteRendererMissingTextureIsRecoverable()
+	{
+		const Guid missingTextureId = GuidGenerator::Generate();
+		AssetManager assetManager;
+		TextureManager textureManager;
+		EngineContext context{
+			.pTextureManager = &textureManager,
+			.pAssetManager = &assetManager
+		};
+
+		SceneBase scene;
+		scene.Initialize(context);
+
+		auto actorOwned = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "MissingSpriteOwner"));
+		SpriteRenderer* renderer = actorOwned->AddComponent<SpriteRenderer>();
+		scene.AddRootActor(std::move(actorOwned));
+
+		nlohmann::json serialized;
+		renderer->Serialize(serialized);
+		serialized["textureAssetId"] = missingTextureId.ToString();
+
+		Check(renderer->Deserialize(serialized) &&
+			renderer->ResolveReferences(scene),
+			"Missing sprite texture does not fail scene reference restoration");
+		Check(renderer->GetTextureAssetId() == missingTextureId &&
+			!renderer->IsConfigured(),
+			"Missing sprite texture remains visible without runtime resources");
 	}
 
 	void TestSpriteRendererSetParamsClearsAssetAssociation()
@@ -1064,8 +1135,8 @@ namespace
 		UIImage restored;
 		Check(restored.Deserialize(serialized),
 			"UIImage accepts a valid deferred texture Guid");
-		Check(!restored.GetTextureAssetId().IsValid() && !restored.IsConfigured(),
-			"UIImage does not create runtime resources during Deserialize");
+		Check(restored.GetTextureAssetId() == textureAssetId && !restored.IsConfigured(),
+			"UIImage exposes its pending texture without creating runtime resources");
 
 		nlohmann::json restoredJson;
 		restored.Serialize(restoredJson);
@@ -1159,6 +1230,36 @@ namespace
 			"UIImage resolves a Canvas when no Texture is assigned");
 	}
 
+	void TestUIImageMissingTextureIsRecoverable()
+	{
+		const Guid missingTextureId = GuidGenerator::Generate();
+		AssetManager assetManager;
+		TextureManager textureManager;
+		EngineContext context{
+			.pTextureManager = &textureManager,
+			.pAssetManager = &assetManager
+		};
+
+		SceneBase scene;
+		scene.Initialize(context);
+
+		auto actorOwned = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "MissingUIImageOwner"));
+		UIImage* image = actorOwned->AddComponent<UIImage>();
+		scene.AddRootActor(std::move(actorOwned));
+
+		nlohmann::json serialized;
+		image->Serialize(serialized);
+		serialized["textureAssetId"] = missingTextureId.ToString();
+
+		Check(image->Deserialize(serialized) &&
+			image->ResolveReferences(scene),
+			"Missing UIImage texture does not fail scene reference restoration");
+		Check(image->GetTextureAssetId() == missingTextureId &&
+			!image->IsConfigured(),
+			"Missing UIImage texture remains visible without runtime resources");
+	}
+
 	void TestUIImageSetParamsClearsTextureAssociation()
 	{
 		const Guid textureAssetId = GuidGenerator::Generate();
@@ -1220,12 +1321,14 @@ int main()
 	TestMeshRendererPendingAssetRoundTrip();
 	TestInvalidMeshRendererGuidDoesNotPartiallyMutate();
 	TestMeshRendererResolveWithoutContextFailsSafely();
+	TestMeshRendererMissingAssetIsRecoverable();
 	TestMeshRendererSetParamsClearsAssetAssociation();
 	TestDefaultMeshRendererRoundTrip();
 	TestSpriteRendererPendingAssetRoundTrip();
 	TestInvalidSpriteRendererGuidDoesNotPartiallyMutate();
 	TestSpriteRendererValidationBoundaries();
 	TestSpriteRendererResolveWithoutContextFailsSafely();
+	TestSpriteRendererMissingTextureIsRecoverable();
 	TestSpriteRendererSetParamsClearsAssetAssociation();
 	TestDefaultSpriteRendererRoundTrip();
 	TestCanvasRoundTrip();
@@ -1241,6 +1344,7 @@ int main()
 	TestInvalidUIImageGuidDoesNotPartiallyMutate();
 	TestUIImageTextureFailureDoesNotApplyCanvas();
 	TestUIImageCanvasOnlyResolution();
+	TestUIImageMissingTextureIsRecoverable();
 	TestUIImageSetParamsClearsTextureAssociation();
 	TestDefaultUIImageRoundTrip();
 

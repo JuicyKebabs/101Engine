@@ -127,6 +127,7 @@ bool UIImage::Deserialize(const nlohmann::json& json)
 bool UIImage::ResolveReferences(SceneBase& scene)
 {
 	Canvas* resolvedCanvas = m_pCanvas;
+	bool textureCanBeResolved = false;
 
 	// Resolve the canvas actor if a pending canvas actor ID is set
 	if (m_pendingCanvasActorId.has_value())
@@ -151,11 +152,20 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 		if (!context || !context->pAssetManager || !context->pTextureManager) return false;
 
 		const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(*m_pendingTextureAssetId);
-		if (!assetEntry || assetEntry->type != AssetType::Texture) return false;
+		if (!assetEntry || assetEntry->type != AssetType::Texture)
+		{
+			m_renderTemplate.clear();
+			m_textureAssetId = {};
+			m_isProxyDirty = true;
+		}
+		else
+		{
+			textureCanBeResolved = true;
+		}
 	}
 
 	// Set the resolved texture asset
-	if (m_pendingTextureAssetId.has_value())
+	if (textureCanBeResolved)
 	{
 		if (!SetTextureAsset(*m_pendingTextureAssetId)) return false;
 	}

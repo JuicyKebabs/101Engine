@@ -38,7 +38,10 @@ public:
 	void PreUpdate(float deltaTime);			// Pre-update
 	void Update(float deltaTime);				// Update
 	void LateUpdate(float deltaTime);			// Late update
-	void OnRender(EngineContext& context);		// Render
+	void OnRender(								// Render
+		EngineContext& context,
+		const CameraInfo* overrideCameraInfo = nullptr
+		);
 	void Finalize();							// Finalize
 
 	// Add an actor to the scene

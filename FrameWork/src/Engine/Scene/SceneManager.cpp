@@ -179,6 +179,7 @@ SceneElement* SceneManager::GetSceneElement(const std::string& name)
 			return &element;
 		}
 	}
+
 	DBG("Error: Scene element '%s' not found.", name.c_str());
 
 	return nullptr;

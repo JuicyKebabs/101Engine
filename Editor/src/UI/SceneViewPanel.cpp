@@ -20,6 +20,13 @@ void SceneViewPanel::Render(
 	m_isHovered = ImGui::IsWindowHovered();
 	m_isFocused = ImGui::IsWindowFocused();
 
+	// Display the resolution of the render target
+	ImGui::Text(
+		"Scene View Resolution: %u x %u",
+		textureWidth,
+		textureHeight
+	);
+
 	// Get the available size of the content region in the ImGui window
 	const ImVec2 availableSize = ImGui::GetContentRegionAvail();
 
@@ -35,8 +42,8 @@ void SceneViewPanel::Render(
 	}
 
 	// Calculate the requested width and height of the viewport based on the available size
-	const UINT requestedWidth = static_cast<UINT>(std::max(1.0f, std::floor(availableSize.x)));
-	const UINT requestedHeight = static_cast<UINT>(std::max(1.0f, std::floor(availableSize.y)));
+	const UINT requestedWidth = static_cast<UINT>(std::max(1.0f, std::floor(availableSize.x * kRenderScale)));
+	const UINT requestedHeight = static_cast<UINT>(std::max(1.0f, std::floor(availableSize.y * kRenderScale)));
 	
 	// Store the previous width and height of the viewport for comparison
 	const UINT previousWidth = static_cast<UINT>(m_viewportSize.x);

@@ -19,6 +19,10 @@ add_executable(101Editor WIN32
     ${IMGUI_SOURCES}
 )
 
+target_include_directories(101Editor PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 add_custom_command(TARGET 101Editor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc143-mtd.dll>

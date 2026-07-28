@@ -93,6 +93,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 				else
 				{
 					SortKeyTransparent transparentKey;
+					transparentKey.psoKey = item.common.materialDesc.psoKey;
 					transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
 					ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
 					m_frameRenderData.AddTransparent(ref);

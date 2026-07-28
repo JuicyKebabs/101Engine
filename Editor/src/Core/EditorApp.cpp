@@ -3,27 +3,44 @@
 #include <mmsystem.h>
 #include <tchar.h>
 #include <shellapi.h> 
-#include "EditorApp.h"
+#include "Core/EditorApp.h"
 #include "Engine/Input/keyboard.h"
 #include "Engine/Input/InputManager.h"
 #include "Engine/Window/WindowInfo.h"
 #include "imgui.h"
 #include "backends/imgui_impl_dx12.h"
 #include "backends/imgui_impl_win32.h"
-#include "EditorScene.h"
+#include "Core/EditorScene.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/SpriteRenderer.h"
+#include "Engine/Component/RectTransform.h"
+#include "Engine/Component/Collider.h"
+#include "Engine/UI/Canvas.h"
+#include "Engine/UI/UIRenderer.h"
+#include "Engine/UI/UIimage.h"
 #include "Engine/Scene/SceneLoader.h"
 #include "Engine/Scene/SceneWriter.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "BehaviorTemplateGenerator.h"
-#include "ClassTemplateGenerator.h"
-#include "ProjectBuilder.h"
+#include "Tools/BehaviorTemplateGenerator.h"
+#include "Tools/ClassTemplateGenerator.h"
+#include "Tools/ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Path/PathManager.h"
 #include "Command/CreateActorCommand.h"
+#include "UI/EditorTheme.h"
+#include "UI/Inspector/Components/TransformInspector.h"
+#include "UI/Inspector/Components/MeshRendererInspector.h"
+#include "UI/Inspector/Components/SpriteRendererInspector.h"
+#include "UI/Inspector/Components/RectTransformInspector.h"
+#include "UI/Inspector/Components/ColliderInspector.h"
+#include "UI/Inspector/Components/CameraInspector.h"
+#include "UI/Inspector/Components/CanvasInspector.h"
+#include "UI/Inspector/Components/UIRendererInspector.h"
+#include "UI/Inspector/Components/UIImageInspector.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -73,10 +90,11 @@ bool EditorApp::Initialize()
         DBG("EditorApp: GameCode.dll loaded successfully");
     }
 
-    CreateMainWindow();    // Create main window
-    PrepareInstance();     // Prepare instance
-    InitInstance();        // Initialize instance
-    InitImGui();           // Initialize ImGui
+    CreateMainWindow();             // Create main window
+    PrepareInstance();              // Prepare instance
+    InitInstance();                 // Initialize instance
+    InitImGui();                    // Initialize ImGui
+	RegisterComponentInspectors();  // Register component inspectors for the editor
 
     NewScene();            // Start with a fresh scene (MainCamera-tagged DefaultCamera)
 
@@ -380,7 +398,8 @@ void EditorApp::PrepareInstance()
     m_engineContext = {
         m_pRenderer.get(),
         m_pTextureManager.get(),
-        m_pMeshManager.get()
+        m_pMeshManager.get(),
+        m_pAssetManager.get()
     };
 
     // Editor-only free-fly camera actor (not part of any SceneBase)
@@ -399,7 +418,11 @@ void EditorApp::InitInstance()
 
     m_pTextureManager->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator());
     m_pMeshManager->Initialize(pDevice, m_pTextureManager.get());
-	m_pAssetManager->Initialize(PathManager::GetProjectRoot(), m_pTextureManager.get(), m_pMeshManager.get());
+	m_pAssetManager->Initialize(
+        PathManager::Resolve("asset"),
+        m_pTextureManager.get(),
+        m_pMeshManager.get()
+    );
     m_pEngine->InitBindings(m_pTextureManager.get());
     m_pRenderer->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator(), m_pTextureManager.get(), m_pMeshManager.get());
 
@@ -411,13 +434,35 @@ void EditorApp::InitInstance()
 
 void EditorApp::InitImGui()
 {
+	//--------------------------
+	// Initialize ImGui context
+	//--------------------------
     IMGUI_CHECKVERSION();
+
+	//---------------------------
+	// Apply custom editor theme
+	//---------------------------
     ImGui::CreateContext();
+
+    EditorTheme::ApplyStyle();
+
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigDpiScaleFonts = true;
 
-    ImGui::StyleColorsDark();
+	//---------------------------------
+	// Load custom font for the editor
+	//---------------------------------
+    EditorFontConfig fontConfig;
+    fontConfig.filePath = "C:/Windows/Fonts/Meiryo.ttc";
+    fontConfig.sizePixels = 16.0f;
+    fontConfig.fontIndex = 3;
 
+    EditorTheme::LoadFont(io, fontConfig);
+
+	//-------------------------------------------
+	// Initialize ImGui for Win32 and DirectX 12
+	//-------------------------------------------
     ImGui_ImplWin32_Init(m_hwnd);
 
     auto descriptorHeapAllocator = m_pEngine->GetDescriptorHeapAllocator();
@@ -433,6 +478,21 @@ void EditorApp::InitImGui()
     );
 
     io.Fonts->Build();
+}
+
+void EditorApp::RegisterComponentInspectors()
+{
+    auto& registry =  m_inspectorPanel.GetComponentInspectorRegistry();
+
+    registry.Register<Transform>(&TransformInspector::Draw);
+	registry.Register<MeshRenderer>(&MeshRendererInspector::Draw);
+	registry.Register<SpriteRenderer>(&SpriteRendererInspector::Draw);
+	registry.Register<RectTransform>(&RectTransformInspector::Draw);
+	registry.Register<Collider>(&ColliderInspector::Draw);
+	registry.Register<Camera>(&CameraInspector::Draw);
+	registry.Register<Canvas>(&CanvasInspector::Draw);
+	registry.Register<UIRenderer>(&UIRendererInspector::Draw);
+	registry.Register<UIImage>(&UIImageInspector::Draw);
 }
 
 void EditorApp::Update(float deltaTime)
@@ -471,7 +531,12 @@ void EditorApp::Render()
 
     m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
 
-    if (m_pScene) m_pScene->OnRender(m_engineContext);
+    if (m_pScene)
+    {
+		// Override camera information with the editor camera for rendering the scene in the editor
+        const CameraInfo& editorCameraInfo = m_pEditorCamera->GetCameraInfo();
+        m_pScene->OnRender(m_engineContext, &editorCameraInfo);
+    }
 
 	// Render the scene to the scene color render target (not directly to the back buffer)
     RenderPassTarget sceneTarget
@@ -676,22 +741,22 @@ void EditorApp::RenderHierarchyPanel()
 
 void EditorApp::RenderInspectorPanel()
 {
-    m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor());
+    InspectorContext context;
+	context.assetManager = m_pAssetManager.get();
+
+    m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor(), context);
 }
 
 void EditorApp::RenderSceneViewPanel()
 {
-    GpuTexture* sceneColor =
-        m_pEngine->GetBuiltinRenderTarget(
-            Engine::BuiltinRenderTarget::SceneColor
-        );
+	// Get the scene color render target from the engine
+    GpuTexture* sceneColor =  m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
 
     if (!sceneColor) return;
 
+	// Get the GPU descriptor handle for the scene color render target's SRV
     const uint32_t srvIndex = sceneColor->GetSrvIndex();
-    const auto gpuHandle =
-        m_pEngine->GetDescriptorHeapAllocator()
-            ->GetCbvSrvUavGpuHandle(srvIndex);
+    const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
 
     m_sceneViewPanel.Render(
         gpuHandle,

@@ -55,6 +55,7 @@ public:
 	// Lookup functions to retrieve asset entries by path or GUID
 	const AssetEntry* GetAssetEntryByPath(const std::string& relativePath) const;
 	const AssetEntry* GetAssetEntry(const Guid& guid) const;
+	std::vector<AssetEntry> GetAssetEntries(AssetType type) const;
 
 	// Get the handle for each asset type by GUID
 	MeshHandle GetMeshHandle(const Guid& guid);

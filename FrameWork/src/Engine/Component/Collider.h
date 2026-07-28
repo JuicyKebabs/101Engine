@@ -115,8 +115,15 @@ public:
 	bool isActive() const { return m_isActive; }
 	const Transform3D& GetWorldTransformCurrent() const { return m_worldTransformCurrent; }
 	const Transform3D& GetWorldTransformPrevious() const { return m_worldTransformPrevious; }
+	const Transform3D& GetLocalTransform() const { return m_localTransform; }
 
 	// Setters
+	void SetLocalCenter(const Vector3& center) { m_localTransform.position = center; m_isDirty = true; }
+	void SetLocalRotation(const Quaternion& rotation) { m_localTransform.rotation = rotation; m_isDirty = true; }
+	void SetLocalScale(const Vector3& scale) { m_localTransform.scale = scale; m_isDirty = true; }
+	void SetType(ColliderType type) { m_type = type; m_isDirty = true; }
+	void SetLayer(CollisionLayer layer) { m_layer = layer; m_layerMask = MakeLayerMask(layer); m_isDirty = true; }
+	void SetTrigger(bool trigger) { m_isTrigger = trigger; }
 	void SetDetected(bool flag) { m_isDetected = flag; }
 	void SetDeleteFlag(bool flag) { m_deleteFlag = flag; }
 	void SetActive(bool flag) { m_isActive = flag; m_isDirty = true; }

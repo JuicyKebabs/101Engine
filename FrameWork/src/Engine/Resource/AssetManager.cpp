@@ -5,18 +5,9 @@
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Core/Debug/Debug.h"
 #include <filesystem>
+#include <algorithm>
 
 namespace fs = std::filesystem;
-
-// Helper function to convert a UTF-8 encoded std::string to a std::wstring
-static std::wstring ToWideString(const std::string& str)
-{
-	if (str.empty()) return std::wstring();
-	int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), nullptr, 0);
-	std::wstring result(len, 0);
-	MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), result.data(), len);
-	return result;
-}
 
 void AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager, MeshManager* pMeshManager)
 {
@@ -113,6 +104,32 @@ const AssetEntry* AssetManager::GetAssetEntry(const Guid& guid) const
 	return &it->second;
 }
 
+std::vector<AssetEntry> AssetManager::GetAssetEntries(AssetType type) const
+{
+	std::vector<AssetEntry> entries;
+	
+	entries.reserve(m_catalog.size()); // Reserve space to avoid multiple allocations
+
+	// Collect entries of the specified type
+	for (const auto& [guid, entry] : m_catalog)
+	{
+		if (entry.type == type)
+		{
+			entries.push_back(entry);
+		}
+	}
+
+	// Sort the entries by their relative paths for consistent ordering
+	std::sort(
+		entries.begin(), entries.end(), 
+		[](const AssetEntry& a, const AssetEntry& b) {
+			return a.relativePath < b.relativePath;
+		}
+	);
+
+	return entries;
+}	
+
 MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 {
 	auto cashed = m_loadedMeshes.find(guid);
@@ -129,7 +146,8 @@ MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 	}
 
 	// Load mesh
-	std::wstring fullPath = ToWideString(m_assetRoot + "/" + entryPtr->relativePath);
+	const std::wstring fullPath =
+		(fs::path(m_assetRoot) / fs::path(entryPtr->relativePath)).wstring();
 	auto& handles = m_pMeshManager->LoadModel(fullPath);
 
 	// If no handles were returned, use the error mesh handle; otherwise, use the first handle
@@ -157,7 +175,8 @@ TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
 	}
 
 	// If the texture has not been loaded yet, load it and cache the handle and return it
-	std::wstring fullPath = ToWideString(m_assetRoot + "/" + entryPtr->relativePath);
+	const std::wstring fullPath =
+		(fs::path(m_assetRoot) / fs::path(entryPtr->relativePath)).wstring();
 	TextureHandle handle = m_pTextureManager->LoadTexture(fullPath);
 	m_loadedTextures[guid] = handle;
 	return handle;
