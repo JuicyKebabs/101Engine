@@ -48,7 +48,7 @@ public:
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
 	const MeshRendererProxy& GetRenderProxy();
 	bool IsConfigured() const override { return !m_templates.empty(); }
-	const Guid& GetAssetId() const { return m_meshAssetId; }
+	Guid GetAssetId() const;
 
 	// Serialization and deserialization methods
 	bool Serialize(nlohmann::json& outJson) const override;
@@ -58,8 +58,9 @@ public:
 private:
 	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn
 	MeshRendererProxy m_proxy;						// Cached render proxy for this component
-	Guid m_meshAssetId;									// Mesh asset ID for this renderer
-	std::optional<Guid> m_pendingMeshAssetId;			// Optional pending asset ID for deferred loading (used during deserialization)
+	Guid m_meshAssetId;								// Mesh asset ID for this renderer
+	std::optional<Guid> m_pendingMeshAssetId;		// Optional pending asset ID for deferred loading (used during deserialization)
+
 private:
 	// Override functions for component lifecycle
 	void OnStartOverride() override;

@@ -43,7 +43,10 @@ public:
 
 	// Setters and getters for texture asset
 	bool SetTextureAsset(const Guid& assetId);
-	const Guid& GetTextureAssetId() const { return m_textureAssetId; }
+	Guid GetTextureAssetId() const {
+		if (m_textureAssetId.IsValid()) return m_textureAssetId;
+		return m_pendingTextureAssetId.value_or(Guid{});
+	}
 
 	// Serialization and deserialization methods
 	bool Serialize(nlohmann::json& outJson) const override;

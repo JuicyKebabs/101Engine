@@ -49,6 +49,7 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 	SubmeshRenderTemplate renderTemplate;
 	renderTemplate.meshDesc.meshHandle = meshHandle;
 	renderTemplate.materialDesc.textureHandle = materialInfo.textureHandle;
+	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;
 	renderTemplate.materialDesc.baseColor = materialInfo.materialColor;
 
 	// Update the component's state
@@ -58,6 +59,13 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 	m_isProxyDirty = true;
 
 	return true;
+}
+
+Guid MeshRenderer::GetAssetId() const
+{
+	if (m_meshAssetId.IsValid()) return m_meshAssetId;
+
+	return m_pendingMeshAssetId.value_or(Guid{});
 }
 
 void MeshRenderer::OnStartOverride()
@@ -104,9 +112,18 @@ void MeshRenderer::OnDestroyOverride()
 
 const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 {
+	auto owner = GetOwner();
+	auto transform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+
+	if (transform && m_transformGeneration != transform->GetWorldGeneration())
+	{
+		m_isProxyDirty = true;
+	}
+
 	if (m_isProxyDirty)
 	{
 		RebuildRenderProxy();
+		if (transform) m_transformGeneration = transform->GetWorldGeneration();
 		m_isProxyDirty = false;
 	}
 	return m_proxy;
@@ -220,7 +237,12 @@ bool MeshRenderer::ResolveReferences(SceneBase& scene)
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
 	if (!assetEntry || assetEntry->type != AssetType::Mesh)
 	{
-		return false;
+		// Clear the asset ID and templates if the asset is invalid or not a mesh
+		m_templates.clear();
+		m_meshAssetId = {};
+		m_isProxyDirty = true;
+
+		return true;
 	}
 
 	// Attempt to set the mesh asset using the resolved asset ID

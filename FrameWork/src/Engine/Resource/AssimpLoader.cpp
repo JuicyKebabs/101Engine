@@ -74,15 +74,16 @@ bool AssimpLoader::Load(ImportSettings settings)
 	flag |= aiProcess_ConvertToLeftHanded;		//左手座標系に変換
 
 	auto scene = importer.ReadFile(path, flag); //モデル読み込み
-	auto aiTexture = scene->mNumTextures; //埋め込みテクスチャ数
-
+	
 	if (!scene)
 	{
 		//読み込み失敗時のエラーメッセージ出力
-		printf(importer.GetErrorString());
+		printf("%s", importer.GetErrorString());
 		printf("\n");
 		return false;
 	}
+
+	auto aiTexture = scene->mNumTextures; //埋め込みテクスチャ数
 
 	//メッシュデータ配列分のメモリを確保
 	meshes.clear();						//メッシュデータ配列をクリア

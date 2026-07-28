@@ -58,7 +58,10 @@ public:
 	}
 
 	bool SetTextureAsset(const Guid& assetId);							// Set the texture asset for this sprite through AssetManager
-	const Guid& GetTextureAssetId() const { return m_textureAssetId; }	// Get the asset ID of the texture used for this sprite
+	Guid GetTextureAssetId() const {
+		if (m_textureAssetId.IsValid()) return m_textureAssetId;
+		return m_pendingTextureAssetId.value_or(Guid{});
+	}
 
 	// Setters
 	void SetUVScale(const Vector2& uvScale) { m_uvScale = uvScale; m_isProxyDirty = true; }

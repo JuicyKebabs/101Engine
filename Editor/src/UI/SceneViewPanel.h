@@ -26,9 +26,11 @@ public:
 	ImVec2 GetImageMax() const { return m_imageMax; }
 
 private:
+	static constexpr float kRenderScale = 1.0f; // Scale factor for rendering the scene view panel
+
 	bool m_isHovered = false;
 	bool m_isFocused = false;
-
+	 
 	// Used for resizing the render target when the viewport size changes
 	// 1 frame delay is happen, but it is acceptable for editor viewport.
 	ImVec2 m_viewportSize = { 0.0f, 0.0f };	

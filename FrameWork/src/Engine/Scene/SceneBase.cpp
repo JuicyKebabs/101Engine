@@ -95,16 +95,14 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-void SceneBase::OnRender(
-	EngineContext& context
-)
+void SceneBase::OnRender(EngineContext& context, const CameraInfo* overrideCameraInfo)
 {
-	const auto* pCameraInfo = m_pCameraSystem->GetCameraInfo();
+	const auto* pCameraInfo = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
 
 	// Check if main camera exists before rendering.
 	if (!pCameraInfo)
 	{
-		//DBG("SceneBase::OnRender: No main camera set, skipping render.");		
+		DBG("SceneBase::OnRender: No main camera set, skipping render.");		
 		return;
 	}
 

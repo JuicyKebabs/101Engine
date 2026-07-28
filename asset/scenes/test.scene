@@ -1,58 +1,209 @@
 {
     "actors": [
         {
-            "actorId": "{E3D19224-EB1A-4B5A-9709-1F517FF58EA5}",
+            "actorId": "{388F83E1-92B0-46EE-9473-0598E67C9337}",
             "components": [
-                "Camera"
+                {
+                    "data": {
+                        "name": "Transform",
+                        "position": [
+                            0.0,
+                            0.0,
+                            -5.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "followActorId": null,
+                        "followMode": 1,
+                        "lens": {
+                            "farZ": 150.0,
+                            "fov": 1.5707963705062866,
+                            "height": 720.0,
+                            "nearZ": 0.10000000149011612,
+                            "projectionType": 0,
+                            "width": 1280.0
+                        },
+                        "name": "Camera",
+                        "pose": {
+                            "position": [
+                                0.0,
+                                0.0,
+                                -5.0
+                            ],
+                            "rotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rig": {
+                            "offsetPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "offsetRotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rotationMode": 1,
+                        "targetActorId": null
+                    },
+                    "type": "Camera"
+                }
             ],
             "is_active": true,
             "name": "DefaultCamera",
             "parentId": null,
-            "tag": "MainCamera",
-            "transform": {
-                "position": [
-                    0.0,
-                    0.0,
-                    -5.0
-                ],
-                "rotation": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "scale": [
-                    1.0,
-                    1.0,
-                    1.0
-                ]
-            }
+            "tag": "MainCamera"
         },
         {
-            "actorId": "{13EC3C80-1F3A-4181-BF21-7B7FB08E39E7}",
+            "actorId": "{074856A0-6CBA-40E8-8CC0-48151F458541}",
             "components": [
-                "Collider"
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            -0.5,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{99961728-DF68-4A89-BCC1-F3B12F4432F5}",
+                        "name": "",
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                },
+                {
+                    "data": {
+                        "center": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "isTrigger": false,
+                        "layer": 0,
+                        "name": "",
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "type": 3
+                    },
+                    "type": "Collider"
+                }
             ],
             "is_active": true,
-            "name": "test",
+            "name": "TestActor",
             "parentId": null,
-            "tag": "None",
-            "transform": {
-                "position": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "rotation": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "scale": [
-                    1.0,
-                    1.0,
-                    1.0
-                ]
-            }
+            "tag": "None"
+        },
+        {
+            "actorId": "{09BE65C6-0AC1-45A2-B453-200B63BC4270}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            4.300000190734863,
+                            -7.699999809265137
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "billboardType": 0,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "textureAssetId": "{6A8831A2-7D3A-47F2-9FCA-1989C33B8EE3}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "SpriteRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "TestActor2D",
+            "parentId": null,
+            "tag": "None"
         }
     ],
     "directional_light": {
@@ -68,5 +219,5 @@
         ],
         "intensity": 1.0
     },
-    "version": 2
+    "version": 3
 }

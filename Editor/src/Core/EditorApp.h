@@ -15,12 +15,12 @@
 #include "Engine/Actor/Actor.h"
 #include "Command/EditorCommandHistory.h"
 
-#include "EditorCamera.h"
-#include "HierarchyPanel.h"
-#include "InspectorPanel.h"
-#include "MenuBar.h"
-#include "ScriptsPanel.h"
-#include "SceneViewPanel.h"
+#include "Core/EditorCamera.h"
+#include "UI/HierarchyPanel.h"
+#include "UI/Inspector/InspectorPanel.h"
+#include "UI/MenuBar.h"
+#include "UI/ScriptsPanel.h"
+#include "UI/SceneViewPanel.h"
 
 //--------------------------------------------
 // EditorApp class
@@ -91,6 +91,7 @@ private:
     void PrepareInstance();
     void InitInstance();
     void InitImGui();
+    void RegisterComponentInspectors();
 
     void Update(float deltaTime);
     void Render();

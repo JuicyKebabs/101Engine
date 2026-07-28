@@ -1,4 +1,4 @@
-#include "EditorApp.h"
+#include "Core/EditorApp.h"
 #include "Engine/Core/Path/PathManager.h"
 #include <objbase.h>
 #include <windows.h>
