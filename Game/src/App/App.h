@@ -53,7 +53,13 @@ public:
 	void Run();			// Execution
 	void Terminate();	// Termination
 
-	void InitSceneManager(){
+	void InitSceneManager()
+	{
+		m_pSceneManager->SetViewportSize(
+			m_pEngine->GetFrameBufferWidth(),
+			m_pEngine->GetFrameBufferHeight()
+		);
+
 		m_pSceneManager->Initialize(m_engineContext);	// Initialize scene manager with engine context
 	}
 

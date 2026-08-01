@@ -100,6 +100,8 @@ public:
 	UINT GetCurrentBufferIndex() const { return m_currentBackBufferIndex; }								// Get frame buffer index
 	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return m_pDescriptorHeapAllocator.get(); }	// Get descriptor heap allocator
 	GpuTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
+	UINT GetFrameBufferWidth() const { return m_frameBufferWidth; }										// Get frame buffer width
+	UINT GetFrameBufferHeight() const { return m_frameBufferHeight; }									// Get frame buffer height
 
 	// Resize the scene render targets (color and depth) to the specified width and height
 	bool ResizeSceneRenderTargets(UINT width, UINT height);

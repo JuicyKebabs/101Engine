@@ -7,6 +7,7 @@
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Component/TransformConversion.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Core/Context/Context.h"
@@ -546,6 +547,286 @@ namespace
 			"Default RectTransform survives its own serialized schema");
 	}
 
+	void TestRectTransformInheritsTransformParent()
+	{
+		SceneBase scene;
+		Actor* parent = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "Parent")));
+		Canvas* parentCanvas =
+			parent->GetComponentByClass<Canvas>();
+		Check(scene.SetCanvasRenderMode(
+			parentCanvas,
+			CanvasRenderMode::WorldSpace),
+			"WorldSpace Canvas configures a Transform parent for RectTransform");
+		Actor* child = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::UI,
+				Actor::InitDesc(true, TAG_NONE, "UIChild")),
+			parent->GetHandle());
+
+		Transform* parentTransform =
+			parent->GetComponentByClass<Transform>();
+		RectTransform* childTransform =
+			child->GetComponentByClass<RectTransform>();
+
+		parentTransform->SetLocalPosition({10.0f, 20.0f, 30.0f});
+		parentTransform->SetLocalScale({2.0f, 2.0f, 2.0f});
+		childTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		childTransform->SetAnchoredPosition({3.0f, 4.0f});
+		childTransform->SetSizeDelta({100.0f, 50.0f});
+
+		scene.Update(0.0f);
+
+		Check(Near(
+			childTransform->GetWorldPosition(),
+			Vector3(16.0f, 28.0f, 30.0f)),
+			"RectTransform inherits its Transform parent's pose");
+		Check(Near(
+			childTransform->GetWorldScale(),
+			Vector3(2.0f, 2.0f, 2.0f)),
+			"RectTransform size is excluded from its inherited Transform scale");
+		Check(Near(
+			childTransform->GetLocalMatrix().TransformPoint(Vector3::Zero()),
+			Vector3(3.0f, 4.0f, 0.0f)),
+			"RectTransform local matrix includes its calculated layout position");
+	}
+
+	void TestRectSizeDoesNotScaleChildren()
+	{
+		SceneBase scene;
+		Actor* parent = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "Panel")));
+		Actor* child = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::UI,
+				Actor::InitDesc(true, TAG_NONE, "Image")),
+			parent->GetHandle());
+
+		RectTransform* parentTransform =
+			parent->GetComponentByClass<RectTransform>();
+		RectTransform* childTransform =
+			child->GetComponentByClass<RectTransform>();
+
+		parentTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		parentTransform->SetSizeDelta({100.0f, 100.0f});
+		childTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		childTransform->SetAnchoredPosition({10.0f, 0.0f});
+		childTransform->SetSizeDelta({20.0f, 20.0f});
+
+		scene.Update(0.0f);
+
+		Check(Near(
+			childTransform->GetWorldPosition(),
+			Vector3(10.0f, 0.0f, 0.0f)),
+			"Parent Rect size does not multiply child layout position");
+		Check(Near(
+			childTransform->GetWorldScale(),
+			Vector3::One()),
+			"Parent Rect size does not multiply child Transform scale");
+	}
+
+	void TestRootScreenSpaceCanvasUsesViewportSize()
+	{
+		SceneBase scene;
+		scene.SetViewportSize(800, 600);
+
+		Actor* canvasActor = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "Canvas")));
+		Actor* childActor = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::UI,
+				Actor::InitDesc(true, TAG_NONE, "Child")),
+			canvasActor->GetHandle());
+
+		RectTransform* canvasTransform =
+			canvasActor->GetComponentByClass<RectTransform>();
+		RectTransform* childTransform =
+			childActor->GetComponentByClass<RectTransform>();
+
+		canvasTransform->SetSizeDelta({1.0f, 1.0f});
+		childTransform->SetAnchorMode(AnchorMode::TopRight);
+		childTransform->SetPivot({0.5f, 0.5f});
+		childTransform->SetAnchoredPosition(Vector2::Zero());
+		childTransform->SetSizeDelta({100.0f, 50.0f});
+
+		scene.Update(0.0f);
+
+		Check(Near(
+			childTransform->GetWorldPosition(),
+			Vector3(400.0f, 300.0f, 0.0f)),
+			"Direct child of a root ScreenSpace Canvas uses the scene viewport size");
+
+		scene.SetViewportSize(1000, 800);
+		scene.Update(0.0f);
+
+		Check(Near(
+			childTransform->GetWorldPosition(),
+			Vector3(500.0f, 400.0f, 0.0f)),
+			"ScreenSpace UI layout follows viewport resizing");
+	}
+
+	void TestTransformToRectTransformConversion()
+	{
+		Transform source;
+		const Quaternion rotation =
+			Quaternion::CreateFromEulerDeg({10.0f, 20.0f, 30.0f});
+		source.SetParams({
+			.localPosition = {12.0f, -4.0f, 7.0f},
+			.localRotation = rotation,
+			.localScale = {2.0f, 3.0f, 4.0f},
+			.name = "ConvertedTransform"
+		});
+
+		nlohmann::json before;
+		source.Serialize(before);
+
+		const TransformSnapshot snapshot =
+			TransformConversion::Capture(source);
+		std::unique_ptr<Transform> converted =
+			TransformConversion::Create(
+				TransformKind::RectTransform,
+				snapshot);
+		RectTransform* rectTransform =
+			dynamic_cast<RectTransform*>(converted.get());
+
+		Check(snapshot.sourceKind == TransformKind::Transform,
+			"Transform conversion snapshot records its concrete source kind");
+		Check(rectTransform != nullptr,
+			"Transform conversion creates a RectTransform");
+		Check(rectTransform &&
+			Near(rectTransform->GetLocalPosition(), {0.0f, 0.0f, 7.0f}) &&
+			Near(rectTransform->GetAnchoredPosition(), {12.0f, -4.0f}) &&
+			rectTransform->GetLocalRotationQuat().NearEqual(rotation, 0.001f) &&
+			Near(rectTransform->GetLocalScale(), {2.0f, 3.0f, 4.0f}),
+			"Transform-to-RectTransform conversion preserves common pose data");
+		Check(rectTransform &&
+			rectTransform->GetAnchorMode() == AnchorMode::MiddleCenter &&
+			Near(rectTransform->GetPivot(), {0.5f, 0.5f}) &&
+			Near(rectTransform->GetSize(), {100.0f, 100.0f}),
+			"Transform-to-RectTransform conversion applies safe layout defaults");
+
+		nlohmann::json after;
+		source.Serialize(after);
+		Check(after == before,
+			"Transform conversion does not mutate its source component");
+	}
+
+	void TestRectTransformToTransformConversion()
+	{
+		SceneBase scene;
+		Actor* actor = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "RectSource")));
+		RectTransform* source =
+			actor->GetComponentByClass<RectTransform>();
+		const Quaternion rotation =
+			Quaternion::CreateFromEulerDeg({0.0f, 0.0f, 15.0f});
+
+		static_cast<Transform&>(*source).SetParams({
+			.localPosition = {0.0f, 0.0f, 3.0f},
+			.localRotation = rotation,
+			.localScale = {1.5f, 2.0f, 1.0f},
+			.name = "ConvertedRectTransform"
+		});
+		source->SetParams({
+			.anchorMode = AnchorMode::TopLeft,
+			.anchoredPosition = {10.0f, -20.0f},
+			.pivot = {0.25f, 0.75f},
+			.size = {200.0f, 100.0f},
+			.name = "ConvertedRectTransform"
+		});
+
+		scene.Update(0.0f);
+
+		Transform3D expectedLocal;
+		source->GetLocalMatrix().Decompose(
+			expectedLocal.position,
+			expectedLocal.rotation,
+			expectedLocal.scale);
+
+		const TransformSnapshot snapshot =
+			TransformConversion::Capture(*source);
+		std::unique_ptr<Transform> converted =
+			TransformConversion::Create(
+				TransformKind::Transform,
+				snapshot);
+
+		Check(snapshot.sourceKind == TransformKind::RectTransform,
+			"RectTransform snapshot records its concrete source kind");
+		Check(converted &&
+			dynamic_cast<RectTransform*>(converted.get()) == nullptr,
+			"RectTransform conversion creates a normal Transform");
+		Check(converted &&
+			Near(converted->GetLocalPosition(), expectedLocal.position) &&
+			converted->GetLocalRotationQuat().NearEqual(
+				expectedLocal.rotation, 0.001f) &&
+			Near(converted->GetLocalScale(), expectedLocal.scale),
+			"RectTransform-to-Transform conversion preserves effective local layout");
+	}
+
+	void TestRectTransformStateReconstruction()
+	{
+		RectTransform source;
+		static_cast<Transform&>(source).SetParams({
+			.localPosition = {0.0f, 0.0f, 5.0f},
+			.localRotation =
+				Quaternion::CreateFromEulerDeg({1.0f, 2.0f, 3.0f}),
+			.localScale = {2.0f, 2.0f, 1.0f},
+			.name = "ReconstructedRect"
+		});
+		source.SetParams({
+			.anchorMode = AnchorMode::BottomRight,
+			.anchoredPosition = {-30.0f, 40.0f},
+			.pivot = {0.2f, 0.8f},
+			.size = {320.0f, 180.0f},
+			.name = "ReconstructedRect"
+		});
+
+		const TransformSnapshot snapshot =
+			TransformConversion::Capture(source);
+		std::unique_ptr<Transform> converted =
+			TransformConversion::Create(
+				TransformKind::RectTransform,
+				snapshot);
+		RectTransform* restored =
+			dynamic_cast<RectTransform*>(converted.get());
+
+		Check(restored &&
+			Near(restored->GetLocalTransform().position,
+				source.GetLocalTransform().position) &&
+			restored->GetLocalRotationQuat().NearEqual(
+				source.GetLocalRotationQuat(), 0.001f) &&
+			Near(restored->GetLocalScale(), source.GetLocalScale()),
+			"RectTransform reconstruction preserves common Transform state");
+		Check(restored &&
+			restored->GetAnchorMode() == source.GetAnchorMode() &&
+			Near(restored->GetAnchoredPosition(),
+				source.GetAnchoredPosition()) &&
+			Near(restored->GetPivot(), source.GetPivot()) &&
+			Near(restored->GetSize(), source.GetSize()),
+			"RectTransform reconstruction preserves all layout state");
+	}
+
+	void TestInvalidTransformConversionKind()
+	{
+		Transform source;
+		const TransformSnapshot snapshot =
+			TransformConversion::Capture(source);
+
+		Check(
+			TransformConversion::Create(
+				static_cast<TransformKind>(999),
+				snapshot) == nullptr,
+			"Transform conversion safely rejects an invalid target kind");
+	}
+
 	void TestRendererComponentRoundTrip()
 	{
 		TestRendererComponent source;
@@ -931,24 +1212,30 @@ namespace
 	{
 		Canvas source;
 		source.SetParams({
+			.renderMode = CanvasRenderMode::WorldSpace,
 			.sortOrder = 42,
 			.isVisible = false,
+			.referenceSize = {1280.0f, 720.0f},
 			.name = "SavedCanvas"
 		});
 
 		nlohmann::json serialized;
 		Check(source.Serialize(serialized), "Canvas Serialize succeeds");
-		Check(serialized.size() == 3 &&
+		Check(serialized.size() == 5 &&
 			serialized.contains("name") &&
+			serialized.contains("renderMode") &&
 			serialized.contains("sortOrder") &&
-			serialized.contains("visible"),
+			serialized.contains("visible") &&
+			serialized.contains("referenceSize"),
 			"Canvas Serialize excludes its runtime UI registration list");
 
 		Canvas restored;
 		Check(restored.Deserialize(serialized), "Canvas Deserialize succeeds");
 		Check(restored.GetName() == "SavedCanvas" &&
+			restored.GetRenderMode() == CanvasRenderMode::WorldSpace &&
 			restored.GetSortOrder() == 42 &&
-			!restored.IsVisible(),
+			!restored.IsVisible() &&
+			Near(restored.GetWorldReferenceSize(), {1280.0f, 720.0f}),
 			"Canvas settings survive a round trip");
 	}
 
@@ -956,6 +1243,7 @@ namespace
 	{
 		Canvas canvas;
 		canvas.SetParams({
+			.renderMode = CanvasRenderMode::WorldSpace,
 			.sortOrder = 7,
 			.isVisible = false,
 			.name = "OriginalCanvas"
@@ -972,6 +1260,88 @@ namespace
 		nlohmann::json after;
 		canvas.Serialize(after);
 		Check(after == before, "Rejected JSON leaves the Canvas unchanged");
+	}
+
+	void TestCanvasRenderModeValidation()
+	{
+		Canvas source;
+		source.SetParams({
+			.renderMode = CanvasRenderMode::WorldSpace,
+			.sortOrder = 3,
+			.isVisible = false,
+			.name = "OriginalCanvas"
+		});
+
+		nlohmann::json before;
+		source.Serialize(before);
+
+		nlohmann::json negative = before;
+		negative["renderMode"] = -1;
+		Check(!source.Deserialize(negative),
+			"Canvas rejects a negative renderMode");
+
+		nlohmann::json sentinel = before;
+		sentinel["renderMode"] =
+			static_cast<int>(CanvasRenderMode::Max);
+		Check(!source.Deserialize(sentinel),
+			"Canvas rejects the CanvasRenderMode sentinel");
+
+		nlohmann::json after;
+		source.Serialize(after);
+		Check(after == before,
+			"Rejected renderMode values leave the Canvas unchanged");
+	}
+
+	void TestCanvasReferenceSizeValidation()
+	{
+		Canvas source;
+		nlohmann::json before;
+		source.Serialize(before);
+
+		const auto rejectsWithoutMutation =
+			[&](const Vector2& invalidSize, const char* message)
+			{
+				nlohmann::json invalid = before;
+				invalid["referenceSize"] =
+					JsonMath::ToJson(invalidSize);
+
+				Check(!source.Deserialize(invalid), message);
+
+				nlohmann::json after;
+				source.Serialize(after);
+				Check(after == before,
+					"Rejected referenceSize leaves the Canvas unchanged");
+			};
+
+		rejectsWithoutMutation(
+			{0.0f, 1080.0f},
+			"Canvas rejects a zero referenceSize axis");
+		rejectsWithoutMutation(
+			{-1.0f, 1080.0f},
+			"Canvas rejects a negative referenceSize axis");
+		rejectsWithoutMutation(
+			{(std::numeric_limits<float>::quiet_NaN)(), 1080.0f},
+			"Canvas rejects a NaN referenceSize axis");
+		rejectsWithoutMutation(
+			{(std::numeric_limits<float>::infinity)(), 1080.0f},
+			"Canvas rejects an infinite referenceSize axis");
+
+		SceneBase scene;
+		Actor* canvasActor = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "Canvas")));
+		Canvas* canvas = canvasActor->GetComponentByClass<Canvas>();
+
+		Check(!scene.SetCanvasReferenceSize(
+			canvas,
+			{(std::numeric_limits<float>::quiet_NaN)(), 1080.0f}),
+			"Scene rejects a non-finite Canvas reference size");
+		Check(scene.SetCanvasReferenceSize(
+			canvas,
+			{640.0f, 360.0f}) &&
+			Near(canvas->GetWorldReferenceSize(), {640.0f, 360.0f}),
+			"Scene applies a valid Canvas reference size");
 	}
 
 	void TestCanvasSortOrderUpperBoundary()
@@ -996,6 +1366,8 @@ namespace
 		Canvas restored;
 		Check(restored.Deserialize(serialized),
 			"Default Canvas survives its own serialized schema");
+		Check(restored.GetRenderMode() == CanvasRenderMode::ScreenSpace,
+			"Default Canvas uses ScreenSpace rendering");
 	}
 
 	void TestUIRendererRoundTripAndCanvasResolution()
@@ -1314,6 +1686,13 @@ int main()
 	TestInvalidRectTransformBaseDoesNotMutateUi();
 	TestRectTransformValidationBoundaries();
 	TestDefaultRectTransformRoundTrip();
+	TestRectTransformInheritsTransformParent();
+	TestRectSizeDoesNotScaleChildren();
+	TestRootScreenSpaceCanvasUsesViewportSize();
+	TestTransformToRectTransformConversion();
+	TestRectTransformToTransformConversion();
+	TestRectTransformStateReconstruction();
+	TestInvalidTransformConversionKind();
 	TestRendererComponentRoundTrip();
 	TestInvalidRendererJsonDoesNotPartiallyMutate();
 	TestRendererRejectsNonFiniteColor();
@@ -1333,6 +1712,8 @@ int main()
 	TestDefaultSpriteRendererRoundTrip();
 	TestCanvasRoundTrip();
 	TestInvalidCanvasJsonDoesNotPartiallyMutate();
+	TestCanvasRenderModeValidation();
+	TestCanvasReferenceSizeValidation();
 	TestCanvasSortOrderUpperBoundary();
 	TestDefaultCanvasRoundTrip();
 	TestUIRendererRoundTripAndCanvasResolution();

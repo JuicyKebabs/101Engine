@@ -1,6 +1,8 @@
 #pragma once
 #include "Engine/Component/Transform.h"
 
+class Actor;
+
 // Anchor modes enumeration
 enum class AnchorMode
 {
@@ -71,5 +73,12 @@ private:
 	void LateUpdateOverride(float deltaTime) override {};
 	void OnDestroyOverride() override {};
 
+	Vector2 ResolveLayoutReferenceSize(
+		Actor* owner,
+		Actor* parent,
+		RectTransform* parentRectTransform
+	) const;
+	Transform3D BuildLayoutTransform(const Vector2& referenceSize) const;
+	bool IsRootScreenSpaceCanvas(Actor* owner) const;
 	Vector2 CalcAnchorOffset(AnchorMode anchorMode, const Vector2& parentSize) const;	// Calculate the offset based on the anchor mode and the size of the parent
 };

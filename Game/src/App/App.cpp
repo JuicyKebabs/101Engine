@@ -213,7 +213,7 @@ void App::CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc)
 
 void App::PrepareInstance()
 {
-	WindowInfo::GetInstance().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+	WindowInfo::Get().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 	// Get singleton instances of various classes
 	m_pEngine = std::make_unique<Engine>();
@@ -320,7 +320,7 @@ void App::Render()
 	// Submit draw requests for the game scene
 	m_pSceneManager->OnRender();
 
-	// Render the shadow depth on map
+	// Render the scene depth into the shadow map
 	RenderPassTarget shadowTarget
 	{
 		RenderPassTargetType::DepthOnly,
@@ -352,7 +352,11 @@ void App::Render()
 	};	
 	m_pEngine->BeginPass(backBufferTarget);
 	m_pRenderer->RenderFullScreenPass(m_pEngine->GetCommandList(), m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor));
-	m_pRenderer->RenderScreenSpace(m_pEngine->GetCommandList());
+	m_pRenderer->RenderScreenSpace(
+		m_pEngine->GetCommandList(),
+		m_pEngine->GetFrameBufferWidth(),
+		m_pEngine->GetFrameBufferHeight()
+		);
 	m_pEngine->EndPass(backBufferTarget);
 
 	// End rendering

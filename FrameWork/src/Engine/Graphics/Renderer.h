@@ -45,7 +45,11 @@ public:
 	void RenderShadowMap(ID3D12GraphicsCommandList* p_commandList);							// Render shadow map (if needed)
 	void RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t shadowMapSrvIndex);	// Render the scene using submitted draw packets
 	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input);	// Render a full-screen pass (for post-processing)
-	void RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList);						// Render screen space draw packet (to avoid post effect)
+	void RenderScreenSpace(																	// Render screen space draw packet (to avoid post effect)
+		ID3D12GraphicsCommandList* p_commandList, 
+		UINT viewportWidth, 
+		UINT viewportHeight
+	);
 
 
 	void SubmitFrameRenderData(const FrameRenderData& frameRenderData);	// Submit draw packets

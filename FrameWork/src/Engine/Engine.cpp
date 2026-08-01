@@ -595,7 +595,8 @@ void Engine::CreateBackBuffers()
 
 void Engine::CreateBuiltinRenderTargets()
 {
-	for(auto& target : m_builtinRenderTargets) {
+	for(auto& target : m_builtinRenderTargets) 
+	{
 		target = std::make_unique<GpuTexture>();
 	}
 

@@ -39,6 +39,8 @@ public:
 
 	const CameraInfo* GetCameraInfo();	// Camera information retrieval
 
+	void SetViewportSize(UINT width, UINT height);
+
 private:
 	EngineContext m_context;					// Engine context
 	std::vector<SceneElement> m_sceneElements;	// Scene element list
@@ -48,6 +50,10 @@ private:
 
 	bool m_sceneChangeReserved = false;	// Scene change reservation flag
 	std::string m_reservedSceneName;	// Reserved scene name for scene change
+	
+	// Latest viewport size applied to the current and subsequent scenes
+	UINT m_viewportWidth = 1;
+	UINT m_viewportHeight = 1;
 
 private:
 	void ChangeScene(const std::string& name);				// Scene change

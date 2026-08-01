@@ -23,7 +23,7 @@ public:
 	void OnDestroy() { if (!IsDestroyed()) OnDestroyOverride(); MarkForDestruction(); }						// Call OnDestroyOverride if not already destroyed
 
 	void SetOwner(Actor* owner) { m_pOwner = owner; }			// Set the owning actor
-	Actor* GetOwner() { return m_pOwner; }						// Get the owning actor
+	Actor* GetOwner() const { return m_pOwner; }						// Get the owning actor
 	void SetName(const std::string& name) { m_name = name; }	// Set the component name
 	const std::string& GetName() const { return m_name; }		// Get the component name
 

@@ -104,4 +104,5 @@ private:
     void ShutdownImGui();
 
 	void ApplySceneViewResizeRequest();
+    void ApplyCurrentViewportSizeToScene();
 };

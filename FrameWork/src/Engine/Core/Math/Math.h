@@ -66,6 +66,8 @@ struct Vector2 : public DirectX::XMFLOAT2
 	Vector2& operator-=(const Vector2& rhs);
 	Vector2& operator*=(float scalar);
 	Vector2& operator/=(float scalar);
+	bool operator==(const Vector2& rhs) const;
+	bool operator!=(const Vector2& rhs) const;
 };
 
 // 3D vector for positions, directions, and scales

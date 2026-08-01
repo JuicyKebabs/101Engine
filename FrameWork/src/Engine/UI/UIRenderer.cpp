@@ -78,6 +78,7 @@ void UIRenderer::RebuildRenderProxy()
 		m_renderProxy.uvOffset = m_uvOffset;
 		m_renderProxy.flip.x = m_flipX ? -1.0f : 1.0f;
 		m_renderProxy.flip.y = m_flipY ? -1.0f : 1.0f;
+		m_renderProxy.isWorldSpace = m_pCanvas && m_pCanvas->GetRenderMode() == CanvasRenderMode::WorldSpace;
 		m_isProxyDirty = false;
 	}
 }

@@ -164,6 +164,11 @@ void SceneManager::ChangeScene(const std::string& next)
 	if (m_pCurrentScene)
 	{
 		m_pCurrentScene->SetSceneManager(this);
+
+		m_pCurrentScene->SetViewportSize(
+			m_viewportWidth,
+			m_viewportHeight
+		);
 	}
 
 	m_currentSceneName = next;
@@ -195,4 +200,22 @@ const CameraInfo* SceneManager::GetCameraInfo()
 	}
 
 	return cameraSystem->GetCameraInfo();
+}
+
+void SceneManager::SetViewportSize(
+	UINT width,
+	UINT height)
+{
+	if (width == 0 || height == 0) return;
+
+	m_viewportWidth = width;
+	m_viewportHeight = height;
+
+	if (m_pCurrentScene)
+	{
+		m_pCurrentScene->SetViewportSize(
+			m_viewportWidth,
+			m_viewportHeight
+		);
+	}
 }
