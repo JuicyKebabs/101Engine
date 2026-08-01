@@ -147,16 +147,54 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 			for (const auto& element : renderTemplate)
 			{
 				auto item = CreateUIRenderItem(element, renderProxy);
-				auto handle = m_frameRenderData.AddUI(item);
 				RenderItemRef ref;
 				ref.renderType = RenderType::UI;
-				ref.handle = handle;
-				SortKeyScreenSpace ssKey;
-				ssKey.psoKey = item.common.materialDesc.psoKey;
-				ssKey.canvasOrder = renderProxy.canvasOrder;
-				ssKey.order = renderProxy.order;
-				ref.sortKey = m_frameSortData.AddScreenSpaceKey(ssKey);
-				m_frameRenderData.AddScreenSpace(ref);
+
+				PSOKey& psoKey = item.common.materialDesc.psoKey;
+
+				if (renderProxy.isWorldSpace)
+				{// World-space UI elements
+					// Get the render queue based on the PSOKey and normalize it
+					RenderQueue queue = GetRenderQueue(psoKey);
+
+					// UI in world -space have to be as a transparent object, 
+					// so if the depth is disabled, we need to set it to TestNoWrite
+					if (psoKey.depth == DepthMode::Disable) psoKey.depth = DepthMode::TestNoWrite;
+
+					NormalizePSOKey(psoKey, queue);
+
+					if (queue == RenderQueue::Opaque)
+					{// Opaque world-space UI elements
+						SortKeyOpaque opaqueKey;
+						opaqueKey.psoKey = psoKey;
+						ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
+						ref.handle = m_frameRenderData.AddUI(std::move(item));
+						m_frameRenderData.AddOpaque(ref);
+					}
+					else
+					{// Transparent world-space UI elements
+						SortKeyTransparent transparentKey;
+						transparentKey.psoKey = psoKey;
+						transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
+						ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
+						ref.handle = m_frameRenderData.AddUI(std::move(item));
+						m_frameRenderData.AddTransparent(ref);
+					}
+				}
+				else
+				{// Screen-space UI elements
+
+					// Disable depth testing
+					psoKey.depth = DepthMode::Disable;
+
+					SortKeyScreenSpace sortKey;
+					sortKey.psoKey = item.common.materialDesc.psoKey;
+					sortKey.canvasOrder = renderProxy.canvasOrder;
+					sortKey.order = renderProxy.order;
+					ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
+					ref.handle = m_frameRenderData.AddUI(std::move(item));
+					m_frameRenderData.AddScreenSpace(ref);
+				}
 			}
 		}
 	}

@@ -211,6 +211,8 @@ void EditorApp::NewScene()
     m_pScene->AddRootActor(std::move(cameraActorOwned));
     m_pScene->GetCameraSystem()->SetMainCamera(camera);
 
+	ApplyCurrentViewportSizeToScene();
+
     DBG("EditorApp: New scene created.");
 }
 
@@ -232,6 +234,9 @@ void EditorApp::LoadScene(const std::string& filePath)
 
     if (result) DBG("EditorApp: Loaded scene from %s", filePath.c_str());
     else        DBG("EditorApp: Failed to load scene from %s", filePath.c_str());
+
+	// Set the viewport size based on the current scene color render target
+    ApplyCurrentViewportSizeToScene();
 }
 
 // Hot reload: rebuild GameCode.dll and reload it without restarting the Editor.
@@ -387,7 +392,7 @@ void EditorApp::CreateMainWindow()
 
 void EditorApp::PrepareInstance()
 {
-    WindowInfo::GetInstance().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+    WindowInfo::Get().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     m_pEngine         = std::make_unique<Engine>();
     m_pRenderer       = std::make_unique<Renderer>();
@@ -538,6 +543,17 @@ void EditorApp::Render()
         m_pScene->OnRender(m_engineContext, &editorCameraInfo);
     }
 
+    // Render the scene depth into the shadow map
+    RenderPassTarget shadowTarget
+    {
+        RenderPassTargetType::DepthOnly,
+        RenderPassTarget::InvalidIndex,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
+    };
+    m_pEngine->BeginPass(shadowTarget);
+    m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
+    m_pEngine->EndPass(shadowTarget);
+
 	// Render the scene to the scene color render target (not directly to the back buffer)
     RenderPassTarget sceneTarget
     { 
@@ -547,8 +563,22 @@ void EditorApp::Render()
     };
     
     m_pEngine->BeginPass(sceneTarget);
+
+	// Render scene with shadow map information
     uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
     m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
+
+	// Render the screen-space elements on top of the scene color render target
+    GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
+    if (sceneColor)
+    {
+        m_pRenderer->RenderScreenSpace(
+            m_pEngine->GetCommandList(),
+            sceneColor->GetWidth(),
+            sceneColor->GetHeight()
+        );
+    }
+
     m_pEngine->EndPass(sceneTarget);
 
 	// Render the scene color render target to the back buffer (screen) for display
@@ -559,6 +589,7 @@ void EditorApp::Render()
         RenderPassTarget::InvalidIndex
     };
 
+	// Render ImGui on top of the back buffer
     m_pEngine->BeginPass(backBufferTarget);
     RenderImGui();
     m_pEngine->EndPass(backBufferTarget);
@@ -788,4 +819,22 @@ void EditorApp::ApplySceneViewResizeRequest()
 	lens.height = static_cast<float>(height);
 
 	m_pEditorCamera->SetCameraLens(lens);
+
+    // Apply the viewport size to the scene and invalidate
+    // all layout elements affected by the size change
+	if (m_pScene) m_pScene->SetViewportSize(width, height);
+}
+
+void EditorApp::ApplyCurrentViewportSizeToScene()
+{
+    if (!m_pScene || !m_pEngine) return;
+
+    GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
+
+    if (!sceneColor) return;
+
+    m_pScene->SetViewportSize(
+        sceneColor->GetWidth(),
+        sceneColor->GetHeight()
+    );
 }

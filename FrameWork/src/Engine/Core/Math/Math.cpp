@@ -213,6 +213,16 @@ Vector2& Vector2::operator/=(float scalar)
     return *this;
 }
 
+bool Vector2::operator==(const Vector2& rhs) const
+{
+	return (x == rhs.x) && (y == rhs.y);
+}
+
+bool Vector2::operator!=(const Vector2& rhs) const
+{
+	return !(*this == rhs);
+}
+
 //===============================
 // Vector3 Implementation
 //===============================

@@ -1,60 +1,145 @@
 #include <cmath>
 #include "RectTransform.h"
 #include "Engine/Actor/Actor.h"
-#include "Engine/Window/WindowInfo.h"
+#include "Engine/Scene/SceneBase.h"
+#include "Engine/UI/Canvas.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 
 void RectTransform::UpdateGeometry()
 {
 	if (!m_isDirty) return;
 
-	// Get transform component of the parent actor
-	auto owner = GetOwner();
-	auto parent = owner ? owner->GetParent() : nullptr;
-	auto parentRT = parent ? parent->GetComponentByClass<RectTransform>() : nullptr;
+	// Get the parent Transform and its RectTransform specialization, if available
+	Actor* owner = GetOwner();
+	Actor* parent = owner ? owner->GetParent() : nullptr;
+	Transform* parentTransform = parent ? parent->GetComponentByClass<Transform>() : nullptr;
+	RectTransform* parentRectTransform = parent ? parent->GetComponentByClass<RectTransform>() : nullptr;
 
-	// Calculate parent size (if parent has RectTransform, use its size; otherwise, use window size)
-	Vector2 parentSize = parentRT ? parentRT->GetSize() 
-		: Vector2(static_cast<float>(WindowInfo::GetInstance().GetWidth()), static_cast<float>(WindowInfo::GetInstance().GetHeight()));
-
-	// Calculate the world position by adding the anchor offset and anchored position to the parent's world position (if parent exists)
-	Vector3 parentWorldPos = parentRT ? parentRT->GetWorldPosition() : Vector3::Zero();
-
-	// Calculate anchor offset based on the anchor mode and parent size
-	Vector2 anchorOffset = CalcAnchorOffset(m_anchorMode, parentSize);
-
-	// Calculate pivot offset based on the pivot point and size of the UI element
-	Vector2 pivotOffset(
-		(0.5f - m_pivot.x) * m_size.x,	// Pivot offset in X direction (centered at 0.5)
-		(0.5f - m_pivot.y) * m_size.y	// Pivot offset in Y direction (centered at 0.5)
-	);
-	
-	// Calculate the final UI position
-	Vector3 uiPosition(
-		parentWorldPos.x + anchorOffset.x + m_anchoredPosition.x + pivotOffset.x,
-		parentWorldPos.y + anchorOffset.y + m_anchoredPosition.y + pivotOffset.y,
-		m_localTransform.position.z
+	// Resolve the reference size used to build the layout transform.
+	const Vector2 referenceSize = ResolveLayoutReferenceSize(
+		owner,
+		parent,
+		parentRectTransform
 	);
 
-	// The scale is determined by the size of the UI element (width and height)
-	Vector3 uiScale(
-		m_size.x,
-		m_size.y,
-		1.0f
+	// Build the layout transform based on the reference size and properties of this RectTransform.
+	const Transform3D layoutTransform = BuildLayoutTransform(referenceSize);
+
+	// Resolve the final hierarchy transform.
+	// Only the topmost Screen-Space Canvas ignores the ancestor's 3D hierarchy.
+	if (parentTransform && !IsRootScreenSpaceCanvas(owner))
+	{// This RectTransform has a parent and is not the topmost Screen-Space Canvas
+
+		// Inherit the world transform from the parent Transform 
+		// and combine it with the layout transform of this RectTransform.
+		m_worldTransform = CombineTransform3D(
+			parentTransform->GetWorldTransform(),
+			layoutTransform
+		);
+	}
+	else
+	{
+		// The topmost Screen-Space Canvas establishes an independent
+		// viewport-based coordinate space and ignores its 3D parent.
+		// An unparented RectTransform also has nothing to inherit.
+		m_worldTransform = layoutTransform;
+	}
+
+	// Update the local matrix based on the layout transform
+	m_localMatrix = layoutTransform.GetMatrix();
+
+	// Apply the RectTransform size only to the render matrix.
+	// The size is excluded from m_worldTransform so that it does not
+	// multiply the position or scale of child RectTransforms.
+	const Vector3 renderScale(
+		m_worldTransform.scale.x * m_size.x,
+		m_worldTransform.scale.y * m_size.y,
+		m_worldTransform.scale.z
 	);
 
-	// Calculate the world matrix (Isolated from parent matrix)
-	m_worldMatrix = Matrix4x4::CreateTRS(uiPosition, m_localTransform.rotation, uiScale);
-
-	// Save world transform by decomposing the world matrix
-	m_worldMatrix.Decompose(
-		m_worldTransform.position, 
-		m_worldTransform.rotation, 
-		m_worldTransform.scale
+	// Update the world matrix based on the world transform and render scale
+	m_worldMatrix = Matrix4x4::CreateTRS(
+		m_worldTransform.position,
+		m_worldTransform.rotation,
+		renderScale
 	);
 
 	m_worldGeneration++;
 	m_isDirty = false;
+}
+
+Vector2 RectTransform::ResolveLayoutReferenceSize(
+	Actor* owner,
+	Actor* parent,
+	RectTransform* parentRectTransform
+) const
+{
+	Canvas* parentCanvas = parent
+		? parent->GetComponentByClass<Canvas>()
+		: nullptr;
+
+	// If parent has a Canvas, use its layout reference size
+	if (parentCanvas) return parentCanvas->GetLayoutReferenceSize();
+
+	// If parent has a RectTransform with no Canvas, use its size
+	if (parentRectTransform) return parentRectTransform->GetSize();
+
+	Canvas* ownerCanvas = owner
+		? owner->GetComponentByClass<Canvas>()
+		: nullptr;
+
+	// If the parent has neither a Canvas nor a RectTransform,
+	// use the owner's Canvas layout reference size when this
+	// RectTransform belongs to a Canvas Actor.
+	if (ownerCanvas) return ownerCanvas->GetLayoutReferenceSize();
+
+	// If no Canvas is found, use the viewport size of the scene as a fallback
+	SceneBase* scene = owner ? owner->GetOwner() : nullptr;
+	return scene ? scene->GetViewportSize() : Vector2::One();
+}
+
+Transform3D RectTransform::BuildLayoutTransform(const Vector2& referenceSize) const
+{
+	// Calculate the anchor offset based on the anchor mode and reference size
+	const Vector2 anchorOffset = CalcAnchorOffset(m_anchorMode, referenceSize);
+	const Vector2 pivotOffset(
+		(0.5f - m_pivot.x) * m_size.x,
+		(0.5f - m_pivot.y) * m_size.y
+	);
+
+	// Apply anchor offset, anchored position, and pivot offset 
+	// to the local transform to get the final layout transform
+	Transform3D layoutTransform = m_localTransform;
+	layoutTransform.position = Vector3(
+		anchorOffset.x + m_anchoredPosition.x + pivotOffset.x,
+		anchorOffset.y + m_anchoredPosition.y + pivotOffset.y,
+		m_localTransform.position.z
+	);
+
+	return layoutTransform;
+}
+
+bool RectTransform::IsRootScreenSpaceCanvas(Actor* owner) const
+{
+	// Try to get the canvas component from the owner actor
+	Canvas* canvas = owner
+		? owner->GetComponentByClass<Canvas>()
+		: nullptr;
+
+	// If the owner does not have a canvas or the canvas is not in screen-space mode, return false
+	if (!canvas || canvas->GetRenderMode() != CanvasRenderMode::ScreenSpace)
+	{
+		return false;
+	}
+
+	// Check if any ancestor actor has a canvas component
+	for (Actor* ancestor = owner->GetParent(); ancestor; ancestor = ancestor->GetParent())
+	{
+		// If any ancestor has a canvas, then this is not a root screen-space canvas
+		if (ancestor->GetComponentByClass<Canvas>()) return false;
+	}
+
+	return true;
 }
 
 Vector2 RectTransform::CalcAnchorOffset(AnchorMode mode, const Vector2& parentSize) const

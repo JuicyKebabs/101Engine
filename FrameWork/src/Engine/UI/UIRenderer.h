@@ -15,6 +15,7 @@ struct UIRendererProxy
 	Vector2 uvScale = { 1, 1 };			// UV scale for texture mapping
 	Vector2 uvOffset = { 0, 0 };		// UV offset for texture mapping
 	Vector2 flip = { 1, 1 };			// Flip flags for X and Y axes (1 for normal, -1 for flipped)
+	bool isWorldSpace = false;			// Flag indicating if the UI element is in world space (true) or screen space (false)
 };
 
 class UIRenderer : public RendererComponent
@@ -22,6 +23,8 @@ class UIRenderer : public RendererComponent
 public:
 	UIRenderer() = default;
 	~UIRenderer() = default;
+
+	void InvalidateRenderProxy() { m_isProxyDirty = true; }	// Mark the render proxy as dirty
 
 	// Setters
 	void SetUVScale(const Vector2& uvScale) { m_uvScale = uvScale; m_isProxyDirty = true; }

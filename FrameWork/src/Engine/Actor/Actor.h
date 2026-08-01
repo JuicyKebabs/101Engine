@@ -37,11 +37,13 @@ public:
 		) : isActive(isActive), tag(tag), name(name) {}
 	};
 
-	struct ComponentBucket {
+	struct ComponentBucket
+	{
 		std::vector<std::unique_ptr<Component>> instances;
 	};
 
-	struct PendingComponent {
+	struct PendingComponent
+	{
 		std::unique_ptr<Component> instance;
 		std::type_index typeId;
 	};
@@ -73,7 +75,6 @@ public:
 	const std::string& GetName() const { return m_name; }
 
 	// Parent handle
-	void SetParentHandle(ActorHandle parent);
 	ActorHandle GetParentHandle() const { return m_parentHandle; }
 
 	// Get the parent actor pointer (via ActorPool)
@@ -93,18 +94,19 @@ public:
 		static_assert(std::is_base_of_v<Component, T>, "AddComponent<T>: T must derive from Component");
 
 		using Policy = ComponentPolicy<T>;
+
 		Policy policy;
-		if (policy.cardinality != ComponentCardinality::Multiple) 
-		{
-			if (HasComponent<T>()) return GetComponentByClass<T>();
-		}
 
 		auto component = std::make_unique<T>(std::forward<Args>(args)...);
-		T* ptr = component.get();
-		component->SetOwner(this);
-		PendingComponent pending{ std::move(component), std::type_index(typeid(T)) };
-		m_pendingComponents.push_back(std::move(pending));
-		return ptr;
+
+		Component* added = AddComponentInternal(
+			std::move(component),
+			std::type_index(typeid(T)),
+			Policy::cardinality,
+			Policy::family
+		);
+
+		return dynamic_cast<T*>(added);
 	}
 
 	// Add a pre-created component instance to the container.
@@ -118,15 +120,7 @@ public:
 	// The exact implementation wasn't captured in chat, so this restored
 	// version is the pre-policy-check baseline (known working, used by
 	// SceneLoader/SceneWriter). Re-add the duplicate check here if desired.
-	Component* AddComponent(std::unique_ptr<Component> component)
-	{
-		if (!component) return nullptr;
-		Component* ptr = component.get();
-		ptr->SetOwner(this);
-		PendingComponent pending{ std::move(component), std::type_index(typeid(*ptr)) };
-		m_pendingComponents.push_back(std::move(pending));
-		return ptr;
-	}
+	Component* AddComponent(std::unique_ptr<Component> component);
 
 	// Check if the container has a component of type T
 	template<class T>
@@ -359,6 +353,10 @@ public:
 		return result;
 	}
 
+	// Component family queries
+	bool HasComponentFamily(ComponentFamily family) const;
+	size_t CountComponentFamily(ComponentFamily family) const;
+
 	// Add a child actor
 	Actor* AddChild(std::unique_ptr<Actor> child);
 
@@ -392,7 +390,16 @@ private:
 	void RemoveDestroyedComponents(Component* component);
 	void MarkForDestruction() { m_destroyed = true; }
 
-private:
+	Component* AddComponentInternal(
+		std::unique_ptr<Component> component,
+		std::type_index typeId,
+		ComponentCardinality cardinality,
+		ComponentFamily family
+	);
+
+	bool HasExactComponent(std::type_index typeId) const;
+
+private:	// The APIs which should sohuld be published to limited scope
 	// Hide default constructor and initialization from public, enforce usage of Init function and ActorFactory for creation
 	Actor() = default;			
 	void Init(const InitDesc& desc)
@@ -402,8 +409,12 @@ private:
 		m_name = desc.name;
 		m_isInitialized = true;
 	}
-
+	void SetParentHandle(ActorHandle parent);			// Set the parent actor handle (used by SceneBase)
 	void SetGuid(const Guid& guid) { m_guid = guid; }	// Set the actor's GUID (used by ActorFactory)
+
+	// Replace transform component with a new one, ensuring only one transform exists
+	// This function is mainly for maintaining the correct use of Transform-family components (Transform and RectTransform) in the actor.
+	bool ReplaceTransformComponent(std::unique_ptr<Transform> transform);
 
 	friend class ActorFactory;	// Allow ActorFactory to access private constructor
 	friend class SceneBase;		// SceneBase coordinates hierarchy-aware destruction

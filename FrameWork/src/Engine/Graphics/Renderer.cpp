@@ -109,12 +109,23 @@ void Renderer::RenderShadowMap(ID3D12GraphicsCommandList* p_commandList)
 	framePtr->proj = m_directionalLight.proj;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_shadowFrameCB->GetAddress());
 
-	int itemIndex = 0;
+
+	const size_t totalMeshCount = m_frameRenderData.GetMeshCount();
+
+	// Allocate constant buffers for shadow map rendering
+	if (m_meshForShadowCB.size() < totalMeshCount)
+	{
+		const size_t toAllocate = totalMeshCount - m_meshForShadowCB.size();
+
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_meshForShadowCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+		}
+	}
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
-		if (item.renderType == RenderType::Mesh) RenderMeshForShadow(p_commandList, m_frameRenderData.GetMesh(item.handle), itemIndex);
-		itemIndex++;
+		if (item.renderType == RenderType::Mesh) RenderMeshForShadow(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle));
 	}
 }
 
@@ -169,21 +180,30 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		}
 	}
 
+	size_t totalUIItemCount = m_frameRenderData.GetUICount();
+	if (m_uiCB.size() < totalUIItemCount)
+	{
+		size_t toAllocate = totalUIItemCount - m_uiCB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_uiCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
+		}
+	}
+
 	PSOKey compare{};
-	int meshItemIndex = 0;
-	int spriteItemIndex = 0;
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
-			meshItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
-			spriteItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare);
+			break;
+		case RenderType::UI:
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		default:
 			break;
@@ -195,12 +215,13 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare);
-			meshItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare);
-			spriteItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare);
+			break;
+		case RenderType::UI:
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		default:
 			break;
@@ -230,12 +251,18 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Gp
 	p_commandList->DrawInstanced(3, 1, 0, 0);									// Issue draw command (full-screen triangle)
 }
 
-void Renderer::RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList)
+void Renderer::RenderScreenSpace(
+	ID3D12GraphicsCommandList* p_commandList,
+	UINT viewportWidth,
+	UINT viewportHeight
+)
 {
+	if (viewportWidth == 0 || viewportHeight == 0) return;
+
 	// Set orthographic projection for screen space rendering
 	auto orthoProj = Matrix4x4::CreateOrthographic(
-		WindowInfo::GetInstance().GetWidth(), 
-		WindowInfo::GetInstance().GetHeight(), 
+		static_cast<float>(viewportWidth),
+		static_cast<float>(viewportHeight),
 		-1.0f, 
 		100.0f);
 
@@ -258,25 +285,19 @@ void Renderer::RenderScreenSpace(ID3D12GraphicsCommandList* p_commandList)
 	}
 
 	PSOKey compare{};
-	int meshItemIndex = 0;
-	int spriteItemIndex = 0;
-	int uiItemIndex = 0;
 
 	for(auto& item : m_frameRenderData.screenspace)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), meshItemIndex, compare); // Screen space items can reuse the first constant buffer since they won't be drawn together
-			meshItemIndex++;
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), spriteItemIndex, compare); // Screen space items can reuse the first constant buffer since they won't be drawn together
-			spriteItemIndex++;
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), uiItemIndex, compare); // Screen space items can reuse the first constant buffer since they won't be drawn together
-			uiItemIndex++;
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare);
 			break;
 		default:
 			break;
@@ -353,11 +374,6 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 
 void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex)
 {
-	if(itemIndex >= m_meshForShadowCB.size())
-	{
-		m_meshForShadowCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
-	}
-
 	// Set up the constant buffer for this mesh
 	auto ptr = m_meshForShadowCB[itemIndex]->GetPtr<MeshRenderConstants>();
 	ptr->worldMatrix = item.common.worldMatrix;

@@ -329,21 +329,42 @@ namespace
 		json data;
 		source.Serialize(data);
 
+		RectTransform canvasTransform;
+		json canvasTransformData;
+		canvasTransform.Serialize(canvasTransformData);
+		Canvas canvas;
+		json canvasData;
+		canvas.Serialize(canvasData);
+
 		const Guid actorGuid = GuidGenerator::Generate();
+		const Guid canvasGuid = GuidGenerator::Generate();
 		const json sceneJson = MakeVersion3Scene({
 			MakeVersion3Actor(
 				actorGuid,
 				"UIActor",
-				json::array({ MakeComponentRecord("RectTransform", data) }))
+				json::array({ MakeComponentRecord("RectTransform", data) }),
+				canvasGuid.ToString()),
+			MakeVersion3Actor(
+				canvasGuid,
+				"CanvasActor",
+				json::array({
+					MakeComponentRecord(
+						"RectTransform",
+						canvasTransformData),
+					MakeComponentRecord(
+						"Canvas",
+						canvasData)
+				}))
 		});
 		TemporarySceneFile file(sceneJson);
 
 		SceneBase scene;
 		const bool loaded = SceneLoader::LoadScene(file.String(), &scene);
 		Check(loaded,
-			"Version 3 accepts RectTransform as the Actor transform");
+			"Version 3 accepts RectTransform below a ScreenSpace Canvas");
 
 		Actor* actor = scene.ResolveActor(actorGuid);
+		Actor* canvasActor = scene.ResolveActor(canvasGuid);
 		RectTransform* rect = actor
 			? actor->GetComponentByClass<RectTransform>()
 			: nullptr;
@@ -368,9 +389,10 @@ namespace
 			rect &&
 			exactTransformCount == 0 &&
 			exactRectTransformCount == 1,
-			"RectTransform restoration does not add a base Transform");
+			"UI hierarchy restoration keeps exactly one RectTransform");
 		Check(
 			rect &&
+			actor->GetParent() == canvasActor &&
 			rect->GetAnchorMode() == AnchorMode::BottomRight &&
 			rect->GetAnchoredPosition().x == 18.0f &&
 			rect->GetAnchoredPosition().y == -24.0f &&
@@ -378,7 +400,7 @@ namespace
 			rect->GetPivot().y == 0.75f &&
 			rect->GetSize().x == 320.0f &&
 			rect->GetSize().y == 180.0f,
-			"Version 3 preserves RectTransform values");
+			"Deferred UI constraints preserve RectTransform values when the child record precedes its Canvas");
 	}
 
 	void TestVersion3TransformValidation()
@@ -522,6 +544,10 @@ namespace
 
 		canvas->SetSortOrder(12);
 		canvas->SetVisible(false);
+		Check(source.SetCanvasRenderMode(
+			canvas,
+			CanvasRenderMode::WorldSpace),
+			"Version 3 source configures Canvas render mode through Scene");
 
 		image->SetCanvas(canvas);
 		image->SetOrder(7);
@@ -612,6 +638,10 @@ namespace
 			"Version 3 preserves SpriteRenderer settings");
 		Check(restoredCanvas && actualCanvas == expectedCanvas,
 			"Version 3 preserves Canvas settings");
+		Check(restoredCanvas &&
+			restoredCanvas->GetRenderMode() ==
+				CanvasRenderMode::WorldSpace,
+			"Version 3 preserves Canvas render mode");
 		Check(
 			restoredImage &&
 			actualImage == expectedImage &&

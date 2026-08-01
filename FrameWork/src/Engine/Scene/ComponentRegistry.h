@@ -22,12 +22,40 @@ class ComponentRegistry
 public:
 	using Factory = std::function<Component* ()>;	// Factory function type that creates a Component instance
 
+	// Entry struct to hold information about a registered component
+	struct Entry
+	{
+		Factory factory;					// Factory function to create a component instance
+		std::type_index typeId;				// Type index of the component class
+		ComponentCardinality cardinality;	// Cardinality of the component (UniqueRequired, UniqueOptional, Multiple)
+		ComponentFamily family;				// Family of the component (Grouping of related components)
+
+		// Constructor forn initialization
+		Entry(
+			Factory componentFactory,
+			std::type_index componentTypeId,
+			ComponentCardinality componentCardinality,
+			ComponentFamily componentFamily
+		)
+		  : factory(std::move(componentFactory)),
+			typeId(componentTypeId),
+			cardinality(componentCardinality),
+			family(componentFamily)
+		{}
+	};
+
 	static ComponentRegistry& Get();
 
 	// Register a behavior factory with a name and its type index
-	void Register(const std::string& name, Factory factory, std::type_index typeId) 
+	void Register(
+		const std::string& name, 
+		Factory factory, 
+		std::type_index typeId,
+		ComponentCardinality cardinality,
+		ComponentFamily family
+	) 
 	{ 
-		m_factories[name] = factory;
+		m_entries.insert_or_assign(name, Entry(std::move(factory), typeId, cardinality, family));
 		DBG("ComponentRegistry: REGISTER name='%s' typeid.name()='%s'", name.c_str(), typeId.name());
 		m_typeNames[typeId.name()] = name;
 	}
@@ -35,7 +63,7 @@ public:
 	// Specialized registration function for components defined in GameCode.dll
 	void RegisterGameComponent(const std::string& name, Factory factory, std::type_index typeId)
 	{
-		Register(name, factory, typeId);
+		Register(name, factory, typeId, ComponentCardinality::Multiple, ComponentFamily::None);
 		m_gameComponentNames.insert(name);
 		DBG("ComponentRegistry: REGISTERED GameCode component '%s'", name.c_str());
 	}
@@ -45,7 +73,7 @@ public:
 	{
 		for (const auto& name : m_gameComponentNames)
 		{
-			m_factories.erase(name);
+			m_entries.erase(name);
 
 			// Delete from type names map as well
 			for (auto it = m_typeNames.begin(); it != m_typeNames.end(); )
@@ -69,10 +97,10 @@ public:
 	// Create a component instance by name from the registry
 	Component* Create(const std::string& name) const 
 	{
-		auto it = m_factories.find(name);
-		if (it != m_factories.end()) 
+		auto it = m_entries.find(name);
+		if (it != m_entries.end()) 
 		{
-			return it->second();
+			return it->second.factory();
 		}
 		return nullptr;
 	}
@@ -80,29 +108,27 @@ public:
 	// Check if a behavior factory exists in the registry
 	bool Has(const std::string& name) const 
 	{
-		return m_factories.find(name) != m_factories.end();
+		return m_entries.find(name) != m_entries.end();
 	}
 
 	// Create a component instance by name and add it to the given actor
 	bool AddToActor(const std::string& name, Actor* actor) const
 	{
-		auto it = m_factories.find(name);
-		if(it == m_factories.end())
+		if (!actor) return false;
+
+		auto it = m_entries.find(name);
+
+		if(it == m_entries.end())
 		{
 			DBG("ComponentRegistry: No factory found for component '%s'", name.c_str());
 			return false;
 		}
 
-		std::unique_ptr<Component> component(it->second());
+		std::unique_ptr<Component> component(it->second.factory());
 
-		if (component)
-		{
-			actor->AddComponent(std::move(component));
-			return true;
-		}
+		if (!component) return false;
 
-		DBG("ComponentRegistry: Factory for component '%s' failed to create an instance", name.c_str());
-		return false;
+		return actor->AddComponent(std::move(component)) != nullptr;
 	}
 
 	// Get name of a component by its type index
@@ -117,11 +143,25 @@ public:
 		return it->second;
 	}
 
+	const Entry* GetEntry(const std::string& name) const
+	{
+		auto it = m_entries.find(name);
+		if (it == m_entries.end()) return nullptr;
+		return &it->second;
+	}
+
+	const Entry* GetEntry(std::type_index typeId) const
+	{
+		auto it = m_typeNames.find(typeId.name());
+		if (it == m_typeNames.end()) return nullptr;
+		return GetEntry(it->second);
+	}
+
 private:
 	ComponentRegistry() = default;
 
-	// Map of component names to their factory functions
-	std::unordered_map<std::string, Factory> m_factories;
+	// Map of component names to their Entry struct containing factory and type information
+	std::unordered_map<std::string, Entry> m_entries;
 
 	// Map of component type indices to their registered names
 	std::unordered_map<std::string, std::string> m_typeNames;
@@ -136,10 +176,13 @@ private:
 // .cpp file must include the .h file to ensure the registration happens at global scope
 #define REGISTER_COMPONENT(ClassName)                                   \
     static bool _reg_##ClassName = [](){                                \
+        using Policy = ComponentPolicy<ClassName>;                      \
         ComponentRegistry::Get().Register(                              \
             #ClassName,                                                 \
             [](){ return static_cast<Component*>(new ClassName()); },   \
-            std::type_index(typeid(ClassName))                          \
+            std::type_index(typeid(ClassName)),                         \
+            Policy::cardinality,                                        \
+            Policy::family                                              \
         );                                                              \
         return true;                                                    \
     }();

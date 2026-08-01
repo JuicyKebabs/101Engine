@@ -142,9 +142,22 @@ bool SceneLoader::LoadSceneVersion2(const json& sceneJson, SceneBase* scene)
 			return false;
 		}
 
-		child->SetParentHandle(parent->GetHandle());
+		// Restore the parent-child relationship in the scene
+		if (!scene->RestoreParentRelationship(child, parent))
+		{
+			DBG("SceneLoader: Failed to restore parent relationship for Actor '%s'.", child->GetName().c_str());
+			return false;
+		}
 	}
 
+	// Apply UI hierarchy constraints after all parent-child relationships have been restored
+	if (!scene->ApplyAllUIHierarchyConstraints())
+	{
+		DBG("SceneLoader: Failed to apply UI hierarchy constraints.");
+		return false;
+	}
+
+	// Apply scene settings
 	if (!ApplySceneSettings(sceneJson, scene))
 	{
 		DBG("SceneLoader: Failed to apply scene settings.");
@@ -228,7 +241,7 @@ Actor* SceneLoader::RestoreActorDataVersion2(
 		}
 	}
 
-	return scene->AddRootActor(std::move(actorOwned));	// Add the actor to the scene and return the pointer
+	return scene->RegisterRestoredActor(std::move(actorOwned));	// Add the actor to the scene and return the pointer
 }
 
 //----------------------------------------------------------------
@@ -269,13 +282,25 @@ bool SceneLoader::LoadSceneVersion3(const json& sceneJson, SceneBase* scene)
 			return false;
 		}
 
-		child->SetParentHandle(parent->GetHandle());
+		// Reparent the child actor to the parent actor in the scene
+		if (!scene->RestoreParentRelationship(child, parent))
+		{
+			DBG("SceneLoader: Failed to restore parent relationship for Actor '%s'.", child->GetName().c_str());
+			return false;
+		}
 	}
 
 	// Thirs pass: resolve component references (Actor or assets)
 	if (!RestoreComponentReferences(records, scene))
 	{
 		DBG("SceneLoader: Failed to restore component references.");
+		return false;
+	}
+
+	// Apply UI hierarchy constraints after all parent-child relationships have been restored
+	if (!scene->ApplyAllUIHierarchyConstraints())
+	{
+		DBG("SceneLoader: Failed to apply UI hierarchy constraints.");
 		return false;
 	}
 
@@ -402,7 +427,7 @@ Actor* SceneLoader::RestoreActorDataVersion3(const ActorLoadRecord& record, Scen
 	}
 
 	// Add the actor to the scene and return the pointer
-	return scene->AddRootActor(std::move(actorOwned));
+	return scene->RegisterRestoredActor(std::move(actorOwned));
 }
 
 bool SceneLoader::RestoreComponentReferences(const std::vector<ActorLoadRecord>& records, SceneBase* scene)

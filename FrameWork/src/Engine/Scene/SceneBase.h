@@ -14,7 +14,6 @@
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
 
-
 //----------------------------------------------------------------------------------------
 // SceneBase class
 // This class represents a base of scene
@@ -22,7 +21,10 @@
 // This also has systems which are used to process the core functionalities of the scene
 //----------------------------------------------------------------------------------------
 
-class SceneManager;	// Forward declaration of SceneManager class
+// Forward declarations
+class SceneManager;
+class SceneLoader;
+enum class TransformKind;
 
 // Scene base class
 class SceneBase
@@ -139,15 +141,29 @@ public:
 		return it->second;
 	}
 
+	// Change the parent of an actor to a new parent
+	// Passing nullptr as newParent will make the actor a root actor
+	bool ReparentActor(Actor* actor, Actor* newParent);
+
+	// Set the render mode of a canvas
+	// This ensure that all canvas in the hierarchy of the given actor have the same render mode as the governing canvas
+	bool SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode);
+
+	// Set the reference size of a canvas
+	// Mark all RectTransform in the hierarchy of the given actor as dirty to update their layout
+	bool SetCanvasReferenceSize(Canvas* canvas, const Vector2& referenceSize);
+
 	// Setters
 	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
 	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager	
+	void SetViewportSize(const UINT width, const UINT height);								// Set viewport size and apply it to all affected systems and components
 
 	// Getters
 	RenderSystem* GetRenderSystem() const { return m_pRenderSystem.get(); }				// Get render system
 	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }				// Get camera system
 	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
 	DirectionalLight GetDirectionalLight() const { return m_directionalLight; }			// Get directional light
+	Vector2 GetViewportSize() const { return m_viewportSize; }							// Get viewport size
 	SceneManager* GetSceneManager() const { return m_pSceneManager; }					// Get scene manager
 	EngineContext* GetEngineContext() const { return m_pEngineContext; }				// Get engine context
 
@@ -164,13 +180,45 @@ private:
 	std::unordered_map<Guid, ActorHandle> m_actorGuidMap;		// Map of actor GUIDs to actor handles (used for resolving actors by GUID)
 	std::unordered_map<ActorHandle, Guid> m_actorHandleGuidMap;	// Map of actor handles to actor GUIDs (used for resolving GUIDs by actor handle)
 
+	Vector2 m_viewportSize = Vector2::One();	// Viewport size used as the root Screen-Space UI layout size
+
 	SceneManager* m_pSceneManager = nullptr;	// Pointer to the scene manager (used for scene switching)
 	EngineContext* m_pEngineContext = nullptr;	// Pointer to the engine context (used for accessing engine systems)
 
 private:
+	friend class SceneLoader;
+
 	// Helper function for Actor registration
-	Actor* RegisterActor(
-		std::unique_ptr<Actor> actor,
-		ActorHandle parentHandle
-	);
+	Actor* RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle, bool applyUIConstraints);
+
+	// Helper function for Actor restoration (used by SceneLoader)
+	Actor* RegisterRestoredActor(std::unique_ptr<Actor> actor);
+
+	// Check if reparenting would create a hierarchy cycle
+	bool WouldCreateHierarchyCycle(const Actor* actor, const Actor* newParent) const;
+
+	// Ensure that the actor has the required transform component (Transform or RectTransform)
+	bool EnsureActorTransformKind(Actor* actor, TransformKind requiredKind);
+
+	// Just construct the parent-child relationship without applying any UI hierarchy constraints
+	// (This is for unique construction method of parent-child relationship in SceneLoader)
+	bool RestoreParentRelationship(Actor* child, Actor* parent);
+
+	// Internal function to reparent an actor, with an option to apply UI hierarchy constraints
+	// (This option is for unique construction method of parent-child relationship in SceneLoader)
+	bool ReparentActorInternal(Actor* actor, Actor* newParent, bool applyUIConstraints);
+
+	// Find the topmost canvas in the hierarchy of the given actor
+	// Used for determining several UI-related settings which are inherited from the topmost canvas
+	Canvas* FindTopmostCanvas(Actor* actor) const;
+
+	// Apply UI hierarchy constraints to the given actor based on the governing canvas
+	bool ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas);
+
+	// Apply UI hierarchy constraints to all actors in the scene
+	bool ApplyAllUIHierarchyConstraints();
+
+	// Helper to mark every RectTransform in the hierarchy of the given actor as dirty
+	// This is used to update the layout of UI elements when the viewport size changes
+	void MarkRectTransformHierarchyDirty(Actor* root);
 };

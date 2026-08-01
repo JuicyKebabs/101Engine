@@ -15,8 +15,6 @@ struct Guid;
 namespace EditorUI
 {
 	// Separate a label and a value with a horizontal layout
-	//
-	// Label | Value
 
 	// Begin a property grid with a unique identifier
 	bool BeginPropertyGrid(std::string_view id);

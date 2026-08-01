@@ -1,7 +1,10 @@
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Component/RectTransform.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
+#include "Engine/Scene/ComponentRegistry.h"
+#include "Engine/Scene/SceneBase.h"
 
 #include <iostream>
 #include <string>
@@ -85,6 +88,97 @@ namespace
 			"RestoreEmptyActor preserves its default Transform");
 	}
 
+	void TestTransformFamilyExclusion()
+	{
+		auto actor = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "TransformActor"));
+
+		RectTransform* rectTransform = actor->AddComponent<RectTransform>();
+
+		Check(rectTransform == nullptr,
+			"Actor rejects RectTransform when Transform already exists");
+		Check(actor->CountComponentFamily(ComponentFamily::Transform) == 1,
+			"Rejected RectTransform leaves exactly one Transform-family component");
+		Check(actor->GetComponentByClass<Transform>() != nullptr,
+			"Rejected RectTransform preserves the existing Transform");
+	}
+
+	void TestRectTransformFamilyExclusion()
+	{
+		auto actor = ActorFactory::CreateActor(
+			ActorType::UI,
+			Actor::InitDesc(true, TAG_NONE, "UIActor"));
+
+		Transform* transform = actor->AddComponent<Transform>();
+
+		Check(actor->GetComponentByClass<RectTransform>() != nullptr,
+			"UI Actor is created with RectTransform");
+		Check(transform == nullptr,
+			"Actor rejects Transform when RectTransform already exists");
+		Check(actor->CountComponentFamily(ComponentFamily::Transform) == 1,
+			"Rejected Transform leaves exactly one Transform-family component");
+	}
+
+	void TestRegistryUsesTransformFamilyPolicy()
+	{
+		auto actor = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "RegistryActor"));
+
+		const bool added =
+			ComponentRegistry::Get().AddToActor("RectTransform", actor.get());
+
+		Check(!added,
+			"ComponentRegistry reports Transform-family conflicts");
+		Check(actor->CountComponentFamily(ComponentFamily::Transform) == 1,
+			"Registry conflict does not add a second Transform-family component");
+	}
+
+	void TestUniqueComponentDuplicateRejection()
+	{
+		auto actor = ActorFactory::CreateActor(
+			ActorType::Camera,
+			Actor::InitDesc(true, TAG_NONE, "CameraActor"));
+
+		Camera* duplicate = actor->AddComponent<Camera>();
+
+		Check(duplicate == nullptr,
+			"Actor rejects a duplicate UniqueOptional component");
+		Check(actor->GetComponentsByClass<Camera>().size() == 1,
+			"Duplicate rejection preserves exactly one Camera");
+	}
+
+	void TestSceneRequiresOneTransformFamilyComponent()
+	{
+		SceneBase scene;
+		const Guid invalidGuid = GuidGenerator::Generate();
+		auto invalid = ActorFactory::RestoreActorShell(
+			Actor::InitDesc(true, TAG_NONE, "InvalidActor"),
+			invalidGuid);
+
+		Check(scene.AddRootActor(std::move(invalid)) == nullptr,
+			"Scene rejects an Actor without a Transform-family component");
+		Check(scene.ResolveActor(invalidGuid) == nullptr,
+			"Rejected Actor does not enter the Scene");
+
+		const Guid validGuid = GuidGenerator::Generate();
+		auto valid = ActorFactory::RestoreActorShell(
+			Actor::InitDesc(true, TAG_NONE, "ValidUIActor"),
+			validGuid);
+		Check(valid->AddComponent<RectTransform>() != nullptr,
+			"Restoration shell accepts a RectTransform");
+
+		Actor* registered = scene.AddRootActor(std::move(valid));
+
+		Check(registered != nullptr,
+			"Scene accepts an Actor with exactly one Transform-family component");
+		Check(registered &&
+			registered->GetComponentByClass<RectTransform>() == nullptr &&
+			registered->GetComponentByClass<Transform>() != nullptr &&
+			registered->CountComponentFamily(
+				ComponentFamily::Transform) == 1,
+			"Scene registration normalizes a Canvas-external Actor to one Transform");
+	}
+
 #ifdef NDEBUG
 	void TestInvalidGuidRejection()
 	{
@@ -106,6 +200,11 @@ int main()
 	TestNewEmptyActorGuidGeneration();
 	TestActorRestoration();
 	TestEmptyActorRestoration();
+	TestTransformFamilyExclusion();
+	TestRectTransformFamilyExclusion();
+	TestRegistryUsesTransformFamilyPolicy();
+	TestUniqueComponentDuplicateRejection();
+	TestSceneRequiresOneTransformFamilyComponent();
 
 #ifdef NDEBUG
 	TestInvalidGuidRejection();

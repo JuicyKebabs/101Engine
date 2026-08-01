@@ -8,7 +8,7 @@ public:
 	WindowInfo(const WindowInfo&) = delete;
 	void operator=(const WindowInfo&) = delete;
 
-	static WindowInfo& GetInstance() {
+	static WindowInfo& Get() {
 		static WindowInfo instance; // Guaranteed to be destroyed and instantiated on first use
 		return instance;
 	}
