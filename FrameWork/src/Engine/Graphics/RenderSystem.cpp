@@ -77,10 +77,87 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 				auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
 				RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
 				NormalizePSOKey(item.common.materialDesc.psoKey, queue);
-				auto handle = m_frameRenderData.AddMeshs(item);
+
+
+				if (renderProxy.common.renderSpace == RenderSpace::Screen)
+				{
+					// Disable depth testing for screen-space meshes
+					//item.common.materialDesc.psoKey.depth = DepthMode::Disable;
+					auto handle = m_frameRenderData.AddMeshs(item);
+
+					SortKeyScreenSpace sortKey;
+					sortKey.psoKey = item.common.materialDesc.psoKey;
+					sortKey.canvasOrder = renderProxy.common.canvasOrder;
+					sortKey.order = renderProxy.common.sortOrder;
+
+					RenderItemRef ref;
+					ref.renderType = RenderType::Mesh;
+					ref.handle = handle;
+					ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
+					m_frameRenderData.AddScreenSpace(ref);
+				}
+				else
+				{
+					auto handle = m_frameRenderData.AddMeshs(item);
+					RenderItemRef ref;
+					ref.renderType = RenderType::Mesh;
+					ref.handle = handle;
+
+					if (queue == RenderQueue::Opaque)
+					{
+						SortKeyOpaque opaqueKey;
+						opaqueKey.psoKey = item.common.materialDesc.psoKey;
+						ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
+						m_frameRenderData.AddOpaque(ref);
+					}
+					else
+					{
+						SortKeyTransparent transparentKey;
+						transparentKey.psoKey = item.common.materialDesc.psoKey;
+						transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
+						ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
+						m_frameRenderData.AddTransparent(ref);
+					}
+				}
+			}
+		}
+	}
+
+	// Build draw packets for sprite renderers
+	for(const auto& renderer : m_spriteRenderers)
+	{
+		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
+		{
+			const auto& renderTemplate = renderer->GetRenderTemplate();
+			const auto& renderProxy = renderer->GetRenderProxy(m_cameraInfo);
+			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
+			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
+			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
+
+
+			if (renderProxy.common.renderSpace == RenderSpace::Screen)
+			{
+				// Disable depth testing for screen-space sprites
+				item.common.materialDesc.psoKey.depth = DepthMode::Disable;
+				auto handle = m_frameRenderData.AddSprites(item);
+
+				SortKeyScreenSpace sortKey;
+				sortKey.psoKey = item.common.materialDesc.psoKey;
+				sortKey.canvasOrder = renderProxy.common.canvasOrder;
+				sortKey.order = renderProxy.common.sortOrder;
 
 				RenderItemRef ref;
-				ref.renderType = RenderType::Mesh;
+				ref.renderType = RenderType::Sprite;
+				ref.handle = handle;
+				ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
+				m_frameRenderData.AddScreenSpace(ref);
+			}
+			else
+			{
+				auto handle = m_frameRenderData.AddSprites(item);
+
+				RenderItemRef ref;
+				ref.renderType = RenderType::Sprite;
 				ref.handle = handle;
 
 				if (queue == RenderQueue::Opaque)
@@ -102,40 +179,6 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 		}
 	}
 
-	// Build draw packets for sprite renderers
-	for(const auto& renderer : m_spriteRenderers)
-	{
-		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
-		{
-			const auto& renderTemplate = renderer->GetRenderTemplate();
-			const auto& renderProxy = renderer->GetRenderProxy(m_cameraInfo);
-			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
-			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
-			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
-			auto handle = m_frameRenderData.AddSprites(item);
-
-			RenderItemRef ref;
-			ref.renderType = RenderType::Sprite;
-			ref.handle = handle;
-
-			if (queue == RenderQueue::Opaque)
-			{
-				SortKeyOpaque opaqueKey;
-				opaqueKey.psoKey = item.common.materialDesc.psoKey;
-				ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
-				m_frameRenderData.AddOpaque(ref);
-			}
-			else
-			{
-				SortKeyTransparent transparentKey;
-				transparentKey.psoKey = item.common.materialDesc.psoKey;
-				transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
-				ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
-				m_frameRenderData.AddTransparent(ref);
-			}
-		}
-	}
-
 	// Build draw packets for UI renderers
 	for(const auto& renderer : m_uiRenderers)
 	{
@@ -152,7 +195,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 
 				PSOKey& psoKey = item.common.materialDesc.psoKey;
 
-				if (renderProxy.isWorldSpace)
+				if (renderProxy.common.renderSpace == RenderSpace::World)
 				{// World-space UI elements
 					// Get the render queue based on the PSOKey and normalize it
 					RenderQueue queue = GetRenderQueue(psoKey);
@@ -181,7 +224,7 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 						m_frameRenderData.AddTransparent(ref);
 					}
 				}
-				else
+				else if (renderProxy.common.renderSpace == RenderSpace::Screen)
 				{// Screen-space UI elements
 
 					// Disable depth testing

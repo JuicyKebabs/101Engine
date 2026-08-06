@@ -1,19 +1,32 @@
 #pragma once
+#include <cstdint>
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
+
+class Canvas;
 
 //-------------------------------------------------------
 // RendererComponent class
 // Base class for all renderer components in the engine
 // ------------------------------------------------------
 
+enum class RenderSpace
+{
+	World,	// Renderer operates in world space (3D)
+	Screen,	// Renderer operates in screen space (2D)
+};
+
 // Common render proxy structure for draw packets (Specific renderer component has this structure with additional fields as needed)
 struct CommonRendererProxy
 {
-	Vector3 position{};			// Position for this draw packet
-	Matrix4x4 worldMatrix = {};	// World matrix for this draw packet
-	Vector4 color{ 1,1,1,1 };	// Color for rendering
-	bool visible = true;		// Visibility flag for this draw packet
+	Vector3 position{};								// Position for this draw packet
+	Matrix4x4 worldMatrix = {};						// World matrix for this draw packet
+	Vector4 color{ 1,1,1,1 };						// Color for rendering
+	bool visible = true;							// Visibility flag for this draw packet
+	RenderSpace renderSpace = RenderSpace::World;	// Render space for this draw packet (World or Screen)
+	
+	uint32_t canvasOrder = 0;	// Order of the canvas this draw packet belongs to (used for sorting within the canvas)
+	uint32_t sortOrder = 0;		// Sort order for this draw packet (used for sorting)
 };
 
 // Base RendererComponent Class (for common rendering properties and functionality)
@@ -29,11 +42,21 @@ public:
 	// Setters
 	void SetVisible(bool visible) { m_isVisible = visible; m_isProxyDirty = true; }
 	void SetColor(const Vector4& color) { m_color = color; m_isProxyDirty = true; }
-
+	virtual void SetGoverningCanvas(Canvas* canvas)
+	{
+		m_pGoverningCanvas = canvas;
+		m_isProxyDirty = true;
+	}
+	void SetSortOrderInCanvas(uint32_t order) { m_sortOrderInCanvas = order; m_isProxyDirty = true; }
+	
 	// Getters
 	Vector4 GetColor() const { return m_color; }
 	virtual bool IsVisible() const { return m_isVisible; }
 	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources
+	Canvas* GetGoverningCanvas() const { return m_pGoverningCanvas; }
+	uint32_t GetSortOrderInCanvas() const { return m_sortOrderInCanvas; }
+
+	RenderSpace GetRenderSpace() const;
 
 	// Serialization and deserialization methods
 	bool Serialize(nlohmann::json& outJson) const override;
@@ -56,4 +79,12 @@ protected:
 
 	// Function to check if the transform has changed and mark the proxy as dirty if needed
 	void CheckIfTransformChanged();
+
+private:
+	// Pointer to the governing Canvas component (if any) for this renderer
+	// This is used to determine the rendering pass if this renderer is part of a UI hierarchy
+	Canvas* m_pGoverningCanvas = nullptr;
+
+	// Sort order for this renderer (used for sorting in the render queue)
+	uint32_t m_sortOrderInCanvas = 0;
 };

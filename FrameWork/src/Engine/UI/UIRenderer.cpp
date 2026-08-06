@@ -3,6 +3,7 @@
 #include "Engine/UI/UIRenderer.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Scene/SceneBase.h"
+#include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/UI/Canvas.h"
@@ -38,7 +39,8 @@ void UIRenderer::OnDestroyOverride()
 	}
 
 	// Unregister from the canvas
-	if(m_pCanvas) m_pCanvas->UnregisterUIRenderer(this);
+	Canvas* governingCanvas = GetGoverningCanvas();
+	if(governingCanvas) governingCanvas->UnregisterUIRenderer(this);
 }
 
 const UIRendererProxy& UIRenderer::GetRenderProxy()
@@ -50,12 +52,15 @@ const UIRendererProxy& UIRenderer::GetRenderProxy()
 
 bool UIRenderer::IsVisible() const
 {
-	return m_isVisible && m_pCanvas && m_pCanvas->IsVisible();
+
+	Canvas* governingCanvas = GetGoverningCanvas();
+	return m_isVisible && governingCanvas && governingCanvas->IsVisible();
 }
 
 UINT UIRenderer::GetCanvasOrder() const
 {
-	return m_pCanvas ? m_pCanvas->GetSortOrder() : 0;
+	Canvas* governingCanvas = GetGoverningCanvas();
+	return governingCanvas ? governingCanvas->GetSortOrder() : 0;
 }
 
 void UIRenderer::RebuildRenderProxy()
@@ -72,20 +77,22 @@ void UIRenderer::RebuildRenderProxy()
 		}
 		m_renderProxy.common.color = m_color;
 		m_renderProxy.common.visible = m_isVisible;
+		m_renderProxy.common.renderSpace = GetRenderSpace();
 		m_renderProxy.canvasOrder = GetCanvasOrder();
-		m_renderProxy.order = m_order;
+		m_renderProxy.order = GetSortOrderInCanvas();
 		m_renderProxy.uvScale = m_uvScale;
 		m_renderProxy.uvOffset = m_uvOffset;
 		m_renderProxy.flip.x = m_flipX ? -1.0f : 1.0f;
 		m_renderProxy.flip.y = m_flipY ? -1.0f : 1.0f;
-		m_renderProxy.isWorldSpace = m_pCanvas && m_pCanvas->GetRenderMode() == CanvasRenderMode::WorldSpace;
 		m_isProxyDirty = false;
 	}
 }
 
 void UIRenderer::InitialRegistration()
 {
-	if (!m_pCanvas) return;
+	Canvas* governingCanvas = GetGoverningCanvas();
+
+	if (!governingCanvas) return;
 
 	// Register with the render system of the scene
 	auto owner = GetOwner();
@@ -117,34 +124,61 @@ void UIRenderer::InitialRegistration()
 		return;
 	}
 
-	m_pCanvas->RegisterUIRenderer(this); // Register with the canvas for sorting and rendering
+	governingCanvas->RegisterUIRenderer(this); // Register with the canvas for sorting and rendering
 }
 
-void UIRenderer::SetCanvas(Canvas* canvas)
+void UIRenderer::SetGoverningCanvas(Canvas* canvas)
 {
-	if (m_pCanvas == canvas) return;
+	Canvas* previousCanvas = GetGoverningCanvas();
 
-	if (m_pCanvas) m_pCanvas->UnregisterUIRenderer(this);
+	if (previousCanvas == canvas)
+	{
+		m_isProxyDirty = true;
+		return;
+	}
 
-	m_pCanvas = canvas;
-	m_isProxyDirty = true;
+	if (previousCanvas) previousCanvas->UnregisterUIRenderer(this);
 
-	if (m_pCanvas && IsStarted()) InitialRegistration();
+	RendererComponent::SetGoverningCanvas(canvas);
+
+	if (!IsStarted()) return;
+
+	if (canvas)
+	{
+		InitialRegistration();
+		return;
+	}
+
+	// If the canvas is set to nullptr, unregister from the render system of the scene
+	Actor* owner = GetOwner();
+	SceneBase* scene = owner
+		? owner->GetOwner()
+		: nullptr;
+
+	if (scene)
+	{
+		if (RenderSystem* renderSystem = scene->GetRenderSystem())
+		{
+			renderSystem->Unregister(this);
+		}
+	}
 }
 
 bool UIRenderer::Serialize(nlohmann::json& outJson) const
 {
 	if (!RendererComponent::Serialize(outJson)) return false;
 
-	outJson["order"] = m_order;
+	outJson["order"] = GetSortOrderInCanvas();
 	outJson["uvScale"] = JsonMath::ToJson(m_uvScale);
 	outJson["uvOffset"] = JsonMath::ToJson(m_uvOffset);
 	outJson["flipX"] = m_flipX;
 	outJson["flipY"] = m_flipY;
 
-	if (m_pCanvas) 
+	Canvas* canvas = GetGoverningCanvas();
+
+	if (canvas) 
 	{// Serialize the canvas actor's Guid for reference
-		Actor* canvasActor = m_pCanvas->GetOwner();
+		Actor* canvasActor = canvas->GetOwner();
 
 		if (!canvasActor || !canvasActor->GetGuid().IsValid())
 		{
@@ -265,9 +299,9 @@ bool UIRenderer::Deserialize(const nlohmann::json& json)
 
 	if (!RendererComponent::Deserialize(json)) return false;
 
-	SetCanvas(nullptr);
+	SetGoverningCanvas(nullptr);
 
-	m_order = static_cast<UINT>(parsedOrder);
+	SetSortOrderInCanvas(static_cast<UINT>(parsedOrder));
 	m_uvScale = parsedUVScale;
 	m_uvOffset = parsedUVOffset;
 	m_flipX = parsedFlipX;
@@ -292,7 +326,7 @@ bool UIRenderer::ResolveReferences(SceneBase& scene)
 
 	if (!canvas) return false;
 
-	SetCanvas(canvas);
+	SetGoverningCanvas(canvas);
 	m_pendingCanvasActorId.reset();
 	m_isProxyDirty = true;
 

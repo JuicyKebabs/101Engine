@@ -4,13 +4,15 @@
 #include <memory>
 #include <functional>
 
+// Forward declarations
+class Actor;
+class SceneBase;
+
 //---------------------------------------------------------------------------------------
 // ActorPool class
 // This class has all ownership of Actor instances in the scene.
 // It manages the lifetime of actors and provides a way to resolve ActorHandle to Actor*.
 //---------------------------------------------------------------------------------------
-
-class Actor;
 
 class ActorPool
 {
@@ -48,4 +50,11 @@ private:
 
 	std::vector<Slot> m_slots;				// The pool of actor slots
 	std::vector<uint32_t> m_freeIndices;	// Indices of free slots in the pool
+
+private:
+	friend class SceneBase;
+
+	// Immediately discard an Actor registered during a failed restoration transaction.
+	// This must only be used before the Actor becomes visible to normal Scene processing.
+	bool DiscardUninitialized(ActorHandle handle);
 };

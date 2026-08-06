@@ -36,5 +36,17 @@ void MeshRendererInspector::Draw(MeshRenderer& meshRenderer, const InspectorCont
 		meshRenderer.SetColor(color);
 	}
 
+	// Draw sort order field if the renderer is in screen space
+	// (In the Screen-Space UI hierarchy)
+	if (meshRenderer.GetRenderSpace() == RenderSpace::Screen)
+	{
+		UINT sortOrder = meshRenderer.GetSortOrderInCanvas();
+
+		if (EditorUI::UIntField("Sort Order", sortOrder))
+		{
+			meshRenderer.SetSortOrderInCanvas(sortOrder);
+		}
+	}
+
 	EditorUI::EndPropertyGrid();
 }

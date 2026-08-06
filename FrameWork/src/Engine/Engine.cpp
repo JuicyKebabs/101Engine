@@ -17,13 +17,13 @@ bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeig
 	CreateViewport();					//ビューポートの生成
 	CreateScissorRect();				//シザー矩形の生成
 	CreateBackBuffers();				//バックバッファの生成
-	CreateBuiltinRenderTargets();		//ビルトインレンダーターゲットの生成（ポストプロセス、ブラー、モーションブラーなど）
+	CreateBuiltinRenderTargets();		//ビルトインレンダーターゲットの生成
 	return true;
 }
 
 void Engine::InitBindings(TextureManager* pTextureManager)
 {
-	this->m_pTextureManager = pTextureManager;	//テクスチャマネージャの保存
+	this->m_pTextureManager = pTextureManager; 
 }
 
 //終了

@@ -96,3 +96,23 @@ size_t ActorPool::Count() const
 	}
 	return count;
 }
+
+bool ActorPool::DiscardUninitialized(ActorHandle handle)
+{
+	if (!IsValid(handle)) return false;
+
+	Slot& slot = m_slots[handle.index];
+
+	if (slot.pendingDestroy) return false;
+
+	// Calling OnDestroy is not necessary because the Actor has not entered
+	// normal Scene processing yet.
+	slot.actor.reset();
+
+	// Invalidate every handle previously issued for this slot.
+	slot.generation++;
+	slot.pendingDestroy = false;
+	m_freeIndices.push_back(handle.index);
+
+	return true;
+}

@@ -7,6 +7,8 @@ void RectTransformInspector::Draw(RectTransform& rectTransform, const InspectorC
 {
 	int anchorMode = static_cast<int>(rectTransform.GetAnchorMode());
 	Vector2 anchoredPosition = rectTransform.GetAnchoredPosition();
+	Vector3 rotation = rectTransform.GetLocalRotationEulerDeg();
+	Vector3 scale = rectTransform.GetLocalScale();
 	Vector2 pivot = rectTransform.GetPivot();
 	Vector2 size = rectTransform.GetSize();
 
@@ -29,9 +31,30 @@ void RectTransformInspector::Draw(RectTransform& rectTransform, const InspectorC
 		rectTransform.SetAnchorMode(static_cast<AnchorMode>(anchorMode));
 	}
 
-	if (EditorUI::Vector2Field("Position", anchoredPosition)) rectTransform.SetAnchoredPosition(anchoredPosition);
-	if (EditorUI::Vector2Field("Pivot", pivot)) rectTransform.SetPivot(pivot);
-	if (EditorUI::Vector2Field("Size", size)) rectTransform.SetSizeDelta(size);
+	if (EditorUI::Vector2Field("Position", anchoredPosition))
+	{
+		rectTransform.SetAnchoredPosition(anchoredPosition);
+	}
+
+	if (EditorUI::Vector3Field("Rotation", rotation, 0.5f))
+	{
+		rectTransform.SetLocalRotationEulerDeg(rotation);
+	}
+
+	if (EditorUI::Vector3Field("Scale", scale, 0.1f))
+	{
+		rectTransform.SetLocalScale(scale);
+	}
+
+	if (EditorUI::Vector2Field("Pivot", pivot))
+	{
+		rectTransform.SetPivot(pivot);
+	}
+
+	if (EditorUI::Vector2Field("Size", size))
+	{
+		rectTransform.SetSizeDelta(size);
+	}
 
 	EditorUI::EndPropertyGrid();
 }

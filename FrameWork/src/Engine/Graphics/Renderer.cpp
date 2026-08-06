@@ -45,6 +45,7 @@ void Renderer::Initialize(
 	m_pDefaultPSO = CreatePipelineStateObject(defaultKey);
 
 	m_colorFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
+	m_screenSpaceFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_shadowFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
 
@@ -267,11 +268,11 @@ void Renderer::RenderScreenSpace(
 		100.0f);
 
 	// Set frame-level constants for screen space rendering
-	auto framePtr = m_colorFrameCB->GetPtr<FrameConstants>();
+	auto framePtr = m_screenSpaceFrameCB->GetPtr<FrameConstants>();
 	framePtr->view = Matrix4x4::Identity;
 	framePtr->proj = orthoProj;
 	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
-	p_commandList->SetGraphicsRootConstantBufferView(0, m_colorFrameCB->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_screenSpaceFrameCB->GetAddress());
 
 	// Allocate constant buffers for ui items
 	size_t totalUIItemCount = m_frameRenderData.GetUICount();

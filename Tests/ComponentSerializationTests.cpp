@@ -446,7 +446,7 @@ namespace
 		RectTransform restored;
 		Check(restored.Deserialize(serialized), "RectTransform Deserialize succeeds");
 		Check(restored.GetName() == "SavedRectTransform" &&
-			Near(restored.GetLocalPosition(), source.GetLocalPosition()) &&
+			Near(restored.GetLocalPosition(), Vector3::Zero()) &&
 			restored.GetLocalRotationQuat().NearEqual(
 				source.GetLocalRotationQuat(), 0.001f) &&
 			Near(restored.GetLocalScale(), source.GetLocalScale()) &&
@@ -454,7 +454,7 @@ namespace
 			Near(restored.GetAnchoredPosition(), source.GetAnchoredPosition()) &&
 			Near(restored.GetPivot(), source.GetPivot()) &&
 			Near(restored.GetSize(), source.GetSize()),
-			"RectTransform base and UI settings survive a round trip");
+			"RectTransform round trip canonicalizes position and preserves other settings");
 	}
 
 	void TestInvalidRectTransformUiDoesNotMutateBase()
@@ -556,6 +556,10 @@ namespace
 				Actor::InitDesc(true, TAG_NONE, "Parent")));
 		Canvas* parentCanvas =
 			parent->GetComponentByClass<Canvas>();
+		Check(scene.SetCanvasScaleMode(
+			parentCanvas,
+			CanvasScaleMode::ConstantPixelSize),
+			"Canvas accepts ConstantPixelSize for Transform inheritance test");
 		Check(scene.SetCanvasRenderMode(
 			parentCanvas,
 			CanvasRenderMode::WorldSpace),
@@ -605,6 +609,8 @@ namespace
 				ActorType::UI,
 				Actor::InitDesc(true, TAG_NONE, "Image")),
 			parent->GetHandle());
+		Canvas* canvas = parent->GetComponentByClass<Canvas>();
+		scene.SetCanvasScaleMode(canvas, CanvasScaleMode::ConstantPixelSize);
 
 		RectTransform* parentTransform =
 			parent->GetComponentByClass<RectTransform>();
@@ -629,6 +635,46 @@ namespace
 			"Parent Rect size does not multiply child Transform scale");
 	}
 
+	void TestRectTransformInheritsRectTransformScale()
+	{
+		SceneBase scene;
+		Actor* parent = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "ScaledPanel")));
+		Actor* child = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::UI,
+				Actor::InitDesc(true, TAG_NONE, "ScaledImage")),
+			parent->GetHandle());
+		Canvas* canvas = parent->GetComponentByClass<Canvas>();
+		scene.SetCanvasScaleMode(canvas, CanvasScaleMode::ConstantPixelSize);
+
+		RectTransform* parentTransform =
+			parent->GetComponentByClass<RectTransform>();
+		RectTransform* childTransform =
+			child->GetComponentByClass<RectTransform>();
+
+		parentTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		parentTransform->SetLocalScale({2.0f, 3.0f, 1.0f});
+		parentTransform->SetSizeDelta({100.0f, 100.0f});
+		childTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		childTransform->SetAnchoredPosition({10.0f, 20.0f});
+		childTransform->SetLocalScale({4.0f, 5.0f, 1.0f});
+		childTransform->SetSizeDelta({20.0f, 20.0f});
+
+		scene.Update(0.0f);
+
+		Check(Near(
+			childTransform->GetWorldPosition(),
+			Vector3(20.0f, 60.0f, 0.0f)),
+			"RectTransform parent scale affects child layout position");
+		Check(Near(
+			childTransform->GetWorldScale(),
+			Vector3(8.0f, 15.0f, 1.0f)),
+			"RectTransform parent and child local scales are combined");
+	}
+
 	void TestRootScreenSpaceCanvasUsesViewportSize()
 	{
 		SceneBase scene;
@@ -643,6 +689,8 @@ namespace
 				ActorType::UI,
 				Actor::InitDesc(true, TAG_NONE, "Child")),
 			canvasActor->GetHandle());
+		Canvas* canvas = canvasActor->GetComponentByClass<Canvas>();
+		scene.SetCanvasScaleMode(canvas, CanvasScaleMode::ConstantPixelSize);
 
 		RectTransform* canvasTransform =
 			canvasActor->GetComponentByClass<RectTransform>();
@@ -669,6 +717,88 @@ namespace
 			childTransform->GetWorldPosition(),
 			Vector3(500.0f, 400.0f, 0.0f)),
 			"ScreenSpace UI layout follows viewport resizing");
+	}
+
+	void TestScreenSpaceCanvasScaleFactor()
+	{
+		SceneBase scene;
+		scene.SetViewportSize(960, 540);
+
+		Actor* canvasActor = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "ScaledCanvas")));
+		Actor* childActor = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::UI,
+				Actor::InitDesc(true, TAG_NONE, "ScaledChild")),
+			canvasActor->GetHandle());
+
+		Canvas* canvas = canvasActor->GetComponentByClass<Canvas>();
+		RectTransform* childTransform =
+			childActor->GetComponentByClass<RectTransform>();
+
+		Check(scene.SetCanvasReferenceSize(canvas, {1920.0f, 1080.0f}) &&
+			scene.SetCanvasScaleMode(canvas, CanvasScaleMode::ScaleWithScreenSize) &&
+			scene.SetCanvasMatchWidthOrHeight(canvas, 0.5f),
+			"Scene accepts ScreenSpace Canvas scaling settings");
+
+		childTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		childTransform->SetAnchoredPosition({100.0f, 40.0f});
+		childTransform->SetLocalScale({2.0f, 3.0f, 1.0f});
+		scene.Update(0.0f);
+
+		Check(std::abs(canvas->GetScaleFactor() - 0.5f) < 0.001f,
+			"Matching aspect ratios produce a uniform Canvas scale");
+		Check(Near(childTransform->GetWorldPosition(), Vector3(50.0f, 20.0f, 0.0f)) &&
+			Near(childTransform->GetWorldScale(), Vector3(1.0f, 1.5f, 0.5f)),
+			"Canvas scale affects layout without overwriting child local scale");
+
+		scene.SetViewportSize(1920, 540);
+		Check(scene.SetCanvasMatchWidthOrHeight(canvas, 0.0f),
+			"Canvas accepts width matching");
+		scene.Update(0.0f);
+		Check(std::abs(canvas->GetScaleFactor() - 1.0f) < 0.001f &&
+			Near(childTransform->GetWorldPosition(), Vector3(100.0f, 40.0f, 0.0f)),
+			"Width matching uses the horizontal viewport ratio");
+
+		Check(scene.SetCanvasMatchWidthOrHeight(canvas, 1.0f),
+			"Canvas accepts height matching");
+		scene.Update(0.0f);
+		Check(std::abs(canvas->GetScaleFactor() - 0.5f) < 0.001f &&
+			Near(childTransform->GetWorldPosition(), Vector3(50.0f, 20.0f, 0.0f)),
+			"Height matching uses the vertical viewport ratio");
+	}
+
+	void TestNestedCanvasDoesNotApplyScaleTwice()
+	{
+		SceneBase scene;
+		scene.SetViewportSize(960, 540);
+
+		Actor* rootActor = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "RootCanvas")));
+		Actor* nestedActor = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "NestedCanvas")),
+			rootActor->GetHandle());
+
+		Canvas* rootCanvas = rootActor->GetComponentByClass<Canvas>();
+		Canvas* nestedCanvas = nestedActor->GetComponentByClass<Canvas>();
+		RectTransform* nestedTransform =
+			nestedActor->GetComponentByClass<RectTransform>();
+
+		scene.SetCanvasReferenceSize(rootCanvas, {1920.0f, 1080.0f});
+		scene.SetCanvasMatchWidthOrHeight(rootCanvas, 0.5f);
+		scene.Update(0.0f);
+
+		Check(std::abs(rootCanvas->GetScaleFactor() - 0.5f) < 0.001f &&
+			std::abs(nestedCanvas->GetScaleFactor() - 1.0f) < 0.001f,
+			"Only the root Canvas produces an automatic scale factor");
+		Check(Near(nestedTransform->GetWorldScale(), Vector3(0.5f, 0.5f, 0.5f)),
+			"Nested Canvas inherits the root scale exactly once");
 	}
 
 	void TestTransformToRectTransformConversion()
@@ -700,7 +830,7 @@ namespace
 		Check(rectTransform != nullptr,
 			"Transform conversion creates a RectTransform");
 		Check(rectTransform &&
-			Near(rectTransform->GetLocalPosition(), {0.0f, 0.0f, 7.0f}) &&
+			Near(rectTransform->GetLocalPosition(), Vector3::Zero()) &&
 			Near(rectTransform->GetAnchoredPosition(), {12.0f, -4.0f}) &&
 			rectTransform->GetLocalRotationQuat().NearEqual(rotation, 0.001f) &&
 			Near(rectTransform->GetLocalScale(), {2.0f, 3.0f, 4.0f}),
@@ -715,6 +845,20 @@ namespace
 		source.Serialize(after);
 		Check(after == before,
 			"Transform conversion does not mutate its source component");
+	}
+
+	void TestRectTransformDeserializeClearsHiddenPosition()
+	{
+		RectTransform source;
+		nlohmann::json serialized;
+		source.Serialize(serialized);
+		serialized["position"] = {12.0f, -4.0f, 9.0f};
+
+		RectTransform restored;
+		Check(restored.Deserialize(serialized),
+			"RectTransform accepts a valid legacy Transform position");
+		Check(Near(restored.GetLocalPosition(), Vector3::Zero()),
+			"RectTransform discards hidden XYZ position during deserialization");
 	}
 
 	void TestRectTransformToTransformConversion()
@@ -799,12 +943,11 @@ namespace
 			dynamic_cast<RectTransform*>(converted.get());
 
 		Check(restored &&
-			Near(restored->GetLocalTransform().position,
-				source.GetLocalTransform().position) &&
+			Near(restored->GetLocalTransform().position, Vector3::Zero()) &&
 			restored->GetLocalRotationQuat().NearEqual(
 				source.GetLocalRotationQuat(), 0.001f) &&
 			Near(restored->GetLocalScale(), source.GetLocalScale()),
-			"RectTransform reconstruction preserves common Transform state");
+			"RectTransform reconstruction canonicalizes position and preserves rotation and scale");
 		Check(restored &&
 			restored->GetAnchorMode() == source.GetAnchorMode() &&
 			Near(restored->GetAnchoredPosition(),
@@ -1036,6 +1179,75 @@ namespace
 			"Default MeshRenderer survives its own serialized schema");
 	}
 
+	void TestRendererCanvasSortOrderRoundTrip()
+	{
+		MeshRenderer source;
+		source.SetSortOrderInCanvas(37);
+
+		nlohmann::json serialized;
+		source.Serialize(serialized);
+
+		MeshRenderer restored;
+		Check(restored.Deserialize(serialized) &&
+			restored.GetSortOrderInCanvas() == 37,
+			"Renderer Canvas sort order survives serialization");
+
+		serialized.erase("sortOrderInCanvas");
+		MeshRenderer legacy;
+		legacy.SetSortOrderInCanvas(99);
+		Check(legacy.Deserialize(serialized) &&
+			legacy.GetSortOrderInCanvas() == 0,
+			"Renderer without a saved Canvas sort order uses the compatibility default");
+	}
+
+	void TestMeshRendererFitsRectWithoutDistortingDepth()
+	{
+		SceneBase scene;
+		Actor* canvasActor = scene.AddRootActor(
+			ActorFactory::CreateActor(
+				ActorType::Canvas,
+				Actor::InitDesc(true, TAG_NONE, "MeshFitCanvas")));
+		Canvas* canvas = canvasActor->GetComponentByClass<Canvas>();
+		scene.SetCanvasScaleMode(canvas, CanvasScaleMode::ConstantPixelSize);
+
+		Actor* meshActor = scene.AddChildActor(
+			ActorFactory::CreateEmptyActor(
+				Actor::InitDesc(true, TAG_NONE, "MeshFitActor")),
+			canvasActor->GetHandle());
+		MeshRenderer* renderer = meshActor->AddComponent<MeshRenderer>();
+		RectTransform* rectTransform =
+			meshActor->GetComponentByClass<RectTransform>();
+
+		SubmeshRenderTemplate renderTemplate;
+		renderTemplate.meshDesc.boundsCenter = {1.0f, 0.0f, 0.0f};
+		renderTemplate.meshDesc.boundsRadius = 1.0f;
+		renderer->SetParams({.templates = {renderTemplate}});
+		rectTransform->SetSizeDelta({200.0f, 100.0f});
+		scene.Update(0.0f);
+
+		Transform3D fittedTransform;
+		renderer->GetRenderProxy().common.worldMatrix.Decompose(
+			fittedTransform.position,
+			fittedTransform.rotation,
+			fittedTransform.scale);
+
+		Check(Near(fittedTransform.scale, Vector3(25.0f, 25.0f, 25.0f)),
+			"MeshRenderer fits Rect size with one uniform XYZ scale");
+
+		renderTemplate.meshDesc.boundsCenter = Vector3::Zero();
+		renderTemplate.meshDesc.boundsRadius = 0.0f;
+		renderer->SetParams({.templates = {renderTemplate}});
+
+		Transform3D fallbackTransform;
+		renderer->GetRenderProxy().common.worldMatrix.Decompose(
+			fallbackTransform.position,
+			fallbackTransform.rotation,
+			fallbackTransform.scale);
+
+		Check(Near(fallbackTransform.scale, Vector3::One()),
+			"MeshRenderer with missing Bounds preserves its Transform scale");
+	}
+
 	void TestSpriteRendererPendingAssetRoundTrip()
 	{
 		const Guid textureAssetId = GuidGenerator::Generate();
@@ -1213,30 +1425,52 @@ namespace
 		Canvas source;
 		source.SetParams({
 			.renderMode = CanvasRenderMode::WorldSpace,
+			.scaleMode = CanvasScaleMode::ConstantPixelSize,
 			.sortOrder = 42,
 			.isVisible = false,
 			.referenceSize = {1280.0f, 720.0f},
+			.matchWidthOrHeight = 0.25f,
 			.name = "SavedCanvas"
 		});
 
 		nlohmann::json serialized;
 		Check(source.Serialize(serialized), "Canvas Serialize succeeds");
-		Check(serialized.size() == 5 &&
+		Check(serialized.size() == 7 &&
 			serialized.contains("name") &&
 			serialized.contains("renderMode") &&
+			serialized.contains("scaleMode") &&
 			serialized.contains("sortOrder") &&
 			serialized.contains("visible") &&
-			serialized.contains("referenceSize"),
+			serialized.contains("referenceSize") &&
+			serialized.contains("matchWidthOrHeight"),
 			"Canvas Serialize excludes its runtime UI registration list");
 
 		Canvas restored;
 		Check(restored.Deserialize(serialized), "Canvas Deserialize succeeds");
 		Check(restored.GetName() == "SavedCanvas" &&
 			restored.GetRenderMode() == CanvasRenderMode::WorldSpace &&
+			restored.GetScaleMode() == CanvasScaleMode::ConstantPixelSize &&
 			restored.GetSortOrder() == 42 &&
 			!restored.IsVisible() &&
-			Near(restored.GetWorldReferenceSize(), {1280.0f, 720.0f}),
+			Near(restored.GetReferenceSize(), {1280.0f, 720.0f}) &&
+			std::abs(restored.GetMatchWidthOrHeight() - 0.25f) < 0.001f,
 			"Canvas settings survive a round trip");
+	}
+
+	void TestCanvasLoadsSchemaWithoutScalingFields()
+	{
+		Canvas source;
+		nlohmann::json legacy;
+		source.Serialize(legacy);
+		legacy.erase("scaleMode");
+		legacy.erase("matchWidthOrHeight");
+
+		Canvas restored;
+		Check(restored.Deserialize(legacy),
+			"Canvas loads scenes saved before scaling settings were added");
+		Check(restored.GetScaleMode() == CanvasScaleMode::ScaleWithScreenSize &&
+			std::abs(restored.GetMatchWidthOrHeight() - 0.5f) < 0.001f,
+			"Missing scaling settings use the current Canvas defaults");
 	}
 
 	void TestInvalidCanvasJsonDoesNotPartiallyMutate()
@@ -1340,7 +1574,7 @@ namespace
 		Check(scene.SetCanvasReferenceSize(
 			canvas,
 			{640.0f, 360.0f}) &&
-			Near(canvas->GetWorldReferenceSize(), {640.0f, 360.0f}),
+			Near(canvas->GetReferenceSize(), {640.0f, 360.0f}),
 			"Scene applies a valid Canvas reference size");
 	}
 
@@ -1688,8 +1922,12 @@ int main()
 	TestDefaultRectTransformRoundTrip();
 	TestRectTransformInheritsTransformParent();
 	TestRectSizeDoesNotScaleChildren();
+	TestRectTransformInheritsRectTransformScale();
 	TestRootScreenSpaceCanvasUsesViewportSize();
+	TestScreenSpaceCanvasScaleFactor();
+	TestNestedCanvasDoesNotApplyScaleTwice();
 	TestTransformToRectTransformConversion();
+	TestRectTransformDeserializeClearsHiddenPosition();
 	TestRectTransformToTransformConversion();
 	TestRectTransformStateReconstruction();
 	TestInvalidTransformConversionKind();
@@ -1703,6 +1941,8 @@ int main()
 	TestMeshRendererMissingAssetIsRecoverable();
 	TestMeshRendererSetParamsClearsAssetAssociation();
 	TestDefaultMeshRendererRoundTrip();
+	TestRendererCanvasSortOrderRoundTrip();
+	TestMeshRendererFitsRectWithoutDistortingDepth();
 	TestSpriteRendererPendingAssetRoundTrip();
 	TestInvalidSpriteRendererGuidDoesNotPartiallyMutate();
 	TestSpriteRendererValidationBoundaries();
@@ -1711,6 +1951,7 @@ int main()
 	TestSpriteRendererSetParamsClearsAssetAssociation();
 	TestDefaultSpriteRendererRoundTrip();
 	TestCanvasRoundTrip();
+	TestCanvasLoadsSchemaWithoutScalingFields();
 	TestInvalidCanvasJsonDoesNotPartiallyMutate();
 	TestCanvasRenderModeValidation();
 	TestCanvasReferenceSizeValidation();

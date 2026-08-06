@@ -126,7 +126,7 @@ bool UIImage::Deserialize(const nlohmann::json& json)
 
 bool UIImage::ResolveReferences(SceneBase& scene)
 {
-	Canvas* resolvedCanvas = m_pCanvas;
+	Canvas* resolvedCanvas = GetGoverningCanvas();
 	bool textureCanBeResolved = false;
 
 	// Resolve the canvas actor if a pending canvas actor ID is set

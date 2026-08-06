@@ -2,7 +2,25 @@
 #include "RendererComponent.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/UI/Canvas.h"
 #include "Engine/Core/Serialization/JsonMath.h"
+
+RenderSpace RendererComponent::GetRenderSpace() const
+{
+	if (m_pGoverningCanvas) 
+	{
+		// If the governing canvas is set, determine the render space based on its render mode
+		if (m_pGoverningCanvas->GetRenderMode() == CanvasRenderMode::ScreenSpace)
+		{// If the governing canvas is in screen space, return Screen render space
+			return RenderSpace::Screen;
+		}
+	}
+
+	// If no governing canvas is set or 
+	// if the governing canvas is in world space, 
+	// return World render space
+	return RenderSpace::World;
+}
 
 void RendererComponent::CheckIfTransformChanged()
 {
@@ -26,6 +44,7 @@ bool RendererComponent::Serialize(
 
 	outJson["color"] = JsonMath::ToJson(m_color);
 	outJson["visible"] = m_isVisible;
+	outJson["sortOrderInCanvas"] = m_sortOrderInCanvas;
 
 	return true;
 }
@@ -80,10 +99,30 @@ bool RendererComponent::Deserialize(
 		return false;
 	}
 
-	// Apply the parsed values to the component
+	// Optional field: sortOrderInCanvas
+	uint32_t parsedSortOrderInCanvas = 0;
+
+	if (json.contains("sortOrderInCanvas"))
+	{
+		if (!json["sortOrderInCanvas"].is_number_integer()) return false;
+
+		const int64_t parsedOrder = json["sortOrderInCanvas"].get<int64_t>();
+
+		if (parsedOrder < 0 ||
+			static_cast<uint64_t>(parsedOrder) >
+			static_cast<uint64_t>((std::numeric_limits<uint32_t>::max)()))
+		{
+			return false;
+		}
+
+		parsedSortOrderInCanvas = static_cast<uint32_t>(parsedOrder);
+	}
+
+	// Apply only after every field has been validated.
 	SetName(parsedName);
 	SetColor(parsedColor);
 	SetVisible(parsedVisible);
+	SetSortOrderInCanvas(parsedSortOrderInCanvas);
 
 	// Reset the transform generation and mark the proxy as dirty
 	m_transformGeneration = static_cast<uint64_t>(-1);

@@ -5,6 +5,7 @@
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Scene/ActorDeserializer.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/Context/Context.h"
@@ -316,118 +317,32 @@ bool SceneLoader::LoadSceneVersion3(const json& sceneJson, SceneBase* scene)
 
 Actor* SceneLoader::RestoreActorDataVersion3(const ActorLoadRecord& record, SceneBase* scene)
 {
+	if (!scene)
+	{
+		DBG("SceneLoader: Cannot restore an Actor to a null Scene.");
+		return nullptr;
+	}
+
 	if (!record.actorJson || !record.actorJson->is_object())
 	{
 		DBG("SceneLoader: Invalid Version 3 actor record.");
 		return nullptr;
 	}
 
-	const json& actorJson = *record.actorJson;
+	// Deserialize the actor from the JSON data
+	std::unique_ptr<Actor> actor =
+		ActorDeserializer::DeserializeActorRecord(
+			*record.actorJson,
+			record.actorGuid);
 
-	// Build an InitDesc for the actor
-	Actor::InitDesc desc;
-
-	desc.name = actorJson.value("name", "Actor");
-	desc.isActive = actorJson.value("is_active", true);
-
-	const std::string tagName = actorJson.value("tag", "None");
-	desc.tag = tagName.empty() ? TAG_NONE : TagRegistry::Get().GetId(tagName);
-
-	// Create the actor
-	auto actorOwned = ActorFactory::RestoreActorShell(desc, record.actorGuid);
-
-	if (!actorOwned)
+	if (!actor)
 	{
-		DBG("SceneLoader: Failed to restore Version 3 actor : %s", record.actorGuid.ToString().c_str());
-		return nullptr;
-	}
-
-	Actor* actor = actorOwned.get();
-
-	// Check if the actor has a valid components array
-	if (!actorJson.contains("components") || !actorJson["components"].is_array())
-	{
-		DBG("SceneLoader: Version 3 actor is missing a valid 'components' array.");
-		return nullptr;
-	}
-
-	bool hasTransformComponent = false;	// Flag to track if a actor has multiple Transform components
-
-	// Deserialize each component in the actor's components array
-	for (const json& componentRecord : actorJson["components"])
-	{
-		if (!componentRecord.is_object())
-		{
-			DBG("SceneLoader: Version 3 component record must be an object.");
-			return nullptr;
-		}
-
-		// Validate the component record structure
-		if (!componentRecord.contains("type")	 ||
-			!componentRecord["type"].is_string() ||
-			!componentRecord.contains("data")	 ||
-			!componentRecord["data"].is_object())
-		{
-			DBG("SceneLoader: Invalid Version 3 component record on actor '%s'.", desc.name.c_str());
-			return nullptr;
-		}
-
-		const std::string componentName = componentRecord["type"].get<std::string>();
-		const json& componentData = componentRecord["data"];
-
-		if (componentName.empty())
-		{
-			DBG("SceneLoader: Empty component type on actor '%s'.", desc.name.c_str());
-			return nullptr;
-		}
-
-		// Check if the component is a Transform or RectTransform
-		const bool isTransformComponent = componentName == "Transform" || componentName == "RectTransform";
-
-		// Check for multiple Transform components on the same actor
-		if (isTransformComponent)
-		{
-			if (hasTransformComponent)
-			{
-				DBG("SceneLoader: Actor '%s' contains multiple Transform components.", desc.name.c_str());
-				return nullptr;
-			}
-
-			hasTransformComponent = true;
-		}
-
-		// Create the component using the ComponentRegistry
-		std::unique_ptr<Component> component(ComponentRegistry::Get().Create(componentName));
-
-		if (!component)
-		{
-			DBG("SceneLoader: Unknown component '%s' on actor '%s'.", componentName.c_str(), desc.name.c_str());
-			return nullptr;
-		}
-
-		// Deserialize the component data
-		if (!component->Deserialize(componentData))
-		{
-			DBG("SceneLoader: Failed to deserialize component '%s' on actor '%s'.", componentName.c_str(), desc.name.c_str());
-			return nullptr;
-		}
-
-		// Add the component to the actor
-		if (!actor->AddComponent(std::move(component)))
-		{
-			DBG("SceneLoader: Failed to add component '%s' to actor '%s'.", componentName.c_str(), desc.name.c_str());
-			return nullptr;
-		}
-	}
-
-	if (!hasTransformComponent)
-	{
-		DBG( "SceneLoader: Version 3 actor '%s' has neither Transform nor RectTransform.", desc.name.c_str());
+		DBG("SceneLoader: Failed to deserialize Actor with Guid: %s", record.actorGuid.ToString().c_str());
 		return nullptr;
 	}
 
 	// Add the actor to the scene and return the pointer
-	return scene->RegisterRestoredActor(std::move(actorOwned));
+	return scene->RegisterRestoredActor(std::move(actor));
 }
 
 bool SceneLoader::RestoreComponentReferences(const std::vector<ActorLoadRecord>& records, SceneBase* scene)

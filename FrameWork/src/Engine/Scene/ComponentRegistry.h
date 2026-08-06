@@ -1,48 +1,48 @@
 #pragma once
+#include "Engine/Component/Component.h"
+#include "Engine/Core/Debug/Debug.h"
+#include "Engine/Actor/Actor.h"
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
 #include <typeindex>
-#include "Engine/Component/Component.h"
-#include "Engine/Core/Debug/Debug.h"
-#include "Engine/Actor/Actor.h"
+#include <algorithm>
+#include <vector>
+#include <optional>
 
 //-----------------------------------------------------------------------------------------------------------------------------------------
 // ComponentRegistry class and registration system
 // This registry allows the engine to create instances of all components (including user-defined ones) by their class name at runtime.
-//------------------------------------------------------------------------------------------------------------------------------------------
-
 // User-defined component and its factory function are stored in the registry by mapping.
 // The registration is done by the helper macro REGISTER_COMPONENT, which should be placed in the component class header file.
 // That header file has to be included in a .cpp file to make sure the registration macro is called at the global scope
+//------------------------------------------------------------------------------------------------------------------------------------------
 
 class ComponentRegistry
 {
 public:
 	using Factory = std::function<Component* ()>;	// Factory function type that creates a Component instance
 
-	// Entry struct to hold information about a registered component
+private:
+	// Internal registration data. Callers should request only the factory result,
+	// type ID, or policy they need through the corresponding public API.
 	struct Entry
 	{
-		Factory factory;					// Factory function to create a component instance
-		std::type_index typeId;				// Type index of the component class
-		ComponentCardinality cardinality;	// Cardinality of the component (UniqueRequired, UniqueOptional, Multiple)
-		ComponentFamily family;				// Family of the component (Grouping of related components)
+		Factory factory;
+		std::type_index typeId;
 
 		// Constructor forn initialization
 		Entry(
 			Factory componentFactory,
-			std::type_index componentTypeId,
-			ComponentCardinality componentCardinality,
-			ComponentFamily componentFamily
+			std::type_index componentTypeId
 		)
 		  : factory(std::move(componentFactory)),
-			typeId(componentTypeId),
-			cardinality(componentCardinality),
-			family(componentFamily)
+			typeId(componentTypeId)
 		{}
 	};
+
+public:
 
 	static ComponentRegistry& Get();
 
@@ -55,9 +55,18 @@ public:
 		ComponentFamily family
 	) 
 	{ 
-		m_entries.insert_or_assign(name, Entry(std::move(factory), typeId, cardinality, family));
+		m_entries.insert_or_assign(name, Entry(std::move(factory), typeId));
+		RegisterPolicy(typeId, { cardinality, family });
 		DBG("ComponentRegistry: REGISTER name='%s' typeid.name()='%s'", name.c_str(), typeId.name());
 		m_typeNames[typeId.name()] = name;
+	}
+
+	// Register policy metadata without exposing the component through a factory.
+	// This is used by internal component types which can be attached in code but
+	// must not appear in serialization or the Inspector's Add Component list.
+	void RegisterPolicy(std::type_index typeId, ComponentPolicyInfo policy)
+	{
+		m_policies.insert_or_assign(typeId.name(), policy);
 	}
 
 	// Specialized registration function for components defined in GameCode.dll
@@ -73,6 +82,12 @@ public:
 	{
 		for (const auto& name : m_gameComponentNames)
 		{
+			auto entryIt = m_entries.find(name);
+			if (entryIt != m_entries.end())
+			{
+				m_policies.erase(entryIt->second.typeId.name());
+			}
+
 			m_entries.erase(name);
 
 			// Delete from type names map as well
@@ -124,7 +139,15 @@ public:
 			return false;
 		}
 
-		std::unique_ptr<Component> component(it->second.factory());
+		const Entry& entry = it->second;
+
+		if (!actor->CanAddComponent(entry.typeId))
+		{
+			DBG("ComponentRegistry: Component '%s' cannot be added to Actor '%s'.", name.c_str(), actor->GetName().c_str());
+			return false;
+		}
+
+		std::unique_ptr<Component> component(entry.factory());
 
 		if (!component) return false;
 
@@ -143,18 +166,55 @@ public:
 		return it->second;
 	}
 
-	const Entry* GetEntry(const std::string& name) const
+	// Get a list of all registered component names, sorted alphabetically
+	// Used by inspector panel to display available components for addition to an actor
+	std::vector<std::string> GetRegisteredComponentNames() const
 	{
-		auto it = m_entries.find(name);
-		if (it == m_entries.end()) return nullptr;
-		return &it->second;
+		std::vector<std::string> names;
+		names.reserve(m_entries.size());
+
+		for (const auto& [name, entry] : m_entries)
+		{
+			names.push_back(name);
+		}
+
+		std::sort(names.begin(), names.end());
+
+		return names;
 	}
 
-	const Entry* GetEntry(std::type_index typeId) const
+	std::optional<std::type_index> GetTypeId(const std::string& name) const
 	{
-		auto it = m_typeNames.find(typeId.name());
-		if (it == m_typeNames.end()) return nullptr;
-		return GetEntry(it->second);
+		auto it = m_entries.find(name);
+		if (it == m_entries.end()) return std::nullopt;
+		return it->second.typeId;
+	}
+
+	std::optional<ComponentPolicyInfo> GetPolicy(const std::string& name) const
+	{
+		auto it = m_entries.find(name);
+		if (it == m_entries.end()) return std::nullopt;
+		return GetPolicy(it->second.typeId);
+	}
+
+	std::optional<ComponentPolicyInfo> GetPolicy(std::type_index typeId) const
+	{
+		auto it = m_policies.find(typeId.name());
+		if (it == m_policies.end()) return std::nullopt;
+		return it->second;
+	}
+
+	// Check if a component can be added to the given actor 
+	// based on its name and the actor's existing components
+	// Used by inspector panel to determine if a component can be added to an actor
+	bool CanAddToActor(const std::string& name, const Actor* actor) const
+	{
+		if (!actor) return false;
+
+		const auto typeId = GetTypeId(name);
+		if (!typeId) return false;
+
+		return actor->CanAddComponent(*typeId);
 	}
 
 private:
@@ -165,6 +225,11 @@ private:
 
 	// Map of component type indices to their registered names
 	std::unordered_map<std::string, std::string> m_typeNames;
+
+	// Runtime component policies are stored separately from factory entries so
+	// internal component types can participate in Actor constraints without
+	// becoming creatable or serializable by registered name.
+	std::unordered_map<std::string, ComponentPolicyInfo> m_policies;
 
 	// Set of component names registered from GameCode.dll (used for hot-reloading)
 	std::unordered_set <std::string> m_gameComponentNames;

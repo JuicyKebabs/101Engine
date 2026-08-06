@@ -2,7 +2,9 @@
 #include "Command/EditorCommandHistory.h"
 
 #include "Engine/Actor/Actor.h"
+#include "Engine/Actor/ActorFactory.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Scene/SceneBase.h"
 
 #include <iostream>
@@ -103,6 +105,56 @@ namespace
 		Check(scene.GetAllActors().empty(),
 			"Invalid command usage does not modify the Scene");
 	}
+
+	void TestCreateChildUndoRedoPreservesParent()
+	{
+		SceneBase scene;
+		EditorCommandHistory history;
+		Actor* parent = scene.AddRootActor(
+			ActorFactory::CreateEmptyActor(
+				Actor::InitDesc(true, TAG_NONE, "Parent")));
+
+		auto command = std::make_unique<CreateActorCommand>(
+			&scene,
+			Actor::InitDesc(true, TAG_NONE, "Child"),
+			parent->GetGuid());
+		CreateActorCommand* commandView = command.get();
+
+		Check(history.Execute(std::move(command)),
+			"CreateActorCommand creates an Actor under the specified parent");
+
+		const Guid childGuid = commandView->GetActorGuid();
+		Actor* child = scene.ResolveActor(childGuid);
+
+		Check(child && child->GetParent() == parent,
+			"Created child keeps the requested parent relationship");
+
+		Check(history.Undo(),
+			"Undo marks the created child for destruction");
+		scene.LateUpdate(0.0f);
+		Check(history.Redo(),
+			"Redo restores the created child");
+
+		child = scene.ResolveActor(childGuid);
+		Check(child && child->GetParent() == parent,
+			"Redo restores the child under the original parent");
+	}
+
+	void TestMissingParentDoesNotCreateRootActor()
+	{
+		SceneBase scene;
+		EditorCommandHistory history;
+		const Guid missingParentGuid = GuidGenerator::Generate();
+
+		Check(!history.Execute(
+			std::make_unique<CreateActorCommand>(
+				&scene,
+				Actor::InitDesc(true, TAG_NONE, "Orphan"),
+				missingParentGuid)),
+			"CreateActorCommand rejects a missing parent");
+		Check(scene.GetAllActors().empty(),
+			"A missing parent does not silently create a root Actor");
+	}
 }
 
 int main()
@@ -110,6 +162,8 @@ int main()
 	TestCreateUndoRedoPreservesGuid();
 	TestRepeatedUndoRedo();
 	TestInvalidUsage();
+	TestCreateChildUndoRedoPreservesParent();
+	TestMissingParentDoesNotCreateRootActor();
 
 	if (g_failures != 0)
 	{

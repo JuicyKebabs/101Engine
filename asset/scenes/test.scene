@@ -1,7 +1,7 @@
 {
     "actors": [
         {
-            "actorId": "{388F83E1-92B0-46EE-9473-0598E67C9337}",
+            "actorId": "{4C32CC15-3769-425B-B6A9-41FCCA03F0B9}",
             "components": [
                 {
                     "data": {
@@ -31,7 +31,7 @@
                         "followMode": 1,
                         "lens": {
                             "farZ": 150.0,
-                            "fov": 1.5707963705062866,
+                            "fov": 1.72787606716156,
                             "height": 720.0,
                             "nearZ": 0.10000000149011612,
                             "projectionType": 0,
@@ -76,30 +76,8 @@
             "tag": "MainCamera"
         },
         {
-            "actorId": "{074856A0-6CBA-40E8-8CC0-48151F458541}",
+            "actorId": "{108D3EDC-5F88-440E-9D09-25642E28B62B}",
             "components": [
-                {
-                    "data": {
-                        "name": "",
-                        "position": [
-                            0.0,
-                            -0.5,
-                            0.0
-                        ],
-                        "rotation": [
-                            0.0,
-                            0.0,
-                            0.0,
-                            1.0
-                        ],
-                        "scale": [
-                            1.0,
-                            1.0,
-                            1.0
-                        ]
-                    },
-                    "type": "Transform"
-                },
                 {
                     "data": {
                         "color": [
@@ -110,51 +88,49 @@
                         ],
                         "meshAssetId": "{99961728-DF68-4A89-BCC1-F3B12F4432F5}",
                         "name": "",
+                        "sortOrderInCanvas": 0,
                         "visible": true
                     },
                     "type": "MeshRenderer"
                 },
                 {
                     "data": {
-                        "center": [
+                        "name": "",
+                        "position": [
                             0.0,
-                            0.0,
+                            3.200000047683716,
                             0.0
                         ],
-                        "isTrigger": false,
-                        "layer": 0,
-                        "name": "",
                         "rotation": [
+                            -0.0,
                             0.0,
-                            0.0,
-                            0.0,
+                            -0.0,
                             1.0
                         ],
                         "scale": [
-                            1.0,
-                            1.0,
-                            1.0
-                        ],
-                        "type": 3
+                            2.0,
+                            2.0,
+                            2.0
+                        ]
                     },
-                    "type": "Collider"
+                    "type": "Transform"
                 }
             ],
             "is_active": true,
-            "name": "TestActor",
+            "name": "TestMesh",
             "parentId": null,
             "tag": "None"
         },
         {
-            "actorId": "{09BE65C6-0AC1-45A2-B453-200B63BC4270}",
+            "actorId": "{4A379698-6819-4383-AF59-F83B9C8A3768}",
             "components": [
                 {
                     "data": {
                         "name": "",
                         "position": [
                             0.0,
-                            4.300000190734863,
-                            -7.699999809265137
+                            0.0,
+                            0.0
                         ],
                         "rotation": [
                             0.0,
@@ -163,9 +139,9 @@
                             1.0
                         ],
                         "scale": [
-                            1.0,
-                            1.0,
-                            1.0
+                            5.0,
+                            5.0,
+                            5.0
                         ]
                     },
                     "type": "Transform"
@@ -186,6 +162,7 @@
                             0.5,
                             0.5
                         ],
+                        "sortOrderInCanvas": 0,
                         "textureAssetId": "{6A8831A2-7D3A-47F2-9FCA-1989C33B8EE3}",
                         "uvOffset": [
                             0.0,
@@ -201,8 +178,184 @@
                 }
             ],
             "is_active": true,
-            "name": "TestActor2D",
+            "name": "TestSprite",
             "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{BEC2EAF6-0E4C-424D-A213-CE68B4E3C251}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                }
+            ],
+            "is_active": true,
+            "name": "TestCanvas",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{F4840A45-32E9-4F5F-BE4B-DCECE2921D34}",
+            "components": [
+                {
+                    "data": {
+                        "canvasActorId": "{BEC2EAF6-0E4C-424D-A213-CE68B4E3C251}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{32A1CF7E-6EC2-4B1F-B644-311E7EA68670}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                },
+                {
+                    "data": {
+                        "anchorMode": 0,
+                        "anchoredPosition": [
+                            14.100000381469727,
+                            -6.400000095367432
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.0,
+                            1.0
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                }
+            ],
+            "is_active": true,
+            "name": "TestUIImage",
+            "parentId": "{BEC2EAF6-0E4C-424D-A213-CE68B4E3C251}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{FC84A8DA-BE69-47D3-B5E9-74199CAD1A0C}",
+            "components": [
+                {
+                    "data": {
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{B61D1031-F6D2-42FF-82F3-C0F98EC09A80}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                },
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            2.4000000953674316,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "TestMeshChild",
+            "parentId": "{108D3EDC-5F88-440E-9D09-25642E28B62B}",
             "tag": "None"
         }
     ],

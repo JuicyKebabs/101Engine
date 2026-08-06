@@ -1,24 +1,36 @@
 #pragma once
 #include <memory>
+#include "Engine/Actor/ActorReference.h"
 #include "Engine/Component/Camera.h"
+
+class SceneBase;
+
+//----------------------------------------------------------
+// CameraSystem class
+// A system that manages main camera component in the scene.
+//----------------------------------------------------------
 
 class CameraSystem
 {
 public:
-	CameraSystem() = default;	// Constructor
-	~CameraSystem() = default;	// Destructor
+	explicit CameraSystem(SceneBase* scene) : m_scene(scene) {}
 
 	// Main processing functions
 	void Initialize();				// Initialization
 	void Update();					// Update
 	void Flush(float deltaTime);	// Flush (reset camera system state if needed, called at the end of each frame)
 
-	void SetMainCamera(Camera* camera);
+	bool SetMainCamera(Camera* camera);
+	void ClearMainCamera();
 
 	// Getters
-	const CameraInfo* GetCameraInfo() const;						// Get camera information
-	const Camera* GetMainCamera() const { return m_pMainCamera; }	// Get main camera component pointer
+	const CameraInfo* GetCameraInfo() const;	// Get camera information
+	const Camera* GetMainCamera() const;		// Get main camera component pointer
 
 private:
-	Camera* m_pMainCamera = nullptr;		// Main camera component pointer (for easy access)
+	SceneBase* m_scene = nullptr;
+	ActorReference m_mainCameraActor;
+
+private:
+	Camera* ResolveMainCamera() const;
 };

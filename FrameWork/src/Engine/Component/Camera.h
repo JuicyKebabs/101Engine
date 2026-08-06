@@ -1,7 +1,6 @@
 #pragma once
-#include <optional>
 #include "Component.h"
-#include "Engine/Core/GUID/Guid.h"
+#include "Engine/Actor/ActorReference.h"
 #include "Engine/Core/Math/Math.h"
 
 //------------------------------------------------------------------------------
@@ -110,20 +109,10 @@ public:
 	void SetCameraRig(const CameraRig& rig) { m_cameraRig = rig; m_isCameraInfoDirty = true; }				// Set camera rig settings
 	void SetCameraLens(const CameraLens& lens) { m_cameraLens = lens; m_isCameraInfoDirty = true; }			// Set camera lens settings
 	void SetCameraPose(const CameraPose& pose) { m_cameraPose = pose; m_isCameraInfoDirty = true; }			// Set camera camera pose (position and rotation)
-	
-	// Set target actor for follow/rotation (if applicable)
-	void SetTargetActor(Actor* target)
-	{ 
-		m_pTargetActor = target; 
-		m_pendingTargetActorGuid.reset();
-		m_isCameraInfoDirty = true; 
-	}
-	void SetFollowTarget(Actor* target)
-	{ 
-		m_pFollowActor = target; 
-		m_pendingFollowActorGuid.reset();
-		m_isCameraInfoDirty = true; 
-	}
+
+	// Set target and follow Actor references.
+	bool SetTargetActor(Actor* target);
+	bool SetFollowTarget(Actor* target);
 
 	CAMERA_FOLLOW_MODE GetFollowMode() const { return m_followMode; }		// Get follow mode
 	CAMERA_ROTATION_MODE GetRotationMode() const { return m_rotationMode; }	// Get rotation mode
@@ -142,25 +131,26 @@ private:
 	CAMERA_FOLLOW_MODE m_followMode = CAMERA_FOLLOW_MODE::FOLLOW_MODE_OWNER;				// Follow mode (default: follow owner)
 	CAMERA_ROTATION_MODE m_rotationMode = CAMERA_ROTATION_MODE::ROTATION_MODE_MATCH_OWNER;	// Rotation mode (default: rotate with owner)
 
+	// References to Actor
+	ActorReference m_targetActor;	// Actor to look at
+	ActorReference m_followActor;	// Actor to follow
+
 	CameraRig m_cameraRig;		// Camera rig settings
 	CameraPose m_cameraPose;	// Camera pose (position and rotation)
 	CameraLens m_cameraLens;	// Camera lens settings (projection parameters)
 
 	CameraInfo m_cameraInfo;	// Cached camera information
 
-	Actor* m_pTargetActor = nullptr;	// Target actor for follow/rotation (if applicable)
-	Actor* m_pFollowActor = nullptr;	// Actor to follow (if applicable)
-
 	bool m_isCameraInfoDirty = true;				// Flag to indicate if camera information needs to be rebuilt
 	uint64_t m_followingTransformGeneration = -1;	// Generation of the transform component that the camera is currently following(used to detect changes in the transform)
 	uint64_t m_rotatingTransformGeneration = -1;	// Generation of the transform component that the camera is currently rotating with(used to detect changes in the transform)
-
-	std::optional<Guid> m_pendingTargetActorGuid;
-	std::optional<Guid> m_pendingFollowActorGuid;
 
 private:
 	CameraInfo RebuildCameraInfo();			// Rebuild camera information
 	void UpdateCameraPose(float deltaTime);	// Update camera pose based on follow mode, rotation mode, and rig settings
 	void UpdatePosition(float deltaTime);	// Update camera position based on follow mode and rig settings
 	void UpdateRotation(float deltaTime);	// Update camera rotation based on rotation mode and rig settings
+
+	// Helper function to resolve ActorReference to Actor pointer
+	Actor* ResolveActorReference(const ActorReference& reference) const;
 };

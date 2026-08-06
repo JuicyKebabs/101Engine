@@ -4,6 +4,9 @@
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Core/GUID/Guid.h"
+#include "Engine/Core/Math/Math.h"
+
+class Transform;
 
 //---------------------------------------------------------
 // MeshRenderer class
@@ -56,10 +59,10 @@ public:
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
-	std::vector<SubmeshRenderTemplate> m_templates;	// Render templates for each mesh to be drawn
-	MeshRendererProxy m_proxy;						// Cached render proxy for this component
-	Guid m_meshAssetId;								// Mesh asset ID for this renderer
-	std::optional<Guid> m_pendingMeshAssetId;		// Optional pending asset ID for deferred loading (used during deserialization)
+	std::vector<SubmeshRenderTemplate> m_templates;			// Render templates for each mesh to be drawn
+	MeshRendererProxy m_proxy;								// Cached render proxy for this component
+	Guid m_meshAssetId;										// Mesh asset ID for this renderer
+	std::optional<Guid> m_pendingMeshAssetId;				// Optional pending asset ID for deferred loading (used during deserialization)
 
 private:
 	// Override functions for component lifecycle
@@ -70,4 +73,5 @@ private:
 	void OnDestroyOverride() override;
 
 	void RebuildRenderProxy();		// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)
+	Matrix4x4 BuildWorldMatrix(Transform* transform) const;	// Build the world matrix for this renderer
 };

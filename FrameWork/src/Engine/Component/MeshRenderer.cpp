@@ -5,6 +5,10 @@
 #include "Engine/Resource/AssetManager.h" 
 #include "Engine/Resource/MeshManager.h" 
 #include "Engine/Core/Context/Context.h"
+#include "Engine/UI/canvas.h"
+#include "Engine/Component/RectTransform.h"
+#include <algorithm>
+#include <cmath>
 
 bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 {
@@ -42,12 +46,19 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 
 	if (meshHandle == InvalidMeshHandle) return false;
 
+	MeshGPU* meshGPU = context->pMeshManager->GetMeshGPU(meshHandle);
+	if (!meshGPU) return false;
+
 	// Get the mesh material info from the mesh manager
 	const MeshMaterialInfo materialInfo = context->pMeshManager->GetMeshMaterialInfo(meshHandle);
 
 	// Create a render template for the mesh
 	SubmeshRenderTemplate renderTemplate;
 	renderTemplate.meshDesc.meshHandle = meshHandle;
+	// MeshGPU stores a sphere centered at the Actor origin that contains
+	// every vertex. Pass it to the render template for RectTransform fitting.
+	renderTemplate.meshDesc.boundsCenter = Vector3::Zero();
+	renderTemplate.meshDesc.boundsRadius = meshGPU->GetSortRadius();
 	renderTemplate.materialDesc.textureHandle = materialInfo.textureHandle;
 	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;
 	renderTemplate.materialDesc.baseColor = materialInfo.materialColor;
@@ -138,7 +149,13 @@ void MeshRenderer::RebuildRenderProxy()
 		if (transform) 
 		{
 			m_proxy.common.position = transform->GetWorldPosition();
-			m_proxy.common.worldMatrix = transform->GetWorldMatrix();
+			m_proxy.common.worldMatrix = BuildWorldMatrix(transform);
+			m_proxy.common.renderSpace = GetRenderSpace();
+
+			Canvas* governingCanvas = GetGoverningCanvas();
+			m_proxy.common.canvasOrder = governingCanvas ? governingCanvas->GetSortOrder() : 0;
+			
+			m_proxy.common.sortOrder = GetSortOrderInCanvas();
 			m_proxy.common.color = m_color;
 			m_proxy.common.visible = m_isVisible;
 		}
@@ -247,4 +264,48 @@ bool MeshRenderer::ResolveReferences(SceneBase& scene)
 
 	// Attempt to set the mesh asset using the resolved asset ID
 	return SetMeshAsset(assetId);
+}
+
+Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
+{
+	if (!transform) return Matrix4x4::Identity;
+
+	RectTransform* rectTransform = dynamic_cast<RectTransform*>(transform);
+
+	if (rectTransform && GetGoverningCanvas())
+	{
+		float modelRadius = 0.0f;
+
+		for (const auto& renderTemplate : m_templates)
+		{
+			const MeshDesc& meshDesc = renderTemplate.meshDesc;
+
+			// Build a sphere around the Actor origin that contains
+			// the submesh's own bounding sphere.
+			const float radiusFromOrigin = meshDesc.boundsCenter.Length() + meshDesc.boundsRadius;
+
+			modelRadius = (std::max)(modelRadius, radiusFromOrigin);
+		}
+
+		Transform3D renderTransform = rectTransform->GetWorldTransform();
+
+		const Vector2 rectSize = rectTransform->GetSize();
+
+		const float rectShortSide = (std::min)(rectSize.x, rectSize.y);
+
+		const float modelDiameter = modelRadius * 2.0f;
+
+		if (modelDiameter > 0.0001f && std::isfinite(modelDiameter))
+		{
+			const float fitScale = rectShortSide / modelDiameter;
+
+			renderTransform.scale *= fitScale;
+		}
+
+		return renderTransform.GetMatrix();
+	}
+	else
+	{
+		return transform->GetWorldMatrix();
+	}
 }

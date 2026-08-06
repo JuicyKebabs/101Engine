@@ -103,40 +103,29 @@ Component* Actor::AddComponent(std::unique_ptr<Component> component)
 {
 	if (!component) return nullptr;
 
-	// Get component policy information
 	const std::type_index typeId = std::type_index(typeid(*component));
-	const auto* entry = ComponentRegistry::Get().GetEntry(typeId);
 
-	if (!entry)
+	if (!ComponentRegistry::Get().GetPolicy(typeId))
 	{
 		DBG("Actor::AddComponent: Component type '%s' is not registered", typeId.name());
 		return nullptr;
 	}
 
 	// Add component and return the raw pointer to the added component
-	return AddComponentInternal(std::move(component), typeId, entry->cardinality, entry->family);
+	return AddComponentInternal(std::move(component), typeId);
 }
 
 Component* Actor::AddComponentInternal(
 	std::unique_ptr<Component> component,
-	std::type_index typeId,
-	ComponentCardinality cardinality,
-	ComponentFamily family
+	std::type_index typeId
 )
 {
 	if (!component) return nullptr;
 
-	// In case of component which is not allowed to be added multiple times
-	if (cardinality != ComponentCardinality::Multiple && HasExactComponent(typeId))
+	// Check if it is allowed to add this component type based on its cardinality and family constraints
+	if (!CanAddComponent(typeId))
 	{
-		DBG("Actor::AddComponent: Actor '%s' already has component '%s'.", m_name.c_str(), typeId.name());
-		return nullptr;
-	}
-
-	// In case of component which is not allowed to be added multiple times in the same family
-	if (family != ComponentFamily::None && HasComponentFamily(family))
-	{
-		DBG("Actor::AddComponent: Actor '%s' already has a component in family '%d'.", m_name.c_str(), static_cast<int>(family));
+		DBG("Actor::AddComponent: Component type '%s' is not allowed on Actor '%s'.", typeId.name(), m_name.c_str());
 		return nullptr;
 	}
 
@@ -148,7 +137,148 @@ Component* Actor::AddComponentInternal(
 	PendingComponent pending(std::move(component), typeId);
 	m_pendingComponents.push_back(std::move(pending));
 
+	// Notify the owner scene that a component has been added to this actor
+	// in order to reapply UI hierarchy constraints if necessary (Canvas/UIRenderer)
+	if (m_pOwner) m_pOwner->OnActorComponentAdded(this, ptr);
+
 	return ptr;
+}
+
+Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, std::size_t occurrenceIndex)
+{
+	if (!component) return nullptr;
+
+	const std::type_index typeId = typeid(*component);
+
+	// Check if it's allowed to add given component type
+	// based on its cardinality and family constraints
+	if (!CanAddComponent(typeId))
+	{
+		return nullptr;
+	}
+
+	// Check if the given occurrence index is within
+	// the valid range of existing components of the same type
+	const std::size_t componentCount = GetComponentsByExactType(typeId).size();
+
+	if (occurrenceIndex > componentCount) return nullptr;
+
+	// Normalize storage of pending components before adding the new component
+	AddPendingComponents();
+
+	// Get components of the same type
+	auto& instances = m_components[typeId].instances;
+
+	Component* componentPtr = component.get();
+	componentPtr->SetOwner(this);
+
+	Component* nextComponent = nullptr;
+	auto pointerIt = m_componentPtrs.end();
+
+	// Get the component at the specified occurrence index
+	// to insert given component before it
+	if (occurrenceIndex < instances.size())
+	{
+		nextComponent = instances[occurrenceIndex].get();
+
+		// Find the next component in the iteration vector (m_componentPtrs)
+		// to check if it exists and to get the iterator for insertion
+		pointerIt = std::find(
+			m_componentPtrs.begin(),
+			m_componentPtrs.end(),
+			nextComponent
+		);
+
+		if (pointerIt == m_componentPtrs.end()) return nullptr;
+	}
+
+	// Add component to the appropriate position in the type based instances vector
+	instances.insert(instances.begin() + occurrenceIndex, std::move(component));
+
+	// Add to the iteration vector (m_componentPtrs) while maintaining component order
+	if (pointerIt != m_componentPtrs.end())
+	{// If there is a component behind the row, insert the new component before it
+		m_componentPtrs.insert(pointerIt, componentPtr);
+	}
+	else
+	{// If there is no component behind the row
+		m_componentPtrs.push_back(componentPtr);
+	}
+
+	return componentPtr;
+}
+
+bool Actor::RemoveComponentImmediate(Component* component)
+{
+	if (!component ||
+		component->GetOwner() != this ||
+		component->IsDestroyed())
+	{
+		return false;
+	}
+
+	const std::type_index typeId = typeid(*component);
+	const auto policy = ComponentRegistry::Get().GetPolicy(typeId);
+
+	// Don't remove components that are required to be unique on the actor
+	if (!policy || policy->cardinality == ComponentCardinality::UniqueRequired)
+	{
+		return false;
+	}
+
+	const auto components = GetComponentsByExactType(typeId);
+
+	if (std::find(
+		components.begin(),
+		components.end(),
+		component) == components.end())
+	{
+		return false;
+	}
+
+	AddPendingComponents();
+
+	// Get bucket of components of the same type
+	auto bucketIt = m_components.find(typeId);
+
+	if (bucketIt == m_components.end()) return false;
+
+	// Get the instances vector of the same type
+	auto& instances = bucketIt->second.instances;
+
+	// Get given component from the instances vector of the same type
+	auto instanceIt = std::find_if(
+		instances.begin(), instances.end(),
+		[component](const std::unique_ptr<Component>& instance)
+		{
+			return instance.get() == component;
+		}
+	);
+
+	if (instanceIt == instances.end()) return false;
+
+	// Get given component from the iteration vector (m_componentPtrs)
+	auto pointerIt = std::find(
+		m_componentPtrs.begin(), m_componentPtrs.end(),
+		component
+	);
+
+	if (pointerIt == m_componentPtrs.end()) return false;
+
+	// Process the component for destruction
+	component->OnDestroy();
+
+	// Remove the component from both the iteration vector and the instances vector
+	m_componentPtrs.erase(pointerIt);
+	instances.erase(instanceIt);
+	
+	// Remove the bucket if there are no more instances of this component type
+	if (instances.empty())
+	{
+		m_components.erase(bucketIt);
+	}
+
+	return true;
 }
 
 void Actor::SetParentHandle(ActorHandle parentHandle)
@@ -219,6 +349,27 @@ bool Actor::HasComponentByName(const std::string& name) const
 	return false;
 }
 
+bool Actor::CanAddComponent(std::type_index typeId) const
+{
+	const auto policy = ComponentRegistry::Get().GetPolicy(typeId);
+	if (!policy) return false;
+
+	// Components which are not Multiple cannot be added
+	// when the same concrete type already exists.
+	if (policy->cardinality != ComponentCardinality::Multiple && HasExactComponent(typeId))
+	{
+		return false;
+	}
+
+	// Only one component from the same family can exist on an Actor.
+	if (policy->family != ComponentFamily::None && HasComponentFamily(policy->family))
+	{
+		return false;
+	}
+
+	return true;
+}
+
 bool Actor::HasExactComponent(std::type_index typeId) const
 {
 	auto it = m_components.find(typeId);
@@ -249,9 +400,9 @@ size_t Actor::CountComponentFamily(ComponentFamily family) const
 	// Count in the main component container
 	for (const auto& [typeId, bucket] : m_components)
 	{
-		if (const auto* entry = ComponentRegistry::Get().GetEntry(typeId))
+		if (const auto policy = ComponentRegistry::Get().GetPolicy(typeId))
 		{
-			if (entry->family == family)
+			if (policy->family == family)
 			{
 				count += bucket.instances.size();
 			}
@@ -261,9 +412,9 @@ size_t Actor::CountComponentFamily(ComponentFamily family) const
 	// Count in the pending components list
 	for (const auto& pending : m_pendingComponents)
 	{
-		if (const auto* entry = ComponentRegistry::Get().GetEntry(pending.typeId))
+		if (const auto policy = ComponentRegistry::Get().GetPolicy(pending.typeId))
 		{
-			if (entry->family == family)
+			if (policy->family == family)
 			{
 				count++;
 			}

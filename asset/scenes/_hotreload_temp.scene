@@ -1,58 +1,180 @@
 {
     "actors": [
         {
-            "actorId": "{F2268373-F953-4752-82D2-F1DE8196A03D}",
+            "actorId": "{355EF932-A7AA-47DF-A9C2-49ECD15C47C2}",
             "components": [
-                "Camera"
+                {
+                    "data": {
+                        "name": "Transform",
+                        "position": [
+                            0.0,
+                            0.0,
+                            -5.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "followActorId": null,
+                        "followMode": 1,
+                        "lens": {
+                            "farZ": 150.0,
+                            "fov": 1.72787606716156,
+                            "height": 720.0,
+                            "nearZ": 0.10000000149011612,
+                            "projectionType": 0,
+                            "width": 1280.0
+                        },
+                        "name": "Camera",
+                        "pose": {
+                            "position": [
+                                0.0,
+                                0.0,
+                                -5.0
+                            ],
+                            "rotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rig": {
+                            "offsetPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "offsetRotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rotationMode": 1,
+                        "targetActorId": null
+                    },
+                    "type": "Camera"
+                }
             ],
             "is_active": true,
             "name": "DefaultCamera",
             "parentId": null,
-            "tag": "MainCamera",
-            "transform": {
-                "position": [
-                    0.0,
-                    0.0,
-                    -5.0
-                ],
-                "rotation": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "scale": [
-                    1.0,
-                    1.0,
-                    1.0
-                ]
-            }
+            "tag": "MainCamera"
         },
         {
-            "actorId": "{146AF24F-5D21-4220-AB1C-72B861D9FBC6}",
+            "actorId": "{9AD2D5F7-67FC-48B6-B874-EBE6FE7630ED}",
             "components": [
-                "MeshRenderer"
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                }
             ],
             "is_active": true,
-            "name": "test",
+            "name": "a",
             "parentId": null,
-            "tag": "None",
-            "transform": {
-                "position": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "rotation": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "scale": [
-                    1.0,
-                    1.0,
-                    1.0
-                ]
-            }
+            "tag": "None"
+        },
+        {
+            "actorId": "{130607CD-CE70-4032-AAF0-C7E3211B4181}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                },
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            -0.0,
+                            0.0,
+                            -0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "b",
+            "parentId": null,
+            "tag": "None"
         }
     ],
     "directional_light": {
@@ -68,5 +190,5 @@
         ],
         "intensity": 1.0
     },
-    "version": 2
+    "version": 3
 }

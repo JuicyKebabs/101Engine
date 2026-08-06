@@ -22,6 +22,7 @@ class Renderer;
 class TextureManager;
 class MeshManager;
 class SceneBase;
+class TransformSubtreeSnapshot;
 
 // Actor Class
 // This defines the all elements that exist in the game world
@@ -64,6 +65,7 @@ public:
 	void SetOwner(SceneBase* ownerScene) { m_pOwner = ownerScene; }
 	void SetTag(TagId tag) { m_tag = tag; }
 	void SetActive(bool isActive) { m_isActive = isActive; }
+	void SetName(const std::string& name) { m_name = name; }
 
 	// Getters
 	const Guid& GetGuid() const { return m_guid; }
@@ -93,17 +95,11 @@ public:
 	{
 		static_assert(std::is_base_of_v<Component, T>, "AddComponent<T>: T must derive from Component");
 
-		using Policy = ComponentPolicy<T>;
-
-		Policy policy;
-
 		auto component = std::make_unique<T>(std::forward<Args>(args)...);
 
 		Component* added = AddComponentInternal(
 			std::move(component),
-			std::type_index(typeid(T)),
-			Policy::cardinality,
-			Policy::family
+			std::type_index(typeid(T))
 		);
 
 		return dynamic_cast<T*>(added);
@@ -112,14 +108,6 @@ public:
 	// Add a pre-created component instance to the container.
 	// Used by ComponentRegistry::AddToActor, where the concrete type is only
 	// known at runtime (created via a Factory function returning Component*).
-	//
-	// NOTE (recovery): in the lost Editor work, a ComponentPolicy-based
-	// duplicate-prevention check (for UniqueRequired-style components such as
-	// Transform/Camera) was reportedly added to this overload so that
-	// InspectorPanel's "Add Component" text field couldn't attach duplicates.
-	// The exact implementation wasn't captured in chat, so this restored
-	// version is the pre-policy-check baseline (known working, used by
-	// SceneLoader/SceneWriter). Re-add the duplicate check here if desired.
 	Component* AddComponent(std::unique_ptr<Component> component);
 
 	// Check if the container has a component of type T
@@ -165,6 +153,53 @@ public:
 	{
 		static_assert(std::is_base_of_v<Component, T>, "GetComponentTypeId<T>: T must derive from Component");
 		return std::type_index(typeid(T));
+	}
+
+	// Get components by exact type (no inheritance)
+	std::vector<Component*> GetComponentsByExactType(std::type_index typeId)
+	{
+		std::vector<Component*> result;
+
+		auto it = m_components.find(typeId);
+
+		if (it != m_components.end() && !it->second.instances.empty())
+		{
+			for (const auto& instance : it->second.instances)
+			{
+				if (instance && !instance->IsDestroyed())
+				{
+					result.push_back(instance.get());
+
+				}
+			}
+		}
+
+		for (auto& pending : m_pendingComponents)
+		{
+			if (pending.typeId == typeId)
+			{
+				if (pending.instance && !pending.instance->IsDestroyed())
+				{
+					result.push_back(pending.instance.get());
+				}
+			}
+		}
+
+		return result;
+	}
+
+	// Get a component by exact type and occurrence index (no inheritance)
+	// Occurrance index is index of duplicate components of the same type, starting from 0 for the first instance.
+	Component* GetComponentByExactType(std::type_index typeId, std::size_t occurrenceIndex)
+	{
+		auto components = GetComponentsByExactType(typeId);
+
+		if (occurrenceIndex < components.size())
+		{
+			return components[occurrenceIndex];
+		}
+
+		return nullptr;
 	}
 
 	// Remove a component of type T from the container by class type
@@ -353,6 +388,10 @@ public:
 		return result;
 	}
 
+	// Return if a component of the specified type can be added to this actor,
+	// based on its cardinality and family constraints.
+	bool CanAddComponent(std::type_index typeId) const;
+
 	// Component family queries
 	bool HasComponentFamily(ComponentFamily family) const;
 	size_t CountComponentFamily(ComponentFamily family) const;
@@ -392,9 +431,7 @@ private:
 
 	Component* AddComponentInternal(
 		std::unique_ptr<Component> component,
-		std::type_index typeId,
-		ComponentCardinality cardinality,
-		ComponentFamily family
+		std::type_index typeId
 	);
 
 	bool HasExactComponent(std::type_index typeId) const;
@@ -409,6 +446,15 @@ private:	// The APIs which should sohuld be published to limited scope
 		m_name = desc.name;
 		m_isInitialized = true;
 	}
+
+	// Add component by skipping the pending queue and inserting directly into the actual storage.
+	// This is used by Editor command to add component. Never be used in game runtime.
+	Component* AddComponentImmediate(std::unique_ptr<Component> component, std::size_t occurrenceIndex);
+
+	// Remove component without deferred removal in a frame, directly from the actual storage.
+	// This is used by Editor command to remove component. Never be used in game runtime.
+	bool RemoveComponentImmediate(Component* component);
+
 	void SetParentHandle(ActorHandle parent);			// Set the parent actor handle (used by SceneBase)
 	void SetGuid(const Guid& guid) { m_guid = guid; }	// Set the actor's GUID (used by ActorFactory)
 
@@ -416,6 +462,7 @@ private:	// The APIs which should sohuld be published to limited scope
 	// This function is mainly for maintaining the correct use of Transform-family components (Transform and RectTransform) in the actor.
 	bool ReplaceTransformComponent(std::unique_ptr<Transform> transform);
 
-	friend class ActorFactory;	// Allow ActorFactory to access private constructor
-	friend class SceneBase;		// SceneBase coordinates hierarchy-aware destruction
+	friend class ActorFactory;				// Allow ActorFactory to access private constructor
+	friend class SceneBase;					// SceneBase coordinates hierarchy-aware destruction
+	friend class TransformSubtreeSnapshot;	// Allow TransformSubtreeSnapshot to access private members for Replacing Transform components
 };

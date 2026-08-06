@@ -80,7 +80,7 @@ std::unique_ptr<Transform> TransformConversion::Create(
 		if (snapshot.rectTransformState)
 		{// In case of specific params of RectTransform are available
 			// Restore all RectTransform-specific state when the source was a RectTransform
-			transformDesc.localPosition = snapshot.localTransform.position;
+			transformDesc.localPosition = Vector3::Zero();
 			transformDesc.localRotation = snapshot.localTransform.rotation;
 			transformDesc.localScale = snapshot.localTransform.scale;
 
@@ -91,8 +91,8 @@ std::unique_ptr<Transform> TransformConversion::Create(
 		}
 		else
 		{// In case of no specific params of RectTransform are available (source was a normal Transform)
-			// X/Y becomes anchored position; Z remains RectTransform depth
-			transformDesc.localPosition = Vector3(0.0f, 0.0f, snapshot.localTransform.position.z);
+			// X/Y becomes anchored position. RectTransform stays on its Canvas plane.
+			transformDesc.localPosition = Vector3::Zero();
 			transformDesc.localRotation = snapshot.localTransform.rotation;
 			transformDesc.localScale = snapshot.localTransform.scale;
 
