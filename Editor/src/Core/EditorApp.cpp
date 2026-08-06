@@ -30,7 +30,12 @@
 #include "Tools/ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Command/RenameActorCommand.h"
 #include "Command/CreateActorCommand.h"
+#include "Command/DeleteActorCommand.h"
+#include "Command/ReparentActorCommand.h"
+#include "Command/AddComponentCommand.h"
+#include "Command/RemoveComponentCommand.h"
 #include "UI/EditorTheme.h"
 #include "UI/Inspector/Components/TransformInspector.h"
 #include "UI/Inspector/Components/MeshRendererInspector.h"
@@ -637,9 +642,6 @@ void EditorApp::RenderMenuBar()
 
     callbacks.onUndo = [this]()
         {
-            // Undo may delete the selected actor.
-            m_hierarchyPanel.ClearSelection();
-
             if (m_commandHistory.Undo())
             {
                 DBG("EditorApp: Undo succeeded.");
@@ -652,8 +654,6 @@ void EditorApp::RenderMenuBar()
 
     callbacks.onRedo = [this]()
         {
-            m_hierarchyPanel.ClearSelection();
-
             if (m_commandHistory.Redo())
             {
                 DBG("EditorApp: Redo succeeded.");
@@ -728,7 +728,41 @@ void EditorApp::RenderHierarchyPanel()
 {
     HierarchyPanel::Callbacks callbacks;
 
-    callbacks.onCreateActor = [this](const std::string& name)
+	callbacks.onRenameActor = [this](const Guid& targetActorGuid, const std::string& newName) -> bool
+		{
+			if (!m_pScene) return false;
+
+			Actor* actor = m_pScene->ResolveActor(targetActorGuid);
+			if (!actor) return false;
+
+			const std::string oldName = actor->GetName();
+			const bool succeeded = m_commandHistory.Execute(
+				std::make_unique<RenameActorCommand>(
+					m_pScene.get(),
+                    targetActorGuid,
+					newName
+				)
+			);
+			if (succeeded)
+			{
+				DBG(
+					"EditorApp: Renamed Actor '%s' to '%s' through command history.",
+					oldName.c_str(),
+					newName.c_str()
+				);
+			}
+			else
+			{
+				DBG(
+					"EditorApp: Failed to rename Actor '%s' to '%s'.",
+					oldName.c_str(),
+					newName.c_str()
+				);
+			}
+			return succeeded;
+		};
+
+    callbacks.onCreateActor = [this](const std::string& name, const Guid& parentGuid)
         {
             if (!m_pScene) return;
 
@@ -736,7 +770,7 @@ void EditorApp::RenderHierarchyPanel()
             desc.name = name;
 
             const bool succeeded = m_commandHistory.Execute(
-                std::make_unique<CreateActorCommand>(m_pScene.get(), desc)
+                std::make_unique<CreateActorCommand>(m_pScene.get(), desc, parentGuid)
             );
 
             if (succeeded)
@@ -755,16 +789,88 @@ void EditorApp::RenderHierarchyPanel()
             }
         };
 
-    callbacks.onDeleteActor = [this](Actor* actor)
+    callbacks.onDeleteActor =
+        [this](const Guid& actorGuid) -> bool
         {
-            if (!m_pScene || !actor) return;
+			if (!m_pScene || !actorGuid.IsValid()) return false;
+
+			Actor* actor = m_pScene->ResolveActor(actorGuid);
+			if (!actor || actor->IsDestroyed()) return false;
 
             const std::string actorName = actor->GetName();
-            m_pScene->RemoveActor(actor);
-            DBG(
-                "EditorApp: Deleted actor '%s' from scene",
-                actorName.c_str()
+
+            const bool succeeded = m_commandHistory.Execute(
+                std::make_unique<DeleteActorCommand>(
+                    m_pScene.get(),
+					actorGuid
+                )
             );
+
+            if (succeeded)
+            {
+                DBG("EditorApp: Deleted Actor '%s' through command history.", actorName.c_str());
+            }
+            else
+            {
+                DBG("EditorApp: Failed to delete Actor '%s'.", actorName.c_str());
+            }
+
+            return succeeded;
+        };
+
+    callbacks.onReparentActor =
+        [this](const Guid& actorGuid, const Guid& newParentGuid) -> bool
+        {
+			if (!m_pScene || !actorGuid.IsValid()) return false;
+
+			Actor* actor = m_pScene->ResolveActor(actorGuid);
+			if (!actor || actor->IsDestroyed()) return false;
+
+			Actor* newParent = newParentGuid.IsValid()
+				? m_pScene->ResolveActor(newParentGuid)
+				: nullptr;
+
+			if (newParentGuid.IsValid() &&
+				(!newParent || newParent->IsDestroyed()))
+			{
+				return false;
+			}
+
+			// Get name for debug logging
+            const std::string actorName = actor->GetName();
+            const std::string parentName =
+                newParent
+                ? newParent->GetName()
+                : "Scene Root";
+
+			// Execute the reparenting command through the command history
+            const bool succeeded =
+                m_commandHistory.Execute(
+                    std::make_unique<ReparentActorCommand>(
+                        m_pScene.get(),
+						actorGuid,
+						newParentGuid
+                    )
+                );
+
+            if (succeeded)
+            {
+                DBG(
+                    "EditorApp: Reparented Actor '%s' to '%s' through command history.",
+                    actorName.c_str(),
+                    parentName.c_str()
+                );
+            }
+            else
+            {
+                DBG(
+                    "EditorApp: Failed to reparent Actor '%s' to '%s'.",
+                    actorName.c_str(),
+                    parentName.c_str()
+                );
+            }
+
+            return succeeded;
         };
 
     m_hierarchyPanel.Render(m_pScene.get(), callbacks);
@@ -775,7 +881,43 @@ void EditorApp::RenderInspectorPanel()
     InspectorContext context;
 	context.assetManager = m_pAssetManager.get();
 
-    m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor(), context);
+    InspectorPanel::Callbacks callbacks;
+
+	// Callback for adding a component to an actor.
+    callbacks.onAddComponent =
+        [this](const Guid& actorGuid, const std::string& componentName)
+        {
+            if (!m_pScene) return false;
+
+            return m_commandHistory.Execute(
+                std::make_unique<AddComponentCommand>(
+                    m_pScene.get(),
+                    actorGuid,
+                    componentName
+                )
+            );
+        };
+
+	// Callback for removing a component from an actor.
+    callbacks.onRemoveComponent =
+        [this](
+            const Guid& actorGuid,
+            const std::string& componentName,
+            std::size_t occurrenceIndex)
+        {
+            if (!m_pScene) return false;
+
+            return m_commandHistory.Execute(
+                std::make_unique<RemoveComponentCommand>(
+                    m_pScene.get(),
+                    actorGuid,
+                    componentName,
+                    occurrenceIndex
+                )
+            );
+        };
+
+	m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor(m_pScene.get()), context, callbacks);
 }
 
 void EditorApp::RenderSceneViewPanel()

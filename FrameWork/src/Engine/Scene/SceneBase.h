@@ -14,17 +14,20 @@
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
 
+// Forward declarations
+class SceneManager;
+class SceneLoader;
+class Component;
+class ActorSubtreeRestorer;
+enum class TransformKind;
+
+
 //----------------------------------------------------------------------------------------
 // SceneBase class
 // This class represents a base of scene
 // Scene has a list of root actors and all actors in the scene
 // This also has systems which are used to process the core functionalities of the scene
 //----------------------------------------------------------------------------------------
-
-// Forward declarations
-class SceneManager;
-class SceneLoader;
-enum class TransformKind;
 
 // Scene base class
 class SceneBase
@@ -141,6 +144,18 @@ public:
 		return it->second;
 	}
 
+	// Adding given component to given actor immediately, without waiting for the next update cycle
+	// Never call this from runtime game code. This function is intended for Editor commands.
+	Component* AddActorComponentImmediate(
+		Actor* actor,
+		std::unique_ptr<Component> component,
+		std::size_t occurrenceIndex
+	);
+
+	// Removing given component from given actor immediately, without waiting for the next update cycle
+	// Never call this from runtime game code. This function is intended for Editor commands.
+	bool RemoveActorComponentImmediate(Actor* actor, Component* component);
+
 	// Change the parent of an actor to a new parent
 	// Passing nullptr as newParent will make the actor a root actor
 	bool ReparentActor(Actor* actor, Actor* newParent);
@@ -153,6 +168,12 @@ public:
 	// Mark all RectTransform in the hierarchy of the given actor as dirty to update their layout
 	bool SetCanvasReferenceSize(Canvas* canvas, const Vector2& referenceSize);
 
+	// Set the scale mode of a canvas
+	bool SetCanvasScaleMode(Canvas* canvas, CanvasScaleMode scaleMode);
+
+	// Set the match width or height of a canvas
+	bool SetCanvasMatchWidthOrHeight(Canvas* canvas, float match);
+	
 	// Setters
 	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
 	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager	
@@ -187,12 +208,21 @@ private:
 
 private:
 	friend class SceneLoader;
+	friend class Actor;
+	friend class ActorSubtreeRestorer;
 
 	// Helper function for Actor registration
 	Actor* RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle, bool applyUIConstraints);
 
 	// Helper function for Actor restoration (used by SceneLoader)
 	Actor* RegisterRestoredActor(std::unique_ptr<Actor> actor);
+
+	// Reapply UI hierarchy constraints when a hierarchy-sensitive
+	// component is added to an Actor already registered in this Scene.
+	void OnActorComponentAdded(
+		Actor* actor,
+		Component* component
+	);
 
 	// Check if reparenting would create a hierarchy cycle
 	bool WouldCreateHierarchyCycle(const Actor* actor, const Actor* newParent) const;
@@ -221,4 +251,10 @@ private:
 	// Helper to mark every RectTransform in the hierarchy of the given actor as dirty
 	// This is used to update the layout of UI elements when the viewport size changes
 	void MarkRectTransformHierarchyDirty(Actor* root);
+
+	// Rollback Actors registered during a failed subtree restoration transaction
+	// The handles must refer only to newly restored, uninitialized Actors
+	// This must not be used for normal Actor removal.
+	// Only use it to roll back a failed restoration transaction.
+	bool RollbackRestoredActors(const std::vector<ActorHandle>& restoredHandles);
 };

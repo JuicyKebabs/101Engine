@@ -15,7 +15,6 @@ struct UIRendererProxy
 	Vector2 uvScale = { 1, 1 };			// UV scale for texture mapping
 	Vector2 uvOffset = { 0, 0 };		// UV offset for texture mapping
 	Vector2 flip = { 1, 1 };			// Flip flags for X and Y axes (1 for normal, -1 for flipped)
-	bool isWorldSpace = false;			// Flag indicating if the UI element is in world space (true) or screen space (false)
 };
 
 class UIRenderer : public RendererComponent
@@ -35,7 +34,7 @@ public:
 	// Getters
 	const UIRenderTemplate& GetRenderTemplate() const { return m_renderTemplate; }
 	const UIRendererProxy& GetRenderProxy();
-	UINT GetOrder() const { return m_order; }
+	UINT GetOrder() const { return GetSortOrderInCanvas(); }
 	Vector2 GetUVScale() const { return m_uvScale; }
 	Vector2 GetUVOffset() const { return m_uvOffset; }
 	bool IsFlipX() const { return m_flipX; }
@@ -43,12 +42,13 @@ public:
 	bool IsVisible() const override;
 	bool IsConfigured() const override { return !m_renderTemplate.empty(); }	// Check if the renderer has been configured with necessary resources (at least one render template)
 
-	void SetCanvas(Canvas* canvas);
-	void SetOrder(UINT order) { m_order = order; m_isProxyDirty = true; }
+	void SetGoverningCanvas(Canvas* canvas) override;
+	void SetCanvas(Canvas* canvas) { SetGoverningCanvas(canvas); }
+	void SetOrder(UINT order) { SetSortOrderInCanvas(order); m_isProxyDirty = true; }
 
-	Canvas* GetCanvas() const { return m_pCanvas; }
+	Canvas* GetCanvas() const { return GetGoverningCanvas(); }
 	UINT GetCanvasOrder() const;
-	void OnCanvasDestroyed() { m_pCanvas = nullptr; }
+	void OnCanvasDestroyed() { SetGoverningCanvas(nullptr); }
 
 	// Serialization and deserialization methods
 	bool Serialize(nlohmann::json& outJson) const override;
@@ -59,8 +59,6 @@ protected:
 	UIRenderTemplate m_renderTemplate;	// Render template containing static rendering information for this UI element
 	UIRendererProxy m_renderProxy;		// Render proxy containing dynamic rendering information for this UI element
 
-	Canvas* m_pCanvas = nullptr;	// Pointer to the canvas this UI element belongs to (used for sorting and rendering)
-	UINT m_order = 0;				// Render order for this UI element (used for sorting)
 	Vector2 m_uvScale{ 1,1 };		// UV scale for texture mapping
 	Vector2 m_uvOffset{ 0,0 };		// UV offset for texture mapping
 	bool m_flipX = false;			// Flip flag for X axis (false for normal, true for flipped)

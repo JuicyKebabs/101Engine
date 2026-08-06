@@ -8,13 +8,14 @@
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Component/TransformConversion.h"
+#include "Engine/UI/UIRenderer.h"
 #include <unordered_set>
 #include <cmath>
 
 // Constructor
 SceneBase::SceneBase()
 {
-	m_pCameraSystem = std::make_unique<CameraSystem>();
+	m_pCameraSystem = std::make_unique<CameraSystem>(this);
 	m_pRenderSystem = std::make_unique<RenderSystem>();
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 }
@@ -229,6 +230,97 @@ Actor* SceneBase::RegisterRestoredActor(std::unique_ptr<Actor> actor)
 	return RegisterActor(std::move(actor), ActorHandle::Null(), /*applyUIConstraints=*/false);
 }
 
+void SceneBase::OnActorComponentAdded(Actor* actor, Component* component)
+{
+	if (!actor ||
+		!component ||
+		actor->GetOwner() != this ||
+		actor->IsDestroyed())
+	{
+		return;
+	}
+
+	// Check if added component affects the UI hierarchy (Canvas or RendererComponent)
+	const bool affectsUIHierarchy =
+		dynamic_cast<Canvas*>(component) != nullptr ||
+		dynamic_cast<RendererComponent*>(component) != nullptr;
+
+	if (!affectsUIHierarchy) return;
+
+	// Get the governing canvas in the hierarchy for the actor (if any)
+	Canvas* governingCanvas = FindTopmostCanvas(actor->GetParent());
+
+	// Reapply UI hierarchy constraints for the actor and its descendants
+	if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
+	{
+		DBG("SceneBase::OnActorComponentAdded: Failed to reapply UI hierarchy constraints for Actor '%s'.", actor->GetName().c_str());
+	}
+}
+
+Component* SceneBase::AddActorComponentImmediate(
+	Actor* actor,
+	std::unique_ptr<Component> component,
+	std::size_t occurrenceIndex
+)
+{
+	if (!actor ||
+		!component ||
+		actor->GetOwner() != this ||
+		actor->IsDestroyed())
+	{
+		return nullptr;
+	}
+
+	Component* added = actor->AddComponentImmediate(
+		std::move(component),
+		occurrenceIndex
+	);
+
+	if (!added) return nullptr;
+
+	OnActorComponentAdded(actor, added);
+
+	return added;
+}
+
+bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component)
+{
+	if (!actor ||
+		!component ||
+		actor->GetOwner() != this ||
+		actor->IsDestroyed() ||
+		component->GetOwner() != actor)
+	{
+		return false;
+	}
+
+	// Check if given component affects the UI hierarchy (Canvas or RendererComponent)
+	const bool affectsUIHierarchy =
+		dynamic_cast<Canvas*>(component) != nullptr ||
+		dynamic_cast<RendererComponent*>(component) != nullptr;
+
+	// Remove the component from the actor immediately
+	if (!actor->RemoveComponentImmediate(component))
+	{
+		return false;
+	}
+
+	// Apply UI hierarchy constraints for the actor if necessary
+	if (affectsUIHierarchy)
+	{
+		Canvas* governingCanvas = FindTopmostCanvas(actor->GetParent());
+
+		if (!ApplyUIHierarchyConstraints(
+			actor,
+			governingCanvas))
+		{
+			DBG("SceneBase::RemoveActorComponentImmediate: Failed to reapply UI hierarchy constraints for Actor '%s'.", actor->GetName().c_str());
+		}
+	}
+
+	return true;
+}
+
 bool SceneBase::ReparentActor(Actor* actor, Actor* newParent)
 {
 	return ReparentActorInternal(actor, newParent, /*applyUIConstraints=*/true);
@@ -343,7 +435,7 @@ bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 	}
 
 	// Set the render mode of the topmost canvas
-	canvas->SetRenderMode(renderMode);
+	canvas->SetAuthoredRenderMode(renderMode);
 
 	// Apply UI hierarchy constraints
 	if (!ApplyUIHierarchyConstraints(owner, nullptr))
@@ -386,12 +478,65 @@ bool SceneBase::SetCanvasReferenceSize(Canvas* canvas, const Vector2& referenceS
 	}
 
 	// Set the reference size of the canvas
-	canvas->SetWorldReferenceSize(referenceSize);
+	canvas->SetReferenceSize(referenceSize);
 
 	// Mark all RectTransform under this canvas as dirty 
 	// to update their layout based on the new reference size
 	MarkRectTransformHierarchyDirty(owner);
 	
+	return true;
+}
+
+bool SceneBase::SetCanvasScaleMode(Canvas* canvas, CanvasScaleMode scaleMode)
+{
+	if (!canvas) return false;
+
+	// Validate the scale mode
+	if (scaleMode < CanvasScaleMode::ConstantPixelSize ||
+		scaleMode >= CanvasScaleMode::Max)
+	{
+		return false;
+	}
+
+	// Get Actor owner of the canvas and validate it
+	Actor* owner = canvas->GetOwner();
+
+	if (!owner ||
+		owner->GetOwner() != this ||
+		owner->IsDestroyed())
+	{
+		return false;
+	}
+
+	// Set the scale mode of the canvas and 
+	// mark all RectTransform under this canvas as dirty
+	canvas->SetScaleMode(scaleMode);
+	MarkRectTransformHierarchyDirty(owner);
+
+	return true;
+}
+
+bool SceneBase::SetCanvasMatchWidthOrHeight(Canvas* canvas, float match)
+{
+	// Validate the input parameters
+	if (!canvas || !std::isfinite(match)) return false;
+	if (match < 0.0f || match > 1.0f) return false;
+
+	// Get Actor owner of the canvas and validate it
+	Actor* owner = canvas->GetOwner();
+
+	if (!owner ||
+		owner->GetOwner() != this ||
+		owner->IsDestroyed())
+	{
+		return false;
+	}
+
+	// Set the match width or height of the canvas and
+	// mark all RectTransform under this canvas as dirty
+	canvas->SetMatchWidthOrHeight(match);
+	MarkRectTransformHierarchyDirty(owner);
+
 	return true;
 }
 
@@ -544,9 +689,17 @@ bool SceneBase::ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanva
 	if (actorCanvas)
 	{// In case of the given actor has a canvas
 		// Inherit render mode from the governing canvas if it exists
-		if (governingCanvas) actorCanvas->SetRenderMode(governingCanvas->GetRenderMode());
+		if (governingCanvas)
+		{
+			actorCanvas->SetInheritedRenderMode(governingCanvas->GetRenderMode());
+		}
+		else
+		{
+			actorCanvas->RestoreAuthoredRenderMode();
+		}
 	}
 
+	// Apply appropriate transform kind based on the hierarchy and canvas render mode
 	TransformKind requiredKind = TransformKind::Transform;
 
 	if (isUnderCanvas)
@@ -566,6 +719,12 @@ bool SceneBase::ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanva
 	{
 		DBG("SceneBase::ApplyUIHierarchyConstraints: Failed to ensure transform kind for Actor '%s'.", actor->GetName().c_str());
 		return false;
+	}
+
+	// Apply the hierarchy-derived Canvas only after transform conversion succeeds.
+	if (RendererComponent* renderer = actor->GetComponentByClass<RendererComponent>())
+	{
+		renderer->SetGoverningCanvas(governingCanvas);
 	}
 
 	Canvas* childGoverningCanvas = governingCanvas;
@@ -616,4 +775,56 @@ void SceneBase::MarkRectTransformHierarchyDirty(Actor* root)
 	{
 		MarkRectTransformHierarchyDirty(child);
 	}
+}
+
+bool SceneBase::RollbackRestoredActors(const std::vector<ActorHandle>& restoredHandles)
+{
+	bool succeeded = true;
+
+	// Detach all restored actors from their parents
+	for (auto it = restoredHandles.rbegin(); it != restoredHandles.rend(); ++it)
+	{
+		Actor* actor = m_actorPool.Resolve(*it);
+		if (!actor)
+		{
+			DBG("SceneBase::RollbackRestoredActors: Failed to resolve a restored Actor."); succeeded = false;
+			continue;
+		}
+
+		// Reset the parent handle to null to detach the actor from its parent
+		actor->SetParentHandle(ActorHandle::Null());
+	}
+
+	// Remove all restored actors from the scene and discard them from the ActorPool
+	for (auto it = restoredHandles.rbegin(); it != restoredHandles.rend(); ++it)
+	{
+		const ActorHandle handle = *it;
+		Actor* actor = m_actorPool.Resolve(handle);
+
+		if (!actor)
+		{
+			succeeded = false;
+			continue;
+		}
+
+		// Get name for logging purposes
+		const std::string actorName = actor->GetName();
+
+		// Preserve identity before releasing the ActorPool slot.
+		const Guid guid = actor->GetGuid();
+
+		// Discard the actor from the ActorPool
+		if (!m_actorPool.DiscardUninitialized(handle))
+		{
+			DBG("SceneBase::RollbackRestoredActors: Failed to discard Actor '%s'.", actorName.c_str());
+			succeeded = false;
+			continue;
+		}
+
+		// Remove Guid mappings only after the ActorPool release succeeds.
+		m_actorGuidMap.erase(guid);
+		m_actorHandleGuidMap.erase(handle);
+	}
+
+	return succeeded;
 }

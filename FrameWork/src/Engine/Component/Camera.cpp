@@ -1,5 +1,3 @@
-#include <cmath>
-#include <string>
 #include "Camera.h"
 #include "Transform.h"
 #include "Engine/Actor/Actor.h"
@@ -8,6 +6,9 @@
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 #include "nlohmann/json.hpp"
+#include <cmath>
+#include <string>
+#include <optional>
 
 void Camera::OnStartOverride()
 {
@@ -43,6 +44,26 @@ const CameraInfo& Camera::GetCameraInfo()
 	}
 
 	return m_cameraInfo;
+}
+
+bool Camera::SetTargetActor(Actor* target)
+{
+	if (!m_targetActor.Set(target)) return false;
+
+	m_isCameraInfoDirty = true;
+	m_rotatingTransformGeneration = static_cast<uint64_t>(-1);
+
+	return true;
+}
+
+bool Camera::SetFollowTarget(Actor* target)
+{
+	if (!m_followActor.Set(target)) return false;
+
+	m_isCameraInfoDirty = true;
+	m_followingTransformGeneration = static_cast<uint64_t>(-1);
+
+	return true;
 }
 
 void Camera::SetAsMainCamera()
@@ -115,7 +136,7 @@ void Camera::UpdateCameraPose(float deltaTime)
 		followingTarget = GetOwner();
 		break;
 	case CAMERA_FOLLOW_MODE::FOLLOW_MODE_TARGET:
-		followingTarget = m_pFollowActor;
+		followingTarget = ResolveActorReference(m_followActor);
 		break;
 	default:
 		break;
@@ -142,7 +163,7 @@ void Camera::UpdateCameraPose(float deltaTime)
 		rotatingTarget = GetOwner();
 		break;
 	case CAMERA_ROTATION_MODE::ROTATION_MODE_LOOK_AT_TARGET:
-		rotatingTarget = m_pTargetActor;
+		rotatingTarget = ResolveActorReference(m_targetActor);
 		rotatingDirty |= followingDirty;	// If the following target is dirty, set rotating dirty as well
 		break;
 	default:
@@ -179,7 +200,7 @@ void Camera::UpdatePosition(float deltaTime)
 		followTarget = GetOwner();
 		break;
 	case CAMERA_FOLLOW_MODE::FOLLOW_MODE_TARGET:
-		followTarget = m_pFollowActor;
+		followTarget = ResolveActorReference(m_followActor);
 		break;
 	default:
 		break;
@@ -215,9 +236,13 @@ void Camera::UpdateRotation(float deltaTime)
 		break;
 
 	case CAMERA_ROTATION_MODE::ROTATION_MODE_LOOK_AT_TARGET:
-		if (m_pTargetActor) {
-			auto targetTransform = m_pTargetActor->GetComponentByClass<Transform>();
-			if (targetTransform) {
+	{
+		Actor* targetActor = ResolveActorReference(m_targetActor);
+		if (targetActor)
+		{
+			auto targetTransform = targetActor->GetComponentByClass<Transform>();
+			if (targetTransform)
+			{
 				Vector3 targetPosition = targetTransform->GetWorldPosition();
 				Vector3 cameraPosition = m_cameraPose.position;
 				Vector3 direction = {
@@ -235,6 +260,7 @@ void Camera::UpdateRotation(float deltaTime)
 			}
 		}
 		break;
+	}
 	default:
 		break;
 	}
@@ -276,13 +302,9 @@ bool Camera::Serialize(nlohmann::json& outJson) const
 	};
 
 	// Reference to target(by GUID)
-	if (m_pTargetActor)
+	if (m_targetActor.HasValue())
 	{
-		outJson["targetActorId"] = m_pTargetActor->GetGuid().ToString();
-	}
-	else if (m_pendingTargetActorGuid.has_value())
-	{
-		outJson["targetActorId"] = m_pendingTargetActorGuid->ToString();
+		outJson["targetActorId"] = m_targetActor.GetGuid().ToString();
 	}
 	else
 	{
@@ -290,13 +312,9 @@ bool Camera::Serialize(nlohmann::json& outJson) const
 	}
 
 	// Reference to follow target(by GUID)
-	if (m_pFollowActor)
+	if (m_followActor.HasValue())
 	{
-		outJson["followActorId"] = m_pFollowActor->GetGuid().ToString();
-	}
-	else if (m_pendingFollowActorGuid.has_value())
-	{
-		outJson["followActorId"] = m_pendingFollowActorGuid->ToString();
+		outJson["followActorId"] = m_followActor.GetGuid().ToString();
 	}
 	else
 	{
@@ -498,13 +516,26 @@ bool Camera::Deserialize(const nlohmann::json& json)
 	m_cameraPose = parsedPose;
 	m_cameraLens = parsedLens;
 
-	// Release any existing references to actors
-	m_pTargetActor = nullptr;
-	m_pFollowActor = nullptr;
+	// Clear existing actor references before setting new ones
+	m_targetActor.Clear();
+	m_followActor.Clear();
 
-	// Store pending GUIDs for later resolution
-	m_pendingTargetActorGuid = parsedTargetGuid;
-	m_pendingFollowActorGuid = parsedFollowGuid;
+	// Set actor references using parsed GUIDs
+	if (parsedTargetGuid.has_value())
+	{
+		if (!m_targetActor.SetGuid(*parsedTargetGuid))
+		{
+			return false;
+		}
+	}
+
+	if (parsedFollowGuid.has_value())
+	{
+		if (!m_followActor.SetGuid(*parsedFollowGuid))
+		{
+			return false;
+		}
+	}
 
 	m_isCameraInfoDirty = true; // Mark camera info as dirty to trigger rebuild
 	m_followingTransformGeneration = static_cast<uint64_t>(-1);	// Reset following transform generation
@@ -515,42 +546,34 @@ bool Camera::Deserialize(const nlohmann::json& json)
 
 bool Camera::ResolveReferences(SceneBase& scene)
 {
-	Actor* resolvedTargetActor = m_pTargetActor;
-	Actor* resolvedFollowActor = m_pFollowActor;
-
-	// Resolve target actor reference
-	if (m_pendingTargetActorGuid.has_value())
+	// Resolve target actor reference using their GUIDs
+	if (m_targetActor.HasValue() && !m_targetActor.Resolve(scene))
 	{
-		resolvedTargetActor = scene.ResolveActor(m_pendingTargetActorGuid.value());
-		if (!resolvedTargetActor)
-		{
-			DBG("Camera::ResolveReferences() - Failed to resolve target actor with GUID: %s\n",
-				m_pendingTargetActorGuid->ToString().c_str());
-			return false;
-		}
+		DBG("Camera::ResolveReferences() - Failed to resolve target Actor with GUID: %s", m_targetActor.GetGuid().ToString().c_str());
+		return false;
 	}
 
-	// Resolve follow actor reference
-	if (m_pendingFollowActorGuid.has_value())
+	// Resolve follow Actor reference using its Guid.
+	if (m_followActor.HasValue() && !m_followActor.Resolve(scene))
 	{
-		resolvedFollowActor = scene.ResolveActor(m_pendingFollowActorGuid.value());
-		if (!resolvedFollowActor)
-		{
-			DBG("Camera::ResolveReferences() - Failed to resolve follow actor with GUID: %s\n",
-				m_pendingFollowActorGuid->ToString().c_str());
-			return false;
-		}
+		DBG("Camera::ResolveReferences() - Failed to resolve follow Actor with GUID: %s", m_followActor.GetGuid().ToString().c_str());
+		return false;
 	}
 
-	// Update references and clear pending GUIDs after both resolutions
-	m_pTargetActor = resolvedTargetActor;
-	m_pFollowActor = resolvedFollowActor;
-	m_pendingTargetActorGuid.reset();
-	m_pendingFollowActorGuid.reset();
-
-	m_isCameraInfoDirty = true; // Mark camera info as dirty to trigger rebuild
-	m_followingTransformGeneration = static_cast<uint64_t>(-1);	// Reset following transform generation
-	m_rotatingTransformGeneration = static_cast<uint64_t>(-1);	// Reset rotating transform generation
+	m_isCameraInfoDirty = true;
+	m_followingTransformGeneration = static_cast<uint64_t>(-1);
+	m_rotatingTransformGeneration = static_cast<uint64_t>(-1);
 
 	return true;
+}
+
+Actor* Camera::ResolveActorReference(const ActorReference& reference) const
+{
+	Actor* owner = GetOwner();
+	if (!owner) return nullptr;
+
+	SceneBase* scene = owner->GetOwner();
+	if (!scene) return nullptr;
+
+	return reference.Resolve(*scene);
 }

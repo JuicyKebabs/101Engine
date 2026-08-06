@@ -1,11 +1,15 @@
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/RectTransform.h"
+#include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
+#include "Engine/UI/UIImage.h"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -147,6 +151,57 @@ namespace
 			"Duplicate rejection preserves exactly one Camera");
 	}
 
+	void TestRendererFamilyExclusion()
+	{
+		auto actor = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "RendererActor"));
+
+		MeshRenderer* meshRenderer = actor->AddComponent<MeshRenderer>();
+		SpriteRenderer* spriteRenderer = actor->AddComponent<SpriteRenderer>();
+
+		Check(meshRenderer != nullptr,
+			"Actor accepts the first Renderer-family component");
+		Check(spriteRenderer == nullptr,
+			"Actor rejects a different Renderer-family component");
+		Check(actor->CountComponentFamily(ComponentFamily::Renderer) == 1,
+			"Renderer-family conflict leaves exactly one renderer");
+		Check(actor->GetComponentByClass<MeshRenderer>() == meshRenderer,
+			"Renderer-family conflict preserves the existing renderer");
+	}
+
+	void TestRegistryUsesRendererFamilyPolicy()
+	{
+		auto actor = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "RegistryRendererActor"));
+
+		const bool addedMesh =
+			ComponentRegistry::Get().AddToActor("MeshRenderer", actor.get());
+		const bool canAddImage =
+			ComponentRegistry::Get().CanAddToActor("UIImage", actor.get());
+		const bool addedImage =
+			ComponentRegistry::Get().AddToActor("UIImage", actor.get());
+
+		Check(addedMesh,
+			"ComponentRegistry adds the first Renderer-family component");
+		Check(!canAddImage,
+			"ComponentRegistry reports Renderer-family conflicts before creation");
+		Check(!addedImage,
+			"ComponentRegistry rejects a conflicting Renderer-family component");
+		Check(actor->CountComponentFamily(ComponentFamily::Renderer) == 1,
+			"Registry conflict leaves exactly one Renderer-family component");
+	}
+
+	void TestRegisteredComponentNamesAreSorted()
+	{
+		const std::vector<std::string> names =
+			ComponentRegistry::Get().GetRegisteredComponentNames();
+
+		Check(!names.empty(),
+			"ComponentRegistry returns registered component names");
+		Check(std::is_sorted(names.begin(), names.end()),
+			"ComponentRegistry returns component names in alphabetical order");
+	}
+
 	void TestSceneRequiresOneTransformFamilyComponent()
 	{
 		SceneBase scene;
@@ -204,6 +259,9 @@ int main()
 	TestRectTransformFamilyExclusion();
 	TestRegistryUsesTransformFamilyPolicy();
 	TestUniqueComponentDuplicateRejection();
+	TestRendererFamilyExclusion();
+	TestRegistryUsesRendererFamilyPolicy();
+	TestRegisteredComponentNamesAreSorted();
 	TestSceneRequiresOneTransformFamilyComponent();
 
 #ifdef NDEBUG

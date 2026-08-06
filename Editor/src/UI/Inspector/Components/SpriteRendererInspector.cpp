@@ -48,5 +48,17 @@ void SpriteRendererInspector::Draw(SpriteRenderer& spriteRenderer, const Inspect
 	if (EditorUI::BoolField("Flip X", flipX)) spriteRenderer.SetFlipX(flipX);
 	if (EditorUI::BoolField("Flip Y", flipY)) spriteRenderer.SetFlipY(flipY);
 
+	// Draw sort order field if the renderer is in screen space
+	// (In the Screen-Space UI hierarchy)
+	if (spriteRenderer.GetRenderSpace() == RenderSpace::Screen)
+	{
+		UINT sortOrder = spriteRenderer.GetSortOrderInCanvas();
+
+		if (EditorUI::UIntField("Sort Order", sortOrder))
+		{
+			spriteRenderer.SetSortOrderInCanvas(sortOrder);
+		}
+	}
+
 	EditorUI::EndPropertyGrid();
 }

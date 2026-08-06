@@ -73,6 +73,7 @@ private:
 
 	// Constant buffers for per-frame and per-draw data
 	std::unique_ptr<ConstantBuffer> m_colorFrameCB;
+	std::unique_ptr<ConstantBuffer> m_screenSpaceFrameCB;
 	std::unique_ptr<ConstantBuffer> m_shadowFrameCB;
 	std::unique_ptr<ConstantBuffer> m_lightCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCB;

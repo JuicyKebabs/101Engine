@@ -23,7 +23,25 @@ void RectTransform::UpdateGeometry()
 	);
 
 	// Build the layout transform based on the reference size and properties of this RectTransform.
-	const Transform3D layoutTransform = BuildLayoutTransform(referenceSize);
+	Transform3D layoutTransform = BuildLayoutTransform(referenceSize);
+
+	// If the owner is a root Screen-Space Canvas,
+	// apply the Canvas scale factor to the layout transform.
+	if (IsRootScreenSpaceCanvas(owner))
+	{
+		Canvas* canvas = owner
+			? owner->GetComponentByClass<Canvas>()
+			: nullptr;
+
+		if (canvas)
+		{
+			const float canvasScale = canvas->GetScaleFactor();
+
+			layoutTransform.scale.x *= canvasScale;
+			layoutTransform.scale.y *= canvasScale;
+			layoutTransform.scale.z *= canvasScale;
+		}
+	}
 
 	// Resolve the final hierarchy transform.
 	// Only the topmost Screen-Space Canvas ignores the ancestor's 3D hierarchy.
@@ -113,7 +131,7 @@ Transform3D RectTransform::BuildLayoutTransform(const Vector2& referenceSize) co
 	layoutTransform.position = Vector3(
 		anchorOffset.x + m_anchoredPosition.x + pivotOffset.x,
 		anchorOffset.y + m_anchoredPosition.y + pivotOffset.y,
-		m_localTransform.position.z
+		0.0f	// Ignore Z position to keep the RectTransform in 2D space on Canvas
 	);
 
 	return layoutTransform;
@@ -256,6 +274,7 @@ bool RectTransform::Deserialize(const nlohmann::json& json)
 
 	// Set the parameters of the RectTransform using the parsed values
 	if (!Transform::Deserialize(json)) return false;
+	m_localTransform.position = Vector3::Zero();
 
 	// Assign the parsed values to the member variables
 	m_anchorMode = parsedDesc.anchorMode;

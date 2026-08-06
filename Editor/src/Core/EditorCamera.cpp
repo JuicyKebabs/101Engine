@@ -1,6 +1,22 @@
 #include "EditorCamera.h"
+#include "Engine/Scene/ComponentRegistry.h"
 #include "imgui.h"
 #include <algorithm>
+
+namespace
+{
+	const bool s_editorCameraPolicyRegistered = []()
+	{
+		using Policy = ComponentPolicy<EditorCamera>;
+
+		ComponentRegistry::Get().RegisterPolicy(
+			std::type_index(typeid(EditorCamera)),
+			{ Policy::cardinality, Policy::family }
+		);
+
+		return true;
+	}();
+}
 
 void EditorCamera::UpdateOverride(float deltaTime)
 {

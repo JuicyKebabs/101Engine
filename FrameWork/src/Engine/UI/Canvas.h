@@ -10,11 +10,20 @@
 
 class SceneBase;
 
+// Enumration of mode for rendering space of UI elements in a Canvas
 enum class CanvasRenderMode
 {
 	ScreenSpace,	// Render UI elements in screen space
 	WorldSpace,		// Render UI elements in world space
-	Max				// Sentinel value for validation
+	Max
+};
+
+// Enumeration of scaling modes for Screen-Space UI elements in a Canvas
+enum class CanvasScaleMode
+{
+	ConstantPixelSize,		// UI elements maintain a constant pixel size regardless of screen resolution
+	ScaleWithScreenSize,	// UI elements scale with the screen size, maintaining relative proportions
+	Max
 };
 
 class Canvas : public Component
@@ -23,9 +32,11 @@ public:
 	struct ParamDesc 
 	{
 		CanvasRenderMode renderMode = CanvasRenderMode::ScreenSpace;
+		CanvasScaleMode scaleMode = CanvasScaleMode::ScaleWithScreenSize;
 		UINT sortOrder = 0;
 		bool isVisible = true;
 		Vector2 referenceSize{ 1920, 1080 };
+		float matchWidthOrHeight = 0.5f;
 		std::string name = "Canvas";
 	};
 
@@ -34,15 +45,15 @@ public:
 	~Canvas() = default;
 	void SetParams(const ParamDesc& desc = ParamDesc()) 
 	{
-		m_renderMode = desc.renderMode;
+		m_authoredRenderMode = desc.renderMode;
+		m_scaleMode = desc.scaleMode;
+		m_effectiveRenderMode = desc.renderMode;
 		m_sortOrder = desc.sortOrder;
 		m_isVisible = desc.isVisible;
-		m_worldReferenceSize = desc.referenceSize;
+		m_referenceSize = desc.referenceSize;
+		m_matchWidthOrHeight = desc.matchWidthOrHeight;
 		SetName(desc.name);
 	}
-
-	// Return the reference size used for layout calculations based on the render mode and hierarchy
-	Vector2 GetLayoutReferenceSize() const;
 
 	// Setters
 	void SetVisible(bool flag) { m_isVisible = flag; }
@@ -54,10 +65,28 @@ public:
 	}
 
 	//Getters
-	CanvasRenderMode GetRenderMode() const { return m_renderMode; }
+	// RenderMode authored directly on this Canvas
+	CanvasRenderMode GetAuthoredRenderMode() const { return m_authoredRenderMode; }
+
+	// RenderMode actually used after resolving Canvas hierarchy inheritance
+	CanvasRenderMode GetRenderMode() const { return m_effectiveRenderMode; }
+
+	// Get the reference size used for layout calculations 
+	// based on the render mode and hierarcy
+	Vector2 GetLayoutReferenceSize() const;
+
+	// Get the scale factor for Screen-Space UI elements in this Canvas 
+	// based on the scaling mode and reference size
+	float GetScaleFactor() const;
+
+	// Chack if this Canvas is a root canvas (no ancestor Canvas in the hierarchy)
+	bool IsRootCanvas() const;
+
+	CanvasScaleMode GetScaleMode() const { return m_scaleMode; }
+	Vector2 GetReferenceSize() const { return m_referenceSize; }
+	float GetMatchWidthOrHeight() const { return m_matchWidthOrHeight; }
 	bool IsVisible() const { return m_isVisible; }
 	UINT GetSortOrder() const { return m_sortOrder; }
-	Vector2 GetWorldReferenceSize() const { return m_worldReferenceSize; }
 
 	// UIRenderer management
 	void RegisterUIRenderer(UIRenderer* ui) 
@@ -77,12 +106,23 @@ public:
 
 private:
 	std::vector<UIRenderer*> m_uiList;
-	CanvasRenderMode m_renderMode = CanvasRenderMode::ScreenSpace;
+
+	CanvasRenderMode m_authoredRenderMode = CanvasRenderMode::ScreenSpace;	// Set by the user
+	CanvasRenderMode m_effectiveRenderMode = CanvasRenderMode::ScreenSpace;	// Effective mode based on hierarchy constraints
+
+	// Scaling mode for Screen-Space UI elements in this Canvas
+	CanvasScaleMode m_scaleMode = CanvasScaleMode::ScaleWithScreenSize;
+
+	// Reference size for layout calculations in this Canvas
+	Vector2 m_referenceSize{ 1920.0f, 1080.0f };
+
+
+	float m_matchWidthOrHeight = 0.5f;
+	
 	UINT m_sortOrder = 0;
 	bool m_isVisible = true;
 
-	// Logical layout size used by direct RectTransform children of a root World-Space Canvas
-	Vector2 m_worldReferenceSize{ 1920, 1080 };
+	
 
 private:
 	// Overrides
@@ -92,7 +132,13 @@ private:
 	void LateUpdateOverride(float deltaTime) override {};
 	void OnDestroyOverride() override 
 	{
-		for(auto* ui : m_uiList) if(ui) ui->OnCanvasDestroyed();
+		auto registeredUI = std::move(m_uiList);
+		m_uiList.clear();
+
+		for (auto* ui : registeredUI)
+		{
+			if (ui) ui->OnCanvasDestroyed();
+		}
 	};
 
 	void InvalidateAllUIRendererProxies()
@@ -105,18 +151,66 @@ private:
 
 private:
 
-	// Allow SceneBase to modify the render mode of the canvas
-	void SetRenderMode(CanvasRenderMode mode) 
+	// Set the authored mode of a topmost Canvas.
+	// A topmost Canvas uses its authored value as its effective value.
+	void SetAuthoredRenderMode(CanvasRenderMode mode)
 	{
-		if (m_renderMode == mode) return;
-		m_renderMode = mode; 
-		InvalidateAllUIRendererProxies(); 
+		const bool authoredChanged = m_authoredRenderMode != mode;
+		const bool effectiveChanged = m_effectiveRenderMode != mode;
+
+		if (!authoredChanged && !effectiveChanged) return;
+
+		m_authoredRenderMode = mode;
+		m_effectiveRenderMode = mode;
+
+		InvalidateAllUIRendererProxies();
 	}
 
-	void SetWorldReferenceSize(const Vector2& size)
+	// Apply a mode inherited from a governing Canvas.
+	// This must not overwrite the Canvas's authored setting.
+	void SetInheritedRenderMode(CanvasRenderMode mode)
 	{
-		if (m_worldReferenceSize == size) return;
-		m_worldReferenceSize = size;
+		if (m_effectiveRenderMode == mode) return;
+
+		m_effectiveRenderMode = mode;
+		InvalidateAllUIRendererProxies();
+	}
+
+	// Use this Canvas's own authored setting after it is detached
+	// from an ancestor Canvas hierarchy.
+	void RestoreAuthoredRenderMode()
+	{
+		if (m_effectiveRenderMode == m_authoredRenderMode) return;
+
+		m_effectiveRenderMode = m_authoredRenderMode;
+		InvalidateAllUIRendererProxies();
+	}
+
+	// Set the reference size for layout calculations in this Canvas.
+	void SetReferenceSize(const Vector2& size)
+	{
+		if (m_referenceSize == size) return;
+
+		m_referenceSize = size;
+		InvalidateAllUIRendererProxies();
+	}
+
+	// Set the scaling mode for Screen-Space UI elements in this Canvas.
+	void SetScaleMode(CanvasScaleMode mode)
+	{
+		if (m_scaleMode == mode) return;
+
+		m_scaleMode = mode;
+		InvalidateAllUIRendererProxies();
+	}
+
+	// Set the match width or height factor for 
+	// scaling Screen-Space UI elements in this Canvas.
+	void SetMatchWidthOrHeight(float match)
+	{
+		if (m_matchWidthOrHeight == match) return;
+
+		m_matchWidthOrHeight = match;
 		InvalidateAllUIRendererProxies();
 	}
 
