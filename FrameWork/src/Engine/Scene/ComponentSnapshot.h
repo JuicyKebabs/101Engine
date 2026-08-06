@@ -7,6 +7,12 @@ class Component;
 class Actor;
 class SceneBase;
 
+//-----------------------------------------------------------------------------
+// ComponentSnapshot class
+// This class captures the state of a component and its owning actor
+// Used by the commnads of adding and removing components to support Undo/Redo
+//-----------------------------------------------------------------------------
+
 class ComponentSnapshot
 {
 public:

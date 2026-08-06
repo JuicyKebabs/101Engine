@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/Core/GUID/Guid.h"
 
 class Transform;
 struct InspectorContext;
@@ -10,8 +11,5 @@ struct InspectorContext;
 class TransformInspector
 {
 public:
-    static void Draw(
-        Transform& transform,
-        const InspectorContext& context
-    );
+    static void Draw(Transform& transform, const InspectorContext& context);
 };

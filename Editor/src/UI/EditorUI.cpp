@@ -97,18 +97,25 @@ bool EditorUI::BoolField(std::string_view label, bool& value)
 	return changed;
 }
 
-bool EditorUI::FloatField(std::string_view label, float& value, float speed)
+EditorUI::EditResult EditorUI::FloatField(std::string_view label, float& value, float speed)
 {
 	BeginPropertyRow(label);
 
 	// Render the drag float field for the float value
 	const bool changed = ImGui::DragFloat("##Value", &value, speed);
 
+	// Check if the item is currently active (being edited)
+	const bool activated = ImGui::IsItemActivated();
+
+	// Check if the item was deactivated after editing (user finished editing)
+	const bool deactivatedAfterEdit = ImGui::IsItemDeactivatedAfterEdit();
+
 	EndPropertyRow();
-	return changed;
+
+	return { changed, activated, deactivatedAfterEdit };
 }
 
-bool EditorUI::UIntField(std::string_view label, unsigned int& value, float speed)
+EditorUI::EditResult EditorUI::UIntField(std::string_view label, unsigned int& value, float speed)
 {
 	BeginPropertyRow(label);
 
@@ -119,40 +126,68 @@ bool EditorUI::UIntField(std::string_view label, unsigned int& value, float spee
 		speed
 	);
 
+	// Check if the item is currently active (being edited)
+	const bool activated = ImGui::IsItemActivated();
+
+	// Check if the item was deactivated after editing (user finished editing)
+	const bool deactivatedAfterEdit = ImGui::IsItemDeactivatedAfterEdit();
+
 	EndPropertyRow();
-	return changed;
+
+	return { changed, activated, deactivatedAfterEdit };
 }
 
-bool EditorUI::Vector2Field(std::string_view label, Vector2& value, float speed)
+EditorUI::EditResult EditorUI::Vector2Field(std::string_view label, Vector2& value, float speed)
 {
 	BeginPropertyRow(label);
 
 	const bool changed = ImGui::DragFloat2("##Value", &value.x, speed);
 
+	// Check if the item is currently active (being edited)
+	const bool activated = ImGui::IsItemActivated();
+
+	// Check if the item was deactivated after editing (user finished editing)
+	const bool deactivatedAfterEdit = ImGui::IsItemDeactivatedAfterEdit();
+
 	EndPropertyRow();
-	return changed;
+
+	return { changed, activated, deactivatedAfterEdit };
 }
 
-bool EditorUI::Vector3Field(std::string_view label, Vector3& value, float speed)
+EditorUI::EditResult EditorUI::Vector3Field(std::string_view label, Vector3& value, float speed)
 {
 	BeginPropertyRow(label);
 
 	// Render the drag float fields for the Vector3 components
 	const bool changed = ImGui::DragFloat3("##Value", &value.x, speed);
 
+	// Check if the item is currently active (being edited)
+	const bool activated = ImGui::IsItemActivated();
+
+	// Check if the item was deactivated after editing (user finished editing)
+	const bool deactivatedAfterEdit = ImGui::IsItemDeactivatedAfterEdit();
+
 	EndPropertyRow();
-	return changed;
+
+	return { changed, activated, deactivatedAfterEdit };
 }
 
-bool EditorUI::ColorField(std::string_view label, Vector4& value)
+EditorUI::EditResult EditorUI::ColorField(std::string_view label, Vector4& value)
 {
 	BeginPropertyRow(label);
 
 	// Render the color edit field for the Vector4 color value
 	const bool changed = ImGui::ColorEdit4("##Value", &value.x, ImGuiColorEditFlags_AlphaBar);
 
+	// Check if the item is currently active (being edited)
+	const bool activated = ImGui::IsItemActivated();
+
+	// Check if the item was deactivated after editing (user finished editing)
+	const bool deactivatedAfterEdit = ImGui::IsItemDeactivatedAfterEdit();
+
 	EndPropertyRow();
-	return changed;
+
+	return { changed, activated, deactivatedAfterEdit };
 }
 
 bool EditorUI::ComboField(

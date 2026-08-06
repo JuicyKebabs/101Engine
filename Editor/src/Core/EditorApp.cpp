@@ -36,6 +36,7 @@
 #include "Command/ReparentActorCommand.h"
 #include "Command/AddComponentCommand.h"
 #include "Command/RemoveComponentCommand.h"
+#include "Command/TransformEditCommand.h"
 #include "UI/EditorTheme.h"
 #include "UI/Inspector/Components/TransformInspector.h"
 #include "UI/Inspector/Components/MeshRendererInspector.h"
@@ -49,8 +50,7 @@
 
 #pragma comment(lib, "winmm.lib")
 
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
-    HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static const int WINDOW_WIDTH  = 1280;
 static const int WINDOW_HEIGHT = 720;
@@ -881,6 +881,21 @@ void EditorApp::RenderInspectorPanel()
     InspectorContext context;
 	context.assetManager = m_pAssetManager.get();
 
+	context.onTransformEditBegin = [this](const Guid& actorGuid, const Transform3D& before)
+		{
+			BeginTransformEdit(actorGuid, before);
+		};
+
+    context.onTransformEditEnd = [this](const Guid& actorGuid, const Transform3D& after)
+        {
+            EndTransformEdit(actorGuid, after);
+        };
+
+    context.onCancelTransformEdit = [this]()
+        {
+            CancelTransformEdit();
+        };
+
     InspectorPanel::Callbacks callbacks;
 
 	// Callback for adding a component to an actor.
@@ -979,4 +994,56 @@ void EditorApp::ApplyCurrentViewportSizeToScene()
         sceneColor->GetWidth(),
         sceneColor->GetHeight()
     );
+}
+
+void EditorApp::BeginTransformEdit(
+    const Guid& actorGuid,
+    const Transform3D& before
+)
+{
+	// Validate the actorGuid
+    if (!actorGuid.IsValid())
+    {
+		m_transformEditTransaction.reset();
+        return;
+    }
+
+	// Store the actorGuid and the "before" transform in a new TransformEditTransaction
+    m_transformEditTransaction = TransformEditTransaction{actorGuid, before};
+}
+
+void EditorApp::EndTransformEdit(
+    const Guid& actorGuid,
+    const Transform3D& after
+)
+{
+	// Validate that there is an ongoing transform edit transaction and that the actorGuid matches
+    if (!m_transformEditTransaction) return;
+
+    if (m_transformEditTransaction->actorGuid != actorGuid)
+    {
+        m_transformEditTransaction.reset();
+        return;
+    }
+
+	// Store the "before" transform from the transaction before resetting it
+    const Transform3D before = m_transformEditTransaction->before;
+
+	// Reset the transaction to indicate that the transform edit has ended
+    m_transformEditTransaction.reset();
+
+	// Add a TransformEditCommand to the command history and execute it
+    m_commandHistory.Execute(
+        std::make_unique<TransformEditCommand>(
+            m_pScene.get(),
+            actorGuid,
+            before,
+            after
+        )
+    );
+}
+
+void EditorApp::CancelTransformEdit()
+{
+    m_transformEditTransaction = {};
 }

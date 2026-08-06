@@ -1,6 +1,7 @@
 #pragma once
 #include <windows.h>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "Engine/Engine.h"
@@ -85,6 +86,17 @@ private:
 	HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
 
 private:
+	// Struct to track transform edits for undo/redo
+    struct TransformEditTransaction
+    {
+        Guid actorGuid;
+        Transform3D before;
+    };
+
+	// Optional to track an ongoing transform edit transaction
+    std::optional<TransformEditTransaction> m_transformEditTransaction;
+
+private:
     EditorApp() = default;
 
     void CreateMainWindow();
@@ -105,4 +117,9 @@ private:
 
 	void ApplySceneViewResizeRequest();
     void ApplyCurrentViewportSizeToScene();
+
+	// Helper functions for callbacks from the InspectorPanel to track transform edits for undo/redo
+	void BeginTransformEdit(const Guid& actorGuid, const Transform3D& before);
+	void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
+    void CancelTransformEdit();
 };
