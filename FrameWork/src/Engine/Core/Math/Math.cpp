@@ -1105,11 +1105,6 @@ Quaternion& Quaternion::operator*=(const Quaternion& rhs)
 //===============================
 // Matrix4x4 Implementation
 //===============================
-Matrix4x4 Matrix4x4::Identity = []() {
-    Matrix4x4 m;
-	XMStoreFloat4x4(&m, XMMatrixIdentity());
-	return m;
-	}();
 
 float Matrix4x4::Determinant() const
 {
@@ -1211,7 +1206,7 @@ Matrix4x4 Matrix4x4::ToBillboard(const Vector3& cameraPos, const Vector3& camera
     right = right.Normalized();
     Vector3 up = forward.Cross(right).Normalized();
 
-    Matrix4x4 result = Identity;
+    Matrix4x4 result = Matrix4x4::Identity();
     result._11 = right.x * sx;  result._12 = right.y * sx;  result._13 = right.z * sx;
     result._21 = up.x * sy;  result._22 = up.y * sy;  result._23 = up.z * sy;
     result._31 = forward.x * sz;  result._32 = forward.y * sz;  result._33 = forward.z * sz;
@@ -1242,7 +1237,7 @@ Matrix4x4 Matrix4x4::ToCylindricalBillboard(const Vector3& cameraPos, const Vect
     Vector3 right = up.Cross(forward).Normalized();
     forward = right.Cross(up).Normalized();
 
-    Matrix4x4 result = Identity;
+    Matrix4x4 result = Matrix4x4::Identity();
     result._11 = right.x * sx;  result._12 = right.y * sx;  result._13 = right.z * sx;
     result._21 = up.x * sy;  result._22 = up.y * sy;  result._23 = up.z * sy;
     result._31 = forward.x * sz;  result._32 = forward.y * sz;  result._33 = forward.z * sz;

@@ -119,12 +119,16 @@ void Engine::BeginPass(RenderPassTarget target)
 			nullptr
 		);
 
-		m_pCommandList->ClearRenderTargetView(
-			rtvHandle,
-			clearColor,
-			0,
-			nullptr
-		);
+		// Clear the render target view when required
+		if (target.clearColor)
+		{
+			m_pCommandList->ClearRenderTargetView(
+				rtvHandle,
+				clearColor,
+				0,
+				nullptr
+			);
+		}
 
 		return;
 	}
@@ -152,21 +156,28 @@ void Engine::BeginPass(RenderPassTarget target)
 			&dsvHandle
 		);
 
-		m_pCommandList->ClearRenderTargetView(
-			rtvHandle,
-			color.GetClearColor(),
-			0,
-			nullptr
-		);
+		// Clear the render target view and depth stencil view when required
+		if (target.clearColor)
+		{
+			m_pCommandList->ClearRenderTargetView(
+				rtvHandle,
+				color.GetClearColor(),
+				0,
+				nullptr
+			);
+		}
 
-		m_pCommandList->ClearDepthStencilView(
-			dsvHandle,
-			D3D12_CLEAR_FLAG_DEPTH,
-			1.0f,
-			0,
-			0,
-			nullptr
-		);
+		if (target.clearDepth)
+		{
+			m_pCommandList->ClearDepthStencilView(
+				dsvHandle,
+				D3D12_CLEAR_FLAG_DEPTH,
+				depth.GetClearDepth(),
+				0,
+				0,
+				nullptr
+			);
+		}
 
 		return;
 	}
@@ -187,14 +198,17 @@ void Engine::BeginPass(RenderPassTarget target)
 			&dsvHandle
 		);
 
-		m_pCommandList->ClearDepthStencilView(
-			dsvHandle,
-			D3D12_CLEAR_FLAG_DEPTH,
-			1.0f,
-			0,
-			0,
-			nullptr
-		);
+		if (target.clearDepth)
+		{
+			m_pCommandList->ClearDepthStencilView(
+				dsvHandle,
+				D3D12_CLEAR_FLAG_DEPTH,
+				depth.GetClearDepth(),
+				0,
+				0,
+				nullptr
+			);
+		}
 
 		return;
 	}
@@ -344,11 +358,12 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 {
 	if (width == 0 || height == 0) return false;	// Invalid size, return false
 
-	// Get the scene render targets (color and depth)
+	// Get the render targets (color, depth, and selection mask)
 	auto* sceneColor = GetBuiltinRenderTarget(BuiltinRenderTarget::SceneColor);
 	auto* sceneDepth = GetBuiltinRenderTarget(BuiltinRenderTarget::SceneDepth);
+	auto* selectionMask = GetBuiltinRenderTarget(BuiltinRenderTarget::SelectionMask);
 
-	if (!sceneColor || !sceneDepth)
+	if (!sceneColor || !sceneDepth || !selectionMask)
 	{
 		assert(false && "Scene render targets are not initialized");
 		return false;
@@ -358,7 +373,9 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 	if (sceneColor->GetWidth() == width &&
 		sceneColor->GetHeight() == height &&
 		sceneDepth->GetWidth() == width &&
-		sceneDepth->GetHeight() == height)
+		sceneDepth->GetHeight() == height &&
+		selectionMask->GetWidth() == width &&
+		selectionMask->GetHeight() == height)
 	{
 		return true;
 	}
@@ -366,7 +383,7 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 	// Wait for the GPU to finish rendering before resizing
 	WaitRender();
 
-	// Resize the scene render targets (color and depth)
+	// Resize the render targets
 	const bool colorResult = sceneColor->Resize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), width, height);
 	if (!colorResult)
 	{
@@ -381,11 +398,22 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 		return false;
 	}
 
-	// Ensure that the resized render targets have the same dimensions
-	assert(sceneColor->GetWidth() == sceneDepth->GetWidth());
-	assert(sceneColor->GetHeight() == sceneDepth->GetHeight());
+	const bool selectionMaskResult = selectionMask->Resize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), width, height);
+	if (!selectionMaskResult)
+	{
+		assert(false && "SelectionMask resize failed after SceneColor and SceneDepth resize");
+		return false;
+	}
 
-	return true;
+	// Ensure that the resized render targets have the same dimensions
+	const bool hasSameSize =
+		sceneColor->GetWidth() == sceneDepth->GetWidth() &&
+		sceneColor->GetHeight() == sceneDepth->GetHeight() &&
+		sceneColor->GetWidth() == selectionMask->GetWidth() &&
+		sceneColor->GetHeight() == selectionMask->GetHeight();
+
+	assert(hasSameSize);
+	return hasSameSize;
 }
 
 //デバイスの生成
@@ -603,6 +631,7 @@ void Engine::CreateBuiltinRenderTargets()
 	CreatePostProcessRenderTarget();
 	CreateSceneDepthRenderTarget();
 	CreateShadowMapRenderTarget();
+	CreateSelectionMaskRenderTarget();
 }
 
 void Engine::CreateSceneDepthRenderTarget()
@@ -657,7 +686,34 @@ void Engine::CreatePostProcessRenderTarget()
 	desc.useSRV = true;
 
 	auto& rt = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)];
+
 	rt->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+}
+
+void Engine::CreateSelectionMaskRenderTarget()
+{
+	GpuTexture::ParamDesc desc{};
+
+	desc.width = m_frameBufferWidth;
+	desc.height = m_frameBufferHeight;
+
+	desc.initialState = GpuTexture::ResourceState::ShaderResource;
+	desc.format = GpuTexture::ColorFormat::RGBA8;
+
+	desc.clearColor[0] = 0.0f;
+	desc.clearColor[1] = 0.0f;
+	desc.clearColor[2] = 0.0f;
+	desc.clearColor[3] = 0.0f;
+
+	// Enable only RTV and SRV
+	desc.useRTV = true;
+	desc.useDSV = false;
+	desc.useSRV = true;
+	desc.useUAV = false;
+
+	auto& selectionMask = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SelectionMask)];
+
+	selectionMask->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
 }
 
 void Engine::SetViewPortAndScissorRect(const GpuTexture& renderTarget)

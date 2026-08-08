@@ -57,8 +57,8 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 	renderTemplate.meshDesc.meshHandle = meshHandle;
 	// MeshGPU stores a sphere centered at the Actor origin that contains
 	// every vertex. Pass it to the render template for RectTransform fitting.
-	renderTemplate.meshDesc.boundsCenter = Vector3::Zero();
-	renderTemplate.meshDesc.boundsRadius = meshGPU->GetSortRadius();
+	renderTemplate.meshDesc.boundsCenter = meshGPU->GetBoundsCenter();
+	renderTemplate.meshDesc.boundsRadius = meshGPU->GetBoundsRadius();
 	renderTemplate.materialDesc.textureHandle = materialInfo.textureHandle;
 	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;
 	renderTemplate.materialDesc.baseColor = materialInfo.materialColor;
@@ -268,7 +268,7 @@ bool MeshRenderer::ResolveReferences(SceneBase& scene)
 
 Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 {
-	if (!transform) return Matrix4x4::Identity;
+	if (!transform) return Matrix4x4::Identity();
 
 	RectTransform* rectTransform = dynamic_cast<RectTransform*>(transform);
 

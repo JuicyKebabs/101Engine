@@ -93,7 +93,7 @@ CameraInfo Camera::RebuildCameraInfo()
 {
 	CameraInfo info;
 
-	Matrix4x4 world = Matrix4x4::Identity;
+	Matrix4x4 world = Matrix4x4::Identity();
 	world *= m_cameraPose.rotation.ToRotationMatrix();
 	world *= Matrix4x4::CreateTranslation(m_cameraPose.position); // Apply inverse translation for view matrix
 	info.viewMatrix = world.Inverse();

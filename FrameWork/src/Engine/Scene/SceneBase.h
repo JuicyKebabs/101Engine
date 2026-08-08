@@ -45,7 +45,8 @@ public:
 	void LateUpdate(float deltaTime);			// Late update
 	void OnRender(								// Render
 		EngineContext& context,
-		const CameraInfo* overrideCameraInfo = nullptr
+		const CameraInfo* overrideCameraInfo = nullptr,
+		RenderViewPolicy viewPolicy = {}
 		);
 	void Finalize();							// Finalize
 

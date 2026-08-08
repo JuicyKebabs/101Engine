@@ -100,7 +100,10 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-void SceneBase::OnRender(EngineContext& context, const CameraInfo* overrideCameraInfo)
+void SceneBase::OnRender(
+	EngineContext& context,
+	const CameraInfo* overrideCameraInfo,
+	RenderViewPolicy viewPolicy)
 {
 	const auto* pCameraInfo = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
 
@@ -114,7 +117,7 @@ void SceneBase::OnRender(EngineContext& context, const CameraInfo* overrideCamer
 	auto cameraInfo = *pCameraInfo;	// Make a copy of the camera info to pass to the render system (in case the render system needs to modify it for sorting or other purposes)
 
 	m_pRenderSystem->FlushRegisters();
-	m_pRenderSystem->BuildFrameRenderData(cameraInfo);
+	m_pRenderSystem->BuildFrameRenderData(cameraInfo, viewPolicy);
 	context.pRenderer->SubmitFrameRenderData(m_pRenderSystem->GetFrameRenderData());
 	context.pRenderer->SubmitCameraInfo(cameraInfo);
 	context.pRenderer->SubmitDirectionalLight(m_directionalLight);

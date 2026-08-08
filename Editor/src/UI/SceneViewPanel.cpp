@@ -82,6 +82,24 @@ void SceneViewPanel::Render(
 		cursorPosition.y + offsetY
 		});
 
+	// Render the tab bar for switching between Scene and Screen view modes
+	if (ImGui::BeginTabBar("##EditorViewportTabs"))
+	{
+		if (ImGui::BeginTabItem("Scene"))
+		{
+			m_viewMode = EditorViewportMode::Scene;
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Screen"))
+		{
+			m_viewMode = EditorViewportMode::Screen;
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+	}
+
 	// Render the image using the ImGui::Image function, passing in the texture handle and the calculated size
 	ImGui::Image(
 		static_cast<ImTextureID>(sceneTextureHandle.ptr),
@@ -92,6 +110,29 @@ void SceneViewPanel::Render(
 	// Store the minimum and maximum coordinates of the image in the ImGui window for later use
 	m_imageMin = ImGui::GetItemRectMin();
 	m_imageMax = ImGui::GetItemRectMax();
+
+	// Handle mouse click events for picking actors in the scene
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+	{
+		// Get the current mouse position in the ImGui window
+		const ImVec2 mousePosition = ImGui::GetMousePos();
+
+		// Calculate the width and height of the scene view image
+		const float imageWidth = m_imageMax.x - m_imageMin.x;
+		const float imageHeight = m_imageMax.y - m_imageMin.y;
+
+		// Calculate the UV coordinates of the mouse click relative to the image
+		if (imageWidth > 0.0f &&imageHeight > 0.0f)
+		{
+			m_pickUV =
+			{
+				(mousePosition.x - m_imageMin.x) / imageWidth,
+				(mousePosition.y - m_imageMin.y) / imageHeight
+			};
+
+			m_hasPickRequest = true;
+		}
+	}
 
 	ImGui::End();
 }
@@ -113,5 +154,17 @@ bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)
 	outHeight = height;
 
 	m_isViewportResized = false;
+	return true;
+}
+
+bool SceneViewPanel::ConsumePickRequest(
+	Vector2& outViewportUV
+)
+{
+	if (!m_hasPickRequest) return false;
+
+	outViewportUV = m_pickUV;
+	m_hasPickRequest = false;
+
 	return true;
 }

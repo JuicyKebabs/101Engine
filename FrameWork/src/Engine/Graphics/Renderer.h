@@ -48,9 +48,17 @@ public:
 	void RenderScreenSpace(																	// Render screen space draw packet (to avoid post effect)
 		ID3D12GraphicsCommandList* p_commandList, 
 		UINT viewportWidth, 
-		UINT viewportHeight
+		UINT viewportHeight,
+		RenderTargetFormat targetFormat
 	);
-
+	void RenderSelectionMask(																// Render selection mask for selected objects
+		ID3D12GraphicsCommandList* p_commandList,
+		const FrameRenderData& selectionRenderData
+	);
+	void RenderSelectionOutline(															// Render selection outline for selected objects
+		ID3D12GraphicsCommandList* p_commandList,
+		GpuTexture* selectionMask
+	);
 
 	void SubmitFrameRenderData(const FrameRenderData& frameRenderData);	// Submit draw packets
 	void SubmitCameraInfo(const CameraInfo& cameraInfo);				// Submit camera information for this frame
@@ -76,27 +84,39 @@ private:
 	std::unique_ptr<ConstantBuffer> m_screenSpaceFrameCB;
 	std::unique_ptr<ConstantBuffer> m_shadowFrameCB;
 	std::unique_ptr<ConstantBuffer> m_lightCB;
+	std::unique_ptr<ConstantBuffer> m_selectionFrameCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshForShadowCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_uiCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionMeshCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionSpriteCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionUICB;
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light
 
 	// Post-processing related
-	PSOKey m_postProcessKey;	// Post-processing PSO key
-	PSOKey m_shadowMapKey;		// Shadow map PSO key
+	PSOKey m_postProcessKey;			// Post-processing PSO key
+	PSOKey m_shadowMapKey;				// Shadow map PSO key
+	PSOKey m_selectionMeshMaskKey;		// Selection mask PSO key
+	PSOKey m_selectionOutlineKey;		// Selection outline PSO key
+	PSOKey m_selectionSpriteMaskKey;	// Selection sprite mask PSO key
+	PSOKey m_selectionUIMaskKey;		// Selection UI mask PSO key
 
 private:
-	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare);			// Render a mesh
-	void RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex);					// Render a mesh for shadow map
-	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare);		// Render a sprite
-	void RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare);				// Render a UI element
+	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);			// Render a mesh
+	void RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex);													// Render a mesh for shadow map
+	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);		// Render a sprite
+	void RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);				// Render a UI element
 
 
 	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
 	std::shared_ptr<PipelineState> CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object
-	void PreparePostProcessKey();	// Prepare post-processing information
-	void PrepareShadowMapKey();		// Prepare shadow map information
+	void PreparePostProcessKey();			// Prepare post-processing information
+	void PrepareShadowMapKey();				// Prepare shadow map information
+	void PrepareSelectionMaskKey();			// Prepare selection mesh information
+	void PrepareSelectionOutlineKey();		// Prepare selection outline information
+	void PrepareSelectionSpriteMaskKey();	// Prepare selection sprite mask information
+	void PrepareSelectionUIMaskKey();		// Prepare selection UI mask information
 };

@@ -36,6 +36,9 @@ MeshGPU::MeshGPU(ID3D12Device* pDevice, Mesh& src)
 		maxDistSq = std::max(maxDistSq, len2);
 	}
 	m_sortRadius = sqrt(maxDistSq);
+
+	m_boundsCenter = src.boundsCenter;
+	m_boundsRadius = src.boundsRadius;
 }
 
 //デストラクタ

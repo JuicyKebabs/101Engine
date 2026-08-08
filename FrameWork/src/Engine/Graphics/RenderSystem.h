@@ -8,6 +8,34 @@
 #include "Engine/Resource/Texture.h"
 #include "Engine/Component/Camera.h"
 
+//-------------------------------------------------------------------------------
+// Render System class
+// This class is responsible for managing the RenderComponents in the scene.
+// Convert every RenderComponent into a draw packet and sort them for rendering.
+//-------------------------------------------------------------------------------
+
+// Enumeration to define which render space to filter for rendering
+enum class RenderSpaceFilter
+{
+	All,
+	WorldOnly,
+	ScreenOnly,
+};
+
+// Enumration to define how the screen-space objects are rendered
+enum class ScreenSpaceRenderBehavior
+{
+	Overlay,	// Render in screen space
+	World,		// Render in world space
+};
+
+// Struct to define the render view policy
+struct RenderViewPolicy
+{
+	RenderSpaceFilter renderSpaceFilter = RenderSpaceFilter::All;
+	ScreenSpaceRenderBehavior screenSpaceBehavior = ScreenSpaceRenderBehavior::Overlay;
+};
+
 // Render system class
 class RenderSystem
 {
@@ -80,10 +108,17 @@ public:
 	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
 	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
-	void FlushRegisters();										// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
-	void BuildFrameRenderData(const CameraInfo& cameraInfo);	// Build draw packets from the registered mesh renderers
+	
+	void FlushRegisters();	// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
+	
+	void BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy);	// Build draw packets from the registered mesh renderers
 
 	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }	// Get the render data for the current frame (contains draw packets and other rendering information)
+
+	// Create render item functions (used to create draw packets from sort entries)
+	static MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
+	static SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);		// Create a sprite draw packet from a sort entry
+	static UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
 
 private:
 	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
@@ -94,10 +129,6 @@ private:
 	CameraInfo m_cameraInfo;						// Cached camera information for the current frame (used for sorting transparent objects)
 
 private:
-	MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
-	SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);	// Create a sprite draw packet from a sort entry
-	UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
-
 	void SortOpaque();		// Sort opaque draw packets
 	void SortTransparent();	// Sort transparent draw packets
 	void SortScreenSpace();	// Sort screen-space draw packets (e.g., UI)

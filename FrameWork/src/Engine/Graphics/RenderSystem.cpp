@@ -58,12 +58,41 @@ void RenderSystem::FlushRegisters()
 	}
 }
 
-void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
+void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy)
 {
+	// Lamda function to determine if a render item should be rendered in screen space based on the view policy
+	const auto shouldRenderAsScreenSpace =
+		[&viewPolicy](RenderSpace renderSpace)
+		{
+			return
+				renderSpace == RenderSpace::Screen &&
+				viewPolicy.screenSpaceBehavior == ScreenSpaceRenderBehavior::Overlay;
+		};
+
 	m_cameraInfo = cameraInfo;	// Update cached camera info for this frame
 
 	m_frameRenderData.Clear();	// Clear previous frame's render data
 	m_frameSortData.Clear();	// Clear previous frame's sort data
+
+	// Lamda funtion determine if a render item should be included 
+	// in the current render pass based on the view policy
+	const auto shouldIncludeRenderSpace =
+		[&viewPolicy](RenderSpace renderSpace)
+		{
+			switch (viewPolicy.renderSpaceFilter)
+			{
+			case RenderSpaceFilter::WorldOnly:
+				return renderSpace == RenderSpace::World;
+
+			case RenderSpaceFilter::ScreenOnly:
+				return renderSpace == RenderSpace::Screen;
+
+			case RenderSpaceFilter::All:
+			default:
+				return true;
+			}
+		};
+
 
 	// Build draw packets for mesh renderers
 	for (const auto& renderer : m_meshRenderers){
@@ -78,11 +107,13 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 				RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
 				NormalizePSOKey(item.common.materialDesc.psoKey, queue);
 
+				// Skip render items that do not match the current render space filter
+				if (!shouldIncludeRenderSpace(renderProxy.common.renderSpace)) continue;
 
-				if (renderProxy.common.renderSpace == RenderSpace::Screen)
+				if (shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
 				{
 					// Disable depth testing for screen-space meshes
-					//item.common.materialDesc.psoKey.depth = DepthMode::Disable;
+					item.common.materialDesc.psoKey.depth = DepthMode::Disable;
 					auto handle = m_frameRenderData.AddMeshs(item);
 
 					SortKeyScreenSpace sortKey;
@@ -134,8 +165,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
 			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
 
+			// Skip render items that do not match the current render space filter
+			if (!shouldIncludeRenderSpace(renderProxy.common.renderSpace)) continue;
 
-			if (renderProxy.common.renderSpace == RenderSpace::Screen)
+			if (shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
 			{
 				// Disable depth testing for screen-space sprites
 				item.common.materialDesc.psoKey.depth = DepthMode::Disable;
@@ -195,7 +228,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 
 				PSOKey& psoKey = item.common.materialDesc.psoKey;
 
-				if (renderProxy.common.renderSpace == RenderSpace::World)
+				// Skip render items that do not match the current render space filter
+				if (!shouldIncludeRenderSpace(renderProxy.common.renderSpace)) continue;
+
+				if (!shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
 				{// World-space UI elements
 					// Get the render queue based on the PSOKey and normalize it
 					RenderQueue queue = GetRenderQueue(psoKey);
@@ -232,8 +268,8 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo)
 
 					SortKeyScreenSpace sortKey;
 					sortKey.psoKey = item.common.materialDesc.psoKey;
-					sortKey.canvasOrder = renderProxy.canvasOrder;
-					sortKey.order = renderProxy.order;
+					sortKey.canvasOrder = renderProxy.common.canvasOrder;
+					sortKey.order = renderProxy.common.sortOrder;
 					ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
 					ref.handle = m_frameRenderData.AddUI(std::move(item));
 					m_frameRenderData.AddScreenSpace(ref);

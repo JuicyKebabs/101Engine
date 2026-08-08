@@ -14,6 +14,9 @@ public:
 	};
 
     void Render(SceneBase* scene, const Callbacks& callbacks);
+
+	void SelectActor(const Guid& actorGuid) { m_selectedActorGuid = actorGuid; }
+
     Actor* GetSelectedActor(SceneBase* scene);
 
 	// Clears the current selection.

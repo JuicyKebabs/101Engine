@@ -22,6 +22,8 @@ public:
 	UINT GetIndexCount() const { return m_IndexCount; }
 	D3D12_PRIMITIVE_TOPOLOGY GetTopology() const { return m_Topology; }
 	float GetSortRadius() const { return m_sortRadius; }
+	Vector3 GetBoundsCenter() const { return m_boundsCenter; }
+	float GetBoundsRadius() const { return m_boundsRadius; }
 
 private:
 	VertexBuffer* m_pVertexBuffer = nullptr;	// Vertex buffer
@@ -31,4 +33,7 @@ private:
 		D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;	// Primitive topology
 
 	float m_sortRadius = 0.0f;	// Sort radius
+
+	Vector3 m_boundsCenter;			// Center of the mesh bounds in local space (Average of all vertex positions)
+	float m_boundsRadius = 0.0f;	// Radius of the mesh bounds in local space (Distance from center to the farthest vertex)
 };

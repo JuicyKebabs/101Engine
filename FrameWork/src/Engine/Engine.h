@@ -46,6 +46,9 @@ struct RenderPassTarget
 	RenderPassTargetType type = RenderPassTargetType::BackBuffer;
 	uint32_t colorIndex = InvalidIndex;	// For BackBuffer, this is the buffer index; for Builtin, this is the built-in render target index
 	uint32_t depthIndex = InvalidIndex;	
+
+	bool clearColor = true;	// Whether to clear the color buffer
+	bool clearDepth = true;	// Whether to clear the depth buffer
 };
 
 // Back buffer render target structure
@@ -68,6 +71,7 @@ public:
 		ShadowMap = 0,	// Shadow map render target
 		SceneColor,		// Main render target for the scene
 		SceneDepth,		// Depth render target for the scene
+		SelectionMask,	// Selection mask render target (for editor selection)
 		//BloomA,
 		//BloomB,
 		//MotionBlur,
@@ -155,6 +159,7 @@ private:	// Internal functions
 	void CreateSceneDepthRenderTarget();	// Scene depth render target creation
 	void CreateShadowMapRenderTarget();		// Shadow map render target creation
 	void CreatePostProcessRenderTarget();	// Post-processing render target creation
+	void CreateSelectionMaskRenderTarget();	// Selection mask render target creation
 
 	void SetViewPortAndScissorRect(const GpuTexture& renderTarget);	// Set viewport and scissor rectangle based on the render target
 };

@@ -48,11 +48,15 @@ void Renderer::Initialize(
 	m_screenSpaceFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_shadowFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
+	m_selectionFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 
-	// Prepare post-processing PSO key
+	// Prepare  specific PSO keys for different rendering passes
 	PreparePostProcessKey();
-	// Prepare shadow map PSO key
 	PrepareShadowMapKey();
+	PrepareSelectionMaskKey();
+	PrepareSelectionOutlineKey();
+	PrepareSelectionSpriteMaskKey();
+	PrepareSelectionUIMaskKey();
 }
 
 // Update
@@ -198,13 +202,13 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
 		default:
 			break;
@@ -216,13 +220,13 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
 		default:
 			break;
@@ -255,7 +259,8 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Gp
 void Renderer::RenderScreenSpace(
 	ID3D12GraphicsCommandList* p_commandList,
 	UINT viewportWidth,
-	UINT viewportHeight
+	UINT viewportHeight,
+	RenderTargetFormat targetFormat
 )
 {
 	if (viewportWidth == 0 || viewportHeight == 0) return;
@@ -269,7 +274,7 @@ void Renderer::RenderScreenSpace(
 
 	// Set frame-level constants for screen space rendering
 	auto framePtr = m_screenSpaceFrameCB->GetPtr<FrameConstants>();
-	framePtr->view = Matrix4x4::Identity;
+	framePtr->view = Matrix4x4::Identity();
 	framePtr->proj = orthoProj;
 	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_screenSpaceFrameCB->GetAddress());
@@ -287,27 +292,240 @@ void Renderer::RenderScreenSpace(
 
 	PSOKey compare{};
 
-	for(auto& item : m_frameRenderData.screenspace)
+	for (auto& item : m_frameRenderData.screenspace)
 	{
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, targetFormat);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, targetFormat);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, targetFormat);
 			break;
 		default:
 			break;
 		}
 	}
-
 }
 
-void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare)
+void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, const FrameRenderData& selectionRenderData)
+{
+	// Create constant buffers for selection mask rendering
+	const size_t meshCount = selectionRenderData.GetMeshCount();
+
+	if (m_selectionMeshCB.size() < meshCount)
+	{
+		size_t toAllocate = meshCount - m_selectionMeshCB.size();
+
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_selectionMeshCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+		}
+	}
+
+	// Create constant buffers for selection sprite rendering
+	const size_t spriteCount = selectionRenderData.GetSpriteCount();
+
+	if (m_selectionSpriteCB.size() < spriteCount)
+	{
+		size_t toAllocate = spriteCount - m_selectionSpriteCB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_selectionSpriteCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
+		}
+	}
+
+	// Create constant buffers for selection UI rendering
+	const size_t uiCount = selectionRenderData.GetUICount();
+
+	if (m_selectionUICB.size() < uiCount)
+	{
+		size_t toAllocate = uiCount - m_selectionUICB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_selectionUICB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
+		}
+	}
+
+	// Set frame-level constants for selection mask rendering
+	auto framePtr = m_selectionFrameCB->GetPtr<FrameConstants>();
+	framePtr->view = m_cameraInfoThisFrame.viewMatrix;
+	framePtr->proj = m_cameraInfoThisFrame.projMatrix;
+	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_selectionFrameCB->GetAddress());
+
+	// Set the pipeline state object for selection mask rendering
+	auto pso = GetPipelineStateObject(m_selectionMeshMaskKey);
+	p_commandList->SetPipelineState(pso->GetPipelineState());
+
+	size_t count = 0;
+
+	// Render all meshes in the selection render data
+	for (const auto& item : selectionRenderData.meshs)
+	{
+		auto ptr = m_selectionMeshCB[count]->GetPtr<MeshRenderConstants>();
+
+		ptr->worldMatrix = item.common.worldMatrix;
+		ptr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+		ptr->lightViewProj = Matrix4x4::Identity();
+		ptr->objectColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		p_commandList->SetGraphicsRootConstantBufferView(1, m_selectionMeshCB[count]->GetAddress());
+
+		auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
+		if (meshGPU == nullptr)
+		{
+			DBG("MeshGPU is null\n");
+			continue;
+		}
+		auto vbv = meshGPU->GetVertexBuffer()->GetView();
+		auto ibv = meshGPU->GetIndexBuffer()->GetView();
+		p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
+		p_commandList->IASetVertexBuffers(0, 1, &vbv);
+		p_commandList->IASetIndexBuffer(&ibv);
+
+		// Draw command
+		p_commandList->DrawIndexedInstanced(
+			meshGPU->GetIndexCount(),
+			1,
+			item.meshDesc.startIndex,
+			item.meshDesc.baseVertex,
+			0
+		);
+
+		count++;
+	}
+
+	// Render all sprites in the selection render data
+	PipelineState* spriteMaskPso = GetPipelineStateObject(m_selectionSpriteMaskKey);
+
+	if (!spriteMaskPso) return;
+
+	p_commandList->SetPipelineState(spriteMaskPso->GetPipelineState());
+
+	D3D12_VERTEX_BUFFER_VIEW nullVertexBuffer{};
+	p_commandList->IASetVertexBuffers(0, 1, &nullVertexBuffer);
+	p_commandList->IASetIndexBuffer(nullptr);
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	for (size_t i = 0; i < spriteCount; i++)
+	{
+		const SpriteRenderItem& item = selectionRenderData.sprites[i];
+
+		ConstantBuffer* constantBuffer = m_selectionSpriteCB[i].get();
+
+		if (!constantBuffer || !constantBuffer->GetIsValid()) continue;
+
+		auto constants = constantBuffer->GetPtr<SpriteRenderConstants>();
+
+		constants->worldMatrix = item.common.worldMatrix;
+		constants->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		constants->uvRect =
+			Vector4(
+				item.uvOffset.x,
+				item.uvOffset.y,
+				item.uvOffset.x + item.uvScale.x,
+				item.uvOffset.y + item.uvScale.y
+			);
+		constants->pivot = item.pivot;
+		constants->flip = item.flip;
+
+		p_commandList->SetGraphicsRootConstantBufferView(1, constantBuffer->GetAddress());
+
+		const int32_t textureSrvIndex =m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+		if (textureSrvIndex < 0) continue;
+
+		const auto textureHandle =m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(textureSrvIndex);
+
+		p_commandList->SetGraphicsRootDescriptorTable(3, textureHandle);
+
+		p_commandList->DrawInstanced(6, 1, 0, 0);
+	}
+
+	// Render all UI elements in the selection render data
+
+	PipelineState* uiMaskPso = GetPipelineStateObject(m_selectionUIMaskKey);
+
+	if (!uiMaskPso) return;
+
+	p_commandList->SetPipelineState(uiMaskPso->GetPipelineState());
+
+	D3D12_VERTEX_BUFFER_VIEW nullUIVertexBuffer{};
+	p_commandList->IASetVertexBuffers(0, 1, &nullUIVertexBuffer);
+	p_commandList->IASetIndexBuffer(nullptr);
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	for (size_t i = 0; i < uiCount; i++)
+	{
+		const UIRenderItem& item = selectionRenderData.uis[i];
+
+		ConstantBuffer* constantBuffer = m_selectionUICB[i].get();
+
+		if (!constantBuffer || !constantBuffer->GetIsValid()) continue;
+
+		auto constants = constantBuffer-> GetPtr<UIRenderConstants>();
+		constants->worldMatrix = item.common.worldMatrix;
+		constants->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		constants->uvRect =
+			Vector4(
+				item.uvOffset.x,
+				item.uvOffset.y,
+				item.uvOffset.x +
+				item.uvScale.x,
+				item.uvOffset.y +
+				item.uvScale.y
+			);
+		constants->flip = item.flip;
+
+		p_commandList->SetGraphicsRootConstantBufferView(1, constantBuffer->GetAddress());
+
+		const int32_t textureSrvIndex =m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+		if (textureSrvIndex < 0) continue;
+
+		const auto textureHandle =m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(textureSrvIndex);
+
+		p_commandList->SetGraphicsRootDescriptorTable(3, textureHandle);
+
+		p_commandList->DrawInstanced(6, 1, 0, 0);
+	}
+}
+
+void Renderer::RenderSelectionOutline(ID3D12GraphicsCommandList* p_commandList, GpuTexture* selectionMask)
+{
+	if (!p_commandList || !selectionMask) return;
+
+	// Get pipeline state object for selection outline rendering
+	PipelineState* pso = GetPipelineStateObject(m_selectionOutlineKey);
+	if (!pso) return;
+
+	p_commandList->SetPipelineState(pso->GetPipelineState());
+
+	// Get gpu handle for the given selection mask texture
+	const uint32_t srvIndex = selectionMask->GetSrvIndex();
+	const auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(srvIndex);
+
+	// Set the descriptor table for the selection mask texture
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+
+	// Reset vertex and index buffers for drawing the full-screen triangle
+	D3D12_VERTEX_BUFFER_VIEW nullVertexBuffer{};
+	p_commandList->IASetVertexBuffers(0, 1, &nullVertexBuffer);
+	p_commandList->IASetIndexBuffer(nullptr);
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// Draw a full-screen triangle to apply the selection outline effect
+	p_commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+void Renderer::RenderMesh(
+	ID3D12GraphicsCommandList* p_commandList, 
+	const MeshRenderItem& item,
+	int itemIndex, 
+	PSOKey& compare,
+	RenderTargetFormat targetFormat
+)
 {
 	// Check if the Constant buffer is valid
 	if (itemIndex >= m_meshCB.size())
@@ -323,6 +541,8 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 
 	// Check if the PSO key's vertex shader file ID is correct
 	PSOKey currentKey = item.common.materialDesc.psoKey;
+	currentKey.rtvFormat = targetFormat;
+
 	if (currentKey.vsKey.fileID != VS_FILE_ID::Mesh) {
 		currentKey.vsKey.fileID = VS_FILE_ID::Mesh;
 	}
@@ -373,7 +593,11 @@ void Renderer::RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRe
 	);
 }
 
-void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex)
+void Renderer::RenderMeshForShadow(
+	ID3D12GraphicsCommandList* p_commandList,
+	const MeshRenderItem& item,
+	int itemIndex
+)
 {
 	// Set up the constant buffer for this mesh
 	auto ptr = m_meshForShadowCB[itemIndex]->GetPtr<MeshRenderConstants>();
@@ -405,7 +629,13 @@ void Renderer::RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, con
 	);
 }
 
-void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare)
+void Renderer::RenderSprite(
+	ID3D12GraphicsCommandList* p_commandList,
+	const SpriteRenderItem& item,
+	int itemIndex,
+	PSOKey& compare,
+	RenderTargetFormat targetFormat
+)
 {
 	// Check if the Constant buffer is valid
 	if (itemIndex >= m_spriteCB.size())
@@ -421,6 +651,8 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 
 	// Compare PSO keys to minimize state changes (optional optimization)
 	PSOKey currentKey = item.common.materialDesc.psoKey;
+	currentKey.rtvFormat = targetFormat;
+
 	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
 	if (!currentKey.indexFree) currentKey.indexFree = true;
 
@@ -455,7 +687,13 @@ void Renderer::RenderSprite(ID3D12GraphicsCommandList* p_commandList, const Spri
 	p_commandList->DrawInstanced(6, 1, 0, 0); // Draw a quad (2 triangles)
 }
 
-void Renderer::RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare)
+void Renderer::RenderUI(
+	ID3D12GraphicsCommandList* p_commandList,
+	const UIRenderItem& item,
+	int itemIndex,
+	PSOKey& compare,
+	RenderTargetFormat targetFormat
+)
 {
 	// Check if the Constant buffer is valid
 	if (itemIndex >= m_uiCB.size())
@@ -471,6 +709,8 @@ void Renderer::RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRender
 
 	// Compare PSO keys to minimize state changes (optional optimization)
 	PSOKey currentKey = item.common.materialDesc.psoKey;
+	currentKey.rtvFormat = targetFormat;
+
 	if (currentKey.vsKey.fileID != VS_FILE_ID::UI) currentKey.vsKey.fileID = VS_FILE_ID::UI;
 	if (currentKey.psKey.fileID != PS_FILE_ID::UI) currentKey.psKey.fileID = PS_FILE_ID::UI;
 	if (!currentKey.indexFree) currentKey.indexFree = true;
@@ -561,6 +801,7 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
+	pso->SetFormat(key.rtvFormat);
 	pso->Create();
 
 	// Check if creation was successful
@@ -600,4 +841,86 @@ void Renderer::PrepareShadowMapKey()
 	key.cull = CullMode::Back;
 	key.depthOnly = true;
 	m_shadowMapKey = key;
+}
+
+void Renderer::PrepareSelectionMaskKey()
+{
+	PSOKey key{};
+
+	key.vsKey.fileID = VS_FILE_ID::Mesh;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
+
+	key.psKey.fileID = PS_FILE_ID::SelectionMask;
+	key.psKey.entryID = PS_ENTRY_ID::Main;
+
+	key.blend = BlendMode::Opaque;
+	key.depth = DepthMode::Disable;
+	key.cull = CullMode::None;
+	key.rtvFormat = RenderTargetFormat::LDR;
+	key.indexFree = false;
+
+	m_selectionMeshMaskKey = key;
+}
+
+void Renderer::PrepareSelectionOutlineKey()
+{
+	PSOKey key{};
+
+	key.vsKey.fileID = VS_FILE_ID::PostEffect;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
+
+	key.psKey.fileID = PS_FILE_ID::SelectionOutline;
+	key.psKey.entryID = PS_ENTRY_ID::Main;
+
+	key.blend = BlendMode::Alpha;
+	key.depth = DepthMode::Disable;
+	key.cull = CullMode::None;
+
+	// Outline is composited into the HDR SceneColor
+	key.rtvFormat = RenderTargetFormat::HDR;
+	key.indexFree = true;
+
+	m_selectionOutlineKey = key;
+}
+
+void Renderer::PrepareSelectionSpriteMaskKey()
+{
+	PSOKey key{};
+
+	key.vsKey.fileID = VS_FILE_ID::Sprite;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
+
+	key.psKey.fileID =
+		PS_FILE_ID::SelectionSpriteMask;
+
+	key.psKey.entryID = PS_ENTRY_ID::Main;
+
+	key.blend = BlendMode::Opaque;
+	key.depth = DepthMode::Disable;
+	key.cull = CullMode::None;
+	key.rtvFormat = RenderTargetFormat::LDR;
+	key.indexFree = true;
+
+	m_selectionSpriteMaskKey = key;
+}
+
+void Renderer::PrepareSelectionUIMaskKey()
+{
+	PSOKey key{};
+
+	key.vsKey.fileID = VS_FILE_ID::UI;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
+
+	key.psKey.fileID =
+		PS_FILE_ID::SelectionSpriteMask;
+
+	key.psKey.entryID = PS_ENTRY_ID::Main;
+
+	key.blend = BlendMode::Opaque;
+	key.depth = DepthMode::Disable;
+	key.cull = CullMode::None;
+	key.rtvFormat = RenderTargetFormat::LDR;
+	key.indexFree = true;
+
+	m_selectionUIMaskKey = key;
 }

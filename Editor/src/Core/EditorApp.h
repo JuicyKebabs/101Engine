@@ -85,6 +85,9 @@ private:
 
 	HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
 
+	// Render data for rendering the outline of a selected object in the scene view
+    FrameRenderData m_selectionRenderData;
+
 private:
 	// Struct to track transform edits for undo/redo
     struct TransformEditTransaction
@@ -122,4 +125,12 @@ private:
 	void BeginTransformEdit(const Guid& actorGuid, const Transform3D& before);
 	void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
     void CancelTransformEdit();
+
+	// Build render data for the selected object in the scene view
+    // (used to render an outline around the selected object)
+    void BuildSelectionRenderData(RenderSpace targetRenderSpace, const CameraInfo& viewportCameraInfo);
+
+	// Helper function to build CameraInfo for the current viewport size
+	// Camera matrix is built based on the current viewport mode (Scene or Screen)
+    CameraInfo BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight) const;
 };

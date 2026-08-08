@@ -355,7 +355,8 @@ void App::Render()
 	m_pRenderer->RenderScreenSpace(
 		m_pEngine->GetCommandList(),
 		m_pEngine->GetFrameBufferWidth(),
-		m_pEngine->GetFrameBufferHeight()
+		m_pEngine->GetFrameBufferHeight(),
+		RenderTargetFormat::LDR
 		);
 	m_pEngine->EndPass(backBufferTarget);
 

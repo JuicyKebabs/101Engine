@@ -11,6 +11,7 @@
 #include "backends/imgui_impl_dx12.h"
 #include "backends/imgui_impl_win32.h"
 #include "Core/EditorScene.h"
+#include "Engine/Core/Math/Math.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Component/Transform.h"
@@ -47,6 +48,7 @@
 #include "UI/Inspector/Components/CanvasInspector.h"
 #include "UI/Inspector/Components/UIRendererInspector.h"
 #include "UI/Inspector/Components/UIImageInspector.h"
+#include "Scene/ScenePicker.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -541,50 +543,139 @@ void EditorApp::Render()
 
     m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
 
-    if (m_pScene)
+    const EditorViewportMode viewportMode = m_sceneViewPanel.GetViewMode();
+    const bool isSceneView = viewportMode == EditorViewportMode::Scene;
+
+    RenderViewPolicy viewPolicy{};
+
+    if (isSceneView)
     {
-		// Override camera information with the editor camera for rendering the scene in the editor
-        const CameraInfo& editorCameraInfo = m_pEditorCamera->GetCameraInfo();
-        m_pScene->OnRender(m_engineContext, &editorCameraInfo);
+        viewPolicy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
+        viewPolicy.screenSpaceBehavior = ScreenSpaceRenderBehavior::World;
+    }
+    else
+    {
+        viewPolicy.renderSpaceFilter = RenderSpaceFilter::ScreenOnly;
+        viewPolicy.screenSpaceBehavior = ScreenSpaceRenderBehavior::Overlay;
     }
 
-    // Render the scene depth into the shadow map
-    RenderPassTarget shadowTarget
-    {
-        RenderPassTargetType::DepthOnly,
-        RenderPassTarget::InvalidIndex,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
-    };
-    m_pEngine->BeginPass(shadowTarget);
-    m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
-    m_pEngine->EndPass(shadowTarget);
-
-	// Render the scene to the scene color render target (not directly to the back buffer)
-    RenderPassTarget sceneTarget
-    { 
-        RenderPassTargetType::ColorDepth, 
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
-    };
-    
-    m_pEngine->BeginPass(sceneTarget);
-
-	// Render scene with shadow map information
-    uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
-    m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
-
-	// Render the screen-space elements on top of the scene color render target
+	// Build CameraInfo based on the current viewport mode and size
     GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-    if (sceneColor)
-    {
-        m_pRenderer->RenderScreenSpace(
-            m_pEngine->GetCommandList(),
+    if (!sceneColor) return;
+
+    const CameraInfo viewportCameraInfo =
+        BuildViewportCameraInfo(
             sceneColor->GetWidth(),
             sceneColor->GetHeight()
         );
+
+    if (m_pScene)
+    {
+        m_pScene->OnRender(m_engineContext, &viewportCameraInfo, viewPolicy);
+    }
+
+    const RenderSpace targetRenderSpace =
+        isSceneView
+        ? RenderSpace::World
+        : RenderSpace::Screen;
+
+    // Build render data for the selected object in the scene view
+    // (for outline rendering)
+    BuildSelectionRenderData(targetRenderSpace, viewportCameraInfo);
+
+    // Scene View only requires shadow rendering
+    if (isSceneView)
+    {
+        RenderPassTarget shadowTarget
+        {
+            RenderPassTargetType::DepthOnly,
+            RenderPassTarget::InvalidIndex,
+            static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
+        };
+
+        m_pEngine->BeginPass(shadowTarget);
+        m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
+        m_pEngine->EndPass(shadowTarget);
+    }
+
+    // Both Scene View and Screen View use SceneColor as their display texture
+    RenderPassTarget sceneTarget
+    {
+        RenderPassTargetType::ColorDepth,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
+    };
+
+    m_pEngine->BeginPass(sceneTarget);
+
+    if (isSceneView)
+    {
+        // Render world-space objects using the Editor Camera
+        GpuTexture* shadowMap =
+            m_pEngine->GetBuiltinRenderTarget(
+                Engine::BuiltinRenderTarget::ShadowMap
+            );
+
+        if (shadowMap)
+        {
+            m_pRenderer->RenderScene(
+                m_pEngine->GetCommandList(),
+                shadowMap->GetSrvIndex()
+            );
+        }
+    }
+    else
+    {
+        // Render only screen-space objects using the viewport-based
+        // orthographic projection created by RenderScreenSpace()
+        GpuTexture* sceneColor =
+            m_pEngine->GetBuiltinRenderTarget(
+                Engine::BuiltinRenderTarget::SceneColor
+            );
+
+        if (sceneColor)
+        {
+            m_pRenderer->RenderScreenSpace(
+                m_pEngine->GetCommandList(),
+                sceneColor->GetWidth(),
+                sceneColor->GetHeight(),
+                RenderTargetFormat::HDR
+            );
+        }
     }
 
     m_pEngine->EndPass(sceneTarget);
+
+	// Render the selection mask for the selected object in the scene view
+    RenderPassTarget selectionMaskTarget
+    {
+        RenderPassTargetType::ColorDepth,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SelectionMask),
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
+        true,
+        false
+    };
+
+    m_pEngine->BeginPass(selectionMaskTarget);
+    m_pRenderer->RenderSelectionMask(m_pEngine->GetCommandList(),m_selectionRenderData);
+    m_pEngine->EndPass(selectionMaskTarget);
+
+    // Get the selection mask render target for outline rendering
+    GpuTexture* selectionMask = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SelectionMask);
+
+	// Render the selection outline for the selected object in the scene view
+    RenderPassTarget selectionOutlineTarget
+    {
+        RenderPassTargetType::ColorDepth,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
+        false,	// Preserve the rendered scene color
+        false	// Preserve the scene depth
+    };
+
+    m_pEngine->BeginPass(selectionOutlineTarget);
+    m_pRenderer->RenderSelectionOutline(m_pEngine->GetCommandList(), selectionMask);
+    m_pEngine->EndPass(selectionOutlineTarget);
 
 	// Render the scene color render target to the back buffer (screen) for display
     RenderPassTarget backBufferTarget
@@ -946,11 +1037,54 @@ void EditorApp::RenderSceneViewPanel()
     const uint32_t srvIndex = sceneColor->GetSrvIndex();
     const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
 
+	// Render the scene view panel with the scene color render target
     m_sceneViewPanel.Render(
         gpuHandle,
         sceneColor->GetWidth(),
         sceneColor->GetHeight()
     );
+
+	// Handle the click event for the scene view panel to select an actor in the scene
+
+	Vector2 pickUV;
+
+	// Check if the click event occurred and get the UV coordinates
+	// of the click within the scene view panel if requested
+    if (!m_sceneViewPanel.ConsumePickRequest(pickUV)) return;
+
+	// Validate necessary pointers before proceeding with picking
+	if (!m_pScene || !m_pEditorCamera) return;
+
+	// Build the camera info for picking based on the current view mode (Scene or Screen)
+    const CameraInfo pickCameraInfo =
+        BuildViewportCameraInfo(
+            sceneColor->GetWidth(),
+            sceneColor->GetHeight()
+        );
+
+    const RenderSpace targetRenderSpace =
+        m_sceneViewPanel.GetViewMode() ==
+        EditorViewportMode::Scene
+        ? RenderSpace::World
+        : RenderSpace::Screen;
+
+    // Get the picked Actor information
+    const std::optional<ScenePickHit> hit =
+		ScenePicker::Pick(
+			*m_pScene,
+			pickCameraInfo,
+			pickUV,
+            targetRenderSpace
+		);
+
+    if (hit)
+    {
+        m_hierarchyPanel.SelectActor(hit->actorGuid);
+    }
+    else
+    {
+        m_hierarchyPanel.ClearSelection();
+    }
 }
 
 void EditorApp::ShutdownImGui()
@@ -1046,4 +1180,130 @@ void EditorApp::EndTransformEdit(
 void EditorApp::CancelTransformEdit()
 {
     m_transformEditTransaction = {};
+}
+
+void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const CameraInfo& viewportCameraInfo)
+{
+	// Clear any existing selection render data
+    m_selectionRenderData.Clear();
+
+    if (!m_pScene) return;
+
+	// Get the currently selected actor from the hierarchy panel and validate it
+	Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+
+    if (!selectedActor ||
+        !selectedActor->IsActive() ||
+        selectedActor->IsDestroyed())
+    {
+        return;
+    }
+
+	// Try to get the MeshRenderer component from the selected actor
+    if (MeshRenderer* meshRenderer = selectedActor->GetComponentByClass<MeshRenderer>())
+    {
+		// Validate the MeshRenderer component
+        if (!meshRenderer->IsVisible() ||
+            !meshRenderer->IsConfigured() ||
+            meshRenderer->GetRenderSpace() != targetRenderSpace)
+        {
+            return;
+        }
+
+		// Get the render proxy
+        const MeshRendererProxy& proxy = meshRenderer->GetRenderProxy();
+
+		// Create render items for each submesh in the MeshRenderer
+        for (const SubmeshRenderTemplate& renderTemplate : meshRenderer->GetRenderTemplates())
+        {
+            MeshRenderItem item =
+                RenderSystem::CreateMeshRenderItem(
+                    renderTemplate,
+                    proxy
+                );
+
+            m_selectionRenderData.AddMeshs(std::move(item));
+        }
+
+        return;
+    }
+
+	// Try to get the SpriteRenderer component from the selected actor
+    if (SpriteRenderer* spriteRenderer = selectedActor->GetComponentByClass<SpriteRenderer>())
+    {
+		// Validate the SpriteRenderer component
+        if (!spriteRenderer->IsVisible() ||
+            !spriteRenderer->IsConfigured() ||
+            spriteRenderer->GetRenderSpace() != targetRenderSpace)
+        {
+            return;
+        }
+
+		// Get the render proxy
+        const SpriteRendererProxy& proxy = spriteRenderer->GetRenderProxy(viewportCameraInfo);
+
+		// Create a render item for the sprite
+        SpriteRenderItem item =
+            RenderSystem::CreateSpriteRenderItem(
+                spriteRenderer->GetRenderTemplate(),
+                proxy
+            );
+
+        m_selectionRenderData.AddSprites(std::move(item));
+    }
+
+	// Try to get the UIRenderer component from the selected actor
+	if (UIRenderer* uiRenderer = selectedActor->GetComponentByClass<UIRenderer>())
+	{
+		// Validate the UIRenderer component
+        if (!uiRenderer->IsVisible() ||
+            !uiRenderer->IsConfigured() ||
+            uiRenderer->GetRenderSpace() != targetRenderSpace)
+        {
+            return;
+        }
+
+        // Get the render proxy
+		const UIRendererProxy& proxy = uiRenderer->GetRenderProxy();
+
+		// Create render items for each UI element in the UIRenderer
+        for (const UIRenderElement& element : uiRenderer->GetRenderTemplate())
+        {
+            UIRenderItem item =
+                RenderSystem::CreateUIRenderItem(
+                    element,
+                    proxy
+                );
+
+            m_selectionRenderData.AddUI(std::move(item));
+        }
+	}
+}
+
+CameraInfo EditorApp::BuildViewportCameraInfo(
+    UINT viewportWidth,
+    UINT viewportHeight
+) const
+{
+	// Decide projection type based on the current viewport mode (Scene or Screen)
+
+    if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene)
+    {
+        return m_pEditorCamera->GetCameraInfo();
+    }
+
+    CameraInfo cameraInfo{};
+    cameraInfo.position = { 0.0f, 0.0f, -1.0f };
+    cameraInfo.forward = Vector3::Forward();
+    cameraInfo.up = Vector3::Up();
+    cameraInfo.viewMatrix = Matrix4x4::Identity();
+    cameraInfo.projMatrix =
+        Matrix4x4::CreateOrthographic(
+            static_cast<float>(viewportWidth),
+            static_cast<float>(viewportHeight),
+            -1.0f,
+            100.0f
+        );
+
+    return cameraInfo;
 }

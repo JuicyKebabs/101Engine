@@ -10,8 +10,6 @@ class Canvas;
 struct UIRendererProxy
 {
 	CommonRendererProxy common;			// Common render proxy data (position, world matrix, color, visibility)
-	UINT canvasOrder = 0;				// Order of the canvas this UI element belongs to (used for sorting within the canvas)
-	UINT order = 0;						// Render order for this UI element (used for sorting)
 	Vector2 uvScale = { 1, 1 };			// UV scale for texture mapping
 	Vector2 uvOffset = { 0, 0 };		// UV offset for texture mapping
 	Vector2 flip = { 1, 1 };			// Flip flags for X and Y axes (1 for normal, -1 for flipped)

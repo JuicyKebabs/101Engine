@@ -43,7 +43,7 @@ endif()
 
 message(STATUS "Using fxc.exe: ${FXC_EXECUTABLE}")
 
-# シェーダーファイルのリスト: ソースパス:プロファイル:エントリポイント
+# List of shader files
 set(SHADER_COMPILE_LIST
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/MeshVS.hlsl|vs_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/SpriteVS.hlsl|vs_5_0|main"
@@ -54,6 +54,9 @@ set(SHADER_COMPILE_LIST
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/SpritePS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/UIPS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/PostEffectPS.hlsl|ps_5_0|main"
+    "${CMAKE_SOURCE_DIR}/shader/PixelShader/SelectionMaskPS.hlsl|ps_5_0|main"
+    "${CMAKE_SOURCE_DIR}/shader/PixelShader/SelectionOutlinePS.hlsl|ps_5_0|main"
+    "${CMAKE_SOURCE_DIR}/shader/PixelShader/SelectionSpriteMaskPS.hlsl|ps_5_0|main"
 )
 
 set(COMPILED_SHADER_OUTPUTS "")
