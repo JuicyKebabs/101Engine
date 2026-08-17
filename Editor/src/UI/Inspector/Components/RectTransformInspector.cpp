@@ -1,5 +1,7 @@
 #include "UI/Inspector/Components/RectTransformInspector.h"
 #include "Engine/Component/RectTransform.h"
+#include "Engine/Actor/Actor.h"
+#include "Engine/UI/Canvas.h"
 #include "UI/EditorUI.h"
 #include "UI/Inspector/InspectorContext.h"
 
@@ -51,7 +53,15 @@ void RectTransformInspector::Draw(RectTransform& rectTransform, const InspectorC
 		rectTransform.SetPivot(pivot);
 	}
 
-	if (EditorUI::Vector2Field("Size", size))
+	Actor* owner = rectTransform.GetOwner();
+	Canvas* canvas = owner
+		? owner->GetComponentByClass<Canvas>()
+		: nullptr;
+	const char* sizeLabel = canvas && !canvas->IsRootCanvas()
+		? "Display Size"
+		: "Size";
+
+	if (EditorUI::Vector2Field(sizeLabel, size))
 	{
 		rectTransform.SetSizeDelta(size);
 	}

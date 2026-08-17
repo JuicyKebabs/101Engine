@@ -52,15 +52,7 @@ const UIRendererProxy& UIRenderer::GetRenderProxy()
 
 bool UIRenderer::IsVisible() const
 {
-
-	Canvas* governingCanvas = GetGoverningCanvas();
-	return m_isVisible && governingCanvas && governingCanvas->IsVisible();
-}
-
-UINT UIRenderer::GetCanvasOrder() const
-{
-	Canvas* governingCanvas = GetGoverningCanvas();
-	return governingCanvas ? governingCanvas->GetSortOrder() : 0;
+	return GetGoverningCanvas() && RendererComponent::IsVisible();
 }
 
 void UIRenderer::RebuildRenderProxy()
@@ -78,8 +70,6 @@ void UIRenderer::RebuildRenderProxy()
 		m_renderProxy.common.color = m_color;
 		m_renderProxy.common.visible = m_isVisible;
 		m_renderProxy.common.renderSpace = GetRenderSpace();
-		m_renderProxy.common.canvasOrder = GetCanvasOrder();
-		m_renderProxy.common.sortOrder = GetSortOrderInCanvas();
 		m_renderProxy.uvScale = m_uvScale;
 		m_renderProxy.uvOffset = m_uvOffset;
 		m_renderProxy.flip.x = m_flipX ? -1.0f : 1.0f;

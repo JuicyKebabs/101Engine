@@ -192,6 +192,9 @@ void EditorApp::NewScene()
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
 
+	// Clear the canvas edit context to avoid dangling pointers
+    m_canvasEditContext.Clear();
+
 	// Clear the command history
 	m_commandHistory.Clear();
 
@@ -228,6 +231,9 @@ void EditorApp::LoadScene(const std::string& filePath)
 {
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
+
+	// Clear the canvas edit context to avoid dangling pointers
+    m_canvasEditContext.Clear();
 
     // Clear the command history
     m_commandHistory.Clear();
@@ -546,42 +552,68 @@ void EditorApp::Render()
     const EditorViewportMode viewportMode = m_sceneViewPanel.GetViewMode();
     const bool isSceneView = viewportMode == EditorViewportMode::Scene;
 
+	// Set up the render view policy based on the current viewport mode
     RenderViewPolicy viewPolicy{};
 
+    // CanvasEditContext is a persistent edit scope. Initialize it from the
+    // current selection only when no valid Canvas is already open.
+    Canvas* editingCanvas = nullptr;
+
+	// Canvas View mode requires a valid Canvas
+    if (!isSceneView && m_pScene)
+    {
+		// Resolve the currently editing Canvas from the CanvasEditContext
+        editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+
+		// First selection of a Canvas in the hierarchy panel opens the CanvasEditContext for editing.
+        if (!editingCanvas)
+        {
+            Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+
+            if (m_canvasEditContext.OpenFromActor(selectedActor))
+            {
+                editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+            }
+        }
+
+        // Sync the CanvasViewNavigation state with the currently editing Canvas
+        SyncCanvasViewNavigation(editingCanvas);
+    }
+
+    // Set up the policy
     if (isSceneView)
     {
+		// Only render the world-space objects in the scene view (no screen-space objects)
         viewPolicy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
-        viewPolicy.screenSpaceBehavior = ScreenSpaceRenderBehavior::World;
     }
     else
     {
-        viewPolicy.renderSpaceFilter = RenderSpaceFilter::ScreenOnly;
-        viewPolicy.screenSpaceBehavior = ScreenSpaceRenderBehavior::Overlay;
+		// In canvas view, render all objects (world-space and screen-space) if editing a canvas,
+        viewPolicy.renderSpaceFilter = editingCanvas
+            ? RenderSpaceFilter::All : RenderSpaceFilter::ScreenOnly;
+
+		// Set the root canvas for rendering in canvas view (accepts nullptr if no canvas is selected)
+        viewPolicy.canvasViewRoot = editingCanvas;
     }
+
 
 	// Build CameraInfo based on the current viewport mode and size
     GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
     if (!sceneColor) return;
 
-    const CameraInfo viewportCameraInfo =
-        BuildViewportCameraInfo(
-            sceneColor->GetWidth(),
-            sceneColor->GetHeight()
-        );
+    const CameraInfo viewportCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
 
     if (m_pScene)
     {
         m_pScene->OnRender(m_engineContext, &viewportCameraInfo, viewPolicy);
     }
 
-    const RenderSpace targetRenderSpace =
-        isSceneView
-        ? RenderSpace::World
-        : RenderSpace::Screen;
+    const RenderSpace targetRenderSpace = isSceneView
+        ? RenderSpace::World : RenderSpace::Screen;
 
     // Build render data for the selected object in the scene view
     // (for outline rendering)
-    BuildSelectionRenderData(targetRenderSpace, viewportCameraInfo);
+    BuildSelectionRenderData(targetRenderSpace, viewportCameraInfo, editingCanvas);
 
     // Scene View only requires shadow rendering
     if (isSceneView)
@@ -598,7 +630,7 @@ void EditorApp::Render()
         m_pEngine->EndPass(shadowTarget);
     }
 
-    // Both Scene View and Screen View use SceneColor as their display texture
+    // Both Scene View and Canvas View use SceneColor as their display texture
     RenderPassTarget sceneTarget
     {
         RenderPassTargetType::ColorDepth,
@@ -611,27 +643,18 @@ void EditorApp::Render()
     if (isSceneView)
     {
         // Render world-space objects using the Editor Camera
-        GpuTexture* shadowMap =
-            m_pEngine->GetBuiltinRenderTarget(
-                Engine::BuiltinRenderTarget::ShadowMap
-            );
+        GpuTexture* shadowMap = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap);
 
         if (shadowMap)
         {
-            m_pRenderer->RenderScene(
-                m_pEngine->GetCommandList(),
-                shadowMap->GetSrvIndex()
-            );
+            m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMap->GetSrvIndex());
         }
     }
     else
     {
         // Render only screen-space objects using the viewport-based
         // orthographic projection created by RenderScreenSpace()
-        GpuTexture* sceneColor =
-            m_pEngine->GetBuiltinRenderTarget(
-                Engine::BuiltinRenderTarget::SceneColor
-            );
+        GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
 
         if (sceneColor)
         {
@@ -639,7 +662,8 @@ void EditorApp::Render()
                 m_pEngine->GetCommandList(),
                 sceneColor->GetWidth(),
                 sceneColor->GetHeight(),
-                RenderTargetFormat::HDR
+                RenderTargetFormat::HDR,
+				&viewportCameraInfo
             );
         }
     }
@@ -918,8 +942,7 @@ void EditorApp::RenderHierarchyPanel()
 			if (!actor || actor->IsDestroyed()) return false;
 
 			Actor* newParent = newParentGuid.IsValid()
-				? m_pScene->ResolveActor(newParentGuid)
-				: nullptr;
+				? m_pScene->ResolveActor(newParentGuid) : nullptr;
 
 			if (newParentGuid.IsValid() &&
 				(!newParent || newParent->IsDestroyed()))
@@ -929,10 +952,8 @@ void EditorApp::RenderHierarchyPanel()
 
 			// Get name for debug logging
             const std::string actorName = actor->GetName();
-            const std::string parentName =
-                newParent
-                ? newParent->GetName()
-                : "Scene Root";
+            const std::string parentName = newParent
+                ? newParent->GetName() : "Scene Root";
 
 			// Execute the reparenting command through the command history
             const bool succeeded =
@@ -946,23 +967,34 @@ void EditorApp::RenderHierarchyPanel()
 
             if (succeeded)
             {
-                DBG(
-                    "EditorApp: Reparented Actor '%s' to '%s' through command history.",
-                    actorName.c_str(),
-                    parentName.c_str()
-                );
+                DBG("EditorApp: Reparented Actor '%s' to '%s' through command history.", actorName.c_str(), parentName.c_str());
             }
             else
             {
-                DBG(
-                    "EditorApp: Failed to reparent Actor '%s' to '%s'.",
-                    actorName.c_str(),
-                    parentName.c_str()
-                );
+                DBG("EditorApp: Failed to reparent Actor '%s' to '%s'.", actorName.c_str(), parentName.c_str());
             }
 
             return succeeded;
         };
+
+	callbacks.onOpenCanvas =
+		[this](const Guid& actorGuid)
+		{
+			if (!m_pScene || !actorGuid.IsValid()) return;
+
+			Actor* actor = m_pScene->ResolveActor(actorGuid);
+			if (!actor || actor->IsDestroyed() || !actor->GetComponentByClass<Canvas>())
+			{
+				return;
+			}
+
+            // Open the CanvasActor in the Canvas View by setting the Actor in the context
+			if (m_canvasEditContext.OpenFromActor(actor))
+			{
+				// Set the scene view panel to Canvas mode when a canvas is opened
+				m_sceneViewPanel.SetViewMode(EditorViewportMode::Canvas);
+			}
+		};
 
     m_hierarchyPanel.Render(m_pScene.get(), callbacks);
 }
@@ -1037,16 +1069,47 @@ void EditorApp::RenderSceneViewPanel()
     const uint32_t srvIndex = sceneColor->GetSrvIndex();
     const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
 
+
+	// Build the overlay data for the scene view panel based on the current view mode and any selected screen canvas
+    ViewportOverlayData overlayData = BuildViewportOverlayData(sceneColor->GetWidth(), sceneColor->GetHeight());
+
 	// Render the scene view panel with the scene color render target
     m_sceneViewPanel.Render(
         gpuHandle,
         sceneColor->GetWidth(),
-        sceneColor->GetHeight()
+        sceneColor->GetHeight(),
+		overlayData
     );
+
+    // Handle the user manipulation in the Canvas View
+    CanvasNavigationInput navigationInput;
+
+    if (m_sceneViewPanel.ConsumeCanvasNavigationInput(navigationInput))
+    {
+        ApplyCanvasNavigationInput(
+            navigationInput,
+            sceneColor->GetWidth(),
+            sceneColor->GetHeight()
+        );
+    }
+
+	// Handle the opening Canvas in the Canvas View mode if the user clicks a Canvas in the breadcrumb list
+    Guid canvasActorGuid;
+
+    if (m_sceneViewPanel.ConsumeCanvasOpenRequest(canvasActorGuid))
+    {
+        Actor* canvasActor = m_pScene
+            ? m_pScene->ResolveActor(canvasActorGuid) : nullptr;
+
+        if (canvasActor && !canvasActor->IsDestroyed() && canvasActor->GetComponentByClass<Canvas>())
+        {
+            m_canvasEditContext.OpenFromActor(canvasActor);
+        }
+    }
 
 	// Handle the click event for the scene view panel to select an actor in the scene
 
-	Vector2 pickUV;
+	Vector2 pickUV; // UV coordinates of the click within the scene view panel
 
 	// Check if the click event occurred and get the UV coordinates
 	// of the click within the scene view panel if requested
@@ -1055,27 +1118,25 @@ void EditorApp::RenderSceneViewPanel()
 	// Validate necessary pointers before proceeding with picking
 	if (!m_pScene || !m_pEditorCamera) return;
 
-	// Build the camera info for picking based on the current view mode (Scene or Screen)
-    const CameraInfo pickCameraInfo =
-        BuildViewportCameraInfo(
-            sceneColor->GetWidth(),
-            sceneColor->GetHeight()
-        );
+	// Build the camera info for picking based on the current view mode (Scene or Canvas)
+    const CameraInfo pickCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
 
+	// Determine the render space for picking based on the current view mode
+	// World(3D) for Scene View, Screen(2D) for Canvas View
     const RenderSpace targetRenderSpace =
-        m_sceneViewPanel.GetViewMode() ==
-        EditorViewportMode::Scene
-        ? RenderSpace::World
-        : RenderSpace::Screen;
+        m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene
+        ? RenderSpace::World : RenderSpace::Screen;
+
+	// Resolve the canvas for picking if in Canvas View mode
+    Canvas* editingCanvas = nullptr;
+
+    if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Canvas)
+    {
+        editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+    }
 
     // Get the picked Actor information
-    const std::optional<ScenePickHit> hit =
-		ScenePicker::Pick(
-			*m_pScene,
-			pickCameraInfo,
-			pickUV,
-            targetRenderSpace
-		);
+    const std::optional<ScenePickHit> hit = ScenePicker::Pick(*m_pScene, pickCameraInfo, pickUV, targetRenderSpace, editingCanvas);
 
     if (hit)
     {
@@ -1182,7 +1243,11 @@ void EditorApp::CancelTransformEdit()
     m_transformEditTransaction = {};
 }
 
-void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const CameraInfo& viewportCameraInfo)
+void EditorApp::BuildSelectionRenderData(
+    RenderSpace targetRenderSpace,
+    const CameraInfo& viewportCameraInfo,
+    const Canvas* canvasViewRoot
+)
 {
 	// Clear any existing selection render data
     m_selectionRenderData.Clear();
@@ -1199,13 +1264,31 @@ void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const Ca
         return;
     }
 
+	// Determine if the current view mode is Canvas View based on whether a canvas view root is provided
+    const bool isCanvasView = canvasViewRoot != nullptr;
+
+    const Matrix4x4 worldToCanvas = isCanvasView
+        ? canvasViewRoot->GetContentWorldMatrix().Inverse()
+        : Matrix4x4::Identity();
+
 	// Try to get the MeshRenderer component from the selected actor
     if (MeshRenderer* meshRenderer = selectedActor->GetComponentByClass<MeshRenderer>())
     {
 		// Validate the MeshRenderer component
-        if (!meshRenderer->IsVisible() ||
-            !meshRenderer->IsConfigured() ||
-            meshRenderer->GetRenderSpace() != targetRenderSpace)
+        if (!meshRenderer->IsVisible() || !meshRenderer->IsConfigured())
+        {
+            return;
+        }
+
+		// In Canvas View, ensure that the renderer component is a descendant of the canvas view root
+        if (isCanvasView)
+        {
+            if (!canvasViewRoot->ContainsRenderer(meshRenderer))
+            {
+                return;
+            }
+        }
+        else if (meshRenderer->GetRenderSpace() != targetRenderSpace)
         {
             return;
         }
@@ -1216,11 +1299,10 @@ void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const Ca
 		// Create render items for each submesh in the MeshRenderer
         for (const SubmeshRenderTemplate& renderTemplate : meshRenderer->GetRenderTemplates())
         {
-            MeshRenderItem item =
-                RenderSystem::CreateMeshRenderItem(
-                    renderTemplate,
-                    proxy
-                );
+            MeshRenderItem item = RenderSystem::CreateMeshRenderItem(renderTemplate, proxy);
+
+			// In Canvas View, transform the world matrix of the render item to canvas space
+			if (isCanvasView) item.common.worldMatrix *= worldToCanvas;
 
             m_selectionRenderData.AddMeshs(std::move(item));
         }
@@ -1232,22 +1314,33 @@ void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const Ca
     if (SpriteRenderer* spriteRenderer = selectedActor->GetComponentByClass<SpriteRenderer>())
     {
 		// Validate the SpriteRenderer component
-        if (!spriteRenderer->IsVisible() ||
-            !spriteRenderer->IsConfigured() ||
-            spriteRenderer->GetRenderSpace() != targetRenderSpace)
+        if (!spriteRenderer->IsVisible() || !spriteRenderer->IsConfigured())
         {
             return;
         }
+
+        // In Canvas View, ensure that the renderer component is a descendant of the canvas view root
+        if (isCanvasView)
+        {
+            if (!canvasViewRoot->ContainsRenderer(spriteRenderer))
+            {
+                return;
+            }
+        }
+        else if (spriteRenderer->GetRenderSpace() != targetRenderSpace)
+        {
+            return;
+        }
+
 
 		// Get the render proxy
         const SpriteRendererProxy& proxy = spriteRenderer->GetRenderProxy(viewportCameraInfo);
 
 		// Create a render item for the sprite
-        SpriteRenderItem item =
-            RenderSystem::CreateSpriteRenderItem(
-                spriteRenderer->GetRenderTemplate(),
-                proxy
-            );
+        SpriteRenderItem item = RenderSystem::CreateSpriteRenderItem(spriteRenderer->GetRenderTemplate(), proxy);
+
+		// In Canvas View, transform the world matrix of the render item to canvas space
+		if (isCanvasView) item.common.worldMatrix *= worldToCanvas;
 
         m_selectionRenderData.AddSprites(std::move(item));
     }
@@ -1256,12 +1349,24 @@ void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const Ca
 	if (UIRenderer* uiRenderer = selectedActor->GetComponentByClass<UIRenderer>())
 	{
 		// Validate the UIRenderer component
-        if (!uiRenderer->IsVisible() ||
-            !uiRenderer->IsConfigured() ||
-            uiRenderer->GetRenderSpace() != targetRenderSpace)
+        if (!uiRenderer->IsVisible() || !uiRenderer->IsConfigured())
         {
             return;
         }
+
+        // In Canvas View, ensure that the renderer component is a descendant of the canvas view root
+        if (isCanvasView)
+        {
+            if (!canvasViewRoot->ContainsRenderer(uiRenderer))
+            {
+                return;
+            }
+        }
+        else if (uiRenderer->GetRenderSpace() != targetRenderSpace)
+        {
+            return;
+        }
+
 
         // Get the render proxy
 		const UIRendererProxy& proxy = uiRenderer->GetRenderProxy();
@@ -1269,41 +1374,425 @@ void EditorApp::BuildSelectionRenderData(RenderSpace targetRenderSpace, const Ca
 		// Create render items for each UI element in the UIRenderer
         for (const UIRenderElement& element : uiRenderer->GetRenderTemplate())
         {
-            UIRenderItem item =
-                RenderSystem::CreateUIRenderItem(
-                    element,
-                    proxy
-                );
+            UIRenderItem item = RenderSystem::CreateUIRenderItem(element, proxy);
+
+            // In Canvas View, transform the world matrix of the render item to canvas space
+            if (isCanvasView) item.common.worldMatrix *= worldToCanvas;
 
             m_selectionRenderData.AddUI(std::move(item));
         }
 	}
 }
 
-CameraInfo EditorApp::BuildViewportCameraInfo(
-    UINT viewportWidth,
-    UINT viewportHeight
-) const
+CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight) const
 {
-	// Decide projection type based on the current viewport mode (Scene or Screen)
+	// Avoid zero division and invalid viewport sizes
+    if (viewportWidth == 0 || viewportHeight == 0) return {};
 
-    if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene)
-    {
-        return m_pEditorCamera->GetCameraInfo();
-    }
+	// Decide projection type based on the current viewport mode (Scene or Canvas)
+
+	if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene)
+	{
+		// Use the editor camera's perspective projection for Scene View
+		return m_pEditorCamera->GetCameraInfo();
+	}
+
+	// From here on, build an orthographic projection for Canvas View
+    // based on the canvas reference size and viewport size
+
+    const Vector2 fitExtent = CalculateCanvasViewExtent(viewportWidth, viewportHeight);
+    const Vector2 visibleExtent = fitExtent / m_canvasViewNavigation.zoom;
 
     CameraInfo cameraInfo{};
     cameraInfo.position = { 0.0f, 0.0f, -1.0f };
     cameraInfo.forward = Vector3::Forward();
     cameraInfo.up = Vector3::Up();
-    cameraInfo.viewMatrix = Matrix4x4::Identity();
+
+    cameraInfo.viewMatrix =
+        Matrix4x4::CreateTranslation(
+            {
+                -m_canvasViewNavigation.center.x,
+                -m_canvasViewNavigation.center.y,
+                0.0f
+            }
+        );
+
+	// Create an orthographic projection matrix for the camera
+    // based on the calculated view width and height
     cameraInfo.projMatrix =
         Matrix4x4::CreateOrthographic(
-            static_cast<float>(viewportWidth),
-            static_cast<float>(viewportHeight),
+            visibleExtent.x,
+            visibleExtent.y,
             -1.0f,
             100.0f
         );
 
     return cameraInfo;
+}
+
+ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT viewportHeight)
+{
+	ViewportOverlayData overlayData;
+
+	if (!m_pScene || viewportWidth == 0 || viewportHeight == 0)
+	{
+		return overlayData;
+	}
+
+	const CameraInfo cameraInfo = BuildViewportCameraInfo(viewportWidth, viewportHeight);
+	const Matrix4x4 viewProjection = cameraInfo.viewMatrix * cameraInfo.projMatrix;
+
+	// Built overlay data for the Canvas View mode
+	// In Canvas View, we need to display the editing canvas and ancestor Canvases of the selected Canvas up to the editing canvas
+	if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Canvas)
+	{
+		// Resolve editing canvas from the CanvasEditContext, which is the root canvas for the Canvas View
+		Canvas* editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+		if (!editingCanvas) return overlayData;
+
+		std::vector<Canvas*> breadcrumbPath;
+
+		for (Actor* current = editingCanvas->GetOwner();
+			current;
+			current = current->GetParent())
+		{
+			if (Canvas* canvas = current->GetComponentByClass<Canvas>())
+			{
+				breadcrumbPath.push_back(canvas);
+			}
+		}
+
+		std::reverse(breadcrumbPath.begin(), breadcrumbPath.end());
+
+		const auto appendBreadcrumb =
+			[&overlayData](Canvas* canvas)
+			{
+				Actor* canvasActor = canvas ? canvas->GetOwner() : nullptr;
+				if (!canvasActor) return;
+
+				CanvasBreadcrumbItem item;
+				item.canvasActorGuid = canvasActor->GetGuid();
+				item.name = canvasActor->GetName();
+
+				overlayData.canvasBreadcrumbs.push_back(std::move(item));
+			};
+
+		constexpr size_t kVisibleParentCount = 3;   // Numberof the displaying parent Canvases in the breadcrumb list (excluding the root and editing canvas)
+		constexpr size_t kMaxBreadcrumbCanvasCount = kVisibleParentCount + 2;	// Root + parents + editing Canvas
+
+		if (breadcrumbPath.size() <= kMaxBreadcrumbCanvasCount)
+		{// Within the limit, display all ancestor Canvases in the breadcrumb list
+			for (Canvas* canvas : breadcrumbPath)
+			{
+				appendBreadcrumb(canvas);
+			}
+		}
+		else
+		{// Exceeds the limit, display the root Canvas, ellipsis, and the last few ancestor Canvases in the breadcrumb list
+			// Display editing root Canvas
+            appendBreadcrumb(breadcrumbPath.front());
+
+			// Omit the middle ancestor Canvases and display ellipsis in the breadcrumb list
+			CanvasBreadcrumbItem ellipsis;
+			ellipsis.type = CanvasBreadcrumbItemType::Ellipsis;
+			ellipsis.name = "...";
+			overlayData.canvasBreadcrumbs.push_back(std::move(ellipsis));
+
+			const size_t firstVisibleIndex = breadcrumbPath.size() - (kVisibleParentCount + 1);
+
+			// Display the last few ancestor Canvases in the breadcrumb list
+			for (size_t i = firstVisibleIndex; i < breadcrumbPath.size(); i++)
+			{
+				appendBreadcrumb(breadcrumbPath[i]);
+			}
+		}
+
+		// Get reference size and inverse matrix of the editing Canvas for transforming world coordinates to the editing canvas's local space
+		// The editing canvas is treated as the origin of the Canvas View
+		const Vector2 referenceSize = editingCanvas->GetLayoutReferenceSize();
+		const Matrix4x4 worldToEditingCanvas = editingCanvas->GetContentWorldMatrix().Inverse();
+
+		// Lambda function to append a ViewportCanvasRect to the overlay data,
+        // transforming the corners from local space to NDC space using the provided transform and view-projection matrix
+		const auto appendRect =[&overlayData, &viewProjection](const Vector3 (&corners)[4], const Matrix4x4& transform, ViewportCanvasRole role)
+			{
+				ViewportCanvasRect rect;
+				rect.role = role;
+
+				for (size_t i = 0; i < 4; i++)
+				{
+					const Vector3 position = transform.TransformPoint(corners[i]);
+					const Vector3 ndc = viewProjection.TransformPoint(position);
+					rect.corners[i] = { ndc.x * 0.5f + 0.5f, 0.5f - ndc.y * 0.5f };
+				}
+
+				overlayData.canvasRects.push_back(rect);
+			};
+
+		// Original corners of the editing canvas in its local space, based on its reference size
+		const Vector3 editingCorners[4]
+		{
+			{ -referenceSize.x * 0.5f, -referenceSize.y * 0.5f, 0.0f },
+			{ -referenceSize.x * 0.5f,  referenceSize.y * 0.5f, 0.0f },
+			{  referenceSize.x * 0.5f,  referenceSize.y * 0.5f, 0.0f },
+			{  referenceSize.x * 0.5f, -referenceSize.y * 0.5f, 0.0f }
+		};
+
+		// Append the editing root canvas rect to the overlay data with identity transform and role as EditingRoot
+		appendRect(editingCorners, Matrix4x4::Identity(), ViewportCanvasRole::EditingRoot);
+
+		// Get the selected actor from the hierarchy panel and find its closest canvas for highlighting in the overlay
+		Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+		Canvas* selectedCanvas = CanvasEditContext::FindClosestCanvas(selectedActor);
+
+		// Collect the ancestor canvases of the selected canvas up to the editing canvas
+        // for overlay rects if the selected canvas is different from the editing canvas
+		if (selectedCanvas && selectedCanvas != editingCanvas && editingCanvas->ContainsCanvas(selectedCanvas))
+		{
+			std::vector<Canvas*> path;
+
+			// Traverse the hierarchy from the selected canvas up to the editing canvas, collecting all ancestor canvases
+			for (Actor* current = selectedCanvas->GetOwner(); current; current = current->GetParent())
+			{
+				if (Canvas* canvas = current->GetComponentByClass<Canvas>())
+				{
+					path.push_back(canvas);
+					if (canvas == editingCanvas) break;
+				}
+			}
+
+			// Reverse the path to have the editing canvas first and the selected canvas last
+			std::reverse(path.begin(), path.end());
+
+			const Vector3 unitCorners[4]
+			{
+				{ -0.5f, -0.5f, 0.0f }, { -0.5f, 0.5f, 0.0f },
+				{  0.5f,  0.5f, 0.0f }, {  0.5f, -0.5f, 0.0f }
+			};
+
+			// Append overlay rects for each ancestor canvas in the path,
+            // transforming their local rects to world space and then to the editing canvas's local space
+			for (size_t i = 1; i < path.size(); i++)
+			{
+				Actor* canvasActor = path[i]->GetOwner();
+
+				// Get RectTransform of the actor
+				RectTransform* rect = canvasActor ? canvasActor->GetComponentByClass<RectTransform>() : nullptr;
+				if (!rect) continue;
+
+				// World space to editing canvas space transform
+				Matrix4x4 transform = rect->GetWorldMatrix() * worldToEditingCanvas;
+
+				// Determine role if the current Canvas is selected or an ancestor for overlay highlighting
+				ViewportCanvasRole role = (i + 1 == path.size()) ? ViewportCanvasRole::Selected : ViewportCanvasRole::Ancestor;
+
+                // Appending
+				appendRect(unitCorners, transform, role);
+			}
+		}
+
+		overlayData.referenceSize = referenceSize;
+		overlayData.canvasOrder = editingCanvas->GetSortOrder();
+		return overlayData;
+	}
+
+	// Build overlay data for the Scene View mode below
+	// In Scene View, we need to display all world-space canvases in the scene and highlight the selected canvas if any
+
+	// Get selected actor and its closest canvas if existing, for highlighting in the overlay
+	Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+	Canvas* selectedCanvas = CanvasEditContext::FindClosestCanvas(selectedActor);
+
+	const Vector3 localCorners[4]
+	{
+		{ -0.5f, -0.5f, 0.0f },
+		{ -0.5f,  0.5f, 0.0f },
+		{  0.5f,  0.5f, 0.0f },
+		{  0.5f, -0.5f, 0.0f }
+	};
+
+	// Iterate through all actors in the scene to find world-space canvases and build overlay rects for them
+	for (Actor* actor : m_pScene->GetAllActors())
+	{
+		if (!actor || !actor->IsActive() || actor->IsDestroyed()) continue;
+
+		// Tray to get Canvas component from the current actor
+		Canvas* canvas = actor->GetComponentByClass<Canvas>();
+
+		// Check if the canvas exists and is a world-space canvas that is visible in the hierarchy
+		if (!canvas || canvas->GetRenderMode() != CanvasRenderMode::WorldSpace || !canvas->IsHierarchyVisible())
+		{
+			continue;
+		}
+
+        // Determine the frame matrix for the canvas based on whether it is a root canvas or a child canvas
+		Matrix4x4 frameMatrix;
+
+		if (canvas->IsRootCanvas())
+		{// Root Canvas
+			const Vector2 referenceSize = canvas->GetLayoutReferenceSize();
+
+			// Scaling the content world matrix (simple TRS matrix ignoring RectTransform property)
+            // by the reference size to get the frame matrix for the root canvas
+			frameMatrix = Matrix4x4::CreateScale({ referenceSize.x, referenceSize.y, 1.0f }) * canvas->GetContentWorldMatrix();
+		}
+		else
+		{// Child Canvas
+			RectTransform* rectTransform = actor->GetComponentByClass<RectTransform>();
+
+			if (!rectTransform) continue;
+
+			// Get the world matrix of the RectTransform which is based on
+            // the hierarchy of UI elements and their layout properties
+			frameMatrix = rectTransform->GetWorldMatrix();
+		}
+
+		ViewportCanvasRect rect;
+
+		// Set the role of the overlay rect based on whether the canvas is the selected canvas or an ancestor
+		rect.role = canvas == selectedCanvas
+			? ViewportCanvasRole::Selected : ViewportCanvasRole::Ancestor;
+
+		bool isInFrontOfCamera = true;  // Flag to check if the canvas is in front of the camera
+
+		// Transform the local corners of the canvas to world space
+        // and then to normalized device coordinates (NDC) for rendering the overlay rect
+		for (size_t i = 0; i < 4; i++)
+		{
+			const Vector3 worldPosition = frameMatrix.TransformPoint(localCorners[i]);
+			const Vector3 viewPosition = cameraInfo.viewMatrix.TransformPoint(worldPosition);
+
+			// Avoid mirrored guides when a Canvas is behind or intersects the Editor Camera's near plane.
+			if (viewPosition.z <= 0.001f)
+			{
+				isInFrontOfCamera = false;
+				break;
+			}
+
+			const Vector3 ndc = viewProjection.TransformPoint(worldPosition);
+
+			rect.corners[i] =
+			{
+				ndc.x * 0.5f + 0.5f,
+				0.5f - ndc.y * 0.5f
+			};
+		}
+
+		// Add the overlay rect to the overlay data only if the canvas is in front of the camera
+		if (isInFrontOfCamera)
+		{
+			overlayData.worldCanvasRects.push_back(rect);
+		}
+	}
+
+	return overlayData;
+}
+
+void EditorApp::SyncCanvasViewNavigation(const Canvas* editingCanvas)
+{
+	Actor* canvasActor = editingCanvas ? editingCanvas->GetOwner() : nullptr;
+
+	const Guid canvasGuid = canvasActor ? canvasActor->GetGuid() : Guid{};
+
+	// Check if the stored Canvas Guid for manipulation is the same as the current editing canvas.
+	if (m_canvasViewNavigation.canvasActorGuid == canvasGuid) return;
+
+	// Reset the canvas view navigation state when switching to a different canvas in the Canvas View mode
+	m_canvasViewNavigation.canvasActorGuid = canvasGuid;
+	m_canvasViewNavigation.center = Vector2::Zero();
+	m_canvasViewNavigation.zoom = 1.0f;
+}
+
+Vector2 EditorApp::CalculateCanvasViewExtent(UINT viewportWidth, UINT viewportHeight) const
+{
+	// Fallback to viewport size if no scene or canvas is available
+    Vector2 referenceSize =
+    {
+        static_cast<float>(viewportWidth),
+        static_cast<float>(viewportHeight)
+    };
+
+	// Get the reference size of the editing canvas if available
+    if (m_pScene)
+    {
+        Canvas* canvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+        if (canvas) referenceSize = canvas->GetLayoutReferenceSize();
+    }
+
+	// Aspect ratiio of the viewport and the reference size of the canvas
+    const float viewportAspect = static_cast<float>(viewportWidth) / static_cast<float>(viewportHeight);
+    const float canvasAspect = referenceSize.x / referenceSize.y;
+
+	// Calculate the extent which can fit the canvas in the viewport while maintaining the both aspect ratios
+
+    Vector2 extent = referenceSize;
+
+    if (viewportAspect > canvasAspect)
+	{// Canvas has a taller aspect ratio than the viewport
+        // Set the width when the viewport height is matched to the canvas height
+        extent.x = extent.y * viewportAspect;
+    }
+    else
+	{// Canvas has a wider aspect ratio than the viewport
+		// Set the height when the viewport width is matched to the canvas width
+        extent.y = extent.x / viewportAspect;
+    }
+
+    return extent;
+}
+
+void EditorApp::ApplyCanvasNavigationInput(const CanvasNavigationInput& input, UINT viewportWidth, UINT viewportHeight)
+{
+    // Fitting the viewport to Editing-Root Canvas (No pan and zoom)
+    if (input.fitRequested)
+    {
+        m_canvasViewNavigation.center = Vector2::Zero();
+        m_canvasViewNavigation.zoom = 1.0f;
+        return;
+    }
+
+	// Avoid zero division and invalid viewport sizes
+    if (viewportWidth == 0 || viewportHeight == 0)  return;
+
+    // Get the extent without zoom
+    const Vector2 fitExtent = CalculateCanvasViewExtent(viewportWidth, viewportHeight);
+
+	// Calculate the extent considering the current zoom level
+    const Vector2 currentExtent = fitExtent / m_canvasViewNavigation.zoom;
+
+    // Calculate center position considering the amount of the pan manipulation
+    m_canvasViewNavigation.center.x -= input.panDeltaPixels.x * currentExtent.x / static_cast<float>(viewportWidth);
+    m_canvasViewNavigation.center.y += input.panDeltaPixels.y * currentExtent.y / static_cast<float>(viewportHeight);
+
+	if (input.wheelDelta == 0.0f) return;   // End if there is no zoom input
+
+	// Calculate the pivot offset before zooming
+    const Vector2 pivotOffsetBefore
+    {
+        (input.zoomPivotUV.x - 0.5f) * currentExtent.x,
+        (0.5f - input.zoomPivotUV.y) * currentExtent.y
+    };
+
+    constexpr float kMinZoom = 0.1f;
+    constexpr float kMaxZoom = 8.0f;
+
+	// Clamp the new zoom level within the defined range to prevent excessive zooming in or out
+	// Use pow() to maintain the feeling of zooming manipulation with the mouse wheel
+	// Make the change of zoom level by a wheel step multiplicative
+    const float newZoom = std::clamp(m_canvasViewNavigation.zoom * std::pow(1.1f, input.wheelDelta), kMinZoom, kMaxZoom);
+
+    // The extent after zooming
+    const Vector2 newExtent = fitExtent / newZoom;
+
+	// Calculate the pivot offset after zooming
+    const Vector2 pivotOffsetAfter
+    {
+        (input.zoomPivotUV.x - 0.5f) * newExtent.x,
+        (0.5f - input.zoomPivotUV.y) * newExtent.y
+    };
+
+	// Adjust the center position to keep the zoom pivot point fixed in the viewport
+    m_canvasViewNavigation.center += pivotOffsetBefore - pivotOffsetAfter;
+
+    m_canvasViewNavigation.zoom = newZoom;
 }

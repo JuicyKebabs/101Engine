@@ -15,6 +15,7 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Command/EditorCommandHistory.h"
+#include "Core/CanvasEditContext.h"
 
 #include "Core/EditorCamera.h"
 #include "UI/HierarchyPanel.h"
@@ -27,6 +28,16 @@
 // EditorApp class
 // The main application class for the editor.
 //--------------------------------------------
+
+// Struct to hold the navigation state of the Canvas view in the editor
+// Used to reflect the user manipulation to the Canvas view (panning, zooming, etc.)
+// User manipulation -> Store the result as CanvasViewNavigation -> Change the Canvas view to reflect the navigation state
+struct CanvasViewNavigation
+{
+	Vector2 center = Vector2::Zero();	// Camara center position in the Canvas view (in Editing-Root Canvas local space)
+	float zoom = 1.0f;					// Zoom level of the Canvas view (Fitting the Canvas rectangle to the viewport is 1.0f)
+	Guid canvasActorGuid;				// Guid of the editing root Canvas Actor 
+};
 
 class EditorApp
 {
@@ -75,6 +86,10 @@ private:
     // written to / read from .scene files.
     std::unique_ptr<Actor> m_pEditorCameraActor;
     EditorCamera* m_pEditorCamera = nullptr;
+
+    // Canvas View controls
+	CanvasEditContext m_canvasEditContext;          // Stores the information for editing a Canvas in the Canvas view mode.
+	CanvasViewNavigation m_canvasViewNavigation;    // Stores the information of manipulation on the Canvas View
 
     // Panels
     HierarchyPanel m_hierarchyPanel;
@@ -128,9 +143,27 @@ private:
 
 	// Build render data for the selected object in the scene view
     // (used to render an outline around the selected object)
-    void BuildSelectionRenderData(RenderSpace targetRenderSpace, const CameraInfo& viewportCameraInfo);
+    void BuildSelectionRenderData(
+        RenderSpace targetRenderSpace,
+        const CameraInfo& viewportCameraInfo,
+        const Canvas* canvasViewRoot
+    );
 
 	// Helper function to build CameraInfo for the current viewport size
-	// Camera matrix is built based on the current viewport mode (Scene or Screen)
+	// Camera matrix is built based on the current viewport mode (Scene or Canvas)
     CameraInfo BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight) const;
+
+	// Build Canvas guide rectangles for the current Scene/Canvas View mode.
+	ViewportOverlayData BuildViewportOverlayData(UINT viewportWidth, UINT viewportHeight);
+
+	// Helper function to synchronize the Canvas view navigation state with the currently editing Canvas
+	// Used when the editing root Canvas is changed in the Canvas View to update the displaying state of the Canvas view
+    void SyncCanvasViewNavigation(const Canvas* editingCanvas);
+
+	// Helper funtion to calculate the extent which can fit the editing root Canvas rectangle into the viewport of Canvas View
+	// The extent is in the local space of the editing root Canvas and before applying the zoom factor of the Canvas view navigation state
+    Vector2 CalculateCanvasViewExtent(UINT viewportWidth, UINT viewportHeight) const;
+
+    // Helper funtion to apply the user manipulation in Canvas View to the viewport of Canvas View
+    void ApplyCanvasNavigationInput(const CanvasNavigationInput& input, UINT viewportWidth, UINT viewportHeight);
 };

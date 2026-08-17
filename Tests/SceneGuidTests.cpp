@@ -171,6 +171,66 @@ namespace
 			"Root reparenting clears both sides of the relationship");
 	}
 
+	void TestReparentInvalidatesTransformSubtree()
+	{
+		SceneBase scene;
+		Actor* firstParent = scene.AddRootActor(
+			ActorFactory::CreateEmptyActor(
+				Actor::InitDesc(true, TAG_NONE, "FirstParent")));
+		Actor* secondParent = scene.AddRootActor(
+			ActorFactory::CreateEmptyActor(
+				Actor::InitDesc(true, TAG_NONE, "SecondParent")));
+		Actor* child = scene.AddRootActor(
+			ActorFactory::CreateEmptyActor(
+				Actor::InitDesc(true, TAG_NONE, "Child")));
+		Actor* grandChild = scene.AddChildActor(
+			ActorFactory::CreateEmptyActor(
+				Actor::InitDesc(true, TAG_NONE, "GrandChild")),
+			child->GetHandle());
+
+		Transform* firstParentTransform =
+			firstParent->GetComponentByClass<Transform>();
+		Transform* secondParentTransform =
+			secondParent->GetComponentByClass<Transform>();
+		Transform* childTransform =
+			child->GetComponentByClass<Transform>();
+		Transform* grandChildTransform =
+			grandChild->GetComponentByClass<Transform>();
+
+		firstParentTransform->SetLocalPosition(Vector3(10.0f, 0.0f, 0.0f));
+		secondParentTransform->SetLocalPosition(Vector3(-5.0f, 0.0f, 0.0f));
+		childTransform->SetLocalPosition(Vector3(1.0f, 0.0f, 0.0f));
+		grandChildTransform->SetLocalPosition(Vector3(2.0f, 0.0f, 0.0f));
+		scene.Update(0.0f);
+
+		Check(scene.ReparentActor(child, firstParent),
+			"ReparentActor can attach a Transform subtree to a parent");
+		scene.Update(0.0f);
+		Check(childTransform->GetWorldPosition().NearEqual(
+			Vector3(11.0f, 0.0f, 0.0f)) &&
+			grandChildTransform->GetWorldPosition().NearEqual(
+				Vector3(13.0f, 0.0f, 0.0f)),
+			"Reparenting updates world transforms for the complete subtree");
+
+		Check(scene.ReparentActor(child, secondParent),
+			"ReparentActor can move a Transform subtree between parents");
+		scene.Update(0.0f);
+		Check(childTransform->GetWorldPosition().NearEqual(
+			Vector3(-4.0f, 0.0f, 0.0f)) &&
+			grandChildTransform->GetWorldPosition().NearEqual(
+				Vector3(-2.0f, 0.0f, 0.0f)),
+			"Moving between parents invalidates descendant world transforms");
+
+		Check(scene.ReparentActor(child, nullptr),
+			"ReparentActor can detach a Transform subtree");
+		scene.Update(0.0f);
+		Check(childTransform->GetWorldPosition().NearEqual(
+			Vector3(1.0f, 0.0f, 0.0f)) &&
+			grandChildTransform->GetWorldPosition().NearEqual(
+				Vector3(3.0f, 0.0f, 0.0f)),
+			"Unparenting updates world transforms for the complete subtree");
+	}
+
 	void TestReparentRejectsCycles()
 	{
 		SceneBase scene;
@@ -481,6 +541,7 @@ int main()
 	TestGuidRemovalAndSlotReuse();
 	TestChildGuidRegistrationAndDestroyedParentRejection();
 	TestReparentActor();
+	TestReparentInvalidatesTransformSubtree();
 	TestReparentRejectsCycles();
 	TestReparentRejectsInvalidActors();
 	TestTopmostCanvasControlsNestedCanvases();

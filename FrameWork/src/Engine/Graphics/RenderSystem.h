@@ -8,6 +8,8 @@
 #include "Engine/Resource/Texture.h"
 #include "Engine/Component/Camera.h"
 
+class Canvas;
+
 //-------------------------------------------------------------------------------
 // Render System class
 // This class is responsible for managing the RenderComponents in the scene.
@@ -22,18 +24,14 @@ enum class RenderSpaceFilter
 	ScreenOnly,
 };
 
-// Enumration to define how the screen-space objects are rendered
-enum class ScreenSpaceRenderBehavior
-{
-	Overlay,	// Render in screen space
-	World,		// Render in world space
-};
-
 // Struct to define the render view policy
 struct RenderViewPolicy
 {
 	RenderSpaceFilter renderSpaceFilter = RenderSpaceFilter::All;
-	ScreenSpaceRenderBehavior screenSpaceBehavior = ScreenSpaceRenderBehavior::Overlay;
+
+	// When set, only renderers belonging to this Canvas subtree are rendererd.
+	// Their world matrices are converted into this Canvas's local layout space.
+	const Canvas* canvasViewRoot = nullptr;
 };
 
 // Render system class
@@ -54,8 +52,7 @@ public:
 	struct SortKeyScreenSpace
 	{
 		PSOKey psoKey = {};
-		UINT canvasOrder = 0;
-		UINT order = 0;
+		std::vector<uint32_t> orderPath;	// Stores all order numbers from the root canvas to the current element for hierarchical sorting
 	};
 
 	struct FrameSortData
@@ -109,11 +106,14 @@ public:
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
 	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
 	
-	void FlushRegisters();	// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
+	// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
+	void FlushRegisters();
 	
-	void BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy);	// Build draw packets from the registered mesh renderers
+	// Build draw packets from the registered mesh renderers
+	void BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy);
 
-	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }	// Get the render data for the current frame (contains draw packets and other rendering information)
+	// Get the render data for the current frame (contains draw packets and other rendering information)
+	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }
 
 	// Create render item functions (used to create draw packets from sort entries)
 	static MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
@@ -131,7 +131,7 @@ private:
 private:
 	void SortOpaque();		// Sort opaque draw packets
 	void SortTransparent();	// Sort transparent draw packets
-	void SortScreenSpace();	// Sort screen-space draw packets (e.g., UI)
+	void SortScreenSpace();	// Sort screen-space draw packets
 	
 	RenderQueue GetRenderQueue(const PSOKey& psoKey);			// Determine the render queue for sort entry 
 	void NormalizePSOKey(PSOKey& psoKey, RenderQueue queue);	// Normalize the draw packet data
@@ -149,6 +149,7 @@ private:
 		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID, a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat, a.indexFree)
 			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, b.rtvFormat, b.indexFree);
 	}
+
 	// Bind sort comparison
 	//static inline bool BindLess(const SortData& a, const SortData& b)
 	//{
@@ -159,6 +160,7 @@ private:
 	//	return std::tie(a.textureHandle, ap, a.startIndex, a.baseVertex)
 	//		< std::tie(b.textureHandle, bp, b.startIndex, b.baseVertex);
 	//}
+
 	// Opaque objects sorting
 	static inline bool OpaqueLess(const SortKeyOpaque& a, const SortKeyOpaque& b)
 	{

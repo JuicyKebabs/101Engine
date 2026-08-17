@@ -1,6 +1,7 @@
 #include "ScenePicker.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Scene/SceneBase.h"
+#include "Engine/UI/Canvas.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
@@ -14,7 +15,8 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 	SceneBase& scene,
 	const CameraInfo& cameraInfo,
 	const Vector2& viewportUV,
-	RenderSpace targetRenderSpace
+	RenderSpace targetRenderSpace,
+	const Canvas* canvasViewRoot
 )
 {
 	// Validate the viewport coordinates 
@@ -26,66 +28,118 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 	{
 		return std::nullopt;
 	}
+
+	// Determine if we are in a canvas view context and compute the world-to-canvas transformation matrix
+	const bool isCanvasView = canvasViewRoot != nullptr;
+
+	const Matrix4x4 worldToCanvas = isCanvasView
+		? canvasViewRoot->GetContentWorldMatrix().Inverse() : Matrix4x4::Identity();
  
 	// Build ray from the camera information and the point in the viewport (normalized coordinates)
 	const SceneRay ray = BuildRay(cameraInfo, viewportUV);
 
 	std::optional<ScenePickHit> nearestHit;	// Store the nearest hit information (actor GUID and distance)
-	uint64_t nearestScreenSortKey = 0;		// Store the sort key for the nearest hit in screen space (canvas order and sort order)
+	std::vector<uint32_t> nearestSortPath;	// Store the sort path of the nearest hit (used for screen space sorting)
 
 	// Iterate through all actors in the scene to check for intersection with the ray
 	for (Actor* actor : scene.GetAllActors())
 	{
 		if (!actor || !actor->IsActive() || actor->IsDestroyed()) continue;
 
-		float distance = 0.0f;		// Distance from the ray origin to the intersection point
-		uint64_t screenSortKey = 0;	// Sort key for screen space rendering (canvas order and sort order)
-		bool hit = false;			// Flag to indicate if the ray hit the actor's renderer
+		float distance = 0.0f;			// Distance from the ray origin to the intersection point
+		std::vector<uint32_t> sortPath;	// Sort path for the actor's renderer in the canvas hierarchy (used for screen space sorting)
+		bool hit = false;				// Flag to indicate if the ray hit the actor's renderer
 
 		// Check for intersection with MeshRenderer or SpriteRenderer components
 		if (MeshRenderer* meshRenderer = actor->GetComponentByClass<MeshRenderer>())
 		{
-			// Check if the render space matches the target render space
-			if (meshRenderer->GetRenderSpace() != targetRenderSpace) continue;
-
-			hit = IntersectMesh(ray, *meshRenderer, distance);
-
-			if (hit)
+			if (isCanvasView)
 			{
-				const MeshRendererProxy& proxy = meshRenderer->GetRenderProxy();
-				screenSortKey = (static_cast<uint64_t>(proxy.common.canvasOrder) << 32) | static_cast<uint64_t>(proxy.common.sortOrder);
+				if (!canvasViewRoot->ContainsRenderer(meshRenderer)) continue;
 			}
+			else if (meshRenderer->GetRenderSpace() != targetRenderSpace)
+			{
+				continue;
+			}
+
+			// Determine world matrix for the mesh renderer based on if we are in a canvas view or not
+			const MeshRendererProxy& proxy = meshRenderer->GetRenderProxy();
+
+			Matrix4x4 pickMatrix = proxy.common.worldMatrix;
+
+			// If we are in a canvas view, apply the world-to-canvas transformation to the pick matrix
+			if (isCanvasView) pickMatrix *= worldToCanvas;
+
+			hit = IntersectMesh(ray, *meshRenderer, pickMatrix, distance);
+
+			if (hit) sortPath = meshRenderer->BuildCanvasSortPath();
 		}
 		else if (SpriteRenderer* spriteRenderer = actor->GetComponentByClass<SpriteRenderer>())
 		{
-			if (spriteRenderer->GetRenderSpace() != targetRenderSpace) continue;
-
-			hit = IntersectSprite(ray, cameraInfo, *spriteRenderer, distance);
-
-			if (hit)
+			if (isCanvasView)
 			{
-				const SpriteRendererProxy& proxy = spriteRenderer->GetRenderProxy(cameraInfo);
-				screenSortKey = (static_cast<uint64_t>(proxy.common.canvasOrder) << 32) | static_cast<uint64_t>(proxy.common.sortOrder);
+				if (!canvasViewRoot->ContainsRenderer(spriteRenderer)) continue;
 			}
+			else if (spriteRenderer->GetRenderSpace() != targetRenderSpace)
+			{
+				continue;
+			}
+
+			// Determine world matrix for the mesh renderer based on if we are in a canvas view or not
+			const SpriteRendererProxy& proxy = spriteRenderer->GetRenderProxy(cameraInfo);
+
+			Matrix4x4 pickMatrix = proxy.common.worldMatrix;
+
+			// If we are in a canvas view, apply the world-to-canvas transformation to the pick matrix
+			if (isCanvasView) pickMatrix *= worldToCanvas;
+
+			hit = IntersectSprite(ray, cameraInfo, *spriteRenderer, pickMatrix, distance);
+
+			if (hit) sortPath = spriteRenderer->BuildCanvasSortPath();
 		}
 		else if (UIRenderer* uiRenderer = actor->GetComponentByClass<UIRenderer>())
 		{
-			if (uiRenderer->GetRenderSpace() != targetRenderSpace) continue;
-
-			hit = IntersectUI(ray, *uiRenderer, distance);
-
-			if (hit)
+			if (isCanvasView)
 			{
-				const UIRendererProxy& proxy = uiRenderer->GetRenderProxy();
-				screenSortKey = (static_cast<uint64_t>(proxy.common.canvasOrder) << 32) | static_cast<uint64_t>(proxy.common.sortOrder);
+				if (!canvasViewRoot->ContainsRenderer(uiRenderer)) continue;
 			}
+			else if (uiRenderer->GetRenderSpace() != targetRenderSpace)
+			{
+				continue;
+			}
+
+			// Determine world matrix for the mesh renderer based on if we are in a canvas view or not
+			const UIRendererProxy& proxy = uiRenderer->GetRenderProxy();
+
+			Matrix4x4 pickMatrix = proxy.common.worldMatrix;
+
+			// If we are in a canvas view, apply the world-to-canvas transformation to the pick matrix
+			if (isCanvasView) pickMatrix *= worldToCanvas;
+
+			hit = IntersectUI(ray, *uiRenderer, pickMatrix, distance);
+
+			if (hit) sortPath = uiRenderer->BuildCanvasSortPath();
+
 		}
 
 		if (!hit) continue;
 
 		// Compare the distance of the current hit with the nearest hit found so far
 
-		if (targetRenderSpace == RenderSpace::Screen)
+		auto IsHigherOrder = [](const std::vector<uint32_t>& a, const std::vector<uint32_t>& b) -> bool
+			{
+				size_t minSize = std::min(a.size(), b.size());
+				for (size_t i = 0; i < minSize; ++i)
+				{
+					if (a[i] != b[i])
+					{
+						return a[i] > b[i]; // Higher order if the current element is greater
+					}
+				}
+				return a.size() > b.size(); // Longer path is considered higher order
+			};
+
+		if (isCanvasView || targetRenderSpace == RenderSpace::Screen)
 		{
 			// In case of screen space , check the order of the elements in addition to the distance, 
 			//to ensure that the topmost element is selected when multiple elements are at the same distance
@@ -94,10 +148,10 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 			
 			// Check if the current hit has a higher order than the stored nearest hit 
 			// or if nearest hit is not set yet (first hit)
-			const bool hasHigherOrder = !nearestHit || screenSortKey > nearestScreenSortKey;
+			const bool hasHigherOrder = !nearestHit || IsHigherOrder(sortPath, nearestSortPath);
 
 			// Check if the current hit has the same order as the nearest hit
-			const bool hasSameOrder = nearestHit && screenSortKey == nearestScreenSortKey;
+			const bool hasSameOrder = nearestHit && sortPath == nearestSortPath;
 
 			// Check if the current hit is closer than the nearest hit when they have the same order
 			const bool isCloserAtSameOrder = hasSameOrder && distance < nearestHit->distance - distanceEpsilon;
@@ -107,7 +161,7 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 			{
 				nearestHit = ScenePickHit{ actor->GetGuid(), distance };
 
-				nearestScreenSortKey = screenSortKey;
+				nearestSortPath = sortPath;
 			}
 		}
 		else
@@ -198,6 +252,7 @@ bool ScenePicker::IntersectSphere(
 bool ScenePicker::IntersectMesh(
 	const SceneRay& ray,
 	MeshRenderer& renderer,
+	const Matrix4x4& worldMatrix,
 	float& outDistance
 )
 {
@@ -215,7 +270,7 @@ bool ScenePicker::IntersectMesh(
 	Vector3 scale;
 
 	// Decompose the world matrix of the proxy to get position, rotation, and scale
-	if (!proxy.common.worldMatrix.Decompose(position, rotation, scale))
+	if (!worldMatrix.Decompose(position, rotation, scale))
 	{
 		return false;
 	}
@@ -248,7 +303,7 @@ bool ScenePicker::IntersectMesh(
 		const MeshDesc& meshDesc = renderTemplate.meshDesc;
 
 		// Transform the mesh's bounding center from local space to world space
-		const Vector3 worldCenter = proxy.common.worldMatrix.TransformPoint(meshDesc.boundsCenter);
+		const Vector3 worldCenter = worldMatrix.TransformPoint(meshDesc.boundsCenter);
 
 		// Scale the mesh's bounding radius by the maximum scale to get the world radius
 		const float worldRadius = meshDesc.boundsRadius * maxScale;
@@ -274,6 +329,7 @@ bool ScenePicker::IntersectSprite(
 	const SceneRay& ray,
 	const CameraInfo& cameraInfo,
 	SpriteRenderer& renderer,
+	const Matrix4x4& worldMatrix,
 	float& outDistance
 )
 {
@@ -295,7 +351,7 @@ bool ScenePicker::IntersectSprite(
 	// Check for intersection between the ray and the sprite's quad in local space
 	return IntersectLocalQuad(
 		ray,
-		proxy.common.worldMatrix,
+		worldMatrix,
 		std::min(x0, x1),
 		std::max(x0, x1),
 		std::min(y0, y1),
@@ -307,6 +363,7 @@ bool ScenePicker::IntersectSprite(
 bool ScenePicker::IntersectUI(
 	const SceneRay& ray,
 	UIRenderer& renderer,
+	const Matrix4x4& worldMatrix,
 	float& outDistance
 )
 {
@@ -319,7 +376,7 @@ bool ScenePicker::IntersectUI(
 
 	return IntersectLocalQuad(
 		ray,
-		proxy.common.worldMatrix,
+		worldMatrix,
 		-0.5f,
 		0.5f,
 		-0.5f,

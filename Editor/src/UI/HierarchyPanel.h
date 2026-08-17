@@ -11,6 +11,7 @@ public:
 		std::function<void(const std::string& name, const Guid& parentGuid)> onCreateActor;		// Callback for when an actor is created
 		std::function<bool(const Guid& actorGuid)> onDeleteActor;								// Callback for when an actor is deleted
 		std::function<bool(const Guid& actorGuid, const Guid& newParentGuid)> onReparentActor;	// Callback for when an actor is reparented
+		std::function<void(const Guid& actorGuid)> onOpenCanvas;								// Callback for opening a Canvas as an edit scope
 	};
 
     void Render(SceneBase* scene, const Callbacks& callbacks);

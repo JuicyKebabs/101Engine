@@ -770,7 +770,7 @@ namespace
 			"Height matching uses the vertical viewport ratio");
 	}
 
-	void TestNestedCanvasDoesNotApplyScaleTwice()
+	void TestNestedCanvasMapsReferenceResolutionToDisplaySize()
 	{
 		SceneBase scene;
 		scene.SetViewportSize(960, 540);
@@ -784,21 +784,60 @@ namespace
 				ActorType::Canvas,
 				Actor::InitDesc(true, TAG_NONE, "NestedCanvas")),
 			rootActor->GetHandle());
+		Actor* childActor = scene.AddChildActor(
+			ActorFactory::CreateActor(
+				ActorType::UI,
+				Actor::InitDesc(true, TAG_NONE, "NestedChild")),
+			nestedActor->GetHandle());
 
 		Canvas* rootCanvas = rootActor->GetComponentByClass<Canvas>();
 		Canvas* nestedCanvas = nestedActor->GetComponentByClass<Canvas>();
 		RectTransform* nestedTransform =
 			nestedActor->GetComponentByClass<RectTransform>();
+		RectTransform* childTransform =
+			childActor->GetComponentByClass<RectTransform>();
 
 		scene.SetCanvasReferenceSize(rootCanvas, {1920.0f, 1080.0f});
 		scene.SetCanvasMatchWidthOrHeight(rootCanvas, 0.5f);
+		nestedTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		nestedTransform->SetSizeDelta({960.0f, 540.0f});
+		scene.SetCanvasReferenceSize(nestedCanvas, {1920.0f, 1080.0f});
+		scene.SetCanvasMatchWidthOrHeight(nestedCanvas, 0.5f);
+		childTransform->SetAnchorMode(AnchorMode::MiddleCenter);
+		childTransform->SetAnchoredPosition({100.0f, 40.0f});
 		scene.Update(0.0f);
 
 		Check(std::abs(rootCanvas->GetScaleFactor() - 0.5f) < 0.001f &&
-			std::abs(nestedCanvas->GetScaleFactor() - 1.0f) < 0.001f,
-			"Only the root Canvas produces an automatic scale factor");
-		Check(Near(nestedTransform->GetWorldScale(), Vector3(0.5f, 0.5f, 0.5f)),
-			"Nested Canvas inherits the root scale exactly once");
+			std::abs(nestedCanvas->GetScaleFactor() - 0.5f) < 0.001f,
+			"Root and nested Canvases calculate their own display mapping factors");
+		Check(Near(
+			childTransform->GetWorldPosition(),
+			Vector3(25.0f, 10.0f, 0.0f)) &&
+			Near(
+			childTransform->GetWorldScale(),
+			Vector3(0.25f, 0.25f, 0.25f)),
+			"Nested Canvas scale is inherited by child layout after the root scale");
+
+		const Matrix4x4 nestedRenderMatrix = nestedTransform->GetWorldMatrix();
+		const Vector3 nestedLeft =
+			nestedRenderMatrix.TransformPoint({-0.5f, 0.0f, 0.0f});
+		const Vector3 nestedRight =
+			nestedRenderMatrix.TransformPoint({0.5f, 0.0f, 0.0f});
+
+		Check(std::abs(nestedRight.x - nestedLeft.x - 480.0f) < 0.001f,
+			"Nested Canvas keeps its RectTransform display width while only children inherit its scale factor");
+
+		Check(scene.SetCanvasScaleMode(
+			nestedCanvas,
+			CanvasScaleMode::ConstantPixelSize),
+			"Nested Canvas accepts ConstantPixelSize");
+		scene.Update(0.0f);
+
+		Check(std::abs(nestedCanvas->GetScaleFactor() - 1.0f) < 0.001f &&
+			Near(
+				childTransform->GetWorldPosition(),
+				Vector3(50.0f, 20.0f, 0.0f)),
+			"ConstantPixelSize uses the nested RectTransform display size as its layout space");
 	}
 
 	void TestTransformToRectTransformConversion()
@@ -1925,7 +1964,7 @@ int main()
 	TestRectTransformInheritsRectTransformScale();
 	TestRootScreenSpaceCanvasUsesViewportSize();
 	TestScreenSpaceCanvasScaleFactor();
-	TestNestedCanvasDoesNotApplyScaleTwice();
+	TestNestedCanvasMapsReferenceResolutionToDisplaySize();
 	TestTransformToRectTransformConversion();
 	TestRectTransformDeserializeClearsHiddenPosition();
 	TestRectTransformToTransformConversion();

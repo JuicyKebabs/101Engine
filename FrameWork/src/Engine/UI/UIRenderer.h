@@ -45,7 +45,6 @@ public:
 	void SetOrder(UINT order) { SetSortOrderInCanvas(order); m_isProxyDirty = true; }
 
 	Canvas* GetCanvas() const { return GetGoverningCanvas(); }
-	UINT GetCanvasOrder() const;
 	void OnCanvasDestroyed() { SetGoverningCanvas(nullptr); }
 
 	// Serialization and deserialization methods

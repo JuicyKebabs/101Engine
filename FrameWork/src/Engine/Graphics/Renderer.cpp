@@ -260,23 +260,34 @@ void Renderer::RenderScreenSpace(
 	ID3D12GraphicsCommandList* p_commandList,
 	UINT viewportWidth,
 	UINT viewportHeight,
-	RenderTargetFormat targetFormat
+	RenderTargetFormat targetFormat,
+	const CameraInfo* overrideCameraInfo
 )
 {
 	if (viewportWidth == 0 || viewportHeight == 0) return;
 
 	// Set orthographic projection for screen space rendering
-	auto orthoProj = Matrix4x4::CreateOrthographic(
-		static_cast<float>(viewportWidth),
-		static_cast<float>(viewportHeight),
-		-1.0f, 
-		100.0f);
+	Matrix4x4 viewMatrix = Matrix4x4::Identity();
+
+	Matrix4x4 projectionMatrix = Matrix4x4::CreateOrthographic(
+			static_cast<float>(viewportWidth),
+			static_cast<float>(viewportHeight),
+			-1.0f,
+			100.0f
+	);
+
+	if (overrideCameraInfo)
+	{
+		viewMatrix = overrideCameraInfo->viewMatrix;
+		projectionMatrix = overrideCameraInfo->projMatrix;
+	}
 
 	// Set frame-level constants for screen space rendering
 	auto framePtr = m_screenSpaceFrameCB->GetPtr<FrameConstants>();
-	framePtr->view = Matrix4x4::Identity();
-	framePtr->proj = orthoProj;
-	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
+	framePtr->view = viewMatrix;
+	framePtr->proj = projectionMatrix;
+	framePtr->cameraPosition = overrideCameraInfo ?
+		overrideCameraInfo->position : m_cameraInfoThisFrame.position;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_screenSpaceFrameCB->GetAddress());
 
 	// Allocate constant buffers for ui items

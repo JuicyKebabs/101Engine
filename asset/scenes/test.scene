@@ -9,7 +9,7 @@
                         "position": [
                             0.0,
                             0.0,
-                            -5.0
+                            -10.0
                         ],
                         "rotation": [
                             0.0,
@@ -42,7 +42,7 @@
                             "position": [
                                 0.0,
                                 0.0,
-                                -5.0
+                                -10.0
                             ],
                             "rotation": [
                                 0.0,
@@ -114,6 +114,10 @@
                         "visible": true
                     },
                     "type": "MeshRenderer"
+                },
+                {
+                    "data": {},
+                    "type": "TestBehavior"
                 }
             ],
             "is_active": true,
@@ -292,7 +296,7 @@
             "components": [
                 {
                     "data": {
-                        "anchorMode": 4,
+                        "anchorMode": 5,
                         "anchoredPosition": [
                             0.0,
                             0.0
@@ -370,8 +374,8 @@
                         ],
                         "name": "",
                         "pivot": [
-                            0.0,
-                            1.0
+                            0.5,
+                            0.5
                         ],
                         "position": [
                             0.0,
@@ -398,7 +402,7 @@
                 },
                 {
                     "data": {
-                        "canvasActorId": "{0ACFF59E-2A86-4CF3-B7A9-857BBD0E6E10}",
+                        "canvasActorId": "{791624D1-0842-461E-B3D5-0DED30694424}",
                         "color": [
                             1.0,
                             1.0,
@@ -425,8 +429,184 @@
                 }
             ],
             "is_active": true,
-            "name": "TEstUIImage2",
+            "name": "TestUIImage2",
+            "parentId": "{791624D1-0842-461E-B3D5-0DED30694424}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{791624D1-0842-461E-B3D5-0DED30694424}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 3,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            960.0,
+                            540.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                }
+            ],
+            "is_active": true,
+            "name": "TestNestedCanvas",
             "parentId": "{0ACFF59E-2A86-4CF3-B7A9-857BBD0E6E10}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{DCDC4E68-126F-43E7-B29B-3897622A49D8}",
+            "components": [
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            10.0,
+                            10.0
+                        ],
+                        "renderMode": 1,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                },
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            -2.4000000953674316,
+                            1.7000000476837158,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            0.5,
+                            0.5,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "TestWorldCanvas",
+            "parentId": "{8633FF64-783A-4F84-990E-6CEF11B68055}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{EEAC6305-02E2-46F8-8C62-87EC736303AC}",
+            "components": [
+                {
+                    "data": {
+                        "canvasActorId": "{DCDC4E68-126F-43E7-B29B-3897622A49D8}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{32A1CF7E-6EC2-4B1F-B644-311E7EA68670}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                },
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            -0.0,
+                            0.0,
+                            -0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            0.20000000298023224,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            10.0,
+                            10.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                }
+            ],
+            "is_active": true,
+            "name": "TestUIImageWorld",
+            "parentId": "{DCDC4E68-126F-43E7-B29B-3897622A49D8}",
             "tag": "None"
         }
     ],

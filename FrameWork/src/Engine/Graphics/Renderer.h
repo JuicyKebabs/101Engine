@@ -49,7 +49,8 @@ public:
 		ID3D12GraphicsCommandList* p_commandList, 
 		UINT viewportWidth, 
 		UINT viewportHeight,
-		RenderTargetFormat targetFormat
+		RenderTargetFormat targetFormat,
+		const CameraInfo* overrideCameraInfo = nullptr
 	);
 	void RenderSelectionMask(																// Render selection mask for selected objects
 		ID3D12GraphicsCommandList* p_commandList,

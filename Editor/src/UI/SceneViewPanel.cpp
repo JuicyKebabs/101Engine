@@ -5,7 +5,8 @@
 
 void SceneViewPanel::Render(
 	D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
-	UINT textureWidth, UINT textureHeight
+	UINT textureWidth, UINT textureHeight,
+	const ViewportOverlayData& overlayData
 )
 {
 	if (!ImGui::Begin("Scene"))
@@ -26,6 +27,87 @@ void SceneViewPanel::Render(
 		textureWidth,
 		textureHeight
 	);
+
+	// Display the reference size and canvas order if in Canvas view mode and a canvas is present
+	if (m_viewMode == EditorViewportMode::Canvas && !overlayData.canvasRects.empty())
+	{
+		ImGui::SameLine();
+
+		ImGui::TextDisabled(
+			"Reference: %.0f x %.0f  Order: %u",
+			overlayData.referenceSize.x,
+			overlayData.referenceSize.y,
+			overlayData.canvasOrder
+		);
+	}
+
+	// Render the breadcrumb navigation for the canvas view mode
+	if (m_viewMode == EditorViewportMode::Canvas && !overlayData.canvasBreadcrumbs.empty())
+	{
+		ImGui::TextDisabled("Canvas Hierarchy:");
+		ImGui::SameLine();
+
+		for (size_t i = 0; i < overlayData.canvasBreadcrumbs.size(); i++)
+		{
+			const CanvasBreadcrumbItem& item = overlayData.canvasBreadcrumbs[i];
+
+			const bool isCurrent = i + 1 == overlayData.canvasBreadcrumbs.size();
+
+			ImGui::PushID(static_cast<int>(i));
+
+			if (item.type == CanvasBreadcrumbItemType::Ellipsis)
+			{
+				ImGui::TextDisabled("...");
+			}
+			else if (isCurrent)
+			{// Display the current canvas name as unformatted text (not clickable)
+				ImGui::TextUnformatted(item.name.c_str());
+			}
+			else if (ImGui::SmallButton(item.name.c_str()))
+			{
+				m_canvasOpenRequest = item.canvasActorGuid;
+			}
+
+			ImGui::PopID();
+
+			if (!isCurrent)
+			{
+				ImGui::SameLine();
+				ImGui::TextDisabled(">");
+				ImGui::SameLine();
+			}
+		}
+	}
+
+	// Button to fit the view to rectangle of the Editing-Root Canvas in Canvas View
+	if (m_viewMode == EditorViewportMode::Canvas)
+	{
+		ImGui::SameLine();
+
+		if (ImGui::SmallButton("Fit"))
+		{
+			m_canvasNavigationInput.fitRequested = true;
+			m_hasCanvasNavigationInput = true;
+		}
+	}
+
+	// Render the tab bar for switching between Scene and Canvas view modes
+	if (ImGui::BeginTabBar("##EditorViewportTabs"))
+	{
+		if (ImGui::BeginTabItem("Scene"))
+		{
+			m_viewMode = EditorViewportMode::Scene;
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Canvas"))
+		{
+			m_viewMode = EditorViewportMode::Canvas;
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+	}
 
 	// Get the available size of the content region in the ImGui window
 	const ImVec2 availableSize = ImGui::GetContentRegionAvail();
@@ -82,24 +164,6 @@ void SceneViewPanel::Render(
 		cursorPosition.y + offsetY
 		});
 
-	// Render the tab bar for switching between Scene and Screen view modes
-	if (ImGui::BeginTabBar("##EditorViewportTabs"))
-	{
-		if (ImGui::BeginTabItem("Scene"))
-		{
-			m_viewMode = EditorViewportMode::Scene;
-			ImGui::EndTabItem();
-		}
-
-		if (ImGui::BeginTabItem("Screen"))
-		{
-			m_viewMode = EditorViewportMode::Screen;
-			ImGui::EndTabItem();
-		}
-
-		ImGui::EndTabBar();
-	}
-
 	// Render the image using the ImGui::Image function, passing in the texture handle and the calculated size
 	ImGui::Image(
 		static_cast<ImTextureID>(sceneTextureHandle.ptr),
@@ -110,6 +174,115 @@ void SceneViewPanel::Render(
 	// Store the minimum and maximum coordinates of the image in the ImGui window for later use
 	m_imageMin = ImGui::GetItemRectMin();
 	m_imageMax = ImGui::GetItemRectMax();
+
+	// Mouse input detection in Canvas View
+	if (m_viewMode == EditorViewportMode::Canvas && ImGui::IsItemHovered())
+	{
+		ImGuiIO& io = ImGui::GetIO();
+
+		const float imageWidth = m_imageMax.x - m_imageMin.x;
+		const float imageHeight = m_imageMax.y - m_imageMin.y;
+
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle,0.0f))
+		{
+			m_canvasNavigationInput.panDeltaPixels.x += io.MouseDelta.x;
+			m_canvasNavigationInput.panDeltaPixels.y += io.MouseDelta.y;
+
+			m_hasCanvasNavigationInput = true;
+		}
+
+		if (io.MouseWheel != 0.0f && imageWidth > 0.0f && imageHeight > 0.0f)
+		{
+			const ImVec2 mousePosition = ImGui::GetMousePos();
+
+			m_canvasNavigationInput.zoomPivotUV =
+			{
+				(mousePosition.x - m_imageMin.x) / imageWidth,
+				(mousePosition.y - m_imageMin.y) / imageHeight
+			};
+
+			m_canvasNavigationInput.wheelDelta += io.MouseWheel;
+
+			m_hasCanvasNavigationInput = true;
+		}
+	}
+
+	// Draw Canvas overlay rectangles on top of the image using the ImDrawList API
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+	// Lamda function to draw a collection of canvas overlay rectangles on the image
+	const auto drawCanvasRects = [this, drawList](const std::vector<ViewportCanvasRect>& rects)
+		{
+			if (rects.empty()) return;
+
+			// Calculate the width and height of the image of the scene view panel
+			const float imageWidth = m_imageMax.x - m_imageMin.x;
+			const float imageHeight = m_imageMax.y - m_imageMin.y;
+
+			// Push a clipping rectangle to ensure that the
+			// overlay rectangles are only drawn within the bounds of the image
+			drawList->PushClipRect(m_imageMin, m_imageMax, true);
+
+			// Iterate through each canvas overlay rectangle and draw it on the image
+			for (const ViewportCanvasRect& rect : rects)
+			{
+				ImVec2 canvasCorners[4]{};
+
+				// Calculate the canvas corners in the ImGui window based on the
+				// normalized coordinates of the canvas rectangle and the size of the image
+				for (size_t i = 0; i < 4; i++)
+				{
+					canvasCorners[i] =
+					{
+						m_imageMin.x + rect.corners[i].x * imageWidth,
+						m_imageMin.y + rect.corners[i].y * imageHeight
+					};
+				}
+
+				ImU32 color = IM_COL32(120, 165, 185, 100);
+				float thickness = 1.0f;
+
+				// Change the color and thickness of the rectangle based on its role in the canvas overlay
+				// Highlight them in the order of EditingRoot > Selected > Ancestor
+				switch (rect.role)
+				{
+				case ViewportCanvasRole::EditingRoot:
+					color = IM_COL32(230, 180, 70, 220);
+					thickness = 2.0f;
+					break;
+				case ViewportCanvasRole::Selected:
+					color = IM_COL32(90, 190, 255, 255);
+					thickness = 2.5f;
+					break;
+				case ViewportCanvasRole::Ancestor:
+					break;
+				}
+
+				drawList->AddPolyline(
+					canvasCorners, 4, color,
+					ImDrawFlags_Closed, thickness
+				);
+			}
+
+			drawList->PopClipRect();
+		};
+
+	if (m_viewMode == EditorViewportMode::Canvas)
+	{// Canvas View Mode
+		const ImU32 viewportColor = IM_COL32(110, 150, 170, 255);
+
+		// Draw a rectangle around the viewport to indicate the canvas view mode
+		drawList->AddRect(m_imageMin, m_imageMax, viewportColor, 0.0f, 0, 2.0f);
+
+		// Draw the canvas overlay rectangles for the currently editing canvas and its ancestors
+		drawCanvasRects(overlayData.canvasRects);
+	}
+	else
+	{// Scene View Mode
+		// Draw the canvas overlay rectangles for the world-space canvases projected into the scene view
+		drawCanvasRects(overlayData.worldCanvasRects);
+	}
 
 	// Handle mouse click events for picking actors in the scene
 	if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
@@ -157,14 +330,34 @@ bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)
 	return true;
 }
 
-bool SceneViewPanel::ConsumePickRequest(
-	Vector2& outViewportUV
-)
+bool SceneViewPanel::ConsumePickRequest(Vector2& outViewportUV)
 {
 	if (!m_hasPickRequest) return false;
 
 	outViewportUV = m_pickUV;
 	m_hasPickRequest = false;
+
+	return true;
+}
+
+bool SceneViewPanel::ConsumeCanvasOpenRequest(Guid& outCanvasActorGuid)
+{
+	if (!m_canvasOpenRequest.IsValid()) return false;
+
+	outCanvasActorGuid = m_canvasOpenRequest;
+	m_canvasOpenRequest = {};
+
+	return true;
+}
+
+bool SceneViewPanel::ConsumeCanvasNavigationInput(CanvasNavigationInput& outInput)
+{
+	if (!m_hasCanvasNavigationInput) return false;
+
+	outInput = m_canvasNavigationInput;
+
+	m_canvasNavigationInput = {};
+	m_hasCanvasNavigationInput = false;
 
 	return true;
 }

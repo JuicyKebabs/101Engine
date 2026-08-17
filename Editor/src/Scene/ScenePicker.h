@@ -5,6 +5,7 @@
 #include "Engine/Component/RendererComponent.h"
 
 class SceneBase;
+class Canvas;
 class MeshRenderer;
 class SpriteRenderer;
 class UIRenderer;
@@ -23,7 +24,6 @@ struct SceneRay
 	Vector3 origin;
 	Vector3 direction;
 };
-
 // Struct to hold information of the Actor hit by a ray
 struct ScenePickHit
 {
@@ -38,10 +38,11 @@ public:
 	// Launch a ray from the point in the viewport and check for intersection with actors' meshes or sprites
 	// Returns the nearest hit information of the actor hit by the ray, or std::nullopt if no actor was hit
 	static std::optional<ScenePickHit> Pick(
-		SceneBase& scene,				// Scene to pick from (to get actors)
-		const CameraInfo& cameraInfo,	// Camera information for building the ray
-		const Vector2& viewportUV,		// Position in the viewport where the ray is launched (normalized coordinates [0,1])
-		RenderSpace targetRenderSpace	// Target render space to filter the pick (World or Screen space)
+		SceneBase& scene,						// Scene to pick from (to get actors)
+		const CameraInfo& cameraInfo,			// Camera information for building the ray
+		const Vector2& viewportUV,				// Position in the viewport where the ray is launched (normalized coordinates [0,1])
+		RenderSpace targetRenderSpace,			// Target render space to filter the pick (World or Screen space)
+		const Canvas* canvasViewRoot = nullptr	// Optional canvas view root for picking the renderer only in the boundory of the Canvas
 	);
 
 private:
@@ -66,6 +67,7 @@ private:
 	static bool IntersectMesh(
 		const SceneRay& ray,
 		class MeshRenderer& renderer,
+		const Matrix4x4& worldMatrix,
 		float& outDistance
 	);
 
@@ -74,6 +76,7 @@ private:
 		const SceneRay& ray,
 		const CameraInfo& cameraInfo,
 		class SpriteRenderer& renderer,
+		const Matrix4x4& worldMatrix,
 		float& outDistance
 	);
 
@@ -81,6 +84,7 @@ private:
 	static bool IntersectUI(
 		const SceneRay& ray,
 		UIRenderer& renderer,
+		const Matrix4x4& worldMatrix,
 		float& outDistance
 	);
 
