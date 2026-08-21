@@ -18,25 +18,14 @@ public:
     struct Callbacks
     {
 		// Callback for adding a component to an actor
-        std::function<bool(
-            const Guid& actorGuid,
-            const std::string& componentName
-            )> onAddComponent;
+        std::function<bool(const Guid& actorGuid, const std::string& componentName)> onAddComponent;
 
 		// Callback for removing a component from an actor
-        std::function<bool(
-            const Guid& actorGuid,
-            const std::string& componentName,
-            std::size_t occurrenceIndex
-            )> onRemoveComponent;
+        std::function<bool(const Guid& actorGuid, const std::string& componentName, std::size_t occurrenceIndex)> onRemoveComponent;
     };
 
 public:
-    void Render(
-        Actor* selectedActor,
-		const InspectorContext& context,
-		const Callbacks& callbacks
-    );
+    void Render(Actor* selectedActor, const InspectorContext& context, const Callbacks& callbacks);
 
 	ComponentInspectorRegistry& GetComponentInspectorRegistry() { return m_componentInspectorRegistry; }
 
@@ -56,8 +45,5 @@ private:
 private:
 	// Helper function to draw the inspector UI for a single component
 	// Returns if the "Remove" button was clicked for this component
-    bool DrawComponent(
-        Component& component,
-        const InspectorContext& context
-    );
+    bool DrawComponent(Component& component,  const InspectorContext& context);
 };

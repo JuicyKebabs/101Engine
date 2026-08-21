@@ -342,6 +342,13 @@ struct Transform3D
 
 	Matrix4x4 GetMatrix() const;
 	Matrix4x4 GetInverseMatrix() const;
+
+	bool operator==(const Transform3D& other) const
+	{
+		return position.NearEqual(other.position) &&
+			rotation.NearEqual(other.rotation) &&
+			scale.NearEqual(other.scale);
+	}
 };
 
 constexpr float PI = std::numbers::pi_v<float>;

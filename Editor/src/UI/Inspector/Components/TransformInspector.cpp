@@ -17,11 +17,7 @@ void TransformInspector::Draw(Transform& transform, const InspectorContext& cont
     Vector3 scale = transform.GetLocalScale();
 
 	// Property grid
-	if (!EditorUI::BeginPropertyGrid("TransformProperties"))
-	{
-		if (context.onCancelTransformEdit) context.onCancelTransformEdit();
-		return;
-	}
+	if (!EditorUI::BeginPropertyGrid("TransformProperties")) return;
 
     // Save the transform state before editing, to support undo/redo
     const Transform3D beforeField = transform.GetLocalTransform();

@@ -189,6 +189,10 @@ void EditorApp::Terminate()
 // (a single DefaultCamera actor tagged "MainCamera")
 void EditorApp::NewScene()
 {
+    // Cancel ongoing editing transactions
+    CancelTransformEdit();
+    CancelRectTransformEdit();
+
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
 
@@ -229,6 +233,10 @@ void EditorApp::NewScene()
 // Load a scene from a file path
 void EditorApp::LoadScene(const std::string& filePath)
 {
+    // Cancel ongoing editing transactions
+    CancelTransformEdit();
+    CancelRectTransformEdit();
+
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
 
@@ -274,6 +282,11 @@ void EditorApp::LoadScene(const std::string& filePath)
 // fix the code and try again.
 void EditorApp::ReloadGameCode(bool reconfigure)
 {
+
+	// Cancel ongoing editing transactions
+	CancelTransformEdit();
+	CancelRectTransformEdit();
+
 	// 1. Save the current scene to a temporary file
 	static const char* kHotReloadScenePath = "asset/scenes/_hotreload_temp.scene";   // file path for hot-reload snapshot
 
@@ -757,6 +770,10 @@ void EditorApp::RenderMenuBar()
 
     callbacks.onUndo = [this]()
         {
+            // Cancel the current editing transaction
+			CancelTransformEdit();
+			CancelRectTransformEdit();
+
             if (m_commandHistory.Undo())
             {
                 DBG("EditorApp: Undo succeeded.");
@@ -769,6 +786,10 @@ void EditorApp::RenderMenuBar()
 
     callbacks.onRedo = [this]()
         {
+            // Cancel the current editing transaction
+            CancelTransformEdit();
+            CancelRectTransformEdit();
+
             if (m_commandHistory.Redo())
             {
                 DBG("EditorApp: Redo succeeded.");
@@ -1004,20 +1025,15 @@ void EditorApp::RenderInspectorPanel()
     InspectorContext context;
 	context.assetManager = m_pAssetManager.get();
 
-	context.onTransformEditBegin = [this](const Guid& actorGuid, const Transform3D& before)
-		{
-			BeginTransformEdit(actorGuid, before);
-		};
+	// Transform editing callbacks
+	context.onTransformEditBegin = [this](const Guid& actorGuid, const Transform3D& before) { BeginTransformEdit(actorGuid, before);};
+    context.onTransformEditEnd = [this](const Guid& actorGuid, const Transform3D& after) { EndTransformEdit(actorGuid, after);};
+    context.onCancelTransformEdit = [this](){ CancelTransformEdit(); };
 
-    context.onTransformEditEnd = [this](const Guid& actorGuid, const Transform3D& after)
-        {
-            EndTransformEdit(actorGuid, after);
-        };
-
-    context.onCancelTransformEdit = [this]()
-        {
-            CancelTransformEdit();
-        };
+	// RectTransform editing callbacks
+	context.onRectTransformEditBegin = [this](const Guid& actorGuid, const RectTransformEditState& before) { BeginRectTransformEdit(actorGuid, before); };
+    context.onRectTransformEditEnd = [this](const Guid& actorGuid, const RectTransformEditState& after) { EndRectTransformEdit(actorGuid, after); };
+    context.onCancelRectTransformEdit = [this]() { CancelRectTransformEdit(); };
 
     InspectorPanel::Callbacks callbacks;
 
@@ -1191,38 +1207,56 @@ void EditorApp::ApplyCurrentViewportSizeToScene()
     );
 }
 
-void EditorApp::BeginTransformEdit(
-    const Guid& actorGuid,
-    const Transform3D& before
-)
+void EditorApp::BeginTransformEdit(const Guid& actorGuid, const Transform3D& before)
 {
 	// Validate the actorGuid
-    if (!actorGuid.IsValid())
+    if (!m_pScene || !actorGuid.IsValid())
     {
-		m_transformEditTransaction.reset();
+		CancelTransformEdit();
         return;
     }
+
+	Actor* actor = m_pScene->ResolveActor(actorGuid);
+
+    std::type_index transformType = std::type_index(typeid(Transform));
+    Component* component = actor ? actor->GetComponentByExactType(transformType, 0) : nullptr;
+
+    Transform* transform = dynamic_cast<Transform*>(component);
+
+	if (!transform)
+	{
+		CancelTransformEdit();
+		return;
+	}
+
+	// Stop any ongoing edit transaction
+	CancelTransformEdit();
+	CancelRectTransformEdit();
 
 	// Store the actorGuid and the "before" transform in a new TransformEditTransaction
     m_transformEditTransaction = TransformEditTransaction{actorGuid, before};
 }
 
-void EditorApp::EndTransformEdit(
-    const Guid& actorGuid,
-    const Transform3D& after
-)
+void EditorApp::EndTransformEdit(const Guid& actorGuid, const Transform3D& after)
 {
 	// Validate that there is an ongoing transform edit transaction and that the actorGuid matches
     if (!m_transformEditTransaction) return;
 
     if (m_transformEditTransaction->actorGuid != actorGuid)
     {
-        m_transformEditTransaction.reset();
+		CancelTransformEdit();
         return;
     }
 
 	// Store the "before" transform from the transaction before resetting it
     const Transform3D before = m_transformEditTransaction->before;
+
+	// Do not create a command if the before and after states are identical (no change)
+	if (before == after)
+	{
+		CancelTransformEdit();
+		return;
+	}
 
 	// Reset the transaction to indicate that the transform edit has ended
     m_transformEditTransaction.reset();
@@ -1240,7 +1274,123 @@ void EditorApp::EndTransformEdit(
 
 void EditorApp::CancelTransformEdit()
 {
-    m_transformEditTransaction = {};
+	if (!m_transformEditTransaction) return;
+
+	const Guid actorGuid = m_transformEditTransaction->actorGuid;
+
+    if (!m_pScene || !actorGuid.IsValid())
+    {
+        m_transformEditTransaction.reset();
+        return;
+    }
+
+	Actor* actor = m_pScene->ResolveActor(actorGuid);
+
+	std::type_index transformType = std::type_index(typeid(Transform));
+	Component* component = actor ? actor->GetComponentByExactType(transformType, 0) : nullptr;
+
+	Transform* transform = dynamic_cast<Transform*>(component);
+
+	if (!transform)
+    {
+        m_transformEditTransaction.reset();
+        return;
+    }
+
+	// Reset the Transform to its "before" state from the edit transaction
+	transform->SetLocalTransform(m_transformEditTransaction->before);
+
+	m_transformEditTransaction = {};
+}
+
+void EditorApp::BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before)
+{
+	if (!m_pScene || !actorGuid.IsValid())
+	{
+		CancelRectTransformEdit();
+		return;
+	}
+
+	Actor* actor = m_pScene->ResolveActor(actorGuid);
+
+	std::type_index rectTransformType = std::type_index(typeid(RectTransform));
+	Component* component = actor ? actor->GetComponentByExactType(rectTransformType, 0) : nullptr;
+
+	RectTransform* rectTransform = dynamic_cast<RectTransform*>(component);
+
+	if (!rectTransform)
+	{
+		CancelRectTransformEdit();
+		return;
+	}
+
+    // Stop any ongoing transform edit transaction
+    CancelTransformEdit();
+    CancelRectTransformEdit();
+
+	m_rectTransformEditTransaction = RectTransformEditTransaction{ actorGuid, before };
+}
+
+void EditorApp::EndRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& after)
+{
+    if (!m_rectTransformEditTransaction) return;
+
+	if (m_rectTransformEditTransaction->actorGuid != actorGuid)
+	{
+		CancelRectTransformEdit();
+		return;
+	}
+
+	const RectTransformEditState before = m_rectTransformEditTransaction->before;
+
+	// Do not create a command if the before and after states are identical (no change)
+	if (before == after)
+	{
+		CancelRectTransformEdit();
+		return;
+	}
+
+    m_rectTransformEditTransaction.reset();
+
+	m_commandHistory.Execute(
+        std::make_unique<RectTransformEditCommand>(
+		    m_pScene.get(),
+		    actorGuid,
+		    before,
+		    after
+	    )
+	);
+}
+
+void EditorApp::CancelRectTransformEdit()
+{
+	if (!m_rectTransformEditTransaction) return;
+
+    const Guid actorGuid = m_rectTransformEditTransaction->actorGuid;
+
+    if (!m_pScene || !actorGuid.IsValid())
+    {
+        m_rectTransformEditTransaction.reset();
+        return;
+    }
+
+	Actor* actor = m_pScene->ResolveActor(actorGuid);
+
+	std::type_index rectTransformType = std::type_index(typeid(RectTransform));
+	Component* component = actor ? actor->GetComponentByExactType(rectTransformType, 0) : nullptr;
+
+	RectTransform* rectTransform = dynamic_cast<RectTransform*>(component);
+
+	if (!rectTransform)
+    {
+        m_rectTransformEditTransaction.reset();
+        return;
+    }
+
+	// Reset the RectTransform to its "before" state from the edit transaction
+	m_rectTransformEditTransaction->before.ApplyTo(*rectTransform);
+
+	m_rectTransformEditTransaction = {};
 }
 
 void EditorApp::BuildSelectionRenderData(

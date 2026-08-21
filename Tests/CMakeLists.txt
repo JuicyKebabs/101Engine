@@ -330,3 +330,21 @@ add_test(NAME TransformEditCommandTests COMMAND TransformEditCommandTests)
 set_tests_properties(TransformEditCommandTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+add_executable(RectTransformEditCommandTests
+    RectTransformEditCommandTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/RectTransformEditCommand.cpp
+)
+
+target_include_directories(RectTransformEditCommandTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(RectTransformEditCommandTests PRIVATE 101Framework)
+
+add_test(NAME RectTransformEditCommandTests COMMAND RectTransformEditCommandTests)
+set_tests_properties(RectTransformEditCommandTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

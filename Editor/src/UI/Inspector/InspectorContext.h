@@ -2,6 +2,7 @@
 #include <functional>
 #include "Engine/Core/GUID/Guid.h"
 #include "Engine/Core/Math/Math.h"
+#include "Command/RectTransformEditCommand.h"
 
 //------------------------------------------------------------------
 // InspectorContext
@@ -14,12 +15,13 @@ struct InspectorContext
 {
 	AssetManager* assetManager = nullptr;	// For drawing asset pull-downs and asset previews.
 
-	// Callback when a transform edit begins (user starts editing)
+	// Transform editing events.
 	std::function<void(const Guid& actorGuid, const Transform3D& before)> onTransformEditBegin;
-
-	// Callback when a transform edit ends (user finishes editing)
 	std::function<void(const Guid& actorGuid, const Transform3D& after)> onTransformEditEnd;
-
-	// Callback when a transform edit is canceled (user cancels editing)
 	std::function<void()> onCancelTransformEdit;
+
+	// RectTransform editing events.
+	std::function<void(const Guid& actorGuid, const RectTransformEditState& before)> onRectTransformEditBegin;
+	std::function<void(const Guid& actorGuid, const RectTransformEditState& after)> onRectTransformEditEnd;
+	std::function<void()> onCancelRectTransformEdit;
 };

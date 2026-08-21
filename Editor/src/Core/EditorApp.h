@@ -15,6 +15,7 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Command/EditorCommandHistory.h"
+#include "Command/RectTransformEditCommand.h"
 #include "Core/CanvasEditContext.h"
 
 #include "Core/EditorCamera.h"
@@ -114,6 +115,26 @@ private:
 	// Optional to track an ongoing transform edit transaction
     std::optional<TransformEditTransaction> m_transformEditTransaction;
 
+    // Helper functions for callbacks from the InspectorPanel to track transform edits for undo/redo
+    void BeginTransformEdit(const Guid& actorGuid, const Transform3D& before);
+    void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
+    void CancelTransformEdit();
+
+	// Struct to track RectTransform edits for undo/redo
+	struct RectTransformEditTransaction
+	{
+		Guid actorGuid;
+		RectTransformEditState before;
+	};
+
+	// Optional to track an ongoing RectTransform edit transaction
+	std::optional<RectTransformEditTransaction> m_rectTransformEditTransaction;
+
+    // Helper functions for callbacks from the InspectorPanel to track RectTransform edits for undo/redo
+    void BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before);
+    void EndRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& after);
+    void CancelRectTransformEdit();
+
 private:
     EditorApp() = default;
 
@@ -135,11 +156,6 @@ private:
 
 	void ApplySceneViewResizeRequest();
     void ApplyCurrentViewportSizeToScene();
-
-	// Helper functions for callbacks from the InspectorPanel to track transform edits for undo/redo
-	void BeginTransformEdit(const Guid& actorGuid, const Transform3D& before);
-	void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
-    void CancelTransformEdit();
 
 	// Build render data for the selected object in the scene view
     // (used to render an outline around the selected object)
