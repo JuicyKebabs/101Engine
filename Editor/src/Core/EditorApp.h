@@ -1,6 +1,7 @@
 #pragma once
 #include <windows.h>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "Engine/Engine.h"
@@ -14,6 +15,8 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Command/EditorCommandHistory.h"
+#include "Command/RectTransformEditCommand.h"
+#include "Core/CanvasEditContext.h"
 
 #include "Core/EditorCamera.h"
 #include "UI/HierarchyPanel.h"
@@ -26,6 +29,16 @@
 // EditorApp class
 // The main application class for the editor.
 //--------------------------------------------
+
+// Struct to hold the navigation state of the Canvas view in the editor
+// Used to reflect the user manipulation to the Canvas view (panning, zooming, etc.)
+// User manipulation -> Store the result as CanvasViewNavigation -> Change the Canvas view to reflect the navigation state
+struct CanvasViewNavigation
+{
+	Vector2 center = Vector2::Zero();	// Camara center position in the Canvas view (in Editing-Root Canvas local space)
+	float zoom = 1.0f;					// Zoom level of the Canvas view (Fitting the Canvas rectangle to the viewport is 1.0f)
+	Guid canvasActorGuid;				// Guid of the editing root Canvas Actor 
+};
 
 class EditorApp
 {
@@ -75,6 +88,10 @@ private:
     std::unique_ptr<Actor> m_pEditorCameraActor;
     EditorCamera* m_pEditorCamera = nullptr;
 
+    // Canvas View controls
+	CanvasEditContext m_canvasEditContext;          // Stores the information for editing a Canvas in the Canvas view mode.
+	CanvasViewNavigation m_canvasViewNavigation;    // Stores the information of manipulation on the Canvas View
+
     // Panels
     HierarchyPanel m_hierarchyPanel;
     InspectorPanel m_inspectorPanel;
@@ -83,6 +100,40 @@ private:
 	ScriptsPanel m_scriptsPanel;
 
 	HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
+
+	// Render data for rendering the outline of a selected object in the scene view
+    FrameRenderData m_selectionRenderData;
+
+private:
+	// Struct to track transform edits for undo/redo
+    struct TransformEditTransaction
+    {
+        Guid actorGuid;
+        Transform3D before;
+    };
+
+	// Optional to track an ongoing transform edit transaction
+    std::optional<TransformEditTransaction> m_transformEditTransaction;
+
+    // Helper functions for callbacks from the InspectorPanel to track transform edits for undo/redo
+    void BeginTransformEdit(const Guid& actorGuid, const Transform3D& before);
+    void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
+    void CancelTransformEdit();
+
+	// Struct to track RectTransform edits for undo/redo
+	struct RectTransformEditTransaction
+	{
+		Guid actorGuid;
+		RectTransformEditState before;
+	};
+
+	// Optional to track an ongoing RectTransform edit transaction
+	std::optional<RectTransformEditTransaction> m_rectTransformEditTransaction;
+
+    // Helper functions for callbacks from the InspectorPanel to track RectTransform edits for undo/redo
+    void BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before);
+    void EndRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& after);
+    void CancelRectTransformEdit();
 
 private:
     EditorApp() = default;
@@ -105,4 +156,30 @@ private:
 
 	void ApplySceneViewResizeRequest();
     void ApplyCurrentViewportSizeToScene();
+
+	// Build render data for the selected object in the scene view
+    // (used to render an outline around the selected object)
+    void BuildSelectionRenderData(
+        RenderSpace targetRenderSpace,
+        const CameraInfo& viewportCameraInfo,
+        const Canvas* canvasViewRoot
+    );
+
+	// Helper function to build CameraInfo for the current viewport size
+	// Camera matrix is built based on the current viewport mode (Scene or Canvas)
+    CameraInfo BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight) const;
+
+	// Build Canvas guide rectangles for the current Scene/Canvas View mode.
+	ViewportOverlayData BuildViewportOverlayData(UINT viewportWidth, UINT viewportHeight);
+
+	// Helper function to synchronize the Canvas view navigation state with the currently editing Canvas
+	// Used when the editing root Canvas is changed in the Canvas View to update the displaying state of the Canvas view
+    void SyncCanvasViewNavigation(const Canvas* editingCanvas);
+
+	// Helper funtion to calculate the extent which can fit the editing root Canvas rectangle into the viewport of Canvas View
+	// The extent is in the local space of the editing root Canvas and before applying the zoom factor of the Canvas view navigation state
+    Vector2 CalculateCanvasViewExtent(UINT viewportWidth, UINT viewportHeight) const;
+
+    // Helper funtion to apply the user manipulation in Canvas View to the viewport of Canvas View
+    void ApplyCanvasNavigationInput(const CanvasNavigationInput& input, UINT viewportWidth, UINT viewportHeight);
 };

@@ -284,7 +284,14 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 	explicit Matrix4x4(const DirectX::XMMATRIX& m) {DirectX::XMStoreFloat4x4(this, m);}
 
 	// Constants
-	static Matrix4x4 Identity;
+	static Matrix4x4 Identity() 
+	{
+		return Matrix4x4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f);
+	}
 
 	// Methods
 	float Determinant() const;
@@ -335,6 +342,13 @@ struct Transform3D
 
 	Matrix4x4 GetMatrix() const;
 	Matrix4x4 GetInverseMatrix() const;
+
+	bool operator==(const Transform3D& other) const
+	{
+		return position.NearEqual(other.position) &&
+			rotation.NearEqual(other.rotation) &&
+			scale.NearEqual(other.scale);
+	}
 };
 
 constexpr float PI = std::numbers::pi_v<float>;

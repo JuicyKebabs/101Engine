@@ -25,32 +25,16 @@ void RectTransform::UpdateGeometry()
 	// Build the layout transform based on the reference size and properties of this RectTransform.
 	Transform3D layoutTransform = BuildLayoutTransform(referenceSize);
 
-	// If the owner is a root Screen-Space Canvas,
-	// apply the Canvas scale factor to the layout transform.
-	if (IsRootScreenSpaceCanvas(owner))
-	{
-		Canvas* canvas = owner
-			? owner->GetComponentByClass<Canvas>()
-			: nullptr;
-
-		if (canvas)
-		{
-			const float canvasScale = canvas->GetScaleFactor();
-
-			layoutTransform.scale.x *= canvasScale;
-			layoutTransform.scale.y *= canvasScale;
-			layoutTransform.scale.z *= canvasScale;
-		}
-	}
-
 	// Resolve the final hierarchy transform.
 	// Only the topmost Screen-Space Canvas ignores the ancestor's 3D hierarchy.
+	Transform3D resolvedWorldTransform;
+
 	if (parentTransform && !IsRootScreenSpaceCanvas(owner))
 	{// This RectTransform has a parent and is not the topmost Screen-Space Canvas
 
 		// Inherit the world transform from the parent Transform 
 		// and combine it with the layout transform of this RectTransform.
-		m_worldTransform = CombineTransform3D(
+		resolvedWorldTransform = CombineTransform3D(
 			parentTransform->GetWorldTransform(),
 			layoutTransform
 		);
@@ -60,7 +44,7 @@ void RectTransform::UpdateGeometry()
 		// The topmost Screen-Space Canvas establishes an independent
 		// viewport-based coordinate space and ignores its 3D parent.
 		// An unparented RectTransform also has nothing to inherit.
-		m_worldTransform = layoutTransform;
+		resolvedWorldTransform = layoutTransform;
 	}
 
 	// Update the local matrix based on the layout transform
@@ -70,17 +54,39 @@ void RectTransform::UpdateGeometry()
 	// The size is excluded from m_worldTransform so that it does not
 	// multiply the position or scale of child RectTransforms.
 	const Vector3 renderScale(
-		m_worldTransform.scale.x * m_size.x,
-		m_worldTransform.scale.y * m_size.y,
-		m_worldTransform.scale.z
+		resolvedWorldTransform.scale.x * m_size.x,
+		resolvedWorldTransform.scale.y * m_size.y,
+		resolvedWorldTransform.scale.z
 	);
 
-	// Update the world matrix based on the world transform and render scale
+	// Build this RectTransform's own visible rectangle before applying its
+	// Canvas scale. A nested Canvas therefore keeps the pixel size specified
+	// by its RectTransform instead of shrinking its own frame.
 	m_worldMatrix = Matrix4x4::CreateTRS(
-		m_worldTransform.position,
-		m_worldTransform.rotation,
+		resolvedWorldTransform.position,
+		resolvedWorldTransform.rotation,
 		renderScale
 	);
+
+	// Children inherit the resolved pose. If this Actor owns a Screen-Space
+	// Canvas, also include the factor that maps the Canvas's logical reference
+	// resolution into its display area. Keeping this factor out of m_worldMatrix
+	// separates the Canvas frame from the coordinate system inherited by children.
+	m_worldTransform = resolvedWorldTransform;
+
+	Canvas* ownerCanvas = owner
+		? owner->GetComponentByClass<Canvas>()
+		: nullptr;
+
+	if (ownerCanvas &&
+		ownerCanvas->GetRenderMode() == CanvasRenderMode::ScreenSpace)
+	{
+		const float canvasScale = ownerCanvas->GetScaleFactor();
+
+		m_worldTransform.scale.x *= canvasScale;
+		m_worldTransform.scale.y *= canvasScale;
+		m_worldTransform.scale.z *= canvasScale;
+	}
 
 	m_worldGeneration++;
 	m_isDirty = false;

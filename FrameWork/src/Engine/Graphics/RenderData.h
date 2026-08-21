@@ -35,6 +35,9 @@ enum class PS_FILE_ID
 	Sprite,
 	UI,
 	PostEffect,
+	SelectionMask,
+	SelectionOutline,
+	SelectionSpriteMask,
 };
 
 //-------------------------------------------------------------------------------------

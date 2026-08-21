@@ -43,64 +43,69 @@ void CanvasInspector::Draw(Canvas& canvas, const InspectorContext&)
 		}
 	}
 
-	// Scale Mode (only for Screen Space canvases)
-	if (canvas.IsRootCanvas())
+	Vector2 referenceSize = canvas.GetReferenceSize();
+
+	// Every Screen-Space Canvas owns the logical resolution used by its
+	// immediate UI hierarchy. A root Canvas maps it to the viewport, while
+	// a nested Canvas maps it to its RectTransform display size.
+	if (canvas.GetRenderMode() == CanvasRenderMode::ScreenSpace)
 	{
-		Vector2 referenceSize = canvas.GetReferenceSize();
+		int scaleMode = static_cast<int>(canvas.GetScaleMode());
 
-		if (canvas.GetRenderMode() == CanvasRenderMode::ScreenSpace)
-		{// In case of Screen - Space Canvas, display the Scale Mode options
-			int scaleMode = static_cast<int>(canvas.GetScaleMode());
+		const char* scaleModes[] =
+		{
+			"Constant Pixel Size",
+			"Scale With Screen Size"
+		};
 
-			const char* scaleModes[] =
+		if (EditorUI::ComboField(
+			"Scale Mode",
+			scaleMode,
+			scaleModes,
+			static_cast<int>(CanvasScaleMode::Max)))
+		{
+			if (scene)
 			{
-				"Constant Pixel Size",
-				"Scale With Screen Size"
-			};
-
-			// Scale Mode selectable pull-down
-			if (EditorUI::ComboField("Scale Mode", scaleMode, scaleModes, static_cast<int>(CanvasScaleMode::Max)))
-			{
-				if (scene)
-				{
-					scene->SetCanvasScaleMode(&canvas, static_cast<CanvasScaleMode>(scaleMode));
-				}
-			}
-
-			// Scale With Screen Size options (Reference Resolution and Match Width Or Height)
-			if (canvas.GetScaleMode() == CanvasScaleMode::ScaleWithScreenSize)
-			{
-				// Reference Resolution field
-				if (EditorUI::Vector2Field("Reference Resolution", referenceSize, 1.0f))
-				{
-					if (scene)
-					{
-						scene->SetCanvasReferenceSize(&canvas, referenceSize);
-					}
-				}
-
-				// Match Width Or Height field
-				float match = canvas.GetMatchWidthOrHeight();
-
-				if (EditorUI::FloatField("Match Width Or Height", match, 0.01f))
-				{
-					match = std::clamp(match, 0.0f, 1.0f);
-
-					if (scene)
-					{
-						scene->SetCanvasMatchWidthOrHeight(&canvas, match);
-					}
-				}
+				scene->SetCanvasScaleMode(
+					&canvas,
+					static_cast<CanvasScaleMode>(scaleMode)
+				);
 			}
 		}
-		else
-		{// In case of World - Space Canvas, display the Reference Size options
-			if (EditorUI::Vector2Field("Reference Size", referenceSize, 1.0f))
+
+		if (canvas.GetScaleMode() == CanvasScaleMode::ScaleWithScreenSize)
+		{
+			if (EditorUI::Vector2Field(
+				"Reference Resolution",
+				referenceSize,
+				1.0f))
 			{
 				if (scene)
 				{
 					scene->SetCanvasReferenceSize(&canvas, referenceSize);
 				}
+			}
+
+			float match = canvas.GetMatchWidthOrHeight();
+
+			if (EditorUI::FloatField("Match Width Or Height", match, 0.01f))
+			{
+				match = std::clamp(match, 0.0f, 1.0f);
+
+				if (scene)
+				{
+					scene->SetCanvasMatchWidthOrHeight(&canvas, match);
+				}
+			}
+		}
+	}
+	else
+	{
+		if (EditorUI::Vector2Field("Reference Size", referenceSize, 1.0f))
+		{
+			if (scene)
+			{
+				scene->SetCanvasReferenceSize(&canvas, referenceSize);
 			}
 		}
 	}

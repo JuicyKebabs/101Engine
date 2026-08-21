@@ -45,7 +45,8 @@ public:
 	void LateUpdate(float deltaTime);			// Late update
 	void OnRender(								// Render
 		EngineContext& context,
-		const CameraInfo* overrideCameraInfo = nullptr
+		const CameraInfo* overrideCameraInfo = nullptr,
+		RenderViewPolicy viewPolicy = {}
 		);
 	void Finalize();							// Finalize
 
@@ -239,8 +240,13 @@ private:
 	bool ReparentActorInternal(Actor* actor, Actor* newParent, bool applyUIConstraints);
 
 	// Find the topmost canvas in the hierarchy of the given actor
+	// This canvas has the highest priority in determining RenderMode of the UI hierarchy which the given actor belongs to
 	// Used for determining several UI-related settings which are inherited from the topmost canvas
 	Canvas* FindTopmostCanvas(Actor* actor) const;
+
+	// Find the closest canvas in the hierarchy of the given actor
+	// This canvas represents the boundary that groups the given Actor as a UI
+	Canvas* FindClosestCanvas(Actor* actor) const;
 
 	// Apply UI hierarchy constraints to the given actor based on the governing canvas
 	bool ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas);

@@ -82,6 +82,19 @@ public:
 	// Chack if this Canvas is a root canvas (no ancestor Canvas in the hierarchy)
 	bool IsRootCanvas() const;
 
+	// Check if this Canvas is visible based on the visibility of its governing Canvas hierarchy
+	bool IsHierarchyVisible() const;
+
+	// Get the world matrix representing the origin and scale of this Canvas's internal layout space.
+	// Unlike RectTransform::GetWorldMatrix(), this does not include the Canvas frame size.
+	Matrix4x4 GetContentWorldMatrix() const;
+
+	// Check whether another Canvas belongs to this Canvas subtree.
+	bool ContainsCanvas(const Canvas* canvas) const;
+
+	// Check whether a Renderer belongs to this Canvas subtree through its governing Canvas.
+	bool ContainsRenderer(const RendererComponent* renderer) const;
+
 	CanvasScaleMode GetScaleMode() const { return m_scaleMode; }
 	Vector2 GetReferenceSize() const { return m_referenceSize; }
 	float GetMatchWidthOrHeight() const { return m_matchWidthOrHeight; }

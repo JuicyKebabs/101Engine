@@ -5,10 +5,12 @@
 
 class Canvas;
 
-//-------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------
 // RendererComponent class
 // Base class for all renderer components in the engine
-// ------------------------------------------------------
+// In this engine, all renderer components are affected by the Canvas component which is located in the same higher level of the same actor hierarchy.
+// So, the base RendererComponent class provides common functionality considering the case of being affected by the Canvas component in the actor hierarchy.
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 enum class RenderSpace
 {
@@ -24,9 +26,6 @@ struct CommonRendererProxy
 	Vector4 color{ 1,1,1,1 };						// Color for rendering
 	bool visible = true;							// Visibility flag for this draw packet
 	RenderSpace renderSpace = RenderSpace::World;	// Render space for this draw packet (World or Screen)
-	
-	uint32_t canvasOrder = 0;	// Order of the canvas this draw packet belongs to (used for sorting within the canvas)
-	uint32_t sortOrder = 0;		// Sort order for this draw packet (used for sorting)
 };
 
 // Base RendererComponent Class (for common rendering properties and functionality)
@@ -38,6 +37,10 @@ public:
 
 	// Flush function to be called before rendering
 	void Flush() { CheckIfTransformChanged(); }
+
+	// Function to build the sort path for this renderer in the canvas hierarchy
+	// Collects the sort order from the root canvas down to this renderer to create a hierarchical sort path
+	std::vector<uint32_t> BuildCanvasSortPath() const;
 
 	// Setters
 	void SetVisible(bool visible) { m_isVisible = visible; m_isProxyDirty = true; }
@@ -51,7 +54,7 @@ public:
 	
 	// Getters
 	Vector4 GetColor() const { return m_color; }
-	virtual bool IsVisible() const { return m_isVisible; }
+	virtual bool IsVisible() const;
 	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources
 	Canvas* GetGoverningCanvas() const { return m_pGoverningCanvas; }
 	uint32_t GetSortOrderInCanvas() const { return m_sortOrderInCanvas; }

@@ -8,6 +8,32 @@
 #include "Engine/Resource/Texture.h"
 #include "Engine/Component/Camera.h"
 
+class Canvas;
+
+//-------------------------------------------------------------------------------
+// Render System class
+// This class is responsible for managing the RenderComponents in the scene.
+// Convert every RenderComponent into a draw packet and sort them for rendering.
+//-------------------------------------------------------------------------------
+
+// Enumeration to define which render space to filter for rendering
+enum class RenderSpaceFilter
+{
+	All,
+	WorldOnly,
+	ScreenOnly,
+};
+
+// Struct to define the render view policy
+struct RenderViewPolicy
+{
+	RenderSpaceFilter renderSpaceFilter = RenderSpaceFilter::All;
+
+	// When set, only renderers belonging to this Canvas subtree are rendererd.
+	// Their world matrices are converted into this Canvas's local layout space.
+	const Canvas* canvasViewRoot = nullptr;
+};
+
 // Render system class
 class RenderSystem
 {
@@ -26,8 +52,7 @@ public:
 	struct SortKeyScreenSpace
 	{
 		PSOKey psoKey = {};
-		UINT canvasOrder = 0;
-		UINT order = 0;
+		std::vector<uint32_t> orderPath;	// Stores all order numbers from the root canvas to the current element for hierarchical sorting
 	};
 
 	struct FrameSortData
@@ -80,10 +105,20 @@ public:
 	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
 	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
-	void FlushRegisters();										// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
-	void BuildFrameRenderData(const CameraInfo& cameraInfo);	// Build draw packets from the registered mesh renderers
+	
+	// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
+	void FlushRegisters();
+	
+	// Build draw packets from the registered mesh renderers
+	void BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy);
 
-	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }	// Get the render data for the current frame (contains draw packets and other rendering information)
+	// Get the render data for the current frame (contains draw packets and other rendering information)
+	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }
+
+	// Create render item functions (used to create draw packets from sort entries)
+	static MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
+	static SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);		// Create a sprite draw packet from a sort entry
+	static UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
 
 private:
 	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
@@ -94,13 +129,9 @@ private:
 	CameraInfo m_cameraInfo;						// Cached camera information for the current frame (used for sorting transparent objects)
 
 private:
-	MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
-	SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);	// Create a sprite draw packet from a sort entry
-	UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
-
 	void SortOpaque();		// Sort opaque draw packets
 	void SortTransparent();	// Sort transparent draw packets
-	void SortScreenSpace();	// Sort screen-space draw packets (e.g., UI)
+	void SortScreenSpace();	// Sort screen-space draw packets
 	
 	RenderQueue GetRenderQueue(const PSOKey& psoKey);			// Determine the render queue for sort entry 
 	void NormalizePSOKey(PSOKey& psoKey, RenderQueue queue);	// Normalize the draw packet data
@@ -118,6 +149,7 @@ private:
 		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID, a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat, a.indexFree)
 			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, b.rtvFormat, b.indexFree);
 	}
+
 	// Bind sort comparison
 	//static inline bool BindLess(const SortData& a, const SortData& b)
 	//{
@@ -128,6 +160,7 @@ private:
 	//	return std::tie(a.textureHandle, ap, a.startIndex, a.baseVertex)
 	//		< std::tie(b.textureHandle, bp, b.startIndex, b.baseVertex);
 	//}
+
 	// Opaque objects sorting
 	static inline bool OpaqueLess(const SortKeyOpaque& a, const SortKeyOpaque& b)
 	{

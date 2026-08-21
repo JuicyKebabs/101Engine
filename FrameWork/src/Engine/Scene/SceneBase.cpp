@@ -100,7 +100,10 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-void SceneBase::OnRender(EngineContext& context, const CameraInfo* overrideCameraInfo)
+void SceneBase::OnRender(
+	EngineContext& context,
+	const CameraInfo* overrideCameraInfo,
+	RenderViewPolicy viewPolicy)
 {
 	const auto* pCameraInfo = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
 
@@ -114,7 +117,7 @@ void SceneBase::OnRender(EngineContext& context, const CameraInfo* overrideCamer
 	auto cameraInfo = *pCameraInfo;	// Make a copy of the camera info to pass to the render system (in case the render system needs to modify it for sorting or other purposes)
 
 	m_pRenderSystem->FlushRegisters();
-	m_pRenderSystem->BuildFrameRenderData(cameraInfo);
+	m_pRenderSystem->BuildFrameRenderData(cameraInfo, viewPolicy);
 	context.pRenderer->SubmitFrameRenderData(m_pRenderSystem->GetFrameRenderData());
 	context.pRenderer->SubmitCameraInfo(cameraInfo);
 	context.pRenderer->SubmitDirectionalLight(m_directionalLight);
@@ -215,7 +218,8 @@ Actor* SceneBase::RegisterActor(
 	// Apply UI hierarchy constraints if requested
 	if (registered && applyUIConstraints)
 	{
-		Canvas* governingCanvas = FindTopmostCanvas(registered->GetParent());
+		Canvas* governingCanvas = FindClosestCanvas(registered->GetParent());
+
 		if (!ApplyUIHierarchyConstraints(registered, governingCanvas))
 		{
 			DBG("SceneBase::RegisterActor: Failed to apply UI hierarchy constraints.");
@@ -248,7 +252,7 @@ void SceneBase::OnActorComponentAdded(Actor* actor, Component* component)
 	if (!affectsUIHierarchy) return;
 
 	// Get the governing canvas in the hierarchy for the actor (if any)
-	Canvas* governingCanvas = FindTopmostCanvas(actor->GetParent());
+	Canvas* governingCanvas = FindClosestCanvas(actor->GetParent());
 
 	// Reapply UI hierarchy constraints for the actor and its descendants
 	if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
@@ -308,11 +312,9 @@ bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component
 	// Apply UI hierarchy constraints for the actor if necessary
 	if (affectsUIHierarchy)
 	{
-		Canvas* governingCanvas = FindTopmostCanvas(actor->GetParent());
+		Canvas* governingCanvas = FindClosestCanvas(actor->GetParent());
 
-		if (!ApplyUIHierarchyConstraints(
-			actor,
-			governingCanvas))
+		if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
 		{
 			DBG("SceneBase::RemoveActorComponentImmediate: Failed to reapply UI hierarchy constraints for Actor '%s'.", actor->GetName().c_str());
 		}
@@ -381,10 +383,19 @@ bool SceneBase::ReparentActorInternal(Actor* actor, Actor* newParent, bool apply
 	// Update the parent handle of the actor
 	actor->SetParentHandle(newParentHandle);
 
+	// Changing the parent changes the world transform of the complete subtree
+	// even though none of its local transform parameters have changed.
+	// Mark it dirty before applying UI constraints because transform conversion
+	// may need to update geometry using the new parent hierarchy.
+	if (Transform* transform = actor->GetComponentByClass<Transform>())
+	{
+		transform->MarkDirty();
+	}
+
 	// Apply UI hierarchy constraints if requested
 	if (applyUIConstraints)
 	{
-		Canvas* governingCanvas = FindTopmostCanvas(newParent);
+		Canvas* governingCanvas = FindClosestCanvas(newParent);
 
 		if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
 		{
@@ -676,6 +687,24 @@ Canvas* SceneBase::FindTopmostCanvas(Actor* actor) const
 	return topmostCanvas;
 }
 
+Canvas* SceneBase::FindClosestCanvas(Actor* actor) const
+{
+	Canvas* closestCanvas = nullptr;
+
+	// Traverse up the hierarchy from the actor to find the closest Canvas component
+	for (Actor* current = actor; current; current = current->GetParent())
+	{
+		Canvas* canvas = current->GetComponentByClass<Canvas>();
+		if (canvas)
+		{
+			closestCanvas = canvas;
+			break;
+		}
+	}
+
+	return closestCanvas;
+}
+
 bool SceneBase::ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas)
 {
 	if (!actor) return false;
@@ -727,13 +756,7 @@ bool SceneBase::ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanva
 		renderer->SetGoverningCanvas(governingCanvas);
 	}
 
-	Canvas* childGoverningCanvas = governingCanvas;
-
-	if (!childGoverningCanvas && actorCanvas)
-	{// In case of the given actor is a root canvas
-		// Set the given actor's canvas as the governing canvas for its children
-		childGoverningCanvas = actorCanvas;
-	}
+	Canvas* childGoverningCanvas = actorCanvas ? actorCanvas : governingCanvas;
 
 	// Recursively apply UI hierarchy constraints to all child actors
 	for (Actor* child : actor->GetDirectChildren())

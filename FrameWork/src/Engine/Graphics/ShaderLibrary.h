@@ -57,22 +57,31 @@ static const std::wstring VS_FILE_TABLE[] = {
     L"shader\\compiled\\VertexShader\\ShadowVS.cso",
     L"shader\\compiled\\VertexShader\\PostEffectVS.cso",
 };
+
 // Pixel shader file tables
 static const std::wstring PS_FILE_TABLE[] = {
     L"shader\\compiled\\PixelShader\\MeshPS.cso",
     L"shader\\compiled\\PixelShader\\SpritePS.cso",
     L"shader\\compiled\\PixelShader\\UIPS.cso",
     L"shader\\compiled\\PixelShader\\PostEffectPS.cso",
-};//  Vertex shader entry point tables
+    L"shader\\compiled\\PixelShader\\SelectionMaskPS.cso",
+    L"shader\\compiled\\PixelShader\\SelectionOutlinePS.cso",
+    L"shader\\compiled\\PixelShader\\SelectionSpriteMaskPS.cso",
+};
+
+//  Vertex shader entry point tables
 static const std::string VS_ENTRY_TABLE[] = {
     "main",
 };
+
 //  Pixel shader entry point tables
 static const std::string PS_ENTRY_TABLE[] = {
     "main",
 };
+
 // Shader profiles(Solid shader model 5.0)
 static const std::string VS_PROFILE = "vs_5_0";
+
 // Shader profiles(Solid shader model 5.0)
 static const std::string PS_PROFILE = "ps_5_0";
 
@@ -83,14 +92,17 @@ struct MacroDefinition
 	const char* name;   // Macro name to be used in shader compilation
 	const char* value;  // Macro value (optional, can be nullptr for simple defines)
 };
+
 // Common shader macros
 static constexpr MacroDefinition COMMON_SHADER_MACROS[] = {
     { 1ull << 0, "TEST", nullptr },
 };
+
 // Vertex shader macros
 static constexpr MacroDefinition VS_SHADER_MACROS[] = {
     { 1ull << 0, "TEST", nullptr },
 };
+
 // Pixel shader macros
 static constexpr MacroDefinition PS_SHADER_MACROS[] = {
 	{ 1ull << 0, "NONE", nullptr },
@@ -98,6 +110,7 @@ static constexpr MacroDefinition PS_SHADER_MACROS[] = {
     { 1ull << 2, "MULTIPLY_ALPHA_CONTROL", nullptr },
     { 1ull << 3, "USE_LIGHTING", nullptr },
 };
+
 // Macro counts
 static constexpr size_t COMMON_SHADER_MACROS_COUNT = sizeof(COMMON_SHADER_MACROS) / sizeof(MacroDefinition);
 static constexpr size_t VS_SHADER_MACROS_COUNT = sizeof(VS_SHADER_MACROS) / sizeof(MacroDefinition);
@@ -128,5 +141,6 @@ private:
         const MacroDefinition* table,
         size_t count
     );
+
     static std::wstring ResolveShaderPath(const  std::wstring& relativePath);
 };

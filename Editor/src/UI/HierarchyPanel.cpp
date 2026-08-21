@@ -1,5 +1,6 @@
 #include "HierarchyPanel.h"
 #include "Engine/Actor/Actor.h"
+#include "Engine/UI/Canvas.h"
 #include "imgui.h"
 #include <cstdio>
 
@@ -234,6 +235,13 @@ void HierarchyPanel::RenderActorNode(
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
     {
 		m_selectedActorGuid = actor->GetGuid();
+
+		if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+			actor->GetComponentByClass<Canvas>() &&
+			callbacks.onOpenCanvas)
+		{
+			callbacks.onOpenCanvas(actor->GetGuid());
+		}
     }
 
     // Begin dragging this Actor.
@@ -272,6 +280,15 @@ void HierarchyPanel::RenderActorNode(
             m_creationParentGuid = actor->GetGuid();
             m_showActorCreationPopup = true;
             m_newActorNameBuffer[0] = '\0';
+		}
+
+		if (actor->GetComponentByClass<Canvas>() &&
+			ImGui::MenuItem("Open in Canvas View"))
+		{
+			if (callbacks.onOpenCanvas)
+			{
+				callbacks.onOpenCanvas(actor->GetGuid());
+			}
 		}
 
         // ==========================================================

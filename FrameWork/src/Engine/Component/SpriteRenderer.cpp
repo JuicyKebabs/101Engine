@@ -147,9 +147,6 @@ void SpriteRenderer::RebuildRenderProxy(const CameraInfo& cameraInfo)
 			m_proxy.common.renderSpace = GetRenderSpace();
 
 			Canvas* governingCanvas = GetGoverningCanvas();
-			m_proxy.common.canvasOrder = governingCanvas ? governingCanvas->GetSortOrder() : 0;
-			
-			m_proxy.common.sortOrder = GetSortOrderInCanvas();
 			m_proxy.uvScale = m_uvScale;
 			m_proxy.uvOffset = m_uvOffset;
 			m_proxy.pivot = m_pivot;
