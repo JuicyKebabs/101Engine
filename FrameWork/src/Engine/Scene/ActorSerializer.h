@@ -1,5 +1,5 @@
 #pragma once
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 class Actor;
 class SceneBase;
@@ -13,9 +13,5 @@ class SceneBase;
 class ActorSerializer
 {
 public:
-	static bool SerializeActorRecord(
-		Actor* actor,
-		SceneBase* scene,
-		nlohmann::json& outJson
-	);
+	static bool SerializeActorRecord(Actor* actor, const SceneBase* scene, nlohmann::json& outJson);
 };

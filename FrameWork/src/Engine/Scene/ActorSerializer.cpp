@@ -9,11 +9,7 @@
 
 using json = nlohmann::json;
 
-bool ActorSerializer::SerializeActorRecord(
-	Actor* actor,
-	SceneBase* scene,
-	json& outJson
-)
+bool ActorSerializer::SerializeActorRecord(Actor* actor, const SceneBase* scene, json& outJson)
 {
 	if (!actor)
 	{

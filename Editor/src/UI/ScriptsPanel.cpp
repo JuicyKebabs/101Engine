@@ -2,7 +2,8 @@
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "Engine/Scene/SceneBase.h"	
+#include "Engine/Scene/SceneBase.h"
+#include "UI/EditorUI.h"
 #include "imgui.h"
 #include <filesystem>
 
@@ -43,36 +44,43 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 
 			// Delete button
 			std::string deleteId = "Delete##" + script.name;
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-			if (ImGui::SmallButton(deleteId.c_str()))
+
 			{
-				m_pendingDeleteName = script.name;
-				m_showDeleteConfirm = true;
-				m_inUseByScene = false;
-
-				// Check if the script is in use by any actors in the scene
-				if (script.isBehavior && scene)
+				EditorUI::DisabledScope disableDelete(!callbacks.canDelete);
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+				if (ImGui::SmallButton(deleteId.c_str()))
 				{
-					for (const auto& actor : scene->GetAllActors())
+					if (callbacks.canDelete)
 					{
-						// Check all actor's components
-						for (const auto& typeId : actor->GetComponentsTypeIds())
-						{
-							// Convert type index to component name that is registered in ComponentRegistry
-							std::string componentname = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
+						m_pendingDeleteName = script.name;
+						m_showDeleteConfirm = true;
+						m_inUseByScene = false;
 
-							// Check if the component name matches the script name
-							if (componentname == script.name)
+						// Check if the script is in use by any actors in the scene
+						if (script.isBehavior && scene)
+						{
+							for (const auto& actor : scene->GetAllActors())
 							{
-								m_inUseByScene = true;
-								break;
+								// Check all actor's components
+								for (const auto& typeId : actor->GetComponentsTypeIds())
+								{
+									// Convert type index to component name that is registered in ComponentRegistry
+									std::string componentname = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
+
+									// Check if the component name matches the script name
+									if (componentname == script.name)
+									{
+										m_inUseByScene = true;
+										break;
+									}
+								}
+								if (m_inUseByScene) break;
 							}
 						}
-						if (m_inUseByScene) break;
 					}
 				}
+				ImGui::PopStyleColor();
 			}
-			ImGui::PopStyleColor();
 		}
 	}
 

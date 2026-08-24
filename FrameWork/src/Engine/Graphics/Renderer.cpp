@@ -805,14 +805,19 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 		pso->SetBlendMode(key.blend);
 		pso->FreeIndex(key.indexFree);
 	}
-	else
-	{
-		pso->SetDepthOnly();
-	}
 
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
-	pso->SetFormat(key.rtvFormat);
+
+	if (key.depthOnly)
+	{
+		pso->SetDepthOnly();
+	}
+	else
+	{
+		pso->SetFormat(key.rtvFormat);
+	}
+
 	pso->Create();
 
 	// Check if creation was successful

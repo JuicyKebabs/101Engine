@@ -83,27 +83,16 @@ void SceneBase::LateUpdate(float deltaTime)
 		m_pCameraSystem->Flush(deltaTime);
 	}
 
-	// ActorPool owns the final OnDestroy + release step. All hierarchy-aware
-	// destruction requests have already been marked through RemoveActor().
-	const auto collectedHandle =  m_actorPool.CollectGarbage();
-
-	// Remove collected actors from the guid map
-	for (const ActorHandle& handle : collectedHandle)
-	{
-		auto it = m_actorHandleGuidMap.find(handle);
-		if (it != m_actorHandleGuidMap.end())
-		{
-			m_actorGuidMap.erase(it->second);
-			m_actorHandleGuidMap.erase(it);
-		}
-	}
+	// Clean up destroyed actors at the end of the frame
+	CollectDestroyedActors();
 }
 
 // Render
 void SceneBase::OnRender(
 	EngineContext& context,
 	const CameraInfo* overrideCameraInfo,
-	RenderViewPolicy viewPolicy)
+	RenderViewPolicy viewPolicy
+)
 {
 	const auto* pCameraInfo = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
 
@@ -126,7 +115,46 @@ void SceneBase::OnRender(
 // Finalization
 void SceneBase::Finalize()
 {
+	if (m_isFinalized) return;
+	m_isFinalized = true;
+
+	std::vector<Actor*> rootActors = GetRootActors();
+
+	for (Actor* root : rootActors)
+	{
+		RemoveActor(root, /*cascadeToChildren=*/true);
+	}
+
+	CollectDestroyedActors();
+
 	m_pCollisionSystem->ClearColliders();
+}
+
+void SceneBase::EditorUpdate(float deltaTime)
+{
+	// Reflect changes of the transform
+	m_actorPool.ForEach([](Actor* actor)
+		{
+			if (!actor->IsActive() || actor->IsDestroyed()) return;
+			if (!actor->GetParentHandle().IsNull()) return;
+
+			actor->FlushTransform();
+		});
+
+	// Synchronize collider transforms with the updated transforms
+	m_actorPool.ForEach([](Actor* actor)
+		{
+			if (!actor->IsActive() || actor->IsDestroyed()) return;
+			if (!actor->GetParentHandle().IsNull()) return;
+
+			actor->FlushColliderTransforms();
+		});
+
+	// Reflect changes made to scene camera components.
+	if (m_pCameraSystem) m_pCameraSystem->Flush(0.0f);
+
+	// Finalize delayed Actor destruction requested by editor commands.
+	CollectDestroyedActors();
 }
 
 Actor* SceneBase::AddRootActor(std::unique_ptr<Actor> actor)
@@ -142,11 +170,7 @@ Actor* SceneBase::AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parent
 	return RegisterActor(std::move(actor), parentHandle, /*applyUIConstraints=*/true);
 }
 
-Actor* SceneBase::RegisterActor(
-	std::unique_ptr<Actor> actor,
-	ActorHandle parentHandle,
-	bool applyUIConstraints
-)
+Actor* SceneBase::RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle, bool applyUIConstraints)
 {
 	if (!actor) return nullptr;
 
@@ -226,6 +250,13 @@ Actor* SceneBase::RegisterActor(
 		}
 	}
 
+	// Normal registration already has its final hierarchy and UI constraints.
+	// Restored actors are attached after the complete hierarchy is rebuilt.
+	if (registered && applyUIConstraints)
+	{
+		registered->AttachComponents();
+	}
+
 	return registered;
 }
 
@@ -234,12 +265,25 @@ Actor* SceneBase::RegisterRestoredActor(std::unique_ptr<Actor> actor)
 	return RegisterActor(std::move(actor), ActorHandle::Null(), /*applyUIConstraints=*/false);
 }
 
+void SceneBase::CollectDestroyedActors()
+{
+	// ActorPool owns the final OnDestroy + release step. All hierarchy-aware
+	// destruction requests have already been marked through RemoveActor().
+	const auto collectedHandles = m_actorPool.CollectGarbage();
+
+	for (const ActorHandle& handle : collectedHandles)
+	{
+		auto it = m_actorHandleGuidMap.find(handle);
+		if (it == m_actorHandleGuidMap.end()) continue;
+
+		m_actorGuidMap.erase(it->second);
+		m_actorHandleGuidMap.erase(it);
+	}
+}
+
 void SceneBase::OnActorComponentAdded(Actor* actor, Component* component)
 {
-	if (!actor ||
-		!component ||
-		actor->GetOwner() != this ||
-		actor->IsDestroyed())
+	if (!actor || !component || actor->GetOwner() != this || actor->IsDestroyed())
 	{
 		return;
 	}
@@ -267,10 +311,7 @@ Component* SceneBase::AddActorComponentImmediate(
 	std::size_t occurrenceIndex
 )
 {
-	if (!actor ||
-		!component ||
-		actor->GetOwner() != this ||
-		actor->IsDestroyed())
+	if (!actor || !component || actor->GetOwner() != this || actor->IsDestroyed())
 	{
 		return nullptr;
 	}
@@ -283,6 +324,7 @@ Component* SceneBase::AddActorComponentImmediate(
 	if (!added) return nullptr;
 
 	OnActorComponentAdded(actor, added);
+	added->OnAttach();
 
 	return added;
 }

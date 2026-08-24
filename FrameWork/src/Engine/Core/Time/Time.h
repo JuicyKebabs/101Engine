@@ -4,10 +4,16 @@
 #include <cstdint>
 #include "Engine/Core/Debug/Debug.h"
 
+//--------------------------------------------------------------------
+// TimeManager class
+// Manages time-related operations, including delta time calculation.
+// -------------------------------------------------------------------
+
 class TimeManager
 {
 public:
-	static TimeManager& GetInstance(){
+	static TimeManager& GetInstance()
+	{
 		if(!m_instance){
 			m_instance = std::unique_ptr<TimeManager>(new TimeManager());
 		}
@@ -17,7 +23,8 @@ public:
 	TimeManager(const TimeManager&) = delete;
 	TimeManager& operator=(const TimeManager&) = delete;
 
-	void Update() {
+	void Update()
+	{
 		auto previous = m_currentTime;
 		m_currentTime = std::chrono::high_resolution_clock::now();
 		m_deltaTime = std::chrono::duration<float>(m_currentTime - previous).count();

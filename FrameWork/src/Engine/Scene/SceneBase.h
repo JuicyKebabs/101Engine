@@ -34,6 +34,7 @@ class SceneBase
 {
 public:
 	static constexpr DirectX::XMFLOAT3 SKY_BOX_SIZE = { 50.0f, 50.0f, 50.0f }; // Skybox size
+
 public:
 	SceneBase();	// Constructor
 	~SceneBase();	// Destructor
@@ -49,6 +50,8 @@ public:
 		RenderViewPolicy viewPolicy = {}
 		);
 	void Finalize();							// Finalize
+
+	void EditorUpdate(float deltaTime);	// Update limited elements for editor
 
 	// Add an actor to the scene
 	Actor* AddRootActor(std::unique_ptr<Actor> actor);
@@ -207,6 +210,8 @@ private:
 	SceneManager* m_pSceneManager = nullptr;	// Pointer to the scene manager (used for scene switching)
 	EngineContext* m_pEngineContext = nullptr;	// Pointer to the engine context (used for accessing engine systems)
 
+	bool m_isFinalized = false;
+
 private:
 	friend class SceneLoader;
 	friend class Actor;
@@ -220,10 +225,10 @@ private:
 
 	// Reapply UI hierarchy constraints when a hierarchy-sensitive
 	// component is added to an Actor already registered in this Scene.
-	void OnActorComponentAdded(
-		Actor* actor,
-		Component* component
-	);
+	void OnActorComponentAdded(Actor* actor, Component* component);
+
+	// Collect destroyed actors and remove their GUID mappings
+	void CollectDestroyedActors();
 
 	// Check if reparenting would create a hierarchy cycle
 	bool WouldCreateHierarchyCycle(const Actor* actor, const Actor* newParent) const;

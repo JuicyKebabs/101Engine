@@ -49,6 +49,7 @@
 #include "UI/Inspector/Components/UIRendererInspector.h"
 #include "UI/Inspector/Components/UIImageInspector.h"
 #include "Scene/ScenePicker.h"
+#include "Scene/SceneCloner.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -58,6 +59,14 @@ static const int WINDOW_WIDTH  = 1280;
 static const int WINDOW_HEIGHT = 720;
 
 static const char* kDefaultScenePath = "asset/scenes/test.scene";
+
+namespace
+{
+    constexpr const char* kHotReloadScenePath = "asset/scenes/_hotreload_temp.scene";
+    constexpr const char* kActiveGameCodePath = "build/bin/Debug/GameCode.dll";
+    constexpr const char* kStagedGameCodePath = "build/bin/Debug/GameCode.staged.dll";
+    constexpr const char* kPreviousGameCodePath = "build/bin/Debug/GameCode.previous.dll";
+}
 
 LRESULT EditorWindowProcedure(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -171,7 +180,18 @@ void EditorApp::Terminate()
     // Clear the command history
     m_commandHistory.Clear();
 
-    m_pScene.reset();
+    if (m_pPlayScene)
+    {
+        m_pPlayScene->Finalize();
+        m_pPlayScene.reset();
+    }
+
+    if (m_pEditScene)
+    {
+        m_pEditScene->Finalize();
+        m_pEditScene.reset();
+    }
+
     ComponentRegistry::Get().UnregisterAllGameComponents();
     if (m_hGameCodeDll)
     {
@@ -190,8 +210,7 @@ void EditorApp::Terminate()
 void EditorApp::NewScene()
 {
     // Cancel ongoing editing transactions
-    CancelTransformEdit();
-    CancelRectTransformEdit();
+    StopAllEditTransactions();
 
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
@@ -203,8 +222,14 @@ void EditorApp::NewScene()
 	m_commandHistory.Clear();
 
 	// Create a new scene instance and initialize it
-    m_pScene = std::make_unique<EditorScene>();
-    m_pScene->Initialize(m_engineContext);
+	if (m_pEditScene)
+	{
+		m_pEditScene->Finalize();
+		m_pEditScene.reset();
+	}
+
+    m_pEditScene = std::make_unique<EditorScene>();
+    m_pEditScene->Initialize(m_engineContext);
 
 	// Create a default camera actor and set it as the main camera in the scene's camera system
     Actor::InitDesc cameraDesc;
@@ -222,8 +247,8 @@ void EditorApp::NewScene()
         .window_width = WINDOW_WIDTH,
         .window_height = WINDOW_HEIGHT
         });
-    m_pScene->AddRootActor(std::move(cameraActorOwned));
-    m_pScene->GetCameraSystem()->SetMainCamera(camera);
+    m_pEditScene->AddRootActor(std::move(cameraActorOwned));
+    m_pEditScene->GetCameraSystem()->SetMainCamera(camera);
 
 	ApplyCurrentViewportSizeToScene();
 
@@ -234,8 +259,7 @@ void EditorApp::NewScene()
 void EditorApp::LoadScene(const std::string& filePath)
 {
     // Cancel ongoing editing transactions
-    CancelTransformEdit();
-    CancelRectTransformEdit();
+    StopAllEditTransactions();
 
     // Clear inspector info to avoid dangling pointers to the soon-to-be-destroyed scene's actors/components
     m_hierarchyPanel.ClearSelection();
@@ -247,11 +271,17 @@ void EditorApp::LoadScene(const std::string& filePath)
     m_commandHistory.Clear();
 
 	// Create a new scene instance and initialize it
-    m_pScene = std::make_unique<EditorScene>();
-    m_pScene->Initialize(m_engineContext);
+	if (m_pEditScene)
+	{
+		m_pEditScene->Finalize();
+		m_pEditScene.reset();
+	}
+
+    m_pEditScene = std::make_unique<EditorScene>();
+    m_pEditScene->Initialize(m_engineContext);
 
 	// Load the scene data from file
-    bool result = SceneLoader::LoadScene(filePath, m_pScene.get());
+    bool result = SceneLoader::LoadScene(filePath, m_pEditScene.get());
 
     if (result) DBG("EditorApp: Loaded scene from %s", filePath.c_str());
     else        DBG("EditorApp: Failed to load scene from %s", filePath.c_str());
@@ -263,87 +293,350 @@ void EditorApp::LoadScene(const std::string& filePath)
 // Hot reload: rebuild GameCode.dll and reload it without restarting the Editor.
 //
 // Order of operations matters for safety:
-//   1. Save the current scene (so we can reconstruct it afterwards)
-//   2. Destroy the scene while the OLD GameCode.dll is still loaded,
-//      so any GameCode-owned component destructors are still valid.
-//   3. Remove GameCode-side factories from ComponentRegistry. Their
-//      std::function objects point into the old DLL's code, which is
-//      about to disappear.
-//   4. FreeLibrary the old DLL. This also releases the file lock on
-//      GameCode.dll so the build below can overwrite it.
-//   5. Rebuild GameCode.dll.
-//   6. LoadLibrary the new DLL. Its static initializers run here,
-//      re-registering all REGISTER_GAME_COMPONENT components.
-//   7. Reconstruct the scene from the saved snapshot. SceneLoader's
-//      AddToActor calls now resolve through the new DLL's factories.
-//
-// If the build or load fails, the scene is still restored from the
-// snapshot (just without GameCode components), so nothing is lost -
-// fix the code and try again.
+// 1. Save a snapshot of the current scene to disk (to preserve all actors and components).
+// 2. Buld the GameCode.dll which is staged to a temporary file (GameCode.staged.dll).
+// 3. Destroy the current runtime state (editor editing related, registered components factory, loaded DLL).
+// 4. Promote the staged DLL to become the new active GameCode.dll (backing up the previous DLL).
+// 5. Reconstruct the scene from the saved snapshot with the new GameCode.dll loaded.
+// 6. Remove the previous GameCode DLL backup after a successful hot reload.
+// If staging fails, the current scene and GameCode remain untouched. If committing
+// the staged DLL fails, restore the previous DLL and reconstruct the scene snapshot.
 void EditorApp::ReloadGameCode(bool reconfigure)
 {
+	// 1. Save a snapshot of the current scene to disk (to preserve all actors and components).
+    if (!SaveHotReloadSnapshot())
+    {
+        DBG("EditorApp: Hot reload aborted because " "the scene snapshot could not be saved.");
+        return;
+    }
 
-	// Cancel ongoing editing transactions
-	CancelTransformEdit();
-	CancelRectTransformEdit();
+	// 2. Build the GameCode.dll which is staged to a temporary file (GameCode.staged.dll).
+    if (!BuildStagedGameCode(reconfigure))
+    {
+        DBG("EditorApp: Staging build failed. " "The current scene and GameCode remain unchanged.");
+        return;
+    }
 
-	// 1. Save the current scene to a temporary file
-	static const char* kHotReloadScenePath = "asset/scenes/_hotreload_temp.scene";   // file path for hot-reload snapshot
+	// 3. Destroy the current runtime state (editor editing related, registered components factory, loaded DLL).
+    if (!DestroyCurrentRuntimeState())
+    {
+        DBG("EditorApp: Failed to destroy the current " "GameCode runtime state.");
 
-    if (!m_pScene)
+		// Restore the previous GameCode DLL and the scene from the snapshot
+
+        if (!RestorePreviousGameCode())
+        {
+            DBG("EditorApp: Failed to recover the previous " "GameCode DLL after runtime destruction failure.");
+            return;
+        }
+
+        if (!RestoreHotReloadSnapshot())
+        {
+            DBG("EditorApp: Failed to restore the scene after " "runtime destruction failure.");
+        }
+
+        return;
+    }
+
+	// 4. Promote the staged DLL to become the new active GameCode.dll (backing up the previous DLL).
+    if (!PromoteStagedGameCode())
+    {
+        DBG("EditorApp: Failed to promote the staged " "GameCode DLL. Restoring the previous DLL.");
+
+        // Restore the previous GameCode DLL and the scene from the snapshot
+
+        if (!RestorePreviousGameCode())
+        {
+            DBG("EditorApp: Failed to restore the previous " "GameCode DLL. The snapshot remains on disk.");
+            return;
+        }
+
+        if (!RestoreHotReloadSnapshot())
+        {
+            DBG("EditorApp: Failed to restore the scene " "using the previous GameCode DLL.");
+        }
+
+        return;
+    }
+
+	// 5. Reconstruct the scene from the saved snapshot with the new GameCode.dll loaded.
+    if (!RestoreHotReloadSnapshot())
+    {
+        DBG("EditorApp: Scene restoration failed with " "the new GameCode DLL. Rolling back.");
+
+        // Restore the previous GameCode DLL and the scene from the snapshot
+
+        if (!RollbackGameCode())
+        {
+            DBG("EditorApp: Failed to roll back GameCode. " "The snapshot remains on disk.");
+            return;
+        }
+
+        if (!RestoreHotReloadSnapshot())
+        {
+            DBG("EditorApp: Scene restoration also failed " "after restoring the previous GameCode DLL.");
+        }
+
+        return;
+    }
+
+	// 6. Remove the previous GameCode DLL backup after a successful hot reload.
+    RemovePreviousGameCodeBackup();
+
+    DBG("EditorApp: GameCode hot reload completed.");
+}
+
+bool EditorApp::SaveHotReloadSnapshot()
+{
+    if (!m_pEditScene)
     {// In case of empty scene
         DBG("EditorApp: ReloadGameCode - no active scene, aborting.");
-        return;
+        return false;
     }
 
-    if (!SceneWriter::SaveScene(kHotReloadScenePath, m_pScene.get()))
+    if (!SceneWriter::SaveScene(kHotReloadScenePath, m_pEditScene.get()))
     {// In case of save failure
         DBG("EditorApp: ReloadGameCode - failed to save scene snapshot, aborting reload.");
-        return;
+        return false;
     }
 
-	// 2. Destroy the current scene while the old DLL is still loaded
-	m_hierarchyPanel.ClearSelection();   // Clear selection to avoid dangling pointers to a selected actor
-    m_commandHistory.Clear();            // Clear the command history
-    m_pScene->Finalize();
-	m_pScene.reset();
+    return true;
+}
 
-	// 3. Unregister GameCode-side factories from ComponentRegistry
-	ComponentRegistry::Get().UnregisterAllGameComponents();
+bool EditorApp::BuildStagedGameCode(bool reconfigure)
+{
+	if (reconfigure)
+	{
+		if (!ProjectBuilder::Reconfigure())
+		{
+			DBG("EditorApp: ReloadGameCode - reconfigure failed, aborting reload.");
+			return false;
+		}
+	}
 
-    // 4. Free the old DLL
+	return ProjectBuilder::BuildGameCodeForHotReload("Debug");
+}
+
+bool EditorApp::DestroyCurrentRuntimeState()
+{
+    StopAllEditTransactions();
+
+    m_hierarchyPanel.ClearSelection();
+    m_commandHistory.Clear();
+
+    if (m_pPlayScene)
+    {
+        m_pPlayScene->Finalize();
+        m_pPlayScene.reset();
+    }
+
+    if (m_pEditScene)
+    {
+        m_pEditScene->Finalize();
+        m_pEditScene.reset();
+    }
+
+    ComponentRegistry::Get().UnregisterAllGameComponents();
+
+    if (!m_hGameCodeDll)
+    {
+        DBG("EditorApp::DestroyCurrentRuntimeState: " "No GameCode DLL is loaded.");
+        return true;
+    }
+
+    if (!FreeLibrary(m_hGameCodeDll))
+    {
+        DBG( "EditorApp::DestroyCurrentRuntimeState: " "FreeLibrary failed with error %lu.", GetLastError());
+        return false;
+    }
+
+    m_hGameCodeDll = nullptr;
+    return true;
+}
+
+bool EditorApp::PromoteStagedGameCode()
+{
+    // Replace the active GameCode.dll with the newly built one, while keeping a backup of the previous version.
+    namespace fs = std::filesystem;
+
+    const fs::path activeDll = PathManager::Resolve("build/bin/Debug/GameCode.dll");
+    const fs::path stagedDll = PathManager::Resolve("build/bin/Debug/GameCode.staged.dll");
+    const fs::path previousDll = PathManager::Resolve("build/bin/Debug/GameCode.previous.dll");
+
+	// Check if the newly built staged DLL exists before attempting to promote it
+    if (!fs::exists(stagedDll))
+    {
+        DBG("EditorApp::PromoteStagedGameCode: " "The staged DLL does not exist.");
+        return false;
+    }
+
+    std::error_code error;
+
+	// Remove the previous backup DLL before backup the current active DLL
+    fs::remove(previousDll, error);
+
+    if (error)
+    {
+        DBG("Failed to back up GameCode.dll.");
+        return false;
+    }
+
+    error.clear();
+
+	// Back up the current active DLL to GameCode.previous.dll
+    if (fs::exists(activeDll))
+    {
+        fs::rename(activeDll, previousDll, error);
+
+        if (error)
+        {
+            DBG("EditorApp::PromoteStagedGameCode: " "Failed to back up the active DLL: %s", error.message().c_str());
+            return false;
+        }
+    }
+
+	// Rename the staged DLL to become the new active DLL
+    error.clear();
+    fs::rename(stagedDll, activeDll, error);
+
+    if (error)
+    {
+        DBG("EditorApp::PromoteStagedGameCode: " "Failed to promote the staged DLL: %s", error.message().c_str());
+        return false;
+    }
+
+	// Load the newly promoted GameCode.dll into the editor process
+    m_hGameCodeDll = LoadLibraryA(activeDll.string().c_str());
+
+	// Check if the LoadLibrary call succeeded
+    if (!m_hGameCodeDll)
+    {
+        DBG("EditorApp::PromoteStagedGameCode: " "LoadLibrary failed with error %lu.", GetLastError());
+        return false;
+    }
+
+    DBG("EditorApp::PromoteStagedGameCode: " "The staged DLL was promoted successfully.");
+    return true;
+}
+
+bool EditorApp::RestorePreviousGameCode()
+{
+    namespace fs = std::filesystem;
+
+    const fs::path activePath = PathManager::Resolve(kActiveGameCodePath);
+    const fs::path previousPath = PathManager::Resolve(kPreviousGameCodePath);
+
+	// Remove registration after failing to load the previous DLL
+    ComponentRegistry::Get().UnregisterAllGameComponents();
+
+	// Free the current failed GameCode.dll if it is still loaded
     if (m_hGameCodeDll)
     {
-        FreeLibrary(m_hGameCodeDll);
+        if (!FreeLibrary(m_hGameCodeDll))
+        {
+            DBG("EditorApp::RestorePreviousGameCode: " "Failed to unload the current DLL.");
+            return false;
+        }
+
         m_hGameCodeDll = nullptr;
-        DBG("EditorApp: Unloaded old GameCode.dll");
-	}
-
-    // 5. Rebuild GameCode.dll
-	// Don't rebuild dependencies (e.g. 101Framework)
-    (void)reconfigure;
-    bool buildSucceeded = ProjectBuilder::BuildGameCodeForHotReload("Debug");
-
-    if (buildSucceeded)
-    {
-		// 6. Load the new DLL
-		m_hGameCodeDll = LoadLibraryA("GameCode.dll");
-        if (m_hGameCodeDll)
-        {
-            DBG("EditorApp: ReloadGameCode - GameCode.dll reloaded successfully.");
-        }
-        else
-        {
-            DBG("EditorApp: ReloadGameCode - LoadLibrary failed (error %lu)", GetLastError());
-        }
-	}
-    else
-    {
-        DBG("EditorApp: ReloadGameCode - build failed. Scene will be restored without GameCode components.");
     }
 
-	// 7. Reconstruct the scene from the saved snapshot
-	LoadScene(kHotReloadScenePath);
+    std::error_code error;
+
+	// Replace the active DLL with the previous DLL if it exists
+    if (fs::exists(previousPath))
+    {
+        fs::remove(activePath, error);
+
+        if (error)
+        {
+            DBG("EditorApp::RestorePreviousGameCode: " "Failed to remove the failed active DLL: %s", error.message().c_str());
+            return false;
+        }
+
+        error.clear();
+        fs::rename(previousPath, activePath, error);
+
+        if (error)
+        {
+            DBG("EditorApp::RestorePreviousGameCode: " "Failed to restore the previous DLL: %s", error.message().c_str());
+            return false;
+        }
+    }
+
+    if (!fs::exists(activePath))
+    {
+        DBG("EditorApp::RestorePreviousGameCode: " "No active or previous DLL exists.");
+        return false;
+    }
+
+	// Rollback to the previous GameCode.dll
+    m_hGameCodeDll = LoadLibraryA(activePath.string().c_str());
+
+    if (!m_hGameCodeDll)
+    {
+        DBG("EditorApp::RestorePreviousGameCode: " "LoadLibrary failed with error %lu.", GetLastError());
+        return false;
+    }
+
+    return true;
+}
+
+bool EditorApp::RollbackGameCode()
+{
+    ComponentRegistry::Get().UnregisterAllGameComponents();
+
+    if (m_hGameCodeDll)
+    {
+        if (!FreeLibrary(m_hGameCodeDll))
+        {
+            DBG("EditorApp::RollbackGameCode: " "Failed to unload the new GameCode DLL.");
+            return false;
+        }
+
+        m_hGameCodeDll = nullptr;
+    }
+
+    return RestorePreviousGameCode();
+}
+
+bool EditorApp::RestoreHotReloadSnapshot()
+{
+    auto restoredScene = std::make_unique<EditorScene>();
+
+	restoredScene->Initialize(m_engineContext); // Initialize scene before loading
+
+	// Load the stored scene snapshot from the temporary file
+    if (!SceneLoader::LoadScene(kHotReloadScenePath, restoredScene.get()))
+    {
+        DBG("EditorApp::RestoreHotReloadSnapshot: " "Failed to deserialize the snapshot.");
+
+        restoredScene->Finalize();
+        return false;
+    }
+
+    m_pEditScene = std::move(restoredScene);
+
+	// Apply the current viewport size to the restored scene to ensure proper camera settings
+    ApplyCurrentViewportSizeToScene();
+
+    return true;
+
+}
+
+void EditorApp::RemovePreviousGameCodeBackup()
+{
+    namespace fs = std::filesystem;
+
+    const fs::path previousPath = PathManager::Resolve(kPreviousGameCodePath);
+
+    std::error_code error;
+    fs::remove(previousPath, error);
+
+    if (error)
+    {
+        DBG("EditorApp::RemovePreviousGameCodeBackup: " "Failed to remove the previous DLL: %s", error.message().c_str());
+    }
 }
 
 void EditorApp::DeleteScript(const std::string& name)
@@ -382,6 +675,88 @@ void EditorApp::DeleteScript(const std::string& name)
 
     // Reconfigure and rebuild the project to reflect the deletion of the script files
 	ReloadGameCode(true); 
+}
+
+void EditorApp::EnterPlayMode()
+{
+	if (m_editorMode == EditorMode::Play)
+	{
+		DBG("EditorApp: Already in Play mode.");
+		return;
+	}
+
+	if (!m_pEditScene)
+	{
+		DBG("EditorApp: No active scene to enter Play mode.");
+		return;
+	}
+
+	// Stop any ongoing editing transactions before switching to Play Mode
+	StopAllEditTransactions();
+
+	// Clone editor scene to create a separate runtime scene for Play Mode
+	std::unique_ptr<SceneBase> playScene = SceneCloner::Clone(m_pEditScene.get(), m_engineContext);
+
+	if (!playScene)
+	{
+		DBG("EditorApp: Failed to clone scene for Play mode.");
+		return;
+	}
+
+	// Move ownership of the cloned scene to m_pPlayScene
+    m_pPlayScene = std::move(playScene);
+
+	// Apply the current viewport size to the play scene
+	ApplyCurrentViewportSizeToScene();
+
+	// Switch to Play Mode
+	m_editorMode = EditorMode::Play;
+}
+
+void EditorApp::ExitPlayMode()
+{
+	if (m_pPlayScene == nullptr)
+	{
+		DBG("EditorApp: No active Play scene to exit from.");
+        m_editorMode = EditorMode::Edit;
+        m_hierarchyPanel.ClearSelection();
+		return;
+	}
+
+	if (m_editorMode != EditorMode::Play)
+	{
+		DBG("EditorApp: Not in Play mode.");
+		return;
+	}
+
+	// Stop any ongoing editing transactions before switching back to Edit Mode
+	StopAllEditTransactions();
+
+	// Get selected actor GUID before destroying the play scene
+	// to check if the selected actor is still valid in the edit scene after exiting Play Mode
+    Guid selectedActorId = m_hierarchyPanel.GetSelectedActorGuid();
+
+    // Destroy the play scene
+	m_pPlayScene->Finalize();
+	m_pPlayScene.reset();
+
+	// Switch back to Edit Mode
+	m_editorMode = EditorMode::Edit;
+
+	// Check if the selected Actor is still valid in the edit scene, if not clear the selection
+	if (selectedActorId.IsValid())
+	{
+		Actor* selectedActor = m_pEditScene ? m_pEditScene->ResolveActor(selectedActorId) : nullptr;
+
+        if (selectedActor)
+        {
+            m_hierarchyPanel.SelectActor(selectedActorId);
+        }
+        else
+		{// In case of the selected actor is no longer valid in the edit scene or the edit scene is null
+            m_hierarchyPanel.ClearSelection();
+        }
+	}
 }
 
 void EditorApp::CreateMainWindow()
@@ -542,17 +917,44 @@ void EditorApp::Update(float deltaTime)
     // Flush the transform of the editor camera actor
     m_pEditorCameraActor->FlushTransform();
 
-    // Update the scene
-    // (call PreUpdate, Update, and LateUpdate in sequence to update all actors and components in the scene)
-    if (m_pScene)
+	SceneBase* activeScene = GetActiveScene();
+
+    // Advance gameplay only in Play Mode.
+    // Edit Mode synchronizes editor-visible scene state without running gameplay callbacks.
+    if (activeScene)
     {
-        m_pScene->PreUpdate(deltaTime);
-        m_pScene->Update(deltaTime);
-        m_pScene->LateUpdate(deltaTime);
+        if (m_editorMode == EditorMode::Play)
+        {
+            activeScene->PreUpdate(deltaTime);
+            activeScene->Update(deltaTime);
+            activeScene->LateUpdate(deltaTime);
+        }
+        else
+        {
+            activeScene->EditorUpdate(deltaTime);
+        }
     }
 
-    // Update the renderer with the latest camera information (for rendering this frame)
-    m_pRenderer->Update(m_pEngine->GetCurrentBufferIndex(), m_pEditorCamera->GetCameraInfo());
+	// Get the current camera information based on the editor mode (Play or Edit)
+    const CameraInfo* currentCamera = nullptr;
+
+	if (m_editorMode == EditorMode::Play)
+	{// In case of Play Mode
+		// Use camera from the active scene's CameraSystem in Play Mode
+		CameraSystem* cameraSystem = activeScene ? activeScene->GetCameraSystem() : nullptr;
+		currentCamera = cameraSystem ? cameraSystem->GetCameraInfo() : nullptr;
+	}
+	else if (m_editorMode == EditorMode::Edit)
+	{// In case of Edit Mode
+		// Use the editor camera in Edit Mode
+		currentCamera = m_pEditorCamera ? &m_pEditorCamera->GetCameraInfo() : nullptr;
+	}
+
+	// Update the renderer with the current camera information for rendering
+    if (currentCamera)
+    {
+		m_pRenderer->Update(m_pEngine->GetCurrentBufferIndex(), *currentCamera);
+    }
 }
 
 void EditorApp::Render()
@@ -562,157 +964,22 @@ void EditorApp::Render()
 
     m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
 
-    const EditorViewportMode viewportMode = m_sceneViewPanel.GetViewMode();
-    const bool isSceneView = viewportMode == EditorViewportMode::Scene;
-
-	// Set up the render view policy based on the current viewport mode
-    RenderViewPolicy viewPolicy{};
-
-    // CanvasEditContext is a persistent edit scope. Initialize it from the
-    // current selection only when no valid Canvas is already open.
-    Canvas* editingCanvas = nullptr;
-
-	// Canvas View mode requires a valid Canvas
-    if (!isSceneView && m_pScene)
-    {
-		// Resolve the currently editing Canvas from the CanvasEditContext
-        editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
-
-		// First selection of a Canvas in the hierarchy panel opens the CanvasEditContext for editing.
-        if (!editingCanvas)
-        {
-            Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
-
-            if (m_canvasEditContext.OpenFromActor(selectedActor))
-            {
-                editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
-            }
-        }
-
-        // Sync the CanvasViewNavigation state with the currently editing Canvas
-        SyncCanvasViewNavigation(editingCanvas);
-    }
-
-    // Set up the policy
-    if (isSceneView)
-    {
-		// Only render the world-space objects in the scene view (no screen-space objects)
-        viewPolicy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
-    }
-    else
-    {
-		// In canvas view, render all objects (world-space and screen-space) if editing a canvas,
-        viewPolicy.renderSpaceFilter = editingCanvas
-            ? RenderSpaceFilter::All : RenderSpaceFilter::ScreenOnly;
-
-		// Set the root canvas for rendering in canvas view (accepts nullptr if no canvas is selected)
-        viewPolicy.canvasViewRoot = editingCanvas;
-    }
-
+	SceneBase* activeScene = GetActiveScene();
 
 	// Build CameraInfo based on the current viewport mode and size
     GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-    if (!sceneColor) return;
 
-    const CameraInfo viewportCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
-
-    if (m_pScene)
+    if (sceneColor)
     {
-        m_pScene->OnRender(m_engineContext, &viewportCameraInfo, viewPolicy);
-    }
-
-    const RenderSpace targetRenderSpace = isSceneView
-        ? RenderSpace::World : RenderSpace::Screen;
-
-    // Build render data for the selected object in the scene view
-    // (for outline rendering)
-    BuildSelectionRenderData(targetRenderSpace, viewportCameraInfo, editingCanvas);
-
-    // Scene View only requires shadow rendering
-    if (isSceneView)
-    {
-        RenderPassTarget shadowTarget
+        if (m_editorMode == EditorMode::Play)
         {
-            RenderPassTargetType::DepthOnly,
-            RenderPassTarget::InvalidIndex,
-            static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
-        };
-
-        m_pEngine->BeginPass(shadowTarget);
-        m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
-        m_pEngine->EndPass(shadowTarget);
-    }
-
-    // Both Scene View and Canvas View use SceneColor as their display texture
-    RenderPassTarget sceneTarget
-    {
-        RenderPassTargetType::ColorDepth,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
-    };
-
-    m_pEngine->BeginPass(sceneTarget);
-
-    if (isSceneView)
-    {
-        // Render world-space objects using the Editor Camera
-        GpuTexture* shadowMap = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap);
-
-        if (shadowMap)
+            RenderPlayViewport(activeScene, sceneColor);
+        }
+        else
         {
-            m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMap->GetSrvIndex());
+            RenderEditViewport(activeScene, sceneColor);
         }
     }
-    else
-    {
-        // Render only screen-space objects using the viewport-based
-        // orthographic projection created by RenderScreenSpace()
-        GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-
-        if (sceneColor)
-        {
-            m_pRenderer->RenderScreenSpace(
-                m_pEngine->GetCommandList(),
-                sceneColor->GetWidth(),
-                sceneColor->GetHeight(),
-                RenderTargetFormat::HDR,
-				&viewportCameraInfo
-            );
-        }
-    }
-
-    m_pEngine->EndPass(sceneTarget);
-
-	// Render the selection mask for the selected object in the scene view
-    RenderPassTarget selectionMaskTarget
-    {
-        RenderPassTargetType::ColorDepth,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SelectionMask),
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
-        true,
-        false
-    };
-
-    m_pEngine->BeginPass(selectionMaskTarget);
-    m_pRenderer->RenderSelectionMask(m_pEngine->GetCommandList(),m_selectionRenderData);
-    m_pEngine->EndPass(selectionMaskTarget);
-
-    // Get the selection mask render target for outline rendering
-    GpuTexture* selectionMask = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SelectionMask);
-
-	// Render the selection outline for the selected object in the scene view
-    RenderPassTarget selectionOutlineTarget
-    {
-        RenderPassTargetType::ColorDepth,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
-        false,	// Preserve the rendered scene color
-        false	// Preserve the scene depth
-    };
-
-    m_pEngine->BeginPass(selectionOutlineTarget);
-    m_pRenderer->RenderSelectionOutline(m_pEngine->GetCommandList(), selectionMask);
-    m_pEngine->EndPass(selectionOutlineTarget);
 
 	// Render the scene color render target to the back buffer (screen) for display
     RenderPassTarget backBufferTarget
@@ -730,134 +997,229 @@ void EditorApp::Render()
     m_pEngine->RenderEnd();
 }
 
+void EditorApp::RenderEditViewport(SceneBase* activeScene, GpuTexture* sceneColor)
+{
+    const EditorViewportMode viewportMode = m_sceneViewPanel.GetViewMode();
+    const bool isSceneView = viewportMode == EditorViewportMode::Scene;
+
+    // Set up the render view policy based on the current viewport mode
+    RenderViewPolicy viewPolicy{};
+
+    // CanvasEditContext is a persistent edit scope. Initialize it from the
+    // current selection only when no valid Canvas is already open.
+    Canvas* editingCanvas = nullptr;
+
+    // Canvas View mode requires a valid Canvas
+    if (!isSceneView && activeScene)
+    {
+        // Resolve the currently editing Canvas from the CanvasEditContext
+        editingCanvas = m_canvasEditContext.ResolveCanvas(*activeScene);
+
+        // First selection of a Canvas in the hierarchy panel opens the CanvasEditContext for editing.
+        if (!editingCanvas)
+        {
+            Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(activeScene);
+
+            if (m_canvasEditContext.OpenFromActor(selectedActor))
+            {
+                editingCanvas = m_canvasEditContext.ResolveCanvas(*activeScene);
+            }
+        }
+
+        // Sync the CanvasViewNavigation state with the currently editing Canvas
+        SyncCanvasViewNavigation(editingCanvas);
+    }
+
+    // Set up the policy
+    if (isSceneView)
+    {
+        // Only render the world-space objects in the scene view (no screen-space objects)
+        viewPolicy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
+    }
+    else
+    {
+        // In canvas view, render all objects (world-space and screen-space) if editing a canvas,
+        viewPolicy.renderSpaceFilter = editingCanvas
+            ? RenderSpaceFilter::All : RenderSpaceFilter::ScreenOnly;
+
+        // Set the root canvas for rendering in canvas view (accepts nullptr if no canvas is selected)
+        viewPolicy.canvasViewRoot = editingCanvas;
+    }
+
+    const CameraInfo viewportCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
+
+    if (activeScene)
+    {
+        activeScene->OnRender(m_engineContext, &viewportCameraInfo, viewPolicy);
+    }
+
+    const RenderSpace targetRenderSpace = isSceneView
+        ? RenderSpace::World : RenderSpace::Screen;
+
+    // Build render data for the selected object in the scene view
+    // (for outline rendering)
+    BuildSelectionRenderData(targetRenderSpace, viewportCameraInfo, editingCanvas);
+
+    // Scene View only requires shadow rendering
+    if (isSceneView)
+    {
+		RenderShadowPass();
+		RenderWorldPass();
+    }
+    else
+    {
+        RenderPassTarget canvasViewTarget
+		{
+			RenderPassTargetType::ColorDepth,
+			static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+			static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
+		};
+
+		m_pEngine->BeginPass(canvasViewTarget);
+
+        // Render only screen-space objects using the viewport-based
+        // orthographic projection created by RenderScreenSpace()
+        GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
+
+        if (sceneColor)
+        {
+            m_pRenderer->RenderScreenSpace(
+                m_pEngine->GetCommandList(),
+                sceneColor->GetWidth(),
+                sceneColor->GetHeight(),
+                RenderTargetFormat::HDR,
+                &viewportCameraInfo
+            );
+        }
+
+		m_pEngine->EndPass(canvasViewTarget);
+    }
+
+	RenderSelectionPass();
+}
+
+void EditorApp::RenderPlayViewport(SceneBase* activeScene, GpuTexture* sceneColor)
+{
+    if (!activeScene) return;
+
+    CameraSystem* cameraSystem = activeScene->GetCameraSystem();
+
+    if (!cameraSystem || !cameraSystem->GetMainCamera())
+    {
+        DBG("EditorApp::RenderPlayViewport: " "Play scene has no main camera.");
+        return;
+    }
+
+    // Don't override camera settings. Use the camera in the runtime scene
+	// No policy for rendering space filter or canvas view root for just playing the game
+    activeScene->OnRender(m_engineContext);
+
+    RenderShadowPass();
+    RenderWorldPass();
+
+    RenderPassTarget sceneTarget
+    {
+        RenderPassTargetType::ColorDepth,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
+        false,
+        false
+    };
+
+    m_pEngine->BeginPass(sceneTarget);
+
+    m_pRenderer->RenderScreenSpace(
+        m_pEngine->GetCommandList(),
+        sceneColor->GetWidth(),
+        sceneColor->GetHeight(),
+        RenderTargetFormat::HDR
+    );
+
+    m_pEngine->EndPass(sceneTarget);
+}
+
+void EditorApp::RenderShadowPass()
+{
+    RenderPassTarget shadowTarget
+    {
+        RenderPassTargetType::DepthOnly,
+        RenderPassTarget::InvalidIndex,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
+    };
+
+    m_pEngine->BeginPass(shadowTarget);
+    m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
+    m_pEngine->EndPass(shadowTarget);
+}
+
+void EditorApp::RenderWorldPass()
+{
+	RenderPassTarget sceneTarget
+	{
+		RenderPassTargetType::ColorDepth,
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
+	};
+
+    m_pEngine->BeginPass(sceneTarget);
+
+    GpuTexture* shadowMap = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap);
+
+    if (shadowMap)
+    {
+        m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMap->GetSrvIndex());
+    }
+
+	m_pEngine->EndPass(sceneTarget);
+}
+
+void EditorApp::RenderSelectionPass()
+{
+    // Render the selection mask for the selected object in the scene view
+    RenderPassTarget selectionMaskTarget
+    {
+        RenderPassTargetType::ColorDepth,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SelectionMask),
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
+        true,
+        false
+    };
+
+    m_pEngine->BeginPass(selectionMaskTarget);
+    m_pRenderer->RenderSelectionMask(m_pEngine->GetCommandList(), m_selectionRenderData);
+    m_pEngine->EndPass(selectionMaskTarget);
+
+    // Get the selection mask render target for outline rendering
+    GpuTexture* selectionMask = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SelectionMask);
+
+    // Render the selection outline for the selected object in the scene view
+    RenderPassTarget selectionOutlineTarget
+    {
+        RenderPassTargetType::ColorDepth,
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
+        false,	// Preserve the rendered scene color
+        false	// Preserve the scene depth
+    };
+
+    m_pEngine->BeginPass(selectionOutlineTarget);
+    m_pRenderer->RenderSelectionOutline(m_pEngine->GetCommandList(), selectionMask);
+    m_pEngine->EndPass(selectionOutlineTarget);
+
+}
+
+
 void EditorApp::RenderImGui()
 {
-    RenderMenuBar();
-    RenderScriptsPanel();
     RenderHierarchyPanel();
     RenderInspectorPanel();
     RenderSceneViewPanel();
+    RenderMenuBar();
+	RenderToolbar();
+    RenderScriptsPanel();
 
     ImGui::Render();
-    ImGui_ImplDX12_RenderDrawData(
-        ImGui::GetDrawData(),
-        m_pEngine->GetCommandList()
-    );
-}
-
-void EditorApp::RenderMenuBar()
-{
-    MenuBar::Callbacks callbacks;
-
-    callbacks.onNewScene = [this]()
-        {
-            NewScene();
-        };
-
-    callbacks.onOpenScene = [this]()
-        {
-            LoadScene(kDefaultScenePath);
-        };
-
-    callbacks.onSaveScene = [this]()
-        {
-            if (m_pScene &&
-                !SceneWriter::SaveScene(kDefaultScenePath, m_pScene.get()))
-            {
-                DBG("EditorApp: Save failed.");
-            }
-        };
-
-    callbacks.onUndo = [this]()
-        {
-            // Cancel the current editing transaction
-			CancelTransformEdit();
-			CancelRectTransformEdit();
-
-            if (m_commandHistory.Undo())
-            {
-                DBG("EditorApp: Undo succeeded.");
-            }
-            else
-            {
-                DBG("EditorApp: Undo failed.");
-            }
-        };
-
-    callbacks.onRedo = [this]()
-        {
-            // Cancel the current editing transaction
-            CancelTransformEdit();
-            CancelRectTransformEdit();
-
-            if (m_commandHistory.Redo())
-            {
-                DBG("EditorApp: Redo succeeded.");
-            }
-            else
-            {
-                DBG("EditorApp: Redo failed.");
-            }
-        };
-
-    callbacks.onBuildGame = []()
-        {
-            ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
-        };
-
-    callbacks.onReloadGameCode = [this](bool reconfigure)
-        {
-            ReloadGameCode(reconfigure);
-        };
-
-    callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
-        {
-            const bool generated = isBehavior
-                ? BehaviorTemplateGenerator::Generate(name)
-                : ClassTemplateGenerator::Generate(name);
-
-            if (generated)
-            {
-                DBG("EditorApp: Generated %s template '%s'",
-                    isBehavior ? "Behavior" : "class", name.c_str());
-
-                ReloadGameCode(true);
-            }
-        };
-
-    callbacks.canUndo = m_commandHistory.CanUndo();
-    callbacks.canRedo = m_commandHistory.CanRedo();
-
-    m_menuBar.Render(callbacks);
-}
-
-void EditorApp::RenderScriptsPanel()
-{
-    ScriptsPanel::Callbacks callbacks;
-
-    callbacks.onDelete = [this](const std::string& name)
-        {
-            DeleteScript(name);
-        };
-
-    callbacks.onOpen = [](const std::string& name)
-        {
-            const std::string headerPath =
-                PathManager::Resolve("Game/GameCode/" + name + ".h");
-
-            ShellExecuteA(
-                nullptr,
-                "open",
-                headerPath.c_str(),
-                nullptr,
-                nullptr,
-                SW_SHOWNORMAL
-            );
-
-            DBG("EditorApp: Opening %s in default editor", name.c_str());
-        };
-
-    m_scriptsPanel.Render(callbacks, m_pScene.get());
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_pEngine->GetCommandList());
 }
 
 void EditorApp::RenderHierarchyPanel()
@@ -866,15 +1228,15 @@ void EditorApp::RenderHierarchyPanel()
 
 	callbacks.onRenameActor = [this](const Guid& targetActorGuid, const std::string& newName) -> bool
 		{
-			if (!m_pScene) return false;
+			if (!m_pEditScene || m_editorMode != EditorMode::Edit) return false;
 
-			Actor* actor = m_pScene->ResolveActor(targetActorGuid);
+			Actor* actor = m_pEditScene->ResolveActor(targetActorGuid);
 			if (!actor) return false;
 
 			const std::string oldName = actor->GetName();
 			const bool succeeded = m_commandHistory.Execute(
 				std::make_unique<RenameActorCommand>(
-					m_pScene.get(),
+					m_pEditScene.get(),
                     targetActorGuid,
 					newName
 				)
@@ -900,13 +1262,13 @@ void EditorApp::RenderHierarchyPanel()
 
     callbacks.onCreateActor = [this](const std::string& name, const Guid& parentGuid)
         {
-            if (!m_pScene) return;
+            if (!m_pEditScene || m_editorMode != EditorMode::Edit) return;
 
             Actor::InitDesc desc;
             desc.name = name;
 
             const bool succeeded = m_commandHistory.Execute(
-                std::make_unique<CreateActorCommand>(m_pScene.get(), desc, parentGuid)
+                std::make_unique<CreateActorCommand>(m_pEditScene.get(), desc, parentGuid)
             );
 
             if (succeeded)
@@ -928,16 +1290,16 @@ void EditorApp::RenderHierarchyPanel()
     callbacks.onDeleteActor =
         [this](const Guid& actorGuid) -> bool
         {
-			if (!m_pScene || !actorGuid.IsValid()) return false;
+			if (!m_pEditScene || m_editorMode != EditorMode::Edit || !actorGuid.IsValid()) return false;
 
-			Actor* actor = m_pScene->ResolveActor(actorGuid);
+			Actor* actor = m_pEditScene->ResolveActor(actorGuid);
 			if (!actor || actor->IsDestroyed()) return false;
 
             const std::string actorName = actor->GetName();
 
             const bool succeeded = m_commandHistory.Execute(
                 std::make_unique<DeleteActorCommand>(
-                    m_pScene.get(),
+                    m_pEditScene.get(),
 					actorGuid
                 )
             );
@@ -957,13 +1319,13 @@ void EditorApp::RenderHierarchyPanel()
     callbacks.onReparentActor =
         [this](const Guid& actorGuid, const Guid& newParentGuid) -> bool
         {
-			if (!m_pScene || !actorGuid.IsValid()) return false;
+			if (!m_pEditScene || m_editorMode != EditorMode::Edit || !actorGuid.IsValid()) return false;
 
-			Actor* actor = m_pScene->ResolveActor(actorGuid);
+			Actor* actor = m_pEditScene->ResolveActor(actorGuid);
 			if (!actor || actor->IsDestroyed()) return false;
 
 			Actor* newParent = newParentGuid.IsValid()
-				? m_pScene->ResolveActor(newParentGuid) : nullptr;
+				? m_pEditScene->ResolveActor(newParentGuid) : nullptr;
 
 			if (newParentGuid.IsValid() &&
 				(!newParent || newParent->IsDestroyed()))
@@ -980,7 +1342,7 @@ void EditorApp::RenderHierarchyPanel()
             const bool succeeded =
                 m_commandHistory.Execute(
                     std::make_unique<ReparentActorCommand>(
-                        m_pScene.get(),
+                        m_pEditScene.get(),
 						actorGuid,
 						newParentGuid
                     )
@@ -998,12 +1360,13 @@ void EditorApp::RenderHierarchyPanel()
             return succeeded;
         };
 
-	callbacks.onOpenCanvas =
-		[this](const Guid& actorGuid)
-		{
-			if (!m_pScene || !actorGuid.IsValid()) return;
+    SceneBase* activeScene = GetActiveScene();
 
-			Actor* actor = m_pScene->ResolveActor(actorGuid);
+	callbacks.onOpenCanvas = [this, activeScene](const Guid& actorGuid)
+		{
+			if (!activeScene || !actorGuid.IsValid()) return;
+
+			Actor* actor = activeScene->ResolveActor(actorGuid);
 			if (!actor || actor->IsDestroyed() || !actor->GetComponentByClass<Canvas>())
 			{
 				return;
@@ -1017,7 +1380,9 @@ void EditorApp::RenderHierarchyPanel()
 			}
 		};
 
-    m_hierarchyPanel.Render(m_pScene.get(), callbacks);
+	callbacks.canEdit = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
+
+    m_hierarchyPanel.Render(activeScene, callbacks);
 }
 
 void EditorApp::RenderInspectorPanel()
@@ -1025,27 +1390,34 @@ void EditorApp::RenderInspectorPanel()
     InspectorContext context;
 	context.assetManager = m_pAssetManager.get();
 
-	// Transform editing callbacks
-	context.onTransformEditBegin = [this](const Guid& actorGuid, const Transform3D& before) { BeginTransformEdit(actorGuid, before);};
-    context.onTransformEditEnd = [this](const Guid& actorGuid, const Transform3D& after) { EndTransformEdit(actorGuid, after);};
-    context.onCancelTransformEdit = [this](){ CancelTransformEdit(); };
+    InspectorState inspectorState = InspectorState::ReadOnly;
+    if (m_pEditScene && m_editorMode == EditorMode::Edit) inspectorState = InspectorState::Editable;
+    context.state = inspectorState;
 
-	// RectTransform editing callbacks
-	context.onRectTransformEditBegin = [this](const Guid& actorGuid, const RectTransformEditState& before) { BeginRectTransformEdit(actorGuid, before); };
-    context.onRectTransformEditEnd = [this](const Guid& actorGuid, const RectTransformEditState& after) { EndRectTransformEdit(actorGuid, after); };
-    context.onCancelRectTransformEdit = [this]() { CancelRectTransformEdit(); };
+    if (inspectorState == InspectorState::Editable)
+    {
+        // Transform editing callbacks
+        context.onTransformEditBegin = [this](const Guid& actorGuid, const Transform3D& before) { BeginTransformEdit(actorGuid, before); };
+        context.onTransformEditEnd = [this](const Guid& actorGuid, const Transform3D& after) { EndTransformEdit(actorGuid, after); };
+        context.onCancelTransformEdit = [this]() { CancelTransformEdit(); };
+
+        // RectTransform editing callbacks
+        context.onRectTransformEditBegin = [this](const Guid& actorGuid, const RectTransformEditState& before) { BeginRectTransformEdit(actorGuid, before); };
+        context.onRectTransformEditEnd = [this](const Guid& actorGuid, const RectTransformEditState& after) { EndRectTransformEdit(actorGuid, after); };
+        context.onCancelRectTransformEdit = [this]() { CancelRectTransformEdit(); };
+    }
 
     InspectorPanel::Callbacks callbacks;
 
 	// Callback for adding a component to an actor.
     callbacks.onAddComponent =
-        [this](const Guid& actorGuid, const std::string& componentName)
+        [this, inspectorState](const Guid& actorGuid, const std::string& componentName)
         {
-            if (!m_pScene) return false;
+            if (!m_pEditScene || inspectorState != InspectorState::Editable) return false;
 
             return m_commandHistory.Execute(
                 std::make_unique<AddComponentCommand>(
-                    m_pScene.get(),
+                    m_pEditScene.get(),
                     actorGuid,
                     componentName
                 )
@@ -1054,16 +1426,16 @@ void EditorApp::RenderInspectorPanel()
 
 	// Callback for removing a component from an actor.
     callbacks.onRemoveComponent =
-        [this](
+        [this, inspectorState](
             const Guid& actorGuid,
             const std::string& componentName,
             std::size_t occurrenceIndex)
         {
-            if (!m_pScene) return false;
+            if (!m_pEditScene || inspectorState != InspectorState::Editable) return false;
 
             return m_commandHistory.Execute(
                 std::make_unique<RemoveComponentCommand>(
-                    m_pScene.get(),
+                    m_pEditScene.get(),
                     actorGuid,
                     componentName,
                     occurrenceIndex
@@ -1071,7 +1443,8 @@ void EditorApp::RenderInspectorPanel()
             );
         };
 
-	m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor(m_pScene.get()), context, callbacks);
+	SceneBase* activeScene = GetActiveScene();
+	m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor(activeScene), context, callbacks);
 }
 
 void EditorApp::RenderSceneViewPanel()
@@ -1085,9 +1458,13 @@ void EditorApp::RenderSceneViewPanel()
     const uint32_t srvIndex = sceneColor->GetSrvIndex();
     const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
 
-
 	// Build the overlay data for the scene view panel based on the current view mode and any selected screen canvas
-    ViewportOverlayData overlayData = BuildViewportOverlayData(sceneColor->GetWidth(), sceneColor->GetHeight());
+    ViewportOverlayData overlayData;
+
+    if (m_editorMode == EditorMode::Edit)
+    {
+        overlayData = BuildViewportOverlayData(sceneColor->GetWidth(), sceneColor->GetHeight());
+    }
 
 	// Render the scene view panel with the scene color render target
     m_sceneViewPanel.Render(
@@ -1097,71 +1474,223 @@ void EditorApp::RenderSceneViewPanel()
 		overlayData
     );
 
-    // Handle the user manipulation in the Canvas View
-    CanvasNavigationInput navigationInput;
-
-    if (m_sceneViewPanel.ConsumeCanvasNavigationInput(navigationInput))
+    if (m_editorMode == EditorMode::Edit)
     {
-        ApplyCanvasNavigationInput(
-            navigationInput,
-            sceneColor->GetWidth(),
-            sceneColor->GetHeight()
-        );
-    }
+        // Handle the user manipulation in the Canvas View
+        CanvasNavigationInput navigationInput;
 
-	// Handle the opening Canvas in the Canvas View mode if the user clicks a Canvas in the breadcrumb list
-    Guid canvasActorGuid;
-
-    if (m_sceneViewPanel.ConsumeCanvasOpenRequest(canvasActorGuid))
-    {
-        Actor* canvasActor = m_pScene
-            ? m_pScene->ResolveActor(canvasActorGuid) : nullptr;
-
-        if (canvasActor && !canvasActor->IsDestroyed() && canvasActor->GetComponentByClass<Canvas>())
+        if (m_sceneViewPanel.ConsumeCanvasNavigationInput(navigationInput))
         {
-            m_canvasEditContext.OpenFromActor(canvasActor);
+            ApplyCanvasNavigationInput(
+                navigationInput,
+                sceneColor->GetWidth(),
+                sceneColor->GetHeight()
+            );
+        }
+
+        // Handle the opening Canvas in the Canvas View mode if the user clicks a Canvas in the breadcrumb list
+        Guid canvasActorGuid;
+
+        SceneBase* activeScene = GetActiveScene();
+
+        if (m_sceneViewPanel.ConsumeCanvasOpenRequest(canvasActorGuid))
+        {
+            Actor* canvasActor = activeScene
+                ? activeScene->ResolveActor(canvasActorGuid) : nullptr;
+
+            if (canvasActor && !canvasActor->IsDestroyed() && canvasActor->GetComponentByClass<Canvas>())
+            {
+                m_canvasEditContext.OpenFromActor(canvasActor);
+            }
+        }
+
+        // Handle the click event for the scene view panel to select an actor in the scene
+
+        Vector2 pickUV; // UV coordinates of the click within the scene view panel
+
+        // Check if the click event occurred and get the UV coordinates
+        // of the click within the scene view panel if requested
+        if (!m_sceneViewPanel.ConsumePickRequest(pickUV)) return;
+
+        // Validate necessary pointers before proceeding with picking
+        if (!activeScene || !m_pEditorCamera) return;
+
+        // Build the camera info for picking based on the current view mode (Scene or Canvas)
+        const CameraInfo pickCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
+
+        // Determine the render space for picking based on the current view mode
+        // World(3D) for Scene View, Screen(2D) for Canvas View
+        const RenderSpace targetRenderSpace =
+            m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene
+            ? RenderSpace::World : RenderSpace::Screen;
+
+        // Resolve the canvas for picking if in Canvas View mode
+        Canvas* editingCanvas = nullptr;
+
+        if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Canvas)
+        {
+            editingCanvas = m_canvasEditContext.ResolveCanvas(*activeScene);
+        }
+
+        // Get the picked Actor information
+        const std::optional<ScenePickHit> hit = ScenePicker::Pick(*activeScene, pickCameraInfo, pickUV, targetRenderSpace, editingCanvas);
+
+        if (hit)
+        {
+            m_hierarchyPanel.SelectActor(hit->actorGuid);
+        }
+        else
+        {
+            m_hierarchyPanel.ClearSelection();
         }
     }
+}
 
-	// Handle the click event for the scene view panel to select an actor in the scene
+void EditorApp::RenderMenuBar()
+{
+    MenuBar::Callbacks callbacks;
 
-	Vector2 pickUV; // UV coordinates of the click within the scene view panel
+    callbacks.onNewScene = [this]()
+        {
+            if (m_editorMode != EditorMode::Edit) return;
+            NewScene();
+        };
 
-	// Check if the click event occurred and get the UV coordinates
-	// of the click within the scene view panel if requested
-    if (!m_sceneViewPanel.ConsumePickRequest(pickUV)) return;
+    callbacks.onOpenScene = [this]()
+        {
+            if (m_editorMode != EditorMode::Edit) return;
+            LoadScene(kDefaultScenePath);
+        };
 
-	// Validate necessary pointers before proceeding with picking
-	if (!m_pScene || !m_pEditorCamera) return;
+    callbacks.onSaveScene = [this]()
+        {
+            if (m_editorMode != EditorMode::Edit) return;
 
-	// Build the camera info for picking based on the current view mode (Scene or Canvas)
-    const CameraInfo pickCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
+            if (m_pEditScene && !SceneWriter::SaveScene(kDefaultScenePath, m_pEditScene.get()))
+            {
+                DBG("EditorApp: Save failed.");
+            }
+        };
 
-	// Determine the render space for picking based on the current view mode
-	// World(3D) for Scene View, Screen(2D) for Canvas View
-    const RenderSpace targetRenderSpace =
-        m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene
-        ? RenderSpace::World : RenderSpace::Screen;
+    callbacks.onUndo = [this]()
+        {
+            if (m_editorMode != EditorMode::Edit) return;
 
-	// Resolve the canvas for picking if in Canvas View mode
-    Canvas* editingCanvas = nullptr;
+            // Cancel the current editing transaction
+            CancelTransformEdit();
+            CancelRectTransformEdit();
 
-    if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Canvas)
-    {
-        editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
-    }
+            if (m_commandHistory.Undo())
+            {
+                DBG("EditorApp: Undo succeeded.");
+            }
+            else
+            {
+                DBG("EditorApp: Undo failed.");
+            }
+        };
 
-    // Get the picked Actor information
-    const std::optional<ScenePickHit> hit = ScenePicker::Pick(*m_pScene, pickCameraInfo, pickUV, targetRenderSpace, editingCanvas);
+    callbacks.onRedo = [this]()
+        {
+            if (m_editorMode != EditorMode::Edit) return;
 
-    if (hit)
-    {
-        m_hierarchyPanel.SelectActor(hit->actorGuid);
-    }
-    else
-    {
-        m_hierarchyPanel.ClearSelection();
-    }
+            // Cancel the current editing transaction
+            CancelTransformEdit();
+            CancelRectTransformEdit();
+
+            if (m_commandHistory.Redo())
+            {
+                DBG("EditorApp: Redo succeeded.");
+            }
+            else
+            {
+                DBG("EditorApp: Redo failed.");
+            }
+        };
+
+    callbacks.onBuildGame = [this]()
+        {
+            if (m_editorMode != EditorMode::Edit) return;
+
+            ProjectBuilder::ReconfigureAndBuild("101Game", "Debug");
+        };
+
+    callbacks.onReloadGameCode = [this](bool reconfigure)
+        {
+            if (m_editorMode != EditorMode::Edit) return;
+
+            ReloadGameCode(reconfigure);
+        };
+
+    callbacks.onCreateScript = [this](const std::string& name, bool isBehavior)
+        {
+            if (m_editorMode != EditorMode::Edit) return;
+
+            const bool generated = isBehavior
+                ? BehaviorTemplateGenerator::Generate(name)
+                : ClassTemplateGenerator::Generate(name);
+
+            if (generated)
+            {
+                DBG("EditorApp: Generated %s template '%s'",
+                    isBehavior ? "Behavior" : "class", name.c_str());
+
+                ReloadGameCode(true);
+            }
+        };
+
+    callbacks.canUndo = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr && m_commandHistory.CanUndo();
+    callbacks.canRedo = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr && m_commandHistory.CanRedo();
+    callbacks.canEditScene = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
+	callbacks.canModifyScripts = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
+    callbacks.canBuild = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
+
+    m_menuBar.Render(callbacks);
+}
+
+void EditorApp::RenderToolbar()
+{
+    Toolbar::Callbacks callbacks;
+
+    callbacks.onPlay = [this]() { EnterPlayMode(); };
+    callbacks.onStop = [this]() { ExitPlayMode(); };
+
+    callbacks.canPlay = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
+    callbacks.canStop = m_editorMode == EditorMode::Play && m_pPlayScene != nullptr;
+
+    m_toolbar.Render(callbacks);
+}
+
+void EditorApp::RenderScriptsPanel()
+{
+    ScriptsPanel::Callbacks callbacks;
+
+    callbacks.onDelete = [this](const std::string& name)
+        {
+			if (m_editorMode != EditorMode::Edit) return;
+            DeleteScript(name);
+        };
+
+    callbacks.onOpen = [](const std::string& name)
+        {
+            const std::string headerPath =
+                PathManager::Resolve("Game/GameCode/" + name + ".h");
+
+            ShellExecuteA(
+                nullptr,
+                "open",
+                headerPath.c_str(),
+                nullptr,
+                nullptr,
+                SW_SHOWNORMAL
+            );
+
+            DBG("EditorApp: Opening %s in default editor", name.c_str());
+        };
+
+	callbacks.canDelete = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
+
+    m_scriptsPanel.Render(callbacks, m_pEditScene.get());
 }
 
 void EditorApp::ShutdownImGui()
@@ -1170,6 +1699,22 @@ void EditorApp::ShutdownImGui()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
+
+SceneBase* EditorApp::GetActiveScene() const
+{
+	if (m_editorMode == EditorMode::Edit && m_pEditScene)
+	{
+		return m_pEditScene.get();
+	}
+
+	if (m_editorMode == EditorMode::Play && m_pPlayScene)
+	{
+		return m_pPlayScene.get();
+	}
+
+	return nullptr;
+}
+
 
 void EditorApp::ApplySceneViewResizeRequest()
 {
@@ -1190,33 +1735,34 @@ void EditorApp::ApplySceneViewResizeRequest()
 
     // Apply the viewport size to the scene and invalidate
     // all layout elements affected by the size change
-	if (m_pScene) m_pScene->SetViewportSize(width, height);
+	if (m_pEditScene) m_pEditScene->SetViewportSize(width, height);
+	if (m_pPlayScene) m_pPlayScene->SetViewportSize(width, height);
 }
 
 void EditorApp::ApplyCurrentViewportSizeToScene()
 {
-    if (!m_pScene || !m_pEngine) return;
+    if (!m_pEngine) return;
 
     GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
 
-    if (!sceneColor) return;
+	if (!sceneColor) return;
 
-    m_pScene->SetViewportSize(
-        sceneColor->GetWidth(),
-        sceneColor->GetHeight()
-    );
+    if (m_pEditScene) m_pEditScene->SetViewportSize(sceneColor->GetWidth(), sceneColor->GetHeight());
+	if (m_pPlayScene) m_pPlayScene->SetViewportSize(sceneColor->GetWidth(), sceneColor->GetHeight());
 }
 
 void EditorApp::BeginTransformEdit(const Guid& actorGuid, const Transform3D& before)
 {
+	if (m_editorMode != EditorMode::Edit) return;
+
 	// Validate the actorGuid
-    if (!m_pScene || !actorGuid.IsValid())
+    if (!m_pEditScene || !actorGuid.IsValid())
     {
 		CancelTransformEdit();
         return;
     }
 
-	Actor* actor = m_pScene->ResolveActor(actorGuid);
+	Actor* actor = m_pEditScene->ResolveActor(actorGuid);
 
     std::type_index transformType = std::type_index(typeid(Transform));
     Component* component = actor ? actor->GetComponentByExactType(transformType, 0) : nullptr;
@@ -1239,6 +1785,8 @@ void EditorApp::BeginTransformEdit(const Guid& actorGuid, const Transform3D& bef
 
 void EditorApp::EndTransformEdit(const Guid& actorGuid, const Transform3D& after)
 {
+    if (m_editorMode != EditorMode::Edit) return;
+
 	// Validate that there is an ongoing transform edit transaction and that the actorGuid matches
     if (!m_transformEditTransaction) return;
 
@@ -1264,7 +1812,7 @@ void EditorApp::EndTransformEdit(const Guid& actorGuid, const Transform3D& after
 	// Add a TransformEditCommand to the command history and execute it
     m_commandHistory.Execute(
         std::make_unique<TransformEditCommand>(
-            m_pScene.get(),
+            m_pEditScene.get(),
             actorGuid,
             before,
             after
@@ -1278,13 +1826,13 @@ void EditorApp::CancelTransformEdit()
 
 	const Guid actorGuid = m_transformEditTransaction->actorGuid;
 
-    if (!m_pScene || !actorGuid.IsValid())
+    if (!m_pEditScene || !actorGuid.IsValid())
     {
         m_transformEditTransaction.reset();
         return;
     }
 
-	Actor* actor = m_pScene->ResolveActor(actorGuid);
+	Actor* actor = m_pEditScene->ResolveActor(actorGuid);
 
 	std::type_index transformType = std::type_index(typeid(Transform));
 	Component* component = actor ? actor->GetComponentByExactType(transformType, 0) : nullptr;
@@ -1305,13 +1853,15 @@ void EditorApp::CancelTransformEdit()
 
 void EditorApp::BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before)
 {
-	if (!m_pScene || !actorGuid.IsValid())
+    if (m_editorMode != EditorMode::Edit) return;
+
+	if (!m_pEditScene || !actorGuid.IsValid())
 	{
 		CancelRectTransformEdit();
 		return;
 	}
 
-	Actor* actor = m_pScene->ResolveActor(actorGuid);
+	Actor* actor = m_pEditScene->ResolveActor(actorGuid);
 
 	std::type_index rectTransformType = std::type_index(typeid(RectTransform));
 	Component* component = actor ? actor->GetComponentByExactType(rectTransformType, 0) : nullptr;
@@ -1333,6 +1883,8 @@ void EditorApp::BeginRectTransformEdit(const Guid& actorGuid, const RectTransfor
 
 void EditorApp::EndRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& after)
 {
+    if (m_editorMode != EditorMode::Edit) return;
+
     if (!m_rectTransformEditTransaction) return;
 
 	if (m_rectTransformEditTransaction->actorGuid != actorGuid)
@@ -1354,7 +1906,7 @@ void EditorApp::EndRectTransformEdit(const Guid& actorGuid, const RectTransformE
 
 	m_commandHistory.Execute(
         std::make_unique<RectTransformEditCommand>(
-		    m_pScene.get(),
+		    m_pEditScene.get(),
 		    actorGuid,
 		    before,
 		    after
@@ -1368,13 +1920,13 @@ void EditorApp::CancelRectTransformEdit()
 
     const Guid actorGuid = m_rectTransformEditTransaction->actorGuid;
 
-    if (!m_pScene || !actorGuid.IsValid())
+    if (!m_pEditScene || !actorGuid.IsValid())
     {
         m_rectTransformEditTransaction.reset();
         return;
     }
 
-	Actor* actor = m_pScene->ResolveActor(actorGuid);
+	Actor* actor = m_pEditScene->ResolveActor(actorGuid);
 
 	std::type_index rectTransformType = std::type_index(typeid(RectTransform));
 	Component* component = actor ? actor->GetComponentByExactType(rectTransformType, 0) : nullptr;
@@ -1402,10 +1954,12 @@ void EditorApp::BuildSelectionRenderData(
 	// Clear any existing selection render data
     m_selectionRenderData.Clear();
 
-    if (!m_pScene) return;
+	SceneBase* activeScene = GetActiveScene();
+
+    if (!activeScene) return;
 
 	// Get the currently selected actor from the hierarchy panel and validate it
-	Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+	Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(activeScene);
 
     if (!selectedActor ||
         !selectedActor->IsActive() ||
@@ -1584,7 +2138,9 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 {
 	ViewportOverlayData overlayData;
 
-	if (!m_pScene || viewportWidth == 0 || viewportHeight == 0)
+	SceneBase* activeScene = GetActiveScene();
+
+	if (!activeScene || viewportWidth == 0 || viewportHeight == 0)
 	{
 		return overlayData;
 	}
@@ -1597,7 +2153,7 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 	if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Canvas)
 	{
 		// Resolve editing canvas from the CanvasEditContext, which is the root canvas for the Canvas View
-		Canvas* editingCanvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+		Canvas* editingCanvas = m_canvasEditContext.ResolveCanvas(*activeScene);
 		if (!editingCanvas) return overlayData;
 
 		std::vector<Canvas*> breadcrumbPath;
@@ -1692,7 +2248,7 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 		appendRect(editingCorners, Matrix4x4::Identity(), ViewportCanvasRole::EditingRoot);
 
 		// Get the selected actor from the hierarchy panel and find its closest canvas for highlighting in the overlay
-		Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+		Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(activeScene);
 		Canvas* selectedCanvas = CanvasEditContext::FindClosestCanvas(selectedActor);
 
 		// Collect the ancestor canvases of the selected canvas up to the editing canvas
@@ -1750,7 +2306,7 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 	// In Scene View, we need to display all world-space canvases in the scene and highlight the selected canvas if any
 
 	// Get selected actor and its closest canvas if existing, for highlighting in the overlay
-	Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(m_pScene.get());
+	Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(activeScene);
 	Canvas* selectedCanvas = CanvasEditContext::FindClosestCanvas(selectedActor);
 
 	const Vector3 localCorners[4]
@@ -1762,7 +2318,7 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 	};
 
 	// Iterate through all actors in the scene to find world-space canvases and build overlay rects for them
-	for (Actor* actor : m_pScene->GetAllActors())
+	for (Actor* actor : activeScene->GetAllActors())
 	{
 		if (!actor || !actor->IsActive() || actor->IsDestroyed()) continue;
 
@@ -1863,9 +2419,11 @@ Vector2 EditorApp::CalculateCanvasViewExtent(UINT viewportWidth, UINT viewportHe
     };
 
 	// Get the reference size of the editing canvas if available
-    if (m_pScene)
+	SceneBase* activeScene = GetActiveScene();
+
+    if (activeScene)
     {
-        Canvas* canvas = m_canvasEditContext.ResolveCanvas(*m_pScene);
+        Canvas* canvas = m_canvasEditContext.ResolveCanvas(*activeScene);
         if (canvas) referenceSize = canvas->GetLayoutReferenceSize();
     }
 
@@ -1945,4 +2503,10 @@ void EditorApp::ApplyCanvasNavigationInput(const CanvasNavigationInput& input, U
     m_canvasViewNavigation.center += pivotOffsetBefore - pivotOffsetAfter;
 
     m_canvasViewNavigation.zoom = newZoom;
+}
+
+void EditorApp::StopAllEditTransactions()
+{
+	CancelTransformEdit();
+	CancelRectTransformEdit();
 }

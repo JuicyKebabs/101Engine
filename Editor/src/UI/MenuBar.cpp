@@ -8,15 +8,15 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// File menu for scene management (new/open/save)
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("New Scene"))
+            if (ImGui::MenuItem("New Scene", nullptr, false, callbacks.canEditScene))
             {
                 if (callbacks.onNewScene) callbacks.onNewScene();
             }
-            if (ImGui::MenuItem("Open Scene"))
+            if (ImGui::MenuItem("Open Scene", nullptr, false, callbacks.canEditScene))
             {
                 if (callbacks.onOpenScene) callbacks.onOpenScene();
             }
-            if (ImGui::MenuItem("Save Scene"))
+            if (ImGui::MenuItem("Save Scene", nullptr, false, callbacks.canEditScene))
             {
                 if (callbacks.onSaveScene) callbacks.onSaveScene();
             }
@@ -25,28 +25,14 @@ void MenuBar::Render(const Callbacks& callbacks)
 
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem(
-                "Undo",
-                nullptr,
-                false,
-                callbacks.canUndo))
+            if (ImGui::MenuItem("Undo", nullptr, false, callbacks.canUndo))
             {
-                if (callbacks.onUndo)
-                {
-                    callbacks.onUndo();
-                }
+                if (callbacks.onUndo) callbacks.onUndo();
             }
 
-            if (ImGui::MenuItem(
-                "Redo",
-                nullptr,
-                false,
-                callbacks.canRedo))
+            if (ImGui::MenuItem("Redo", nullptr, false, callbacks.canRedo))
             {
-                if (callbacks.onRedo)
-                {
-                    callbacks.onRedo();
-                }
+                if (callbacks.onRedo) callbacks.onRedo();
             }
 
             ImGui::EndMenu();
@@ -55,7 +41,7 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// Assets menu for creating new assets like behaviors
         if (ImGui::BeginMenu("Assets"))
         {
-            if (ImGui::MenuItem("Create Script..."))
+            if (ImGui::MenuItem("Create Script...", nullptr, false, callbacks.canModifyScripts))
             {
                 m_showCreateScriptPopup = true;
                 m_newScriptNameBuffer[0] = '\0';
@@ -67,16 +53,16 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// Build menu for building the game and hot-reloading game code
         if (ImGui::BeginMenu("Build"))
         {
-            if (ImGui::MenuItem("Build Game"))
+            if (ImGui::MenuItem("Build Game", nullptr, false, callbacks.canBuild))
             {
                 if (callbacks.onBuildGame) callbacks.onBuildGame();
             }
-            if (ImGui::MenuItem("Reload GameCode"))
+            if (ImGui::MenuItem("Reload GameCode", nullptr, false, callbacks.canBuild))
             {
                 // Build without reconfigure
                 if (callbacks.onReloadGameCode) callbacks.onReloadGameCode(false);
             }
-            if (ImGui::MenuItem("Reload GameCode (with Reconfigure)"))
+            if (ImGui::MenuItem("Reload GameCode (with Reconfigure)", nullptr, false, callbacks.canBuild))
             {
                 // Build with reconfigure
                 if (callbacks.onReloadGameCode) callbacks.onReloadGameCode(true);

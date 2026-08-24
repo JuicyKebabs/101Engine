@@ -142,18 +142,45 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
         return false;
     }
 
-	// Construct paths for vcvars64.bat, game code directory, and framework include directory
+	// Construct paths for vcvars64.bat and the include directories exposed by 101Framework.
+	// The hot-reload compiler is invoked directly, so it does not inherit CMake's
+	// target_include_directories settings automatically.
     std::string vcvars = vsPath + "\\VC\\Auxiliary\\Build\\vcvars64.bat";
     std::string gameCodeDir = projectRoot + "\\Game\\GameCode";
     std::string frameworkInc = projectRoot + "\\Framework\\src";
+    std::string thirdPartyInc = projectRoot + "\\third_party";
+    std::string directXInc = thirdPartyInc + "\\DirectX\\d3dx12";
+    std::string directXTexInc = thirdPartyInc + "\\DirectX\\DirectXTex\\include";
+    std::string assimpInc = thirdPartyInc + "\\Assimp\\include";
+    std::string imguiInc = thirdPartyInc + "\\ImGui";
+    std::string imguiBackendInc = imguiInc + "\\backends";
 
 	// Construct paths for location of outputting build artifacts
     std::string objDir = projectRoot + "\\build\\GameCode_hotreload\\obj";
     std::string frameworkLib = projectRoot + "\\build\\lib\\" + config + "\\101Framework.lib";
-    std::string outputDll = projectRoot + "\\build\\bin\\" + config + "\\GameCode.dll";
-    std::string outputLib = projectRoot + "\\build\\lib\\" + config + "\\GameCode.lib";
+    std::string outputDll = projectRoot + "\\build\\bin\\" + config + "\\GameCode.staged.dll";
+    std::string outputLib = projectRoot + "\\build\\lib\\" + config + "\\GameCode.staged.lib";
     std::string logPath = projectRoot + "\\hotreload_compile.log";
     std::string batPath = projectRoot + "\\build_hotreload.bat";
+
+	// Remove staged GameCode.dll and GameCode.lib if they exist, to ensure a clean build
+    std::error_code error;
+
+    fs::remove(outputDll, error);
+	if (error)
+	{
+		DBG("ProjectBuilder: Failed to remove %s (error %s)", outputDll.c_str(), error.message().c_str());
+        return false;
+	}
+
+    error.clear();
+
+    fs::remove(outputLib, error);
+	if (error)
+    {
+		DBG("ProjectBuilder: Failed to remove %s (error %s)", outputLib.c_str(), error.message().c_str());
+		return false;
+	}
 
     // Collect all source files for hot reload
     std::vector<std::string> sources;
@@ -195,6 +222,12 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
         bat << "cl.exe /nologo " << rtFlag << " /Z7 /EHsc /std:c++latest /DNOMINMAX /c";
         bat << " /I\"" << gameCodeDir << "\"";
         bat << " /I\"" << frameworkInc << "\"";
+        bat << " /I\"" << thirdPartyInc << "\"";
+        bat << " /I\"" << directXInc << "\"";
+        bat << " /I\"" << directXTexInc << "\"";
+        bat << " /I\"" << assimpInc << "\"";
+        bat << " /I\"" << imguiInc << "\"";
+        bat << " /I\"" << imguiBackendInc << "\"";
         bat << " /Fo\"" << objDir << "\\\\\"";
         for (const auto& src : sources)
             bat << " \"" << src << "\"";

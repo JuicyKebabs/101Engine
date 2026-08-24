@@ -18,7 +18,7 @@ Actor::~Actor()
 // Post-update (for late update)
 void Actor::PreUpdate(float deltaTime)
 {
-	AddPendingComponents();
+	AttachPendingComponents();
 
 	// Post-update all components
 	for (const auto& component : m_componentPtrs) 
@@ -91,10 +91,12 @@ void Actor::OnDestroy()
 
 	for (auto& component : m_componentPtrs)
 	{
+		component->OnDetach();
 		component->OnDestroy();
 	}
 	for (auto& pending : m_pendingComponents)
 	{
+		pending.instance->OnDetach();
 		pending.instance->OnDestroy();
 	}
 }
@@ -139,7 +141,11 @@ Component* Actor::AddComponentInternal(
 
 	// Notify the owner scene that a component has been added to this actor
 	// in order to reapply UI hierarchy constraints if necessary (Canvas/UIRenderer)
-	if (m_pOwner) m_pOwner->OnActorComponentAdded(this, ptr);
+	if (m_pOwner)
+	{
+		m_pOwner->OnActorComponentAdded(this, ptr);
+		AttachPendingComponents();
+	}
 
 	return ptr;
 }
@@ -164,7 +170,7 @@ Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, st
 	if (occurrenceIndex > componentCount) return nullptr;
 
 	// Normalize storage of pending components before adding the new component
-	AddPendingComponents();
+	AttachPendingComponents();
 
 	// Get components of the same type
 	auto& instances = m_components[typeId].instances;
@@ -236,7 +242,7 @@ bool Actor::RemoveComponentImmediate(Component* component)
 		return false;
 	}
 
-	AddPendingComponents();
+	AttachPendingComponents();
 
 	// Get bucket of components of the same type
 	auto bucketIt = m_components.find(typeId);
@@ -265,7 +271,8 @@ bool Actor::RemoveComponentImmediate(Component* component)
 
 	if (pointerIt == m_componentPtrs.end()) return false;
 
-	// Process the component for destruction
+	// Detach the component from scene systems before destroying its instance.
+	component->OnDetach();
 	component->OnDestroy();
 
 	// Remove the component from both the iteration vector and the instances vector
@@ -465,21 +472,29 @@ void Actor::FlushColliderTransforms()
 }
 
 // Add pending components to the main component container
-void Actor::AddPendingComponents()
+void Actor::AttachPendingComponents()
 {
-	for(auto& pending : m_pendingComponents) {
+	if (!m_pOwner) return;
+
+	for (auto& pending : m_pendingComponents)
+	{
 		auto& instance = pending.instance;
-		m_componentPtrs.push_back(instance.get());
+		Component* component = instance.get();
+
+		m_componentPtrs.push_back(component);
+
 		auto& bucket = m_components[pending.typeId];
 		bucket.instances.push_back(std::move(instance));
+
+		component->OnAttach();
 	}
 
 	m_pendingComponents.clear();
 }
-
 // Remove components marked for destruction
 void Actor::RemoveDestroyedComponents(Component* component)
 {
+	component->OnDetach();
 	component->OnDestroy();
 
 	auto mapIt = m_components.find(std::type_index(typeid(*component)));
@@ -506,6 +521,18 @@ Actor* Actor::AddChild(std::unique_ptr<Actor> child)
 {
 	if (!m_pOwner || !child) return nullptr;
 	return m_pOwner->AddChildActor(std::move(child), m_handle);
+}
+
+void Actor::AttachComponents()
+{
+	if (!m_pOwner) return;
+
+	AttachPendingComponents();
+
+	for (Component* component : m_componentPtrs)
+	{
+		if (component) component->OnAttach();
+	}
 }
 
 bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
@@ -541,6 +568,7 @@ bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 		// Store pointer to the old and new transform
 		Component* oldTransformPtr = oldTransform.get();
 		Component* newTransformPtr = transform.get();
+		oldTransformPtr->OnDetach();
 
 		auto pointerIt = std::find(m_componentPtrs.begin(), m_componentPtrs.end(), oldTransformPtr);
 
@@ -549,6 +577,7 @@ bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 			// Just replace the existing transform with the new one
 			instances.front() = std::move(transform);
 			if (pointerIt != m_componentPtrs.end()) *pointerIt = newTransformPtr;
+			newTransformPtr->OnAttach();
 
 			return true;
 		}
@@ -566,6 +595,8 @@ bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 			// Replace the old iteration pointer with the new transform
 			*pointerIt = newTransformPtr;
 		}
+
+		newTransformPtr->OnAttach();
 
 		return true;
 	}

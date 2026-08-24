@@ -348,3 +348,35 @@ add_test(NAME RectTransformEditCommandTests COMMAND RectTransformEditCommandTest
 set_tests_properties(RectTransformEditCommandTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+add_executable(SceneClonerTests
+    SceneClonerTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Scene/SceneCloner.cpp
+)
+
+target_include_directories(SceneClonerTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(SceneClonerTests PRIVATE 101Framework)
+
+add_test(NAME SceneClonerTests COMMAND SceneClonerTests)
+set_tests_properties(SceneClonerTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(SceneEditorUpdateTests
+    SceneEditorUpdateTests.cpp
+)
+
+target_include_directories(SceneEditorUpdateTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(SceneEditorUpdateTests PRIVATE 101Framework)
+
+add_test(NAME SceneEditorUpdateTests COMMAND SceneEditorUpdateTests)
+set_tests_properties(SceneEditorUpdateTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

@@ -18,6 +18,7 @@
 #include <array>
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
+#include "Engine/Graphics/SwapChain.h"
 #include "Engine/Resource/GpuTexture.h"
 
 #pragma comment(lib,"d3d12.lib")
@@ -49,15 +50,6 @@ struct RenderPassTarget
 
 	bool clearColor = true;	// Whether to clear the color buffer
 	bool clearDepth = true;	// Whether to clear the depth buffer
-};
-
-// Back buffer render target structure
-struct BackBufferRenderTarget
-{
-	ComPtr<ID3D12Resource> resource;									// Back buffer resource
-	uint32_t rtvIndex;													// RTV index for the back buffer
-	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;	// Current resource state of the back buffer
-	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };					// Clear color for the back buffer
 };
 
 // DirectX12 engine class

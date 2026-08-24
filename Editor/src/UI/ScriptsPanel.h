@@ -19,6 +19,7 @@ public:
 	{
 		std::function<void(const std::string& name)> onDelete;	// Callback for when a script is deleted	
 		std::function<void(const std::string& name)> onOpen;	// Callback for when a script is opened
+		bool canDelete = true;	// Flag to indicate if scripts can be deleted
 	};
 
 	void Render(const Callbacks& callbacks, SceneBase* scene);
