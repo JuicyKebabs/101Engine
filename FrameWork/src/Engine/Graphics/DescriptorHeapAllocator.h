@@ -11,15 +11,16 @@ public:
 	static constexpr uint32_t MAX_DSV_DESCRIPTORS = 100;
 
 public:
-	DescriptorHeapAllocator(ID3D12Device* device) : m_pDevice(device) {}
+	DescriptorHeapAllocator() = default;
 	~DescriptorHeapAllocator() = default;
 
 	DescriptorHeapAllocator(const DescriptorHeapAllocator&) = delete;
 	DescriptorHeapAllocator& operator=(const DescriptorHeapAllocator&) = delete;
 
-	void Initialize() {
-		assert(m_pDevice && "DescriptorHeapAllocator: Device pointer is null.");
+	void Initialize(ID3D12Device* device) {
+		assert(device && "DescriptorHeapAllocator: Device pointer is null.");
 		assert(!m_isInitialized && "DescriptorHeapAllocator: Already initialized.");
+		m_pDevice = device;
 		m_cbvSrvUavHeap.Initialize(m_pDevice, DescriptorHeap::Type::CBV_SRV_UAV, MAX_CBV_SRV_UAV_DESCRIPTORS);
 		m_rtvHeap.Initialize(m_pDevice, DescriptorHeap::Type::RTV, MAX_RTV_DESCRIPTORS);
 		m_dsvHeap.Initialize(m_pDevice, DescriptorHeap::Type::DSV, MAX_DSV_DESCRIPTORS);

@@ -3,6 +3,7 @@
 #include "Engine/Core/Debug/Debug.h"
 
 #include <cassert>
+#include <stdexcept>
 
 bool SwapChain::Initialize(
 	ID3D12Device* pDevice,
@@ -15,8 +16,18 @@ bool SwapChain::Initialize(
 	m_device = pDevice;
 	m_descriptorHeapAllocator = pDescriptorHeapAllocator;
 
-	CreateSwapChain(pCommandQueue, hwnd, width, height);
-	CreateBackBuffers();
+	if (!CreateSwapChain(pCommandQueue, hwnd, width, height))
+	{
+		DBG("SwapChain::Initialize failed: CreateSwapChain failed.");
+		return false;
+	}
+
+	if (!CreateBackBuffers())
+	{
+		DBG("SwapChain::Initialize failed: CreateBackBuffers failed.");
+		return false;
+	}
+
 	return true;
 }
 
@@ -25,6 +36,17 @@ HRESULT SwapChain::Present(UINT syncInterval, UINT flags)
 	if (!m_pSwapChain) return E_POINTER;
 
 	return m_pSwapChain->Present(syncInterval, flags);
+}
+
+BackBufferRenderTarget& SwapChain::GetBackBuffer(UINT index)
+{
+	if (index < 0 || index >= BufferCount)
+	{
+		assert(false && "SwapChain::GetBackBuffer: Index out of bounds.");
+		throw std::out_of_range("SwapChain::GetBackBuffer: Index out of bounds.");
+	}
+
+	return m_backBuffers[index];
 }
 
 UINT SwapChain::GetCurrentBackBufferIndex() const
@@ -118,6 +140,12 @@ bool SwapChain::CreateBackBuffers()
 	DXGI_SWAP_CHAIN_DESC swcDesc = {};	// Swap chain description structure
 	result = m_pSwapChain->GetDesc(&swcDesc);
 
+	if (FAILED(result))
+	{
+		DBG("SwapChain::CreateBackBuffers failed: GetDesc failed with HRESULT 0x%08X.", result);
+		return false;
+	}
+
 	for (UINT idx = 0; idx < swcDesc.BufferCount; idx++)
 	{
 		auto& buffer = m_backBuffers[idx];
@@ -139,6 +167,12 @@ bool SwapChain::CreateBackBuffers()
 			idx,													// Index of the buffer to get
 			IID_PPV_ARGS(buffer.resource.ReleaseAndGetAddressOf())	// Get the address of the render target (specify the object type with IID_PPV_ARGS macro)
 		);
+
+		if (FAILED(result))
+		{
+			DBG("SwapChain::CreateBackBuffers failed: GetBuffer failed with HRESULT 0x%08X.", result);
+			return false;
+		}
 
 		// Create render target view (RTV)
 		m_device->CreateRenderTargetView(

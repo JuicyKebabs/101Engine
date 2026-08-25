@@ -34,6 +34,8 @@ public:
 	);
 
 	HRESULT Present(UINT syncInterval, UINT flags);
+
+	BackBufferRenderTarget& GetBackBuffer(UINT index);
 	UINT GetCurrentBackBufferIndex() const;
 
 private:

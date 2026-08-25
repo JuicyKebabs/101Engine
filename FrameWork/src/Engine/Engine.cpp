@@ -12,11 +12,26 @@ bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeig
 	CreateDevice();						//デバイスの生成
 	CreateDescriptorHeapAllocator();	//ディスクリプタヒープアロケータの生成
 	CreateCommandObjects();				//コマンドオブジェクトの生成
-	CreateSwapChain();					//スワップチェーンの生成
+
+	bool result = m_swapChain.Initialize(
+		m_pDevice.Get(),
+		m_pCommandQueue.Get(),
+		&m_descriptorHeapAllocator,
+		hwnd,
+		m_frameBufferWidth,
+		m_frameBufferHeight
+	);
+
+	if (!result)
+	{
+		assert(false && "Engine : Failed to initialize swap chain");
+		return false;
+	}
+
+
 	CreateFence();						//フェンスの生成
 	CreateViewport();					//ビューポートの生成
 	CreateScissorRect();				//シザー矩形の生成
-	CreateBackBuffers();				//バックバッファの生成
 	CreateBuiltinRenderTargets();		//ビルトインレンダーターゲットの生成
 	return true;
 }
@@ -45,7 +60,7 @@ void Engine::BeginPass(RenderPassTarget target)
 	switch (target.type)
 	{
 	case RenderPassTargetType::BackBuffer:
-		assert(target.colorIndex < FRAME_BUFFER_COUNT);
+		assert(target.colorIndex < SwapChain::BufferCount);
 		assert(target.depthIndex == RenderPassTarget::InvalidIndex);
 		break;
 
@@ -73,9 +88,9 @@ void Engine::BeginPass(RenderPassTarget target)
 	// Set up the render target based on the target type
 	if(target.type == RenderPassTargetType::BackBuffer)
 	{
-		auto& rt = m_backBuffers[target.colorIndex];				// Get the back buffer render target for the specified index
+		auto& rt = m_swapChain.GetBackBuffer(target.colorIndex);				// Get the back buffer render target for the specified index
 		resource = rt.resource.Get();						// Get the resource for the back buffer
-		rtvIndex = m_backBuffers[target.colorIndex].rtvIndex;
+		rtvIndex = rt.rtvIndex;
 		currentState = rt.currentState;						// Get the current resource state of the back buffer
 		clearColor[0] = rt.clearColor[0];
 		clearColor[1] = rt.clearColor[1];
@@ -110,7 +125,7 @@ void Engine::BeginPass(RenderPassTarget target)
 		scissorRect.bottom = m_frameBufferHeight;
 		m_pCommandList->RSSetScissorRects(1, &scissorRect);
 
-		const auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get the RTV handle for the current render target slot
+		const auto rtvHandle = m_descriptorHeapAllocator.GetRtvCpuHandle(rtvIndex);	// Get the RTV handle for the current render target slot
 
 		m_pCommandList->OMSetRenderTargets(
 			1,
@@ -146,8 +161,8 @@ void Engine::BeginPass(RenderPassTarget target)
 
 		SetViewPortAndScissorRect(color);	// Set the viewport and scissor rectangle for rendering
 
-		const auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(color.GetRtvIndex());	// Get the RTV handle for the current render target slot
-		const auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(depth.GetDsvIndex());	// Get the DSV handle for the depth render target
+		const auto rtvHandle = m_descriptorHeapAllocator.GetRtvCpuHandle(color.GetRtvIndex());	// Get the RTV handle for the current render target slot
+		const auto dsvHandle = m_descriptorHeapAllocator.GetDsvCpuHandle(depth.GetDsvIndex());	// Get the DSV handle for the depth render target
 
 		m_pCommandList->OMSetRenderTargets(
 			1,
@@ -189,7 +204,7 @@ void Engine::BeginPass(RenderPassTarget target)
 
 		SetViewPortAndScissorRect(depth);	// Set the viewport and scissor rectangle for rendering
 
-		const auto dsvHandle = m_pDescriptorHeapAllocator->GetDsvCpuHandle(depth.GetDsvIndex());	// Get the DSV handle for the depth-only render target
+		const auto dsvHandle = m_descriptorHeapAllocator.GetDsvCpuHandle(depth.GetDsvIndex());	// Get the DSV handle for the depth-only render target
 
 		m_pCommandList->OMSetRenderTargets(
 			0,
@@ -222,7 +237,7 @@ void Engine::EndPass(RenderPassTarget target)
 	switch (target.type)
 	{
 	case RenderPassTargetType::BackBuffer:
-		assert(target.colorIndex < FRAME_BUFFER_COUNT);
+		assert(target.colorIndex < SwapChain::BufferCount);
 		assert(target.depthIndex == RenderPassTarget::InvalidIndex);
 		break;
 
@@ -247,7 +262,7 @@ void Engine::EndPass(RenderPassTarget target)
 
 	if(target.type == RenderPassTargetType::BackBuffer)
 	{
-		auto& rt = m_backBuffers[target.colorIndex];		// Get the back buffer render target for the specified index
+		auto& rt = m_swapChain.GetBackBuffer(target.colorIndex);		// Get the back buffer render target for the specified index
 		resource = rt.resource.Get();						// Get the resource for the back buffer
 		currentState = rt.currentState;						// Get the current resource state of the back buffer
 		nextState = D3D12_RESOURCE_STATE_PRESENT;			// Next state for the back buffer is "Present" for presentation to the screen
@@ -285,9 +300,9 @@ void Engine::EndPass(RenderPassTarget target)
 void Engine::BeginFrame()
 {
 	// Initialize command settings for the current frame
-	m_pCommandAllocator[m_currentBackBufferIndex]->Reset();		// Reset the command allocator for the current back buffer index
+	m_pCommandAllocator[m_swapChain.GetCurrentBackBufferIndex()]->Reset();		// Reset the command allocator for the current back buffer index
 	m_pCommandList->Reset(										// Reset the command list
-		m_pCommandAllocator[m_currentBackBufferIndex].Get(),	// Get the command allocator for the current back buffer index
+		m_pCommandAllocator[m_swapChain.GetCurrentBackBufferIndex()].Get(),	// Get the command allocator for the current back buffer index
 		nullptr													// Initial pipeline state (nullptr means no initial pipeline state)
 	);
 }
@@ -345,13 +360,16 @@ void Engine::RenderEnd()
 	);
 
 	// Swap the back buffers
-	m_pSwapChain->Present(1, 0);	// Present with vertical sync
+	HRESULT result = m_swapChain.Present(1, 0);	// Present with vertical sync
+
+	// Check if presenting the swap chain was successful
+	if (FAILED(result))
+	{
+		assert(false && "Failed to present swap chain");
+	}
 
 	// Wait for the previous frame to finish
 	WaitRender();
-
-	// Get the next back buffer index
-	m_currentBackBufferIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 }
 
 bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
@@ -384,21 +402,21 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 	WaitRender();
 
 	// Resize the render targets
-	const bool colorResult = sceneColor->Resize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), width, height);
+	const bool colorResult = sceneColor->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
 	if (!colorResult)
 	{
 		assert(false && "SceneColor resize failed");
 		return false;
 	}
 
-	const bool depthResult = sceneDepth->Resize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), width, height);
+	const bool depthResult = sceneDepth->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
 	if (!depthResult)
 	{
 		assert(false && "SceneDepth resize failed after SceneColor resize");
 		return false;
 	}
 
-	const bool selectionMaskResult = selectionMask->Resize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), width, height);
+	const bool selectionMaskResult = selectionMask->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
 	if (!selectionMaskResult)
 	{
 		assert(false && "SelectionMask resize failed after SceneColor and SceneDepth resize");
@@ -449,29 +467,40 @@ void Engine::CreateDevice()
 // Create the descriptor heap allocator
 void Engine::CreateDescriptorHeapAllocator()
 {
-	m_pDescriptorHeapAllocator = std::make_unique<DescriptorHeapAllocator>(m_pDevice.Get());
-	m_pDescriptorHeapAllocator->Initialize();
+	m_descriptorHeapAllocator.Initialize(m_pDevice.Get());
 }
 
 //コマンドオブジェクトの生成
 void Engine::CreateCommandObjects()
 {
-	for (size_t i = 0; i < FRAME_BUFFER_COUNT; i++)
+	for (size_t i = 0; i < SwapChain::BufferCount; i++)
 	{
 		//コマンドアロケーターの生成
 		result = m_pDevice->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,			//直接コマンド
 			IID_PPV_ARGS(&m_pCommandAllocator[i])	//コマンドアロケーターのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
 		);
+
+		if (FAILED(result))
+		{
+			assert(false && "Failed to create command allocator");
+			return;
+		}
 	}
 
 	result = m_pDevice->CreateCommandList(
 		0,														//ノードマスク
 		D3D12_COMMAND_LIST_TYPE_DIRECT,							//直接コマンド
-		m_pCommandAllocator[m_currentBackBufferIndex].Get(),	//コマンドアロケーター
+		m_pCommandAllocator[m_swapChain.GetCurrentBackBufferIndex()].Get(),	//コマンドアロケーター
 		nullptr,												//パイプラインステートオブジェクト
 		IID_PPV_ARGS(&m_pCommandList)							//コマンドリストのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
 	);
+
+	if (FAILED(result))
+	{
+		assert(false && "Failed to create command list");
+		return;
+	}
 
 	m_pCommandList->Close();	//コマンドリストは生成直後に開いている状態なので閉じておく
 
@@ -488,51 +517,12 @@ void Engine::CreateCommandObjects()
 		&cmdQueueDesc,					//コマンドキューの設定構造体
 		IID_PPV_ARGS(&m_pCommandQueue)	//コマンドキューのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
 	);
-}
 
-//スワップチェーンの生成
-void Engine::CreateSwapChain()
-{
-	//DXGIファクトリの生成
-	IDXGIFactory4* pDXGIFactory4 = nullptr;						//DXGIファクトリ6
-	result = CreateDXGIFactory1(IID_PPV_ARGS(&pDXGIFactory4));	//DXGIファクトリ1の生成
-
-	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};	//スワップチェーンの設定構造体
-
-	swapchainDesc.Width = m_frameBufferWidth;					//ウィンドウの幅
-	swapchainDesc.Height = m_frameBufferHeight;					//ウィンドウの高さ
-	swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;			//色フォーマット
-	swapchainDesc.Stereo = false;								//ステレオ表示かどうか
-	swapchainDesc.SampleDesc.Count = 1;							//マルチサンプリングしない
-	swapchainDesc.SampleDesc.Quality = 0;						//クオリティレベル0
-	swapchainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;			//バックバッファとして使用
-	swapchainDesc.BufferCount = 2;								//バッファ数(ダブルバッファリング)
-	swapchainDesc.Scaling = DXGI_SCALING_STRETCH;				//ウィンドウサイズに合わせて伸縮
-	swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;	//フリップ後破棄
-	swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;		//アルファモードは指定しない
-	swapchainDesc.Flags = 0;									//特に指定なし
-
-	//スワップチェーンの生成
-	IDXGISwapChain1* pSwapChain = nullptr;
-
-	result = pDXGIFactory4->CreateSwapChainForHwnd(
-		m_pCommandQueue.Get(),			//コマンドキュー
-		hwnd,							//ウィンドウハンドル
-		&swapchainDesc,					//スワップチェーンの設定構造体
-		nullptr,						//フルスクリーン設定(nullptrでデフォルト)
-		nullptr,						//制限出力(nullptrで制限なし)
-		&pSwapChain						//スワップチェーンのアドレスを取得
-	);
-
-	//IDXGISwapChain4に変換
-	result = pSwapChain->QueryInterface(IID_PPV_ARGS(m_pSwapChain.ReleaseAndGetAddressOf()));
-
-	//バックバッファのインデックスを取得
-	m_currentBackBufferIndex = m_pSwapChain->GetCurrentBackBufferIndex();
-
-	//不要になったリソースを解放
-	pSwapChain->Release();
-	pDXGIFactory4->Release();
+	if (FAILED(result))
+	{
+		assert(false && "Failed to create command queue");
+		return;
+	}
 }
 
 void Engine::CreateFence()
@@ -543,6 +533,12 @@ void Engine::CreateFence()
 		D3D12_FENCE_FLAG_NONE,
 		IID_PPV_ARGS(&m_pFence)
 	);
+
+	if (FAILED(result))
+	{
+		assert(false && "Failed to create fence");
+		return;
+	}
 
 	m_nextFenceValue = 1;	// Initialize the next fence value
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -577,50 +573,6 @@ void Engine::CreateScissorRect()
 	m_scissorRect = scissorRect;	// Save to member variable
 }
 
-void Engine::CreateBackBuffers()
-{
-	// Get swap chain description
-	DXGI_SWAP_CHAIN_DESC swcDesc = {};	// Swap chain description structure
-	result = m_pSwapChain->GetDesc(&swcDesc);
-
-	for (UINT idx = 0; idx < swcDesc.BufferCount; idx++)
-	{
-		auto& buffer = m_backBuffers[idx];
-		float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };	// Back buffer clear color (black)
-
-		// Get render target view handle
-		auto rtvIndex = m_pDescriptorHeapAllocator->AllocateRtv();				// Allocate render target view index
-		auto rtvHandle = m_pDescriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get render target view handle
-
-		// Create render target view (RTV)
-		// Render target view settings
-		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};	// Render target view settings structure
-
-		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;			// Color format
-		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;	// 2D texture
-
-		// Get buffer from swap chain
-		result = m_pSwapChain->GetBuffer(
-			idx,													// Index of the buffer to get
-			IID_PPV_ARGS(buffer.resource.ReleaseAndGetAddressOf())	// Get the address of the render target (specify the object type with IID_PPV_ARGS macro)
-		);
-
-		// Create render target view (RTV)
-		m_pDevice->CreateRenderTargetView(
-			buffer.resource.Get(),		// Buffer to set as render target
-			&rtvDesc,					// Render target view settings (for sRGB)
-			rtvHandle					// Handle to the descriptor heap to store the render target view
-		);
-
-		buffer.rtvIndex = rtvIndex;							// Save the RTV index of the back buffer
-		buffer.currentState = D3D12_RESOURCE_STATE_COMMON;	// Save the current resource state of the back buffer
-		buffer.clearColor[0] = clearColor[0];				// Save the clear color of the back buffer
-		buffer.clearColor[1] = clearColor[1];
-		buffer.clearColor[2] = clearColor[2];
-		buffer.clearColor[3] = clearColor[3];
-	}
-}
-
 void Engine::CreateBuiltinRenderTargets()
 {
 	for(auto& target : m_builtinRenderTargets) 
@@ -653,7 +605,7 @@ void Engine::CreateSceneDepthRenderTarget()
 
 	auto& sceneDepth = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneDepth)];
 
-	sceneDepth->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+	sceneDepth->Initialize(m_pDevice.Get(), &m_descriptorHeapAllocator, desc);
 }
 
 void Engine::CreateShadowMapRenderTarget()
@@ -667,7 +619,7 @@ void Engine::CreateShadowMapRenderTarget()
 	desc.useSRV = true;
 
 	auto& rt = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::ShadowMap)];
-	rt->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+	rt->Initialize(m_pDevice.Get(), &m_descriptorHeapAllocator, desc);
 }
 
 // Create post-process render target
@@ -687,7 +639,7 @@ void Engine::CreatePostProcessRenderTarget()
 
 	auto& rt = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SceneColor)];
 
-	rt->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+	rt->Initialize(m_pDevice.Get(), &m_descriptorHeapAllocator, desc);
 }
 
 void Engine::CreateSelectionMaskRenderTarget()
@@ -713,7 +665,7 @@ void Engine::CreateSelectionMaskRenderTarget()
 
 	auto& selectionMask = m_builtinRenderTargets[static_cast<size_t>(BuiltinRenderTarget::SelectionMask)];
 
-	selectionMask->Initialize(m_pDevice.Get(), m_pDescriptorHeapAllocator.get(), desc);
+	selectionMask->Initialize(m_pDevice.Get(), &m_descriptorHeapAllocator, desc);
 }
 
 void Engine::SetViewPortAndScissorRect(const GpuTexture& renderTarget)
