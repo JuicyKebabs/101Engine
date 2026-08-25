@@ -1,4 +1,5 @@
 #include "SceneWriter.h"
+#include "SceneVersion.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Scene/ActorSerializer.h"
 #include "Engine/Actor/Actor.h"
@@ -7,6 +8,7 @@
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "nlohmann/json.hpp"
 #include <fstream>
 
 using json = nlohmann::json;
@@ -39,7 +41,7 @@ bool SceneWriter::SaveScene(const std::string& filePath, SceneBase* scene)
 	return true;
 }
 
-bool SceneWriter::SerializeScene(SceneBase* scene, json& outJson)
+bool SceneWriter::SerializeScene(const SceneBase* scene, json& outJson)
 {
 	// Check if the scene pointer is valid before proceeding
 	if (!scene)

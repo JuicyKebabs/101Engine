@@ -1,4 +1,5 @@
 #include "SceneLoader.h"
+#include "SceneVersion.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Actor/ActorFactory.h"
@@ -47,27 +48,45 @@ bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene)
 		return false;
 	}
 
-	// Check scene version
-	if (!j.contains("version") || !j["version"].is_number_integer())
+	return DeserializeScene(scene, j);
+}
+
+bool SceneLoader::DeserializeScene(SceneBase* scene, const json& sceneRecord)
+{
+	if (!sceneRecord.is_object())
 	{
-		DBG("SceneLoader: Scene file is missing a valid 'version' field.");
+		DBG("SceneLoader: Scene record is not a valid JSON object.");
 		return false;
 	}
 
-	const int version = j["version"].get<int>();
+	if (!scene)
+	{
+		DBG("SceneLoader: Scene is missing.");
+		return false;
+	}
+
+	// Check scene version
+	if (!sceneRecord.contains("version") || !sceneRecord["version"].is_number_integer())
+	{
+		DBG("SceneLoader: Scene record is missing a valid 'version' field.");
+		return false;
+	}
 
 	bool loaded = false;
 
 	try
 	{// Load the scene based on its version
+		// Get the version number from the scene record
+		const int version = sceneRecord["version"].get<int>();
+
 		switch (version)
 		{
 		case LEGACY_SCENE_VERSION:
-			loaded = LoadSceneVersion2(j, scene);
+			loaded = LoadSceneVersion2(sceneRecord, scene);
 			break;
 
 		case CURRENT_SCENE_VERSION:
-			loaded = LoadSceneVersion3(j, scene);
+			loaded = LoadSceneVersion3(sceneRecord, scene);
 			break;
 
 		default:
@@ -79,9 +98,7 @@ bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene)
 	}
 	catch (const json::exception& exception)
 	{// Catch any JSON parsing exceptions and log the error
-		DBG(
-			"SceneLoader: Invalid scene data: %s",
-			exception.what());
+		DBG("SceneLoader: Invalid scene data: %s", exception.what());
 		return false;
 	}
 
@@ -156,6 +173,13 @@ bool SceneLoader::LoadSceneVersion2(const json& sceneJson, SceneBase* scene)
 	{
 		DBG("SceneLoader: Failed to apply UI hierarchy constraints.");
 		return false;
+	}
+
+	// Components can safely register with scene systems after the complete
+	// hierarchy and its UI constraints have been restored.
+	for (Actor* actor : scene->GetAllActors())
+	{
+		if (actor) actor->AttachComponents();
 	}
 
 	// Apply scene settings
@@ -303,6 +327,13 @@ bool SceneLoader::LoadSceneVersion3(const json& sceneJson, SceneBase* scene)
 	{
 		DBG("SceneLoader: Failed to apply UI hierarchy constraints.");
 		return false;
+	}
+
+	// Components can safely register with scene systems after the complete
+	// hierarchy and its UI constraints have been restored.
+	for (Actor* actor : scene->GetAllActors())
+	{
+		if (actor) actor->AttachComponents();
 	}
 
 	// Apply scene settings (e.g., directional light)

@@ -2,6 +2,7 @@
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "UI/EditorUI.h"
 #include "imgui.h"
 #include <typeindex>
 #include <unordered_map>
@@ -22,10 +23,15 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
     ImGui::Text("Name: %s", selectedActor->GetName().c_str());
     ImGui::Text("Tag: %s", TagRegistry::Get().GetName(selectedActor->GetTag()).c_str());
 
-    bool isActive = selectedActor->IsActive();
-    if (ImGui::Checkbox("Active", &isActive))
+	bool readOnly = (context.state == InspectorState::ReadOnly);
+
     {
-        selectedActor->SetActive(isActive);
+        EditorUI::DisabledScope disabledScope(readOnly);
+        bool isActive = selectedActor->IsActive();
+        if (ImGui::Checkbox("Active", &isActive))
+        {
+            selectedActor->SetActive(isActive);
+        }
     }
 
     ImGui::Separator();
@@ -43,7 +49,7 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
         const std::size_t occurrenceIndex = occurrenceCounts[typeId]++;
 
 		// Draw the component using the registered drawer function
-        if (DrawComponent(*component, context))
+        if (DrawComponent(*component, context, readOnly))
 		{// If the "Remove" button was clicked, prepare a removal request
             const std::string componentName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
 
@@ -73,7 +79,10 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 	// Buffer to hold the name of the component to be added
     std::string pendingAddComponent;
 
-    if (ImGui::Button("Add Component", ImVec2(-1.0f, 0.0f))) ImGui::OpenPopup("AddComponentPopup");
+    {
+        EditorUI::DisabledScope addComponentDisabledScope(readOnly);
+        if (ImGui::Button("Add Component", ImVec2(-1.0f, 0.0f))) ImGui::OpenPopup("AddComponentPopup");
+    }
 
     if (ImGui::BeginPopup("AddComponentPopup"))
     {
@@ -86,9 +95,11 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
             // based on its cardinality and existing components
             const bool canAdd = ComponentRegistry::Get().CanAddToActor(name, selectedActor);
 
+			const bool disabled = readOnly || !canAdd;
+
 			// Disable the following selectable item
             // if the component cannot be added
-            ImGui::BeginDisabled(!canAdd);
+            ImGui::BeginDisabled(disabled);
 
 			// Draw a selectable item for the component name
             if (ImGui::Selectable(name.c_str()))
@@ -111,10 +122,7 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
     ImGui::End();
 }
 
-bool InspectorPanel::DrawComponent(
-    Component& component,
-    const InspectorContext& context
-)
+bool InspectorPanel::DrawComponent(Component& component, const InspectorContext& context, bool readOnly)
 {
 	const std::type_index typeId = std::type_index(typeid(component));
 
@@ -160,12 +168,14 @@ bool InspectorPanel::DrawComponent(
         ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - buttonWidth);
 
 		// Draw the "Remove" button and set the flag if clicked
+		EditorUI::DisabledScope disabledScope(readOnly);
         if (ImGui::SmallButton("Remove")) removeRequested = true;
     }
 
 	// Draw the inspector UI for the component if the header is opened
     if (opened)
     {
+		EditorUI::DisabledScope disabledScope(readOnly);
 		// Draw the component's inspector UI using the registered drawer function
 		const bool drawn = m_componentInspectorRegistry.Draw(component, context);
 

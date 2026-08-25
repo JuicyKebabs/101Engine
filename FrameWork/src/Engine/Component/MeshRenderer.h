@@ -66,10 +66,12 @@ private:
 
 private:
 	// Override functions for component lifecycle
+	void OnAttachOverride() override;
 	void OnStartOverride() override;
 	void PreUpdateOverride(float deltaTime) override;
 	void UpdateOverride(float deltaTime) override;
 	void LateUpdateOverride(float deltaTime) override;
+	void OnDetachOverride() override;
 	void OnDestroyOverride() override;
 
 	void RebuildRenderProxy();		// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)

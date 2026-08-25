@@ -18,6 +18,7 @@
 #include <array>
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
+#include "Engine/Graphics/SwapChain.h"
 #include "Engine/Resource/GpuTexture.h"
 
 #pragma comment(lib,"d3d12.lib")
@@ -51,21 +52,10 @@ struct RenderPassTarget
 	bool clearDepth = true;	// Whether to clear the depth buffer
 };
 
-// Back buffer render target structure
-struct BackBufferRenderTarget
-{
-	ComPtr<ID3D12Resource> resource;									// Back buffer resource
-	uint32_t rtvIndex;													// RTV index for the back buffer
-	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;	// Current resource state of the back buffer
-	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };					// Clear color for the back buffer
-};
-
 // DirectX12 engine class
 class Engine
 {
 public:
-	static constexpr int FRAME_BUFFER_COUNT = 2; // Number of frame buffers for double buffering
-
 	enum class BuiltinRenderTarget
 	{
 		ShadowMap = 0,	// Shadow map render target
@@ -101,8 +91,8 @@ public:
 	// Various getters
 	ID3D12Device* GetDevice() { return m_pDevice.Get(); }												// Get device
 	ID3D12GraphicsCommandList* GetCommandList() { return m_pCommandList.Get(); }						// Get command list
-	UINT GetCurrentBufferIndex() const { return m_currentBackBufferIndex; }								// Get frame buffer index
-	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return m_pDescriptorHeapAllocator.get(); }	// Get descriptor heap allocator
+	UINT GetCurrentBufferIndex() const { return m_swapChain.GetCurrentBackBufferIndex(); }				// Get frame buffer index
+	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return &m_descriptorHeapAllocator; }			// Get descriptor heap allocator
 	GpuTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
 	UINT GetFrameBufferWidth() const { return m_frameBufferWidth; }										// Get frame buffer width
 	UINT GetFrameBufferHeight() const { return m_frameBufferHeight; }									// Get frame buffer height
@@ -116,10 +106,10 @@ private:
 
 private:	// DirectX12 related
 	ComPtr<ID3D12Device> m_pDevice;												// Device
-	ComPtr<ID3D12CommandAllocator> m_pCommandAllocator[FRAME_BUFFER_COUNT];		// Command allocator
+	DescriptorHeapAllocator m_descriptorHeapAllocator;							// Descriptor heap allocator (for CBV/SRV/UAV, RTV, DSV)
+	ComPtr<ID3D12CommandAllocator> m_pCommandAllocator[SwapChain::BufferCount];	// Command allocator
 	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;							// Command list
 	ComPtr<ID3D12CommandQueue> m_pCommandQueue;									// Command queue
-	ComPtr<IDXGISwapChain4> m_pSwapChain;										// Swap chain
 
 	ComPtr<ID3D12Fence> m_pFence;	// Fence
 	HANDLE m_fenceEvent = nullptr;	// Fence event handle
@@ -128,15 +118,14 @@ private:	// DirectX12 related
 	D3D12_VIEWPORT m_viewport{};	// Viewport
 	D3D12_RECT m_scissorRect{};		// Scissor rectangle
 
+	SwapChain m_swapChain;	// Swap chain wrapper
+
 private:	// Rendering related
 	UINT m_frameBufferWidth = 0;		// Frame buffer width
 	UINT m_frameBufferHeight = 0;		// Frame buffer height
-	UINT m_currentBackBufferIndex = 0;	// Current back buffer index
 
 	// Resource management
-	BackBufferRenderTarget m_backBuffers[FRAME_BUFFER_COUNT];															// Back buffers
 	std::array< std::unique_ptr<GpuTexture>, static_cast<size_t>(BuiltinRenderTarget::Count)> m_builtinRenderTargets{};	// Built-in render target handles (post-processing, bloom, motion blur, etc.)
-	std::unique_ptr<DescriptorHeapAllocator> m_pDescriptorHeapAllocator;												// Descriptor heap allocator (for CBV/SRV/UAV, RTV, DSV)	
 	RenderTargetHandle m_nextRenderTargetHandle = static_cast<RenderTargetHandle>(BuiltinRenderTarget::Count);			// Next render target handle to assign
 	TextureManager* m_pTextureManager = nullptr;	// Texture manager (for post-processing render target)
 
@@ -147,12 +136,10 @@ private:	// Internal functions
 	// Various creation functions
 	void CreateDevice();					// Device creation
 	void CreateDescriptorHeapAllocator();	// Descriptor heap allocator creation
-	void CreateCommandObjects();			// Command object creation
-	void CreateSwapChain();					// Swap chain creation
+	void CreateCommandObjects();			// Command objects creation
 	void CreateFence();						// Fence creation
 	void CreateViewport();					// Viewport creation
 	void CreateScissorRect();				// Scissor rectangle creation
-	void CreateBackBuffers();				// Back buffer creation
 	void CreateBuiltinRenderTargets();		// Built-in render target creation (post-processing, bloom, motion blur, etc.)
 
 	// Built-in render target creation functions

@@ -2,9 +2,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "SceneVersion.h"
 #include "Engine/Core/GUID/Guid.h"
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 //-----------------------------------------------------------------------------
 // SceneLoader class
@@ -20,14 +19,18 @@ class SceneLoader
 public:
 	static bool LoadScene(const std::string& filePath, SceneBase* scene);
 
+	// Output the scene data from the JSON record into the provided scene instance.
+	// Provided scene must be initialized before calling this function.
+	static bool DeserializeScene(SceneBase* scene, const nlohmann::json& sceneRecord);
+
 private:
 	// Structure to hold information about an actor being loaded
 	struct ActorLoadRecord
 	{
 		const nlohmann::json* actorJson = nullptr;	// Pointer to the actor's JSON data
-		Guid actorGuid;						// Actor's GUID
-		bool hasParent = false;				// Whether the actor has a parent
-		Guid parentGuid;					// Parent actor's GUID (if any)
+		Guid actorGuid;								// Actor's GUID
+		bool hasParent = false;						// Whether the actor has a parent
+		Guid parentGuid;							// Parent actor's GUID (if any)
 	};
 
 	// Enum to represent the visit state of an actor reference during the loading process

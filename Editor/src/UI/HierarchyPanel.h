@@ -12,6 +12,7 @@ public:
 		std::function<bool(const Guid& actorGuid)> onDeleteActor;								// Callback for when an actor is deleted
 		std::function<bool(const Guid& actorGuid, const Guid& newParentGuid)> onReparentActor;	// Callback for when an actor is reparented
 		std::function<void(const Guid& actorGuid)> onOpenCanvas;								// Callback for opening a Canvas as an edit scope
+		bool canEdit = true;	// Flag to indicate if the hierarchy panel is editable (e.g., in edit mode)
 	};
 
     void Render(SceneBase* scene, const Callbacks& callbacks);
@@ -19,6 +20,7 @@ public:
 	void SelectActor(const Guid& actorGuid) { m_selectedActorGuid = actorGuid; }
 
     Actor* GetSelectedActor(SceneBase* scene);
+	Guid GetSelectedActorGuid() const { return m_selectedActorGuid; }
 
 	// Clears the current selection.
 	// Must be called when the selected actor is destroyed (e.g. hot-reload is performed).
@@ -54,7 +56,7 @@ private:
 		const Callbacks& callbacks
 	);
 
-	void HandleActorDragSource(Actor* actor);
+	void HandleActorDragSource(Actor* actor, const Callbacks& callbacks);
 
 	void HandleActorDropTarget(
 		const Guid& newParentGuid,

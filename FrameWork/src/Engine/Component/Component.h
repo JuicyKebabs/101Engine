@@ -16,10 +16,12 @@ public:
 	Component() = default;
 	virtual ~Component() = default;
 
+	void OnAttach() { if (!m_attached) { OnAttachOverride(); m_attached = true; } }							// Call OnAttachOverride if not already attached
 	void OnStart() { OnStartOverride(); MarkAsStarted(); }													// Call OnStartOverride if not already started
 	void PreUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) PreUpdateOverride(deltaTime); }	// Call PreUpdateOverride if started and not destroyed
 	void Update(float deltaTime) { if (IsStarted() && !IsDestroyed()) UpdateOverride(deltaTime); }			// Call UpdateOverride if started and not destroyed
 	void LateUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) LateUpdateOverride(deltaTime); }	// Call LateUpdateOverride if started and not destroyed
+	void OnDetach() { if (m_attached) { OnDetachOverride(); m_attached = false; } }							// Call OnDetachOverride if attached
 	void OnDestroy() { if (!IsDestroyed()) OnDestroyOverride(); MarkForDestruction(); }						// Call OnDestroyOverride if not already destroyed
 
 	void SetOwner(Actor* owner) { m_pOwner = owner; }			// Set the owning actor
@@ -36,19 +38,24 @@ public:
 	virtual bool Serialize(nlohmann::json& outJson) const;
 	virtual bool Deserialize(const nlohmann::json& json);
 	virtual bool ResolveReferences(SceneBase& scene);
+
 protected:
 	EngineContext* GetEngineContext() const;	// Get the engine context from the owning actor's scene
 
 private:
 	Actor* m_pOwner = nullptr;		// Pointer to the owning actor
 	std::string m_name;				// Component name (optional, can be used for debugging or identification)
+
+	bool m_attached = false;		// Flag to check if the component is attached to an actor
 	bool m_started = false;			// Flag to check if OnStart has been called
 	bool m_destroyed = false;		// Flag to check if the component is marked for destruction
 
 private:
+	virtual void OnAttachOverride() {}						// Called when the component is attached to an actor
 	virtual void OnStartOverride() = 0;						// Called when the component is initialized
 	virtual void PreUpdateOverride(float deltaTime) = 0;	// Called every frame before Update to perform pre-update tasks
 	virtual void UpdateOverride(float deltaTime) = 0;		// Called every frame to update the component
 	virtual void LateUpdateOverride(float deltaTime) = 0;	// Called every frame after Update to perform late updates
+	virtual void OnDetachOverride() {}						// Called when the component is detached from an actor
 	virtual void OnDestroyOverride() = 0;					// Called when the component is destroyed
 };

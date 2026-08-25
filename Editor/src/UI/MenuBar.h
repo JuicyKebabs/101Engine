@@ -25,6 +25,9 @@ public:
 
         bool canUndo = false;
         bool canRedo = false;
+        bool canEditScene = true;
+        bool canModifyScripts = true;
+        bool canBuild = true;
     };
 
     void Render(const Callbacks& callbacks);

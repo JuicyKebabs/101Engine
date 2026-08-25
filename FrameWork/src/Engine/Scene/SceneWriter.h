@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
-#include "SceneVersion.h"
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 class SceneBase;
 
@@ -17,5 +16,5 @@ public:
 	static bool SaveScene(const std::string& filePath, SceneBase* scene);
 
 	// Create JSON data for the given scene without saving to a file.
-	static bool SerializeScene(SceneBase* scene, nlohmann::json& outJson);
+	static bool SerializeScene(const SceneBase* scene, nlohmann::json& outJson);
 };

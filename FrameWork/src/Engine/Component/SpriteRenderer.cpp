@@ -8,22 +8,22 @@
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 
+void SpriteRenderer::OnAttachOverride()
+{
+	auto* owner = GetOwner();
+	if (!owner) return;
+
+	auto* scene = owner->GetOwner();
+	if (!scene) return;
+
+	auto* renderSystem = scene->GetRenderSystem();
+	if (!renderSystem) return;
+
+	renderSystem->Register(this);
+}
+
 void SpriteRenderer::OnStartOverride()
 {
-	// Register this component to the renderer system
-	auto owner = GetOwner();
-	if (owner) 
-	{
-		auto scene = owner->GetOwner();
-		if (scene) 
-		{
-			auto renderSystem = scene->GetRenderSystem();
-			if (renderSystem) 
-			{
-				renderSystem->Register(this);
-			}
-		}
-	}
 }
 
 void SpriteRenderer::PreUpdateOverride(float deltaTime)
@@ -38,22 +38,22 @@ void SpriteRenderer::LateUpdateOverride(float deltaTime)
 {
 }
 
+void SpriteRenderer::OnDetachOverride()
+{
+	auto* owner = GetOwner();
+	if (!owner) return;
+
+	auto* scene = owner->GetOwner();
+	if (!scene) return;
+
+	auto* renderSystem = scene->GetRenderSystem();
+	if (!renderSystem) return;
+
+	renderSystem->Unregister(this);
+}
+
 void SpriteRenderer::OnDestroyOverride()
 {
-	// Unregister this component from the renderer system
-	auto owner = GetOwner();
-	if (owner) 
-	{
-		auto scene = owner->GetOwner();
-		if (scene) 
-		{
-			auto renderSystem = scene->GetRenderSystem();
-			if (renderSystem) 
-			{
-				renderSystem->Unregister(this);
-			}
-		}
-	}
 }
 
 bool SpriteRenderer::SetTextureAsset(const Guid& assetId)

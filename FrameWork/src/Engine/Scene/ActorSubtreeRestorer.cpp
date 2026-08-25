@@ -355,6 +355,12 @@ Actor* ActorSubtreeRestorer::Restore(
 			return rollback();
 		}
 
+		// Attach only after the restored hierarchy and its UI constraints are final.
+		for (auto& record : pendingRecords)
+		{
+			if (record.registeredActor) record.registeredActor->AttachComponents();
+		}
+
 		return restoredRoot;
 	}
 	catch (const json::exception& exception)

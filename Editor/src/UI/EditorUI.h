@@ -50,4 +50,14 @@ namespace EditorUI
 		const Guid& currentAssetId,
 		Guid& outSelectedAssetId
 	);
+
+	class DisabledScope
+	{
+	public:
+		explicit DisabledScope(bool disabled);
+		~DisabledScope();
+
+		DisabledScope(const DisabledScope&) = delete;
+		DisabledScope& operator=(const DisabledScope&) = delete;
+	};
 }

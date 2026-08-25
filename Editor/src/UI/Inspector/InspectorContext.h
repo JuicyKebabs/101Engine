@@ -4,12 +4,18 @@
 #include "Engine/Core/Math/Math.h"
 #include "Command/RectTransformEditCommand.h"
 
+class AssetManager;
+
 //------------------------------------------------------------------
 // InspectorContext
 // Context to contain information for drawing inspector UI elements.
 //------------------------------------------------------------------
 
-class AssetManager;
+enum class InspectorState
+{
+	Editable,
+	ReadOnly,
+};
 
 struct InspectorContext
 {
@@ -24,4 +30,6 @@ struct InspectorContext
 	std::function<void(const Guid& actorGuid, const RectTransformEditState& before)> onRectTransformEditBegin;
 	std::function<void(const Guid& actorGuid, const RectTransformEditState& after)> onRectTransformEditEnd;
 	std::function<void()> onCancelRectTransformEdit;
+
+	InspectorState state = InspectorState::Editable;	// Whether the properties are editable or read-only.
 };

@@ -399,6 +399,8 @@ public:
 	// Add a child actor
 	Actor* AddChild(std::unique_ptr<Actor> child);
 
+	void AttachComponents();	// Attach all components (call OnAttach)
+
 	void FlushTransform();			// Update world transform of this actor and all child actors;
 	void FlushColliderTransforms(); // Update collider transforms of this actor and all child actors
 
@@ -425,7 +427,7 @@ private:
 	std::string m_name;		// Actor name (for debugging and editor)
 
 private:
-	void AddPendingComponents();
+	void AttachPendingComponents();
 	void RemoveDestroyedComponents(Component* component);
 	void MarkForDestruction() { m_destroyed = true; }
 

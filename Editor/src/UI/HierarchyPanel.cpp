@@ -62,7 +62,7 @@ void HierarchyPanel::Render(SceneBase* scene, const Callbacks& callbacks)
     if (ImGui::BeginPopup("HierarchyContextMenu"))
     {
         // Menu item for creating a new actor
-        if (ImGui::MenuItem("Create Empty Actor"))
+        if (ImGui::MenuItem("Create Empty Actor", nullptr, false, callbacks.canEdit))
         {
 			m_creationParentGuid = {};
             m_showActorCreationPopup = true;
@@ -205,11 +205,7 @@ void HierarchyPanel::Render(SceneBase* scene, const Callbacks& callbacks)
     }
 }
 
-void HierarchyPanel::RenderActorNode(
-    Actor* actor,
-    SceneBase* scene,
-    const Callbacks& callbacks
-)
+void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene, const Callbacks& callbacks)
 {
     if (!actor) return;
 
@@ -224,12 +220,7 @@ void HierarchyPanel::RenderActorNode(
 
     if (m_selectedActorGuid == actor->GetGuid()) flags |= ImGuiTreeNodeFlags_Selected;
 
-    bool opened = ImGui::TreeNodeEx(
-        (void*)actor,
-        flags,
-        "%s",
-        actor->GetName().c_str()
-    );
+    bool opened = ImGui::TreeNodeEx((void*)actor, flags, "%s", actor->GetName().c_str());
 
     // Left-click to select
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
@@ -245,37 +236,29 @@ void HierarchyPanel::RenderActorNode(
     }
 
     // Begin dragging this Actor.
-    HandleActorDragSource(actor);
+    HandleActorDragSource(actor, callbacks);
 
     // Dropping another Actor onto this node makes this Actor its parent.
-    HandleActorDropTarget(
-		actor->GetGuid(),
-        callbacks
-    );
+    HandleActorDropTarget(actor->GetGuid(), callbacks);
 
 	// Right-click to open the context menu for this actor
     if (ImGui::BeginPopupContextItem())
     {
 		m_selectedActorGuid = actor->GetGuid();
 
-		if (ImGui::MenuItem("Rename Actor"))
+		if (ImGui::MenuItem("Rename Actor", nullptr, false, callbacks.canEdit))
 		{
 			m_renameTargetGuid = actor->GetGuid();
 			m_showRenamePopup = true;
-			std::snprintf(
-				m_renameBuffer,
-				sizeof(m_renameBuffer),
-				"%s",
-				actor->GetName().c_str()
-			);
+			std::snprintf(m_renameBuffer, sizeof(m_renameBuffer), "%s", actor->GetName().c_str());
 		}
 
-        if (ImGui::MenuItem("Delete Actor"))
+        if (ImGui::MenuItem("Delete Actor", nullptr, false, callbacks.canEdit))
         {
 			m_actorToDeleteGuid = actor->GetGuid();
         }
 
-		if (ImGui::MenuItem("Create Child Actor"))
+		if (ImGui::MenuItem("Create Child Actor", nullptr, false, callbacks.canEdit))
 		{
             m_creationParentGuid = actor->GetGuid();
             m_showActorCreationPopup = true;
@@ -295,35 +278,25 @@ void HierarchyPanel::RenderActorNode(
 		// Additional context menu items can be added here.
         // ==========================================================
 
-
         ImGui::EndPopup();
     }
     if (opened)
     {
         for (auto* child : children)
         {
-            RenderActorNode(
-                child,
-                scene,
-                callbacks
-            );
+            RenderActorNode(child, scene, callbacks);
         }
 
         ImGui::TreePop();
     }
 }
 
-void HierarchyPanel::RenderRootDropTarget(
-    const Callbacks& callbacks
-)
+void HierarchyPanel::RenderRootDropTarget(const Callbacks& callbacks)
 {
     const bool selected = false;
 
 	// Render a selectable item for the root of the hierarchy
-    if (ImGui::Selectable(
-        "Scene Root",
-        selected,
-        ImGuiSelectableFlags_SpanAllColumns))
+    if (ImGui::Selectable("Scene Root", selected, ImGuiSelectableFlags_SpanAllColumns))
     {
 		m_selectedActorGuid = {};
     }
@@ -334,9 +307,9 @@ void HierarchyPanel::RenderRootDropTarget(
     ImGui::Separator();
 }
 
-void HierarchyPanel::HandleActorDragSource(Actor* actor)
+void HierarchyPanel::HandleActorDragSource(Actor* actor, const Callbacks& callbacks)
 {
-    if (!actor || !actor->GetGuid().IsValid()) return;
+    if (!actor || !actor->GetGuid().IsValid() || !callbacks.onReparentActor || !callbacks.canEdit) return;
 
 	// Begin dragging this Actor.
     // The payload will contain the Actor's Guid,
@@ -363,12 +336,9 @@ void HierarchyPanel::HandleActorDragSource(Actor* actor)
     }
 }
 
-void HierarchyPanel::HandleActorDropTarget(
-	const Guid& newParentGuid,
-    const Callbacks& callbacks
-)
+void HierarchyPanel::HandleActorDropTarget(const Guid& newParentGuid, const Callbacks& callbacks)
 {
-	if (!callbacks.onReparentActor) return;
+	if (!callbacks.onReparentActor || !callbacks.canEdit) return;
 
 	// Check if the current item is a valid drop target for drag-and-drop operations.
     if (!ImGui::BeginDragDropTarget()) return;

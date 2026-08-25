@@ -45,5 +45,5 @@ private:
 private:
 	// Helper function to draw the inspector UI for a single component
 	// Returns if the "Remove" button was clicked for this component
-    bool DrawComponent(Component& component,  const InspectorContext& context);
+    bool DrawComponent(Component& component,  const InspectorContext& context, bool readOnly);
 };

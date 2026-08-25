@@ -232,3 +232,13 @@ bool EditorUI::AssetField(
 	EndPropertyRow();
 	return changed;
 }
+
+EditorUI::DisabledScope::DisabledScope(bool disabled)
+{
+	ImGui::BeginDisabled(disabled);
+}
+
+EditorUI::DisabledScope::~DisabledScope()
+{
+	ImGui::EndDisabled();
+}

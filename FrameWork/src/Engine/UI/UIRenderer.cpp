@@ -9,9 +9,13 @@
 #include "Engine/UI/Canvas.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 
-void UIRenderer::OnStartOverride()
+void UIRenderer::OnAttachOverride()
 {
 	InitialRegistration();
+}
+
+void UIRenderer::OnStartOverride()
+{
 }
 
 void UIRenderer::PreUpdateOverride(float deltaTime)
@@ -26,7 +30,7 @@ void UIRenderer::LateUpdateOverride(float deltaTime)
 {
 }
 
-void UIRenderer::OnDestroyOverride()
+void UIRenderer::OnDetachOverride()
 {
 	// Unregister from the render system of the scene
 	auto owner = GetOwner();
@@ -41,6 +45,10 @@ void UIRenderer::OnDestroyOverride()
 	// Unregister from the canvas
 	Canvas* governingCanvas = GetGoverningCanvas();
 	if(governingCanvas) governingCanvas->UnregisterUIRenderer(this);
+}
+
+void UIRenderer::OnDestroyOverride()
+{
 }
 
 const UIRendererProxy& UIRenderer::GetRenderProxy()
