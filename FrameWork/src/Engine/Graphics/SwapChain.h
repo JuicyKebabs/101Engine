@@ -7,9 +7,12 @@
 
 class DescriptorHeapAllocator;
 
-//--------------------
+//-------------------------------------------------------------------
 // SwapChain class
-//--------------------
+// This class manages the swap chain and back buffers for rendering.
+// Providing the selected back buffer for rendering and 
+// presenting the swap chain for displaying the rendered image.
+//-------------------------------------------------------------------
 
 // Back buffer render target structure
 struct BackBufferRenderTarget

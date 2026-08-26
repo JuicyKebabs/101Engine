@@ -5,17 +5,28 @@ using namespace DirectX;
 
 bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeight)
 {
-	this->hwnd = hwnd;									//ウィンドウハンドルの保存
-	this->m_frameBufferWidth = m_FrameBufferWidth;		//フレームバッファの幅の保存
-	this->m_frameBufferHeight = m_FrameBufferHeight;	//フレームバッファの高さの保存
+	this->hwnd = hwnd;
+	this->m_frameBufferWidth = m_FrameBufferWidth;
+	this->m_frameBufferHeight = m_FrameBufferHeight;
 
-	CreateDevice();						//デバイスの生成
-	CreateDescriptorHeapAllocator();	//ディスクリプタヒープアロケータの生成
-	CreateCommandObjects();				//コマンドオブジェクトの生成
+	CreateDevice();
+	CreateDescriptorHeapAllocator();
 
-	bool result = m_swapChain.Initialize(
+	bool result = false;
+
+	// Initialize the frame command manager
+	result = m_frameCommandManager.Initialize(m_pDevice.Get(), SwapChain::BufferCount);
+
+	if (!result)
+	{
+		assert(false && "Engine : Failed to initialize frame command manager");
+		return false;
+	}
+
+	// Initialize the swap chain
+	result = m_swapChain.Initialize(
 		m_pDevice.Get(),
-		m_pCommandQueue.Get(),
+		m_frameCommandManager.GetNativeQueue(),
 		&m_descriptorHeapAllocator,
 		hwnd,
 		m_frameBufferWidth,
@@ -28,11 +39,10 @@ bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeig
 		return false;
 	}
 
+	CreateViewport();
+	CreateScissorRect();
+	CreateBuiltinRenderTargets();
 
-	CreateFence();						//フェンスの生成
-	CreateViewport();					//ビューポートの生成
-	CreateScissorRect();				//シザー矩形の生成
-	CreateBuiltinRenderTargets();		//ビルトインレンダーターゲットの生成
 	return true;
 }
 
@@ -41,15 +51,10 @@ void Engine::InitBindings(TextureManager* pTextureManager)
 	this->m_pTextureManager = pTextureManager; 
 }
 
-//終了
 void Engine::Terminate()
 {
-	//フェンスイベントのクローズ
-	if (m_fenceEvent)
-	{
-		CloseHandle(m_fenceEvent);
-		m_fenceEvent = nullptr;
-	}
+	const bool flushed = FlushGPU();
+	assert(flushed && "Failed to flush GPU commands");
 }
 
 // Begin rendering to the render target
@@ -107,7 +112,7 @@ void Engine::BeginPass(RenderPassTarget target)
 				nextState		// New resource state for rendering
 			);
 		// Set the resource barrier command
-		m_pCommandList->ResourceBarrier(1, &barrier);
+		m_pCurrentCommandList->ResourceBarrier(1, &barrier);
 
 		D3D12_VIEWPORT viewport = {};
 		viewport.Width = static_cast<float>(m_frameBufferWidth);
@@ -116,18 +121,18 @@ void Engine::BeginPass(RenderPassTarget target)
 		viewport.TopLeftY = 0;
 		viewport.MaxDepth = 1.0f;
 		viewport.MinDepth = 0.0f;
-		m_pCommandList->RSSetViewports(1, &viewport);
+		m_pCurrentCommandList->RSSetViewports(1, &viewport);
 
 		D3D12_RECT scissorRect = {};
 		scissorRect.left = 0;
 		scissorRect.top = 0;
 		scissorRect.right = m_frameBufferWidth;
 		scissorRect.bottom = m_frameBufferHeight;
-		m_pCommandList->RSSetScissorRects(1, &scissorRect);
+		m_pCurrentCommandList->RSSetScissorRects(1, &scissorRect);
 
 		const auto rtvHandle = m_descriptorHeapAllocator.GetRtvCpuHandle(rtvIndex);	// Get the RTV handle for the current render target slot
 
-		m_pCommandList->OMSetRenderTargets(
+		m_pCurrentCommandList->OMSetRenderTargets(
 			1,
 			&rtvHandle,
 			FALSE,
@@ -137,7 +142,7 @@ void Engine::BeginPass(RenderPassTarget target)
 		// Clear the render target view when required
 		if (target.clearColor)
 		{
-			m_pCommandList->ClearRenderTargetView(
+			m_pCurrentCommandList->ClearRenderTargetView(
 				rtvHandle,
 				clearColor,
 				0,
@@ -156,15 +161,15 @@ void Engine::BeginPass(RenderPassTarget target)
 		assert(color.GetWidth() == depth.GetWidth());
 		assert(color.GetHeight() == depth.GetHeight());
 
-		color.TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::RenderTarget);
-		depth.TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::DepthWrite);
+		color.TransitionToState(m_pCurrentCommandList, GpuTexture::ResourceState::RenderTarget);
+		depth.TransitionToState(m_pCurrentCommandList, GpuTexture::ResourceState::DepthWrite);
 
 		SetViewPortAndScissorRect(color);	// Set the viewport and scissor rectangle for rendering
 
 		const auto rtvHandle = m_descriptorHeapAllocator.GetRtvCpuHandle(color.GetRtvIndex());	// Get the RTV handle for the current render target slot
 		const auto dsvHandle = m_descriptorHeapAllocator.GetDsvCpuHandle(depth.GetDsvIndex());	// Get the DSV handle for the depth render target
 
-		m_pCommandList->OMSetRenderTargets(
+		m_pCurrentCommandList->OMSetRenderTargets(
 			1,
 			&rtvHandle,
 			FALSE,
@@ -174,7 +179,7 @@ void Engine::BeginPass(RenderPassTarget target)
 		// Clear the render target view and depth stencil view when required
 		if (target.clearColor)
 		{
-			m_pCommandList->ClearRenderTargetView(
+			m_pCurrentCommandList->ClearRenderTargetView(
 				rtvHandle,
 				color.GetClearColor(),
 				0,
@@ -184,7 +189,7 @@ void Engine::BeginPass(RenderPassTarget target)
 
 		if (target.clearDepth)
 		{
-			m_pCommandList->ClearDepthStencilView(
+			m_pCurrentCommandList->ClearDepthStencilView(
 				dsvHandle,
 				D3D12_CLEAR_FLAG_DEPTH,
 				depth.GetClearDepth(),
@@ -200,13 +205,13 @@ void Engine::BeginPass(RenderPassTarget target)
 	{// Depth only uses depth buffer, and next state is DepthWrite
 		auto& depth = *m_builtinRenderTargets.at(target.depthIndex);
 
-		depth.TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::DepthWrite);
+		depth.TransitionToState(m_pCurrentCommandList, GpuTexture::ResourceState::DepthWrite);
 
 		SetViewPortAndScissorRect(depth);	// Set the viewport and scissor rectangle for rendering
 
 		const auto dsvHandle = m_descriptorHeapAllocator.GetDsvCpuHandle(depth.GetDsvIndex());	// Get the DSV handle for the depth-only render target
 
-		m_pCommandList->OMSetRenderTargets(
+		m_pCurrentCommandList->OMSetRenderTargets(
 			0,
 			nullptr,
 			FALSE,
@@ -215,7 +220,7 @@ void Engine::BeginPass(RenderPassTarget target)
 
 		if (target.clearDepth)
 		{
-			m_pCommandList->ClearDepthStencilView(
+			m_pCurrentCommandList->ClearDepthStencilView(
 				dsvHandle,
 				D3D12_CLEAR_FLAG_DEPTH,
 				depth.GetClearDepth(),
@@ -277,21 +282,21 @@ void Engine::EndPass(RenderPassTarget target)
 			);
 
 		// Set the resource barrier command
-		m_pCommandList->ResourceBarrier(1, &barrier);
+		m_pCurrentCommandList->ResourceBarrier(1, &barrier);
 
 		return;
 	}
 	else if (target.type == RenderPassTargetType::ColorDepth)
 	{
 		auto& color = *m_builtinRenderTargets.at(target.colorIndex);
-		color.TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::ShaderResource);
+		color.TransitionToState(m_pCurrentCommandList, GpuTexture::ResourceState::ShaderResource);
 
 		return;
 	}
 	else if (target.type == RenderPassTargetType::DepthOnly)
 	{
 		auto& depth = *m_builtinRenderTargets.at(target.depthIndex);
-		depth.TransitionToState(m_pCommandList.Get(), GpuTexture::ResourceState::ShaderResource);
+		depth.TransitionToState(m_pCurrentCommandList, GpuTexture::ResourceState::ShaderResource);
 		return;
 	}
 }
@@ -299,77 +304,53 @@ void Engine::EndPass(RenderPassTarget target)
 // Begin rendering the frame
 void Engine::BeginFrame()
 {
-	// Initialize command settings for the current frame
-	m_pCommandAllocator[m_swapChain.GetCurrentBackBufferIndex()]->Reset();		// Reset the command allocator for the current back buffer index
-	m_pCommandList->Reset(										// Reset the command list
-		m_pCommandAllocator[m_swapChain.GetCurrentBackBufferIndex()].Get(),	// Get the command allocator for the current back buffer index
-		nullptr													// Initial pipeline state (nullptr means no initial pipeline state)
-	);
-}
+	// Get the current back buffer index from the swap chain
+	const size_t frameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
-// Wait for the GPU to finish rendering the current frame
-void Engine::WaitRender()
-{
-	// Increment the fence value for the next frame
-	const UINT64 fenceValue = m_nextFenceValue++;
-	
-	// Signal the command queue to set the fence value
-	const HRESULT signalResult = m_pCommandQueue->Signal(m_pFence.Get(), fenceValue);
+	// Begin the frame command list for the current frame index
+	// (Synchronization with the GPU and Resetting the command context)
+	m_pCurrentCommandList = m_frameCommandManager.BeginFrame(frameIndex);
 
-	// Check if signaling the fence was successful
-	if (FAILED(signalResult))
+	if (!m_pCurrentCommandList)
 	{
-		assert(false && "Failed to signal GPU fence");
+		assert(false && "Failed to begin frame command list");
 		return;
-	}
-
-	// If the fence has already been completed, no need to wait (return early)
-	if (m_pFence->GetCompletedValue() >= fenceValue) return;
-
-	// Set an event to be signaled when the fence reaches the specified value
-	const HRESULT eventResult = m_pFence->SetEventOnCompletion(fenceValue, m_fenceEvent);
-
-	// Check if setting the fence completion event was successful
-	if (FAILED(eventResult))
-	{
-		assert(false && "Failed to set fence completion event");
-		return;
-	}
-
-	// Wait for the fence event to be signaled (indicating that the GPU has finished rendering)
-	const DWORD waitResult = WaitForSingleObject(m_fenceEvent, INFINITE);
-
-	// Check if waiting for the fence event was successful
-	if (waitResult != WAIT_OBJECT_0)
-	{
-		assert(false && "Failed while waiting for GPU fence");
 	}
 }
 
 // End rendering the frame
-void Engine::RenderEnd()
+void Engine::EndFrame()
 {
-	// Close the command list
-	m_pCommandList->Close();
+	size_t frameIndex = m_swapChain.GetCurrentBackBufferIndex();
 
-	// Execute the command list
-	ID3D12CommandList* cmdLists[] = { m_pCommandList.Get() };	// Array of command lists to execute
-	m_pCommandQueue->ExecuteCommandLists(
-		1,			// Number of command lists
-		cmdLists	// Pointer to the array of command lists
-	);
+	m_pCurrentCommandList = nullptr;	// Clear the current command list pointer
 
-	// Swap the back buffers
-	HRESULT result = m_swapChain.Present(1, 0);	// Present with vertical sync
+	// End the frame command list for the current frame index
+	// (Finalizing the command list and submitting it to the GPU with signaling)
+	if (!m_frameCommandManager.EndFrame(frameIndex))
+	{
+		assert(false && "Failed to end frame command list");
+		return;
+	}
 
-	// Check if presenting the swap chain was successful
-	if (FAILED(result))
+	// Present the frame (sync interval = 1 for VSync)
+	const HRESULT hr = m_swapChain.Present(1, 0);
+	if (FAILED(hr))
 	{
 		assert(false && "Failed to present swap chain");
 	}
+}
 
-	// Wait for the previous frame to finish
-	WaitRender();
+// Wait for the GPU to finish rendering the current frame
+bool Engine::FlushGPU()
+{
+	if (!m_frameCommandManager.Flush())
+	{
+		assert(false && "Failed to flush GPU commands");
+		return false;
+	}
+
+	return true;
 }
 
 bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
@@ -399,7 +380,13 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 	}
 
 	// Wait for the GPU to finish rendering before resizing
-	WaitRender();
+	const bool flushed = FlushGPU();
+
+	if (!flushed)
+	{
+		assert(false && "Failed to flush GPU commands before resizing render targets");
+		return false;
+	}
 
 	// Resize the render targets
 	const bool colorResult = sceneColor->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
@@ -468,80 +455,6 @@ void Engine::CreateDevice()
 void Engine::CreateDescriptorHeapAllocator()
 {
 	m_descriptorHeapAllocator.Initialize(m_pDevice.Get());
-}
-
-//コマンドオブジェクトの生成
-void Engine::CreateCommandObjects()
-{
-	for (size_t i = 0; i < SwapChain::BufferCount; i++)
-	{
-		//コマンドアロケーターの生成
-		result = m_pDevice->CreateCommandAllocator(
-			D3D12_COMMAND_LIST_TYPE_DIRECT,			//直接コマンド
-			IID_PPV_ARGS(&m_pCommandAllocator[i])	//コマンドアロケーターのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
-		);
-
-		if (FAILED(result))
-		{
-			assert(false && "Failed to create command allocator");
-			return;
-		}
-	}
-
-	result = m_pDevice->CreateCommandList(
-		0,														//ノードマスク
-		D3D12_COMMAND_LIST_TYPE_DIRECT,							//直接コマンド
-		m_pCommandAllocator[m_swapChain.GetCurrentBackBufferIndex()].Get(),	//コマンドアロケーター
-		nullptr,												//パイプラインステートオブジェクト
-		IID_PPV_ARGS(&m_pCommandList)							//コマンドリストのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
-	);
-
-	if (FAILED(result))
-	{
-		assert(false && "Failed to create command list");
-		return;
-	}
-
-	m_pCommandList->Close();	//コマンドリストは生成直後に開いている状態なので閉じておく
-
-	//コマンドキューの生成
-	//各種設定
-	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {}; //コマンドキューの設定構造体
-	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;				//フラグ
-	cmdQueueDesc.NodeMask = 0;										//ノードマスク
-	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;	//優先度
-	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;				//直接コマンド(コマンドリストと同じ)
-
-	//生成
-	result = m_pDevice->CreateCommandQueue(
-		&cmdQueueDesc,					//コマンドキューの設定構造体
-		IID_PPV_ARGS(&m_pCommandQueue)	//コマンドキューのアドレスを取得(IID_PPV_ARGSマクロでオブジェクトの型を特定)
-	);
-
-	if (FAILED(result))
-	{
-		assert(false && "Failed to create command queue");
-		return;
-	}
-}
-
-void Engine::CreateFence()
-{
-	// Create a fence for GPU synchronization
-	result = m_pDevice->CreateFence(
-		0,
-		D3D12_FENCE_FLAG_NONE,
-		IID_PPV_ARGS(&m_pFence)
-	);
-
-	if (FAILED(result))
-	{
-		assert(false && "Failed to create fence");
-		return;
-	}
-
-	m_nextFenceValue = 1;	// Initialize the next fence value
-	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 }
 
 void Engine::CreateViewport()
@@ -677,12 +590,12 @@ void Engine::SetViewPortAndScissorRect(const GpuTexture& renderTarget)
 	viewport.TopLeftY = 0;
 	viewport.MaxDepth = 1.0f;
 	viewport.MinDepth = 0.0f;
-	m_pCommandList->RSSetViewports(1, &viewport);
+	m_pCurrentCommandList->RSSetViewports(1, &viewport);
 
 	D3D12_RECT scissorRect = {};
 	scissorRect.left = 0;
 	scissorRect.top = 0;
 	scissorRect.right = renderTarget.GetWidth();
 	scissorRect.bottom = renderTarget.GetHeight();
-	m_pCommandList->RSSetScissorRects(1, &scissorRect);
+	m_pCurrentCommandList->RSSetScissorRects(1, &scissorRect);
 }
