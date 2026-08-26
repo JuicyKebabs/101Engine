@@ -10,6 +10,7 @@ void TestBehavior::Start()
 
 void TestBehavior::Update()
 {
+
     if (InputManager::GetInstance().GetInputInfo().key.a.down)
     {
         Transform* transform = GetOwner()->GetComponentByClass<Transform>();

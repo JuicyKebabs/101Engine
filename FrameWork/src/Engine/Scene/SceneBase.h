@@ -49,6 +49,7 @@ public:
 		RenderViewPolicy viewPolicy = {}
 		);
 	void Finalize();							// Finalize
+	void EditorUpdate(float deltaTime);		// Update limited elements for editor
 
 	// Add an actor to the scene
 	Actor* AddRootActor(std::unique_ptr<Actor> actor);
@@ -207,6 +208,8 @@ private:
 	SceneManager* m_pSceneManager = nullptr;	// Pointer to the scene manager (used for scene switching)
 	EngineContext* m_pEngineContext = nullptr;	// Pointer to the engine context (used for accessing engine systems)
 
+	bool m_isFinalized = false;
+
 private:
 	friend class SceneLoader;
 	friend class Actor;
@@ -224,6 +227,9 @@ private:
 		Actor* actor,
 		Component* component
 	);
+
+	// Collect destroyed actors and remove their GUID mappings
+	void CollectDestroyedActors();
 
 	// Check if reparenting would create a hierarchy cycle
 	bool WouldCreateHierarchyCycle(const Actor* actor, const Actor* newParent) const;

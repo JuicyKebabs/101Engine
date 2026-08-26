@@ -14,6 +14,7 @@
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
+#include "Engine/Graphics/SwapChain.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Component/MeshRenderer.h"
@@ -833,7 +834,7 @@ void EditorApp::InitInstance()
     m_pRenderer->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator(), m_pTextureManager.get(), m_pMeshManager.get());
 
     m_pEngine->BeginFrame();
-    m_pEngine->RenderEnd();
+    m_pEngine->EndFrame();
 
     InputManager::GetInstance().Initialize();
 }
@@ -876,7 +877,7 @@ void EditorApp::InitImGui()
 
     ImGui_ImplDX12_Init(
         m_pEngine->GetDevice(),
-        Engine::FRAME_BUFFER_COUNT,
+        SwapChain::BufferCount,
         DXGI_FORMAT_R8G8B8A8_UNORM,
         descriptorHeapAllocator->GetCbvSrvUavHeap().GetHeap(),
         descriptorHeapAllocator->GetCbvSrvUavCpuHandle(imguiIndex),
@@ -994,7 +995,7 @@ void EditorApp::Render()
     RenderImGui();
     m_pEngine->EndPass(backBufferTarget);
 
-    m_pEngine->RenderEnd();
+    m_pEngine->EndFrame();
 }
 
 void EditorApp::RenderEditViewport(SceneBase* activeScene, GpuTexture* sceneColor)

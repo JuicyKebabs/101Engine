@@ -279,7 +279,7 @@ void App::InitInstance()
 	m_pEngine->BeginFrame();
 
 	// Initialize rendering
-	m_pEngine->RenderEnd();
+	m_pEngine->EndFrame();
 
 	// Initialize audio management class
 	m_audioManager.Initialize();
@@ -361,5 +361,5 @@ void App::Render()
 	m_pEngine->EndPass(backBufferTarget);
 
 	// End rendering
-	m_pEngine->RenderEnd();
+	m_pEngine->EndFrame();
 }
