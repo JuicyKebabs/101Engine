@@ -6,6 +6,7 @@ file(GLOB_RECURSE GAME_SOURCES
 
 add_executable(101Game WIN32
     ${GAME_SOURCES}
+    ${CMAKE_SOURCE_DIR}/Config/Windows/101Engine.manifest
 )
 
 add_custom_command(TARGET 101Game POST_BUILD

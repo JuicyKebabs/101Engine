@@ -283,9 +283,10 @@ LRESULT Window::HandleMessage(
 		const bool wasPreviouslyDown = (keyState & (uintptr_t{ 1 } << 30)) != 0;
 
 		if (m_allowFullscreenToggle && wParam == VK_RETURN && altIsDown)
-		{
+		{// Alt+Enter pressed and turning to borderless fullscreen is allowed
 			if (!wasPreviouslyDown)
-			{
+			{// Key was not previously down, so this is a new key press
+				// Request a toggle between windowed and borderless fullscreen mode
 				RequestToggleFullscreen();
 			}
 			handled = true;

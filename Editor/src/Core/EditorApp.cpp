@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <algorithm>
+#include <filesystem>
 #include <mmsystem.h>
 #include <tchar.h>
 #include <shellapi.h> 
@@ -7,6 +8,7 @@
 #include "Engine/Input/keyboard.h"
 #include "Engine/Input/InputManager.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "backends/imgui_impl_dx12.h"
 #include "backends/imgui_impl_win32.h"
 #include "Core/EditorScene.h"
@@ -31,6 +33,7 @@
 #include "Tools/ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Engine/Core/String/StringEncoding.h"
 #include "Command/RenameActorCommand.h"
 #include "Command/CreateActorCommand.h"
 #include "Command/DeleteActorCommand.h"
@@ -937,13 +940,30 @@ void EditorApp::InitImGui()
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigDpiScaleFonts = true;
 
+    namespace fs = std::filesystem;
+    const fs::path iniPath = PathManager::ResolveW("Saved/Editor/imgui.ini");
+    std::error_code directoryError;
+    fs::create_directories(iniPath.parent_path(), directoryError);
+    if (directoryError)
+    {
+        DBG("EditorApp: Failed to create ImGui settings directory: %s", directoryError.message().c_str());
+    }
+
+    m_imguiIniPath = StringEncoding::WideToUtf8(iniPath.wstring());
+    if (m_imguiIniPath.empty())
+    {
+        DBG("EditorApp: Failed to convert the ImGui settings path to UTF-8.");
+    }
+    m_shouldBuildDefaultDockLayout = !fs::exists(iniPath);
+    io.IniFilename = m_imguiIniPath.empty() ? nullptr : m_imguiIniPath.c_str();
+
 	//---------------------------------
 	// Load custom font for the editor
 	//---------------------------------
     EditorFontConfig fontConfig;
     fontConfig.filePath = "C:/Windows/Fonts/Meiryo.ttc";
     fontConfig.sizePixels = 16.0f;
-    fontConfig.fontIndex = 3;
+    fontConfig.fontIndex = 2;
 
     EditorTheme::LoadFont(io, fontConfig);
 
@@ -1296,15 +1316,60 @@ void EditorApp::RenderSelectionPass()
 
 void EditorApp::RenderImGui()
 {
+    RenderMenuBar();
+    RenderMainDockSpace();
+
     RenderHierarchyPanel();
     RenderInspectorPanel();
     RenderSceneViewPanel();
-    RenderMenuBar();
 	RenderToolbar();
     RenderScriptsPanel();
 
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_pEngine->GetCommandList());
+}
+
+void EditorApp::RenderMainDockSpace()
+{
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImGuiID dockSpaceId = ImHashStr("EditorDockSpace");
+
+    // Build only for a new workspace or an explicit reset. Rebuilding every
+    // frame would overwrite layout changes made by the user.
+    if (m_shouldBuildDefaultDockLayout)
+    {
+        BuildDefaultDockLayout(dockSpaceId);
+        m_shouldBuildDefaultDockLayout = false;
+    }
+
+    ImGui::DockSpaceOverViewport(dockSpaceId, viewport);
+}
+
+void EditorApp::BuildDefaultDockLayout(unsigned int dockSpaceId)
+{
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    ImGui::DockBuilderRemoveNode(dockSpaceId);
+    ImGui::DockBuilderAddNode(dockSpaceId, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockSpaceId, viewport->WorkSize);
+
+    ImGuiID centerNode = dockSpaceId;
+    ImGuiID leftNode = 0;
+    ImGuiID rightNode = 0;
+    ImGuiID toolbarNode = 0;
+    ImGuiID scriptsNode = 0;
+
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Left, 0.20f, &leftNode, &centerNode);
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Right, 0.30f, &rightNode, &centerNode);
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Up, 0.08f, &toolbarNode, &centerNode);
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Down, 0.25f, &scriptsNode, &centerNode);
+
+    ImGui::DockBuilderDockWindow("Hierarchy", leftNode);
+    ImGui::DockBuilderDockWindow("Inspector", rightNode);
+    ImGui::DockBuilderDockWindow("Toolbar", toolbarNode);
+    ImGui::DockBuilderDockWindow("Scripts", scriptsNode);
+    ImGui::DockBuilderDockWindow("Scene", centerNode);
+    ImGui::DockBuilderFinish(dockSpaceId);
 }
 
 void EditorApp::RenderHierarchyPanel()
@@ -1691,6 +1756,11 @@ void EditorApp::RenderMenuBar()
             {
                 DBG("EditorApp: Redo failed.");
             }
+        };
+
+    callbacks.onResetLayout = [this]()
+        {
+            m_shouldBuildDefaultDockLayout = true;
         };
 
     callbacks.onBuildGame = [this]()

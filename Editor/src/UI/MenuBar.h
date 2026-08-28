@@ -18,6 +18,7 @@ public:
 
         std::function<void()> onUndo;
         std::function<void()> onRedo;
+        std::function<void()> onResetLayout;
 
         std::function<void()> onBuildGame;
         std::function<void(bool)> onReloadGameCode;

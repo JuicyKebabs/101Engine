@@ -117,6 +117,11 @@ private:
     Toolbar m_toolbar;
     ScriptsPanel m_scriptsPanel;
 
+    // ImGui keeps IniFilename as a raw pointer, so the backing string must
+    // remain alive for the entire ImGui context lifetime.
+    std::string m_imguiIniPath;
+    bool m_shouldBuildDefaultDockLayout = false;
+
     HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
 
     // Render data for rendering the outline of a selected object in the scene view
@@ -191,6 +196,8 @@ private:
     void RenderSelectionPass();
 
     void RenderImGui();
+    void RenderMainDockSpace();
+    void BuildDefaultDockLayout(unsigned int dockSpaceId);
     void RenderHierarchyPanel();
     void RenderInspectorPanel();
     void RenderSceneViewPanel();

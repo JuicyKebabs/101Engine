@@ -88,7 +88,8 @@ private:
 	bool m_isMinimized = false;
 	bool m_classRegistered = false;
 	bool m_allowFullscreenToggle = false;
-
+	
+private:
 	Mode m_mode = Mode::Windowed;
 	Mode m_requestedMode = Mode::Windowed;
 	bool m_hasModeChangeRequest = false;

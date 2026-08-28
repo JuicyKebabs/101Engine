@@ -139,11 +139,8 @@ void App::Run()
 					continue;
 				}
 
-				// Update
-				Update();	// Update
-
-				// Draw
-				Render();		// Draw
+				Update();
+				Render();
 
 				// Input update
 				m_inputManager.Copy(); // Copy key information from input manager
