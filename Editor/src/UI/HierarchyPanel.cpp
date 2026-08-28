@@ -21,7 +21,9 @@ Actor* HierarchyPanel::GetSelectedActor(SceneBase* scene)
 
 void HierarchyPanel::Render(SceneBase* scene, const Callbacks& callbacks)
 {
-    if (ImGui::Begin("Hierarchy"))
+    const bool isOpen = ImGui::Begin("Hierarchy");
+
+    if (isOpen)
     {
         if (scene)
         {
@@ -49,8 +51,9 @@ void HierarchyPanel::Render(SceneBase* scene, const Callbacks& callbacks)
 				m_selectedActorGuid = {};
             }
         }
-        ImGui::End();
     }
+
+    ImGui::End();
 
     // Menu popup
     if (m_showMenuPopup)

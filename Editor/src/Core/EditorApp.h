@@ -14,6 +14,7 @@
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
+#include "Engine/Window/Window.h"
 #include "Command/EditorCommandHistory.h"
 #include "Command/RectTransformEditCommand.h"
 #include "Core/CanvasEditContext.h"
@@ -50,6 +51,11 @@ struct CanvasViewNavigation
 
 class EditorApp
 {
+    // Fixed resolution for the play viewport
+    // This should be moved to the data driven configuration in the future (e.g., from a project settings file)
+    static constexpr UINT PLAY_VIEWPORT_WIDTH = 1920;
+    static constexpr UINT PLAY_VIEWPORT_HEIGHT = 1080;
+
 public:
     EditorApp(const EditorApp&) = delete;
     EditorApp& operator=(const EditorApp&) = delete;
@@ -67,8 +73,14 @@ public:
     void Terminate();
 
 private:
-    HWND m_hwnd = nullptr;
-    WNDCLASSEX m_wc = {};
+    enum class EditorModeTransition
+    {
+        None,
+        EnterPlay,
+        ExitPlay
+    };
+
+    Window m_window;
 
     std::unique_ptr<Engine> m_pEngine;
     std::unique_ptr<Renderer> m_pRenderer;
@@ -82,6 +94,7 @@ private:
     EngineContext m_engineContext;
 
     EditorMode m_editorMode = EditorMode::Edit; // The current mode of the editor (Edit or Play)
+    EditorModeTransition m_pendingModeTransition = EditorModeTransition::None;
     std::unique_ptr<SceneBase> m_pEditScene;    // The scene currently being edited
     std::unique_ptr<SceneBase> m_pPlayScene;    // The scene currently being played (runtime)
 
@@ -143,12 +156,15 @@ private:
 private:
     EditorApp() = default;
 
+	bool ApplyWindowResizeRequest();
+
     void NewScene();                                // Create a new scene with default settings
     void LoadScene(const std::string& filePath);    // Load a scene from a file
     void ReloadGameCode(bool reconfigure);          // For hot-reloading game code DLL
     void DeleteScript(const std::string& name);     // Delete a script file from the project
     void EnterPlayMode();                           // Switch to Play mode
     void ExitPlayMode();                            // Switch back to Edit mode
+    void ApplyPendingModeTransition();              // Apply a deferred Play/Edit mode transition
 
     bool SaveHotReloadSnapshot();
     bool BuildStagedGameCode(bool reconfigure);
@@ -159,7 +175,6 @@ private:
     bool RestoreHotReloadSnapshot();
     void RemovePreviousGameCodeBackup();
 
-    void CreateMainWindow();
     void PrepareInstance();
     void InitInstance();
     void InitImGui();
@@ -187,7 +202,7 @@ private:
     SceneBase* GetActiveScene() const;
 
     void ApplySceneViewResizeRequest();
-    void ApplyCurrentViewportSizeToScene();
+    void ApplySceneRenderTargetSizeToScene(SceneBase& scene);
 
     // Build render data for the selected object in the scene view
     // (used to render an outline around the selected object)

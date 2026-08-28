@@ -38,9 +38,73 @@ HRESULT SwapChain::Present(UINT syncInterval, UINT flags)
 	return m_pSwapChain->Present(syncInterval, flags);
 }
 
+bool SwapChain::Resize(UINT width, UINT height)
+{
+	if (!m_pSwapChain)
+	{
+		DBG("SwapChain::Resize failed: Swap chain is not initialized.");
+		return false;
+	}
+
+	if (width == 0 || height == 0)
+	{
+		DBG("SwapChain::Resize failed: Invalid width or height.");
+		return false;
+	}
+
+	// Get the current swap chain description to check if a resize is necessary
+	DXGI_SWAP_CHAIN_DESC1 swcDesc = {};
+	HRESULT hr = m_pSwapChain->GetDesc1(&swcDesc);
+
+	if (FAILED(hr))
+	{
+		DBG("SwapChain::Resize failed: GetDesc1 failed with HRESULT 0x%08X.", hr);
+		return false;
+	}
+
+	if (swcDesc.Width == width && swcDesc.Height == height)
+	{
+		DBG("SwapChain::Resize: No resize needed, dimensions are the same.");
+		return true; // No need to resize if dimensions are the same
+	}
+
+	// Release the back buffer resources before resizing
+	for (auto& buffer : m_backBuffers)
+	{
+		if (buffer.resource)
+		{
+			buffer.resource.Reset();
+		}
+	}
+
+	// Resize the swap chain buffers
+	HRESULT result = m_pSwapChain->ResizeBuffers(
+		BufferCount,
+		width,
+		height,
+		swcDesc.Format,
+		swcDesc.Flags
+	);
+
+	if (FAILED(result))
+	{
+		DBG("SwapChain::Resize failed: ResizeBuffers failed with HRESULT 0x%08X.", result);
+		return false;
+	}
+
+	// Recreate the back buffers after resizing
+	if (!CreateBackBuffers())
+	{
+		DBG("SwapChain::Resize failed: CreateBackBuffers failed after resizing.");
+		return false;
+	}
+
+	return true;
+}
+
 BackBufferRenderTarget& SwapChain::GetBackBuffer(UINT index)
 {
-	if (index < 0 || index >= BufferCount)
+	if (index >= BufferCount)
 	{
 		assert(false && "SwapChain::GetBackBuffer: Index out of bounds.");
 		throw std::out_of_range("SwapChain::GetBackBuffer: Index out of bounds.");
@@ -114,6 +178,17 @@ bool SwapChain::CreateSwapChain(ID3D12CommandQueue* pCommandQueue, HWND hwnd, UI
 		return false;
 	}
 
+	// The engine handles Alt+Enter itself to provide borderless fullscreen.
+	// Disable DXGI's default exclusive-fullscreen transition to avoid both
+	// mode-change paths running for the same key press.
+	result = factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+
+	if (FAILED(result))
+	{
+		DBG("SwapChain::Initialize failed: MakeWindowAssociation failed with HRESULT 0x%08X.", result);
+		return false;
+	}
+
 	// Convert to IDXGISwapChain4
 	result = swapChain1->QueryInterface(IID_PPV_ARGS(m_pSwapChain.ReleaseAndGetAddressOf()));
 
@@ -128,9 +203,9 @@ bool SwapChain::CreateSwapChain(ID3D12CommandQueue* pCommandQueue, HWND hwnd, UI
 
 bool SwapChain::CreateBackBuffers()
 {
-	if (!m_device)
+	if (!m_device || !m_descriptorHeapAllocator || !m_pSwapChain)
 	{
-		DBG("SwapChain::CreateBackBuffers failed: Invalid device.");
+		DBG("SwapChain::CreateBackBuffers failed: Invalid dependencies.");
 		return false;
 	}
 
@@ -152,8 +227,12 @@ bool SwapChain::CreateBackBuffers()
 		float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };	// Back buffer clear color (black)
 
 		// Get render target view handle
-		auto rtvIndex = m_descriptorHeapAllocator->AllocateRtv();				// Allocate render target view index
-		auto rtvHandle = m_descriptorHeapAllocator->GetRtvCpuHandle(rtvIndex);	// Get render target view handle
+		if (buffer.rtvIndex == BackBufferRenderTarget::InvalidIndex)
+		{
+			buffer.rtvIndex = m_descriptorHeapAllocator->AllocateRtv();	// Allocate RTV index if not already allocated
+		}
+
+		auto rtvHandle = m_descriptorHeapAllocator->GetRtvCpuHandle(buffer.rtvIndex);	// Get render target view handle
 
 		// Create render target view (RTV)
 		// Render target view settings
@@ -181,7 +260,6 @@ bool SwapChain::CreateBackBuffers()
 			rtvHandle					// Handle to the descriptor heap to store the render target view
 		);
 
-		buffer.rtvIndex = rtvIndex;							// Save the RTV index of the back buffer
 		buffer.currentState = D3D12_RESOURCE_STATE_COMMON;	// Save the current resource state of the back buffer
 		buffer.clearColor[0] = clearColor[0];				// Save the clear color of the back buffer
 		buffer.clearColor[1] = clearColor[1];
