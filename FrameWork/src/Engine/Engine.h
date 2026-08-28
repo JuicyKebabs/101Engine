@@ -88,7 +88,12 @@ public:
 	void BeginFrame();							// Start rendering
 	void EndFrame();							// End rendering
 
-	bool FlushGPU();	// Wait for the previous frame to finish
+	// Flush the GPU command queue and wait for completion
+	bool FlushGPU();
+
+	// Resize the window output resources.
+	// Must be called outside command recording.
+	bool ResizeOutput(UINT width, UINT height);
 
 	// Various getters
 	ID3D12Device* GetDevice() { return m_pDevice.Get(); }												// Get device

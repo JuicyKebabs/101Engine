@@ -1,6 +1,5 @@
 #pragma once
 #include <unordered_map>
-#include "Engine/Window/WindowInfo.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/RenderData.h"

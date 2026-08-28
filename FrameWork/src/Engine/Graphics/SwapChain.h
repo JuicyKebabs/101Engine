@@ -17,8 +17,10 @@ class DescriptorHeapAllocator;
 // Back buffer render target structure
 struct BackBufferRenderTarget
 {
+	static constexpr uint32_t InvalidIndex = UINT32_MAX;	// Invalid index constant
+
 	ComPtr<ID3D12Resource> resource;									// Back buffer resource
-	uint32_t rtvIndex;													// RTV index for the back buffer
+	uint32_t rtvIndex = InvalidIndex;									// RTV index for the back buffer
 	D3D12_RESOURCE_STATES currentState = D3D12_RESOURCE_STATE_COMMON;	// Current resource state of the back buffer
 	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };					// Clear color for the back buffer
 };
@@ -36,7 +38,12 @@ public:
 		UINT width, UINT height
 	);
 
+	// Present the swap chain to display the rendered image
 	HRESULT Present(UINT syncInterval, UINT flags);
+
+	// Resize the swap chain buffers and recreate back buffers
+	// This must be called after ensuring that the command queue is idle and all GPU work is completed.
+	bool Resize(UINT width, UINT height);
 
 	BackBufferRenderTarget& GetBackBuffer(UINT index);
 	UINT GetCurrentBackBufferIndex() const;

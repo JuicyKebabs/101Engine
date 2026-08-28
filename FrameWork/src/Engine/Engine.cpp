@@ -1,7 +1,6 @@
 #include "Engine/Engine.h"
 #include "Engine/Resource/TextureManager.h"
-
-using namespace DirectX;
+#include "Engine/Core/Debug/Debug.h"
 
 bool Engine::InitCore(HWND hwnd, UINT m_FrameBufferWidth, UINT m_FrameBufferHeight)
 {
@@ -353,6 +352,48 @@ bool Engine::FlushGPU()
 	return true;
 }
 
+bool Engine::ResizeOutput(UINT width, UINT height)
+{
+	if (width == 0 || height == 0)
+	{
+		return false;
+	}
+
+	if (width == m_frameBufferWidth && height == m_frameBufferHeight)
+	{
+		return true;
+	}
+
+	// Resize must not occur while a frame is being recorded.
+	if (m_pCurrentCommandList)
+	{
+		DBG("Engine::ResizeOutput: A frame is currently being recorded.");
+		return false;
+	}
+
+	// Back buffers must no longer be in use by the GPU.
+	if (!m_frameCommandManager.Flush())
+	{
+		DBG("Engine::ResizeOutput: Failed to flush GPU commands.");
+		return false;
+	}
+
+	if (!m_swapChain.Resize(width, height))
+	{
+		DBG("Engine::ResizeOutput: Failed to resize swap chain.");
+		return false;
+	}
+
+	// Commit the new dimensions only after Resize succeeds.
+	m_frameBufferWidth = width;
+	m_frameBufferHeight = height;
+
+	CreateViewport();		// Update the viewport to match the new dimensions
+	CreateScissorRect();	// Update the scissor rectangle to match the new dimensions
+
+	return true;
+}
+
 bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 {
 	if (width == 0 || height == 0) return false;	// Invalid size, return false
@@ -377,6 +418,14 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 		selectionMask->GetHeight() == height)
 	{
 		return true;
+	}
+
+	// Render targets referenced by a command list must not be released while
+	// the frame is still being recorded. Flush only waits for submitted work.
+	if (m_pCurrentCommandList)
+	{
+		DBG("Engine::ResizeSceneRenderTargets: A frame is currently being recorded.");
+		return false;
 	}
 
 	// Wait for the GPU to finish rendering before resizing

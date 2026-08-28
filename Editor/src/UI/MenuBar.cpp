@@ -38,6 +38,15 @@ void MenuBar::Render(const Callbacks& callbacks)
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Window"))
+        {
+            if (ImGui::MenuItem("Reset Layout"))
+            {
+                if (callbacks.onResetLayout) callbacks.onResetLayout();
+            }
+            ImGui::EndMenu();
+        }
+
 		// Assets menu for creating new assets like behaviors
         if (ImGui::BeginMenu("Assets"))
         {

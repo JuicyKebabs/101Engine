@@ -8,7 +8,6 @@
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "Engine/Window/WindowInfo.h"
 #include "Engine/Graphics/GpuBufferLayouts.h"
 #include "Engine/Graphics/PipelineState.h"
 

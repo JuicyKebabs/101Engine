@@ -17,6 +17,7 @@ file(GLOB_RECURSE EDITOR_SOURCES
 add_executable(101Editor WIN32
     ${EDITOR_SOURCES}
     ${IMGUI_SOURCES}
+    ${CMAKE_SOURCE_DIR}/Config/Windows/101Engine.manifest
 )
 
 target_include_directories(101Editor PRIVATE

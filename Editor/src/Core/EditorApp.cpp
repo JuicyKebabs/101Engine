@@ -1,13 +1,14 @@
 #include <windows.h>
 #include <algorithm>
+#include <filesystem>
 #include <mmsystem.h>
 #include <tchar.h>
 #include <shellapi.h> 
 #include "Core/EditorApp.h"
 #include "Engine/Input/keyboard.h"
 #include "Engine/Input/InputManager.h"
-#include "Engine/Window/WindowInfo.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "backends/imgui_impl_dx12.h"
 #include "backends/imgui_impl_win32.h"
 #include "Core/EditorScene.h"
@@ -32,6 +33,7 @@
 #include "Tools/ProjectBuilder.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Engine/Core/String/StringEncoding.h"
 #include "Command/RenameActorCommand.h"
 #include "Command/CreateActorCommand.h"
 #include "Command/DeleteActorCommand.h"
@@ -69,31 +71,6 @@ namespace
     constexpr const char* kPreviousGameCodePath = "build/bin/Debug/GameCode.previous.dll";
 }
 
-LRESULT EditorWindowProcedure(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
-        return true;
-
-    switch (msg)
-    {
-    case WM_ACTIVATEAPP:
-    case WM_SYSKEYDOWN:
-    case WM_KEYUP:
-    case WM_SYSKEYUP:
-        Keyboard_ProcessMessage(msg, wParam, lParam);
-        break;
-    case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE)
-            SendMessage(hwnd, WM_CLOSE, 0, 0);
-        Keyboard_ProcessMessage(msg, wParam, lParam);
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    }
-    return DefWindowProc(hwnd, msg, wParam, lParam);
-}
-
 bool EditorApp::Initialize()
 {
 	// Load the game code DLL at startup. This is needed to recognize GameCode-defined
@@ -107,7 +84,52 @@ bool EditorApp::Initialize()
         DBG("EditorApp: GameCode.dll loaded successfully");
     }
 
-    CreateMainWindow();             // Create main window
+    Window::InitDesc windowDesc{};
+    windowDesc.className = L"101EngineEditorWindow";
+    windowDesc.title = L"101Editor";
+    windowDesc.clientWidth = WINDOW_WIDTH;
+    windowDesc.clientHeight = WINDOW_HEIGHT;
+    windowDesc.messageCallback = [](
+        HWND hwnd,
+        UINT message,
+        WPARAM wParam,
+        LPARAM lParam,
+        LRESULT& outResult)
+        {
+            if (ImGui::GetCurrentContext() &&
+                ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
+            {
+                outResult = TRUE;
+                return true;
+            }
+
+            switch (message)
+            {
+            case WM_ACTIVATEAPP:
+            case WM_SYSKEYDOWN:
+            case WM_KEYUP:
+            case WM_SYSKEYUP:
+                Keyboard_ProcessMessage(message, wParam, lParam);
+                break;
+
+            case WM_KEYDOWN:
+                if (wParam == VK_ESCAPE)
+                {
+                    SendMessage(hwnd, WM_CLOSE, 0, 0);
+                }
+                Keyboard_ProcessMessage(message, wParam, lParam);
+                break;
+            }
+
+            return false;
+        };
+
+    if (!m_window.Initialize(windowDesc))
+    {
+        DBG("EditorApp: Failed to initialize the main window.");
+        return false;
+    }
+
     PrepareInstance();              // Prepare instance
     InitInstance();                 // Initialize instance
     InitImGui();                    // Initialize ImGui
@@ -120,7 +142,7 @@ bool EditorApp::Initialize()
 
 void EditorApp::Run()
 {
-    ShowWindow(m_hwnd, SW_SHOW);
+    m_window.Show();
 
     MSG msg = {};
     DWORD dwExecLastTime;
@@ -154,8 +176,16 @@ void EditorApp::Run()
                 dwExecLastTime = dwCurrentTime;
                 dwFrameCount++;
 
-                float deltaTime = m_timeManager.GetDeltaTime();
-                m_timeManager.Update();
+                if (m_window.IsMinimized())
+                {
+                    m_timeManager.Update();
+                    continue;
+                }
+
+                if (!ApplyWindowResizeRequest())
+                {
+                    continue;
+                }
 
                 // ImGui's NewFrame is called before Update so that debug
                 // ImGui windows (e.g. EditorCamera's "Camera Info") can be
@@ -163,6 +193,9 @@ void EditorApp::Run()
                 ImGui_ImplDX12_NewFrame();
                 ImGui_ImplWin32_NewFrame();
                 ImGui::NewFrame();
+
+                float deltaTime = m_timeManager.GetDeltaTime();
+                m_timeManager.Update();
 
                 Update(deltaTime);
                 Render();
@@ -203,7 +236,29 @@ void EditorApp::Terminate()
 	// Terminate editor related resources
     ShutdownImGui();
     m_pEngine->Terminate();
-    UnregisterClass(m_wc.lpszClassName, m_wc.hInstance);
+    m_window.Terminate();
+}
+
+bool EditorApp::ApplyWindowResizeRequest()
+{
+    Window::Size requestedSize{};
+	
+	// Check if there is a pending resize request
+    if (!m_window.GetResizeRequest(requestedSize))
+	{
+		return true; // No resize request pending
+	}
+
+	// Resize the engine output to match the requested window size
+	if (!m_pEngine->ResizeOutput(requestedSize.width, requestedSize.height))
+	{
+		DBG("EditorApp: Failed to resize engine output to %ux%u", requestedSize.width, requestedSize.height);
+		return false;
+	}
+
+	m_window.CommitResize();
+	return true;
+	
 }
 
 // Create a new scene with default settings
@@ -251,7 +306,7 @@ void EditorApp::NewScene()
     m_pEditScene->AddRootActor(std::move(cameraActorOwned));
     m_pEditScene->GetCameraSystem()->SetMainCamera(camera);
 
-	ApplyCurrentViewportSizeToScene();
+	ApplySceneRenderTargetSizeToScene(*m_pEditScene);
 
     DBG("EditorApp: New scene created.");
 }
@@ -288,7 +343,7 @@ void EditorApp::LoadScene(const std::string& filePath)
     else        DBG("EditorApp: Failed to load scene from %s", filePath.c_str());
 
 	// Set the viewport size based on the current scene color render target
-    ApplyCurrentViewportSizeToScene();
+    ApplySceneRenderTargetSizeToScene(*m_pEditScene);
 }
 
 // Hot reload: rebuild GameCode.dll and reload it without restarting the Editor.
@@ -619,7 +674,7 @@ bool EditorApp::RestoreHotReloadSnapshot()
     m_pEditScene = std::move(restoredScene);
 
 	// Apply the current viewport size to the restored scene to ensure proper camera settings
-    ApplyCurrentViewportSizeToScene();
+    ApplySceneRenderTargetSizeToScene(*m_pEditScene);
 
     return true;
 
@@ -707,8 +762,18 @@ void EditorApp::EnterPlayMode()
 	// Move ownership of the cloned scene to m_pPlayScene
     m_pPlayScene = std::move(playScene);
 
-	// Apply the current viewport size to the play scene
-	ApplyCurrentViewportSizeToScene();
+	// Resize the scene render targets to the fixed resolution for Play Mode
+    if (!m_pEngine->ResizeSceneRenderTargets(PLAY_VIEWPORT_WIDTH, PLAY_VIEWPORT_HEIGHT))
+    {
+		DBG("EditorApp: Failed to resize scene render targets for Play mode.");
+		m_pPlayScene->Finalize();
+		m_pPlayScene.reset();
+		return;
+    }
+
+    // Apply the render target size to viewport-dependent elements
+    // in the Play scene, such as Screen-Space UI layout.
+    ApplySceneRenderTargetSizeToScene(*m_pPlayScene);
 
 	// Switch to Play Mode
 	m_editorMode = EditorMode::Play;
@@ -744,6 +809,38 @@ void EditorApp::ExitPlayMode()
 	// Switch back to Edit Mode
 	m_editorMode = EditorMode::Edit;
 
+	// Apply the current viewport size to the edit scene to ensure proper camera settings
+    const ImVec2 viewportSize = m_sceneViewPanel.GetViewportSize();
+
+    const UINT width = static_cast<UINT>(viewportSize.x);
+    const UINT height = static_cast<UINT>(viewportSize.y);
+
+    if (width > 0 && height > 0)
+    {
+        if (!m_pEngine->ResizeSceneRenderTargets(width, height))
+        {
+            DBG("EditorApp: Failed to resize scene render targets.");
+        }
+
+        GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
+
+        if (sceneColor)
+        {
+            const UINT actualWidth = sceneColor->GetWidth();
+            const UINT actualHeight = sceneColor->GetHeight();
+
+            CameraLens lens = m_pEditorCamera->GetCameraLens();
+            lens.width = static_cast<float>(actualWidth);
+            lens.height = static_cast<float>(actualHeight);
+            m_pEditorCamera->SetCameraLens(lens);
+
+            if (m_pEditScene)
+            {
+                ApplySceneRenderTargetSizeToScene(*m_pEditScene);
+            }
+        }
+    }
+
 	// Check if the selected Actor is still valid in the edit scene, if not clear the selection
 	if (selectedActorId.IsValid())
 	{
@@ -760,42 +857,28 @@ void EditorApp::ExitPlayMode()
 	}
 }
 
-void EditorApp::CreateMainWindow()
+void EditorApp::ApplyPendingModeTransition()
 {
-    HINSTANCE hInst = GetModuleHandle(nullptr);
+    const EditorModeTransition transition = m_pendingModeTransition;
+    m_pendingModeTransition = EditorModeTransition::None;
 
-    m_wc.cbSize        = sizeof(WNDCLASSEX);
-    m_wc.style         = CS_HREDRAW | CS_VREDRAW;
-    m_wc.lpfnWndProc   = (WNDPROC)EditorWindowProcedure;
-    m_wc.hIcon         = LoadIcon(hInst, IDI_APPLICATION);
-    m_wc.hCursor       = LoadCursor(hInst, IDC_ARROW);
-    m_wc.hbrBackground = GetSysColorBrush(COLOR_BACKGROUND);
-    m_wc.lpszMenuName  = nullptr;
-    m_wc.lpszClassName = _T("101_Editor");
-    m_wc.hInstance     = hInst;
+    switch (transition)
+    {
+    case EditorModeTransition::EnterPlay:
+        EnterPlayMode();
+        break;
 
-    RegisterClassEx(&m_wc);
+    case EditorModeTransition::ExitPlay:
+        ExitPlayMode();
+        break;
 
-    RECT wrc = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
-    AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
-
-    m_hwnd = CreateWindowEx(
-        0,
-        m_wc.lpszClassName,
-        _T("101Editor"),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        wrc.right - wrc.left,
-        wrc.bottom - wrc.top,
-        NULL, NULL, hInst, NULL
-    );
+    case EditorModeTransition::None:
+        break;
+    }
 }
 
 void EditorApp::PrepareInstance()
 {
-    WindowInfo::Get().SetWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-
     m_pEngine         = std::make_unique<Engine>();
     m_pRenderer       = std::make_unique<Renderer>();
     m_pTextureManager = std::make_unique<TextureManager>();
@@ -819,7 +902,7 @@ void EditorApp::PrepareInstance()
 
 void EditorApp::InitInstance()
 {
-    m_pEngine->InitCore(m_hwnd, WINDOW_WIDTH, WINDOW_HEIGHT);
+    m_pEngine->InitCore(m_window.GetHandle(), WINDOW_WIDTH, WINDOW_HEIGHT);
 
     auto pDevice = m_pEngine->GetDevice();
 
@@ -857,20 +940,37 @@ void EditorApp::InitImGui()
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigDpiScaleFonts = true;
 
+    namespace fs = std::filesystem;
+    const fs::path iniPath = PathManager::ResolveW("Saved/Editor/imgui.ini");
+    std::error_code directoryError;
+    fs::create_directories(iniPath.parent_path(), directoryError);
+    if (directoryError)
+    {
+        DBG("EditorApp: Failed to create ImGui settings directory: %s", directoryError.message().c_str());
+    }
+
+    m_imguiIniPath = StringEncoding::WideToUtf8(iniPath.wstring());
+    if (m_imguiIniPath.empty())
+    {
+        DBG("EditorApp: Failed to convert the ImGui settings path to UTF-8.");
+    }
+    m_shouldBuildDefaultDockLayout = !fs::exists(iniPath);
+    io.IniFilename = m_imguiIniPath.empty() ? nullptr : m_imguiIniPath.c_str();
+
 	//---------------------------------
 	// Load custom font for the editor
 	//---------------------------------
     EditorFontConfig fontConfig;
     fontConfig.filePath = "C:/Windows/Fonts/Meiryo.ttc";
     fontConfig.sizePixels = 16.0f;
-    fontConfig.fontIndex = 3;
+    fontConfig.fontIndex = 2;
 
     EditorTheme::LoadFont(io, fontConfig);
 
 	//-------------------------------------------
 	// Initialize ImGui for Win32 and DirectX 12
 	//-------------------------------------------
-    ImGui_ImplWin32_Init(m_hwnd);
+    ImGui_ImplWin32_Init(m_window.GetHandle());
 
     auto descriptorHeapAllocator = m_pEngine->GetDescriptorHeapAllocator();
     uint32_t imguiIndex = descriptorHeapAllocator->AllocateCbvSrvUav();
@@ -905,6 +1005,10 @@ void EditorApp::RegisterComponentInspectors()
 void EditorApp::Update(float deltaTime)
 {
     InputManager::GetInstance().Update();
+
+	// Apply mode transitions before command recording begins. Toolbar callbacks
+	// run while ImGui is being rendered and must not resize GPU resources directly.
+    ApplyPendingModeTransition();
 
 	// Handle any pending resize requests for the scene view panel
     ApplySceneViewResizeRequest();
@@ -1212,15 +1316,60 @@ void EditorApp::RenderSelectionPass()
 
 void EditorApp::RenderImGui()
 {
+    RenderMenuBar();
+    RenderMainDockSpace();
+
     RenderHierarchyPanel();
     RenderInspectorPanel();
     RenderSceneViewPanel();
-    RenderMenuBar();
 	RenderToolbar();
     RenderScriptsPanel();
 
     ImGui::Render();
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_pEngine->GetCommandList());
+}
+
+void EditorApp::RenderMainDockSpace()
+{
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImGuiID dockSpaceId = ImHashStr("EditorDockSpace");
+
+    // Build only for a new workspace or an explicit reset. Rebuilding every
+    // frame would overwrite layout changes made by the user.
+    if (m_shouldBuildDefaultDockLayout)
+    {
+        BuildDefaultDockLayout(dockSpaceId);
+        m_shouldBuildDefaultDockLayout = false;
+    }
+
+    ImGui::DockSpaceOverViewport(dockSpaceId, viewport);
+}
+
+void EditorApp::BuildDefaultDockLayout(unsigned int dockSpaceId)
+{
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    ImGui::DockBuilderRemoveNode(dockSpaceId);
+    ImGui::DockBuilderAddNode(dockSpaceId, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockSpaceId, viewport->WorkSize);
+
+    ImGuiID centerNode = dockSpaceId;
+    ImGuiID leftNode = 0;
+    ImGuiID rightNode = 0;
+    ImGuiID toolbarNode = 0;
+    ImGuiID scriptsNode = 0;
+
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Left, 0.20f, &leftNode, &centerNode);
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Right, 0.30f, &rightNode, &centerNode);
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Up, 0.08f, &toolbarNode, &centerNode);
+    ImGui::DockBuilderSplitNode(centerNode, ImGuiDir_Down, 0.25f, &scriptsNode, &centerNode);
+
+    ImGui::DockBuilderDockWindow("Hierarchy", leftNode);
+    ImGui::DockBuilderDockWindow("Inspector", rightNode);
+    ImGui::DockBuilderDockWindow("Toolbar", toolbarNode);
+    ImGui::DockBuilderDockWindow("Scripts", scriptsNode);
+    ImGui::DockBuilderDockWindow("Scene", centerNode);
+    ImGui::DockBuilderFinish(dockSpaceId);
 }
 
 void EditorApp::RenderHierarchyPanel()
@@ -1609,6 +1758,11 @@ void EditorApp::RenderMenuBar()
             }
         };
 
+    callbacks.onResetLayout = [this]()
+        {
+            m_shouldBuildDefaultDockLayout = true;
+        };
+
     callbacks.onBuildGame = [this]()
         {
             if (m_editorMode != EditorMode::Edit) return;
@@ -1653,8 +1807,15 @@ void EditorApp::RenderToolbar()
 {
     Toolbar::Callbacks callbacks;
 
-    callbacks.onPlay = [this]() { EnterPlayMode(); };
-    callbacks.onStop = [this]() { ExitPlayMode(); };
+    callbacks.onPlay = [this]()
+        {
+            m_pendingModeTransition = EditorModeTransition::EnterPlay;
+        };
+
+    callbacks.onStop = [this]()
+        {
+            m_pendingModeTransition = EditorModeTransition::ExitPlay;
+        };
 
     callbacks.canPlay = m_editorMode == EditorMode::Edit && m_pEditScene != nullptr;
     callbacks.canStop = m_editorMode == EditorMode::Play && m_pPlayScene != nullptr;
@@ -1722,10 +1883,22 @@ void EditorApp::ApplySceneViewResizeRequest()
 	UINT width = 0, height = 0;
 
 	// Check if the scene view panel has requested a resize of the render target
-    if (!m_sceneViewPanel.ConsumeResizeRequest(width, height)) return;
+    if (!m_sceneViewPanel.ConsumeResizeRequest(width, height))
+    {
+        return;
+    }
+
+	// Fix the reslolution in the Play Mode to the current scene render target size (no resizing allowed)
+    if (m_editorMode == EditorMode::Play)
+    {
+        return;
+    }
     
 	// Resize the scene render targets (color and depth) to the new width and height
-    if (!m_pEngine->ResizeSceneRenderTargets(width, height)) return;
+    if (!m_pEngine->ResizeSceneRenderTargets(width, height)) 
+    {
+        return;
+    }
 
 	// Update the editor camera's lens parameters
 	CameraLens lens = m_pEditorCamera->GetCameraLens();
@@ -1736,20 +1909,27 @@ void EditorApp::ApplySceneViewResizeRequest()
 
     // Apply the viewport size to the scene and invalidate
     // all layout elements affected by the size change
-	if (m_pEditScene) m_pEditScene->SetViewportSize(width, height);
-	if (m_pPlayScene) m_pPlayScene->SetViewportSize(width, height);
+    if (m_pEditScene)
+    {
+        m_pEditScene->SetViewportSize(width, height);
+    }
 }
 
-void EditorApp::ApplyCurrentViewportSizeToScene()
+void EditorApp::ApplySceneRenderTargetSizeToScene(SceneBase& scene)
 {
-    if (!m_pEngine) return;
+    if (!m_pEngine) 
+    {
+        return;
+    }
 
     GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
 
-	if (!sceneColor) return;
+	if (!sceneColor) 
+    {
+        return;
+    }
 
-    if (m_pEditScene) m_pEditScene->SetViewportSize(sceneColor->GetWidth(), sceneColor->GetHeight());
-	if (m_pPlayScene) m_pPlayScene->SetViewportSize(sceneColor->GetWidth(), sceneColor->GetHeight());
+	scene.SetViewportSize(sceneColor->GetWidth(), sceneColor->GetHeight());
 }
 
 void EditorApp::BeginTransformEdit(const Guid& actorGuid, const Transform3D& before)

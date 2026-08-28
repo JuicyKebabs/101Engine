@@ -11,6 +11,7 @@
 #include "Engine/Audio/Audio.h"
 #include "Engine/Core/Time/Time.h"
 #include "Engine/Core/Context/Context.h"
+#include "Engine/Window/Window.h"
 
 // Application class
 class App
@@ -20,10 +21,7 @@ public:
 	static constexpr int WINDOW_HEIGHT = 1080;	// Window height
 
 private:
-	HINSTANCE hInstance = nullptr;	// Instance handle
-	HWND hwnd = nullptr;			// Window handle
-
-	WNDCLASSEX wc = {};	// Window class
+	Window m_window;
 
 	App(const App&) = delete;				// Copy constructor disabled
 	void operator=(const App&) = delete;	// Assignment operator disabled
@@ -68,9 +66,10 @@ public:
 private:
 	App() = default;	// Constructor
 
+	bool ApplyWindowResizeRequest();
+
 	void LoadGameCode();	// Load game code DLL
 
-	void CreateMainWindow(HWND& hwnd, WNDCLASSEX& wc);	// Create main window
 	void PrepareInstance();								// Prepare instance
 
 	void InitInstance();	// Initialize instance
