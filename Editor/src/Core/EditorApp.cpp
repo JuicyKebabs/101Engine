@@ -69,6 +69,17 @@ namespace
     constexpr const char* kActiveGameCodePath = "build/bin/Debug/GameCode.dll";
     constexpr const char* kStagedGameCodePath = "build/bin/Debug/GameCode.staged.dll";
     constexpr const char* kPreviousGameCodePath = "build/bin/Debug/GameCode.previous.dll";
+
+    // Temporary Scene View navigation tuning. These values intentionally live
+    // outside EditorViewCamera so they can later move to editor preferences.
+    constexpr float kLookRadiansPerPixel = 0.003f;
+    constexpr float kOrbitRadiansPerPixel = 0.003f;
+    constexpr float kPanDistanceScalePerPixel = 0.002f;
+    constexpr float kDollyDistanceFractionPerStep = 0.12f;
+    constexpr float kFastMoveMultiplier = 4.0f;
+    constexpr float kMaximumPitchRadians = PI_DIV_2 - 0.01f;
+    constexpr float kMinimumPivotDistance = 0.1f;
+    constexpr float kFocusPadding = 1.2f;
 }
 
 bool EditorApp::Initialize()
@@ -187,9 +198,8 @@ void EditorApp::Run()
                     continue;
                 }
 
-                // ImGui's NewFrame is called before Update so that debug
-                // ImGui windows (e.g. EditorCamera's "Camera Info") can be
-                // drawn from within Update().
+                // ImGui's NewFrame is called before Update so debug ImGui
+                // windows can be drawn from within Update().
                 ImGui_ImplDX12_NewFrame();
                 ImGui_ImplWin32_NewFrame();
                 ImGui::NewFrame();
@@ -829,10 +839,11 @@ void EditorApp::ExitPlayMode()
             const UINT actualWidth = sceneColor->GetWidth();
             const UINT actualHeight = sceneColor->GetHeight();
 
-            CameraLens lens = m_pEditorCamera->GetCameraLens();
+            Camera& editorCamera = m_editorViewCamera.GetCamera();
+            CameraLens lens = editorCamera.GetCameraLens();
             lens.width = static_cast<float>(actualWidth);
             lens.height = static_cast<float>(actualHeight);
-            m_pEditorCamera->SetCameraLens(lens);
+            editorCamera.SetCameraLens(lens);
 
             if (m_pEditScene)
             {
@@ -892,12 +903,7 @@ void EditorApp::PrepareInstance()
         m_pAssetManager.get()
     };
 
-    // Editor-only free-fly camera actor (not part of any SceneBase)
-    Actor::InitDesc camDesc;
-    camDesc.name = "EditorCamera";
-    m_pEditorCameraActor = ActorFactory::CreateEmptyActor(camDesc);
-    m_pEditorCamera = m_pEditorCameraActor->AddComponent<EditorCamera>();
-    m_pEditorCamera->Initialize(WINDOW_WIDTH, WINDOW_HEIGHT);
+    m_editorViewCamera.Initialize(WINDOW_WIDTH, WINDOW_HEIGHT);
 }
 
 void EditorApp::InitInstance()
@@ -1013,15 +1019,6 @@ void EditorApp::Update(float deltaTime)
 	// Handle any pending resize requests for the scene view panel
     ApplySceneViewResizeRequest();
 
-    // Update the editor camera actor
-    // (call PreUpdate, Update, and LateUpdate in sequence to update camera component)
-    m_pEditorCameraActor->PreUpdate(deltaTime);
-    m_pEditorCameraActor->Update(deltaTime);
-    m_pEditorCameraActor->LateUpdate(deltaTime);
-
-    // Flush the transform of the editor camera actor
-    m_pEditorCameraActor->FlushTransform();
-
 	SceneBase* activeScene = GetActiveScene();
 
     // Advance gameplay only in Play Mode.
@@ -1052,7 +1049,7 @@ void EditorApp::Update(float deltaTime)
 	else if (m_editorMode == EditorMode::Edit)
 	{// In case of Edit Mode
 		// Use the editor camera in Edit Mode
-		currentCamera = m_pEditorCamera ? &m_pEditorCamera->GetCameraInfo() : nullptr;
+		currentCamera = &m_editorViewCamera.GetCamera().GetCameraInfo();
 	}
 
 	// Update the renderer with the current camera information for rendering
@@ -1626,6 +1623,16 @@ void EditorApp::RenderSceneViewPanel()
 
     if (m_editorMode == EditorMode::Edit)
     {
+        SceneBase* activeScene = GetActiveScene();
+
+        SceneNavigationInput sceneNavigationInput;
+        if (m_sceneViewPanel.ConsumeSceneNavigationInput(sceneNavigationInput))
+        {
+            ApplySceneNavigationInput(
+                sceneNavigationInput,
+                m_timeManager.GetDeltaTime());
+        }
+
         // Handle the user manipulation in the Canvas View
         CanvasNavigationInput navigationInput;
 
@@ -1640,8 +1647,6 @@ void EditorApp::RenderSceneViewPanel()
 
         // Handle the opening Canvas in the Canvas View mode if the user clicks a Canvas in the breadcrumb list
         Guid canvasActorGuid;
-
-        SceneBase* activeScene = GetActiveScene();
 
         if (m_sceneViewPanel.ConsumeCanvasOpenRequest(canvasActorGuid))
         {
@@ -1663,7 +1668,7 @@ void EditorApp::RenderSceneViewPanel()
         if (!m_sceneViewPanel.ConsumePickRequest(pickUV)) return;
 
         // Validate necessary pointers before proceeding with picking
-        if (!activeScene || !m_pEditorCamera) return;
+        if (!activeScene) return;
 
         // Build the camera info for picking based on the current view mode (Scene or Canvas)
         const CameraInfo pickCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
@@ -1901,11 +1906,12 @@ void EditorApp::ApplySceneViewResizeRequest()
     }
 
 	// Update the editor camera's lens parameters
-	CameraLens lens = m_pEditorCamera->GetCameraLens();
+	Camera& editorCamera = m_editorViewCamera.GetCamera();
+	CameraLens lens = editorCamera.GetCameraLens();
 	lens.width = static_cast<float>(width);
 	lens.height = static_cast<float>(height);
 
-	m_pEditorCamera->SetCameraLens(lens);
+	editorCamera.SetCameraLens(lens);
 
     // Apply the viewport size to the scene and invalidate
     // all layout elements affected by the size change
@@ -2269,7 +2275,7 @@ void EditorApp::BuildSelectionRenderData(
 	}
 }
 
-CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight) const
+CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight)
 {
 	// Avoid zero division and invalid viewport sizes
     if (viewportWidth == 0 || viewportHeight == 0) return {};
@@ -2279,7 +2285,7 @@ CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportH
 	if (m_sceneViewPanel.GetViewMode() == EditorViewportMode::Scene)
 	{
 		// Use the editor camera's perspective projection for Scene View
-		return m_pEditorCamera->GetCameraInfo();
+		return m_editorViewCamera.GetCamera().GetCameraInfo();
 	}
 
 	// From here on, build an orthographic projection for Canvas View
@@ -2628,6 +2634,129 @@ Vector2 EditorApp::CalculateCanvasViewExtent(UINT viewportWidth, UINT viewportHe
     }
 
     return extent;
+}
+
+void EditorApp::ApplySceneNavigationInput(
+    const SceneNavigationInput& input,
+    float deltaTime)
+{
+    if (input.lookDeltaPixels.LengthSq() > 0.0f)
+    {
+        m_editorViewCamera.Look(
+            input.lookDeltaPixels,
+            kLookRadiansPerPixel,
+            kMaximumPitchRadians);
+    }
+
+    if (input.flyDirection.LengthSq() > 0.0f)
+    {
+        const float speedMultiplier = input.fastMove ? kFastMoveMultiplier : 1.0f;
+        const float distance =
+            m_editorViewCamera.GetNavigationState().moveSpeed *
+            speedMultiplier * deltaTime;
+
+        m_editorViewCamera.Fly(input.flyDirection, distance);
+    }
+
+    if (input.panDeltaPixels.LengthSq() > 0.0f)
+    {
+        m_editorViewCamera.Pan(
+            input.panDeltaPixels,
+            kPanDistanceScalePerPixel);
+    }
+
+    if (input.orbitDeltaPixels.LengthSq() > 0.0f)
+    {
+        m_editorViewCamera.Orbit(
+            input.orbitDeltaPixels,
+            kOrbitRadiansPerPixel,
+            kMaximumPitchRadians);
+    }
+
+    if (input.wheelDelta != 0.0f)
+    {
+        m_editorViewCamera.Dolly(
+            input.wheelDelta,
+            kDollyDistanceFractionPerStep,
+            kMinimumPivotDistance);
+    }
+
+    if (input.focusRequested)
+    {
+        SceneBase* scene = GetActiveScene();
+        if (scene)
+        {
+            const std::optional<EditorCameraFocusBounds> bounds =
+                BuildSelectedActorFocusBounds(*scene);
+
+            if (bounds)
+            {
+                m_editorViewCamera.Focus(
+                    *bounds,
+                    kFocusPadding,
+                    kMinimumPivotDistance);
+            }
+        }
+    }
+}
+
+std::optional<EditorCameraFocusBounds> EditorApp::BuildSelectedActorFocusBounds(
+    SceneBase& scene)
+{
+    Actor* selectedActor = m_hierarchyPanel.GetSelectedActor(&scene);
+    if (!selectedActor || selectedActor->IsDestroyed()) return std::nullopt;
+
+    Vector3 boundsMin;
+    Vector3 boundsMax;
+    bool hasBounds = false;
+
+    for (MeshRenderer* renderer : selectedActor->GetComponentsByClass<MeshRenderer>())
+    {
+        if (!renderer || !renderer->IsVisible() || !renderer->IsConfigured()) continue;
+
+        const MeshRendererProxy& proxy = renderer->GetRenderProxy();
+        if (proxy.common.renderSpace != RenderSpace::World) continue;
+
+        Vector3 worldPosition;
+        Quaternion worldRotation;
+        Vector3 worldScale;
+        if (!proxy.common.worldMatrix.Decompose(worldPosition, worldRotation, worldScale)) continue;
+
+        const float maximumScale = std::max({
+            std::abs(worldScale.x),
+            std::abs(worldScale.y),
+            std::abs(worldScale.z)
+        });
+
+        for (const SubmeshRenderTemplate& renderTemplate : renderer->GetRenderTemplates())
+        {
+            const MeshDesc& mesh = renderTemplate.meshDesc;
+            const Vector3 center = proxy.common.worldMatrix.TransformPoint(mesh.boundsCenter);
+            const float radius = std::max(0.0f, mesh.boundsRadius * maximumScale);
+            const Vector3 extent(radius);
+            const Vector3 sphereMin = center - extent;
+            const Vector3 sphereMax = center + extent;
+
+            if (!hasBounds)
+            {
+                boundsMin = sphereMin;
+                boundsMax = sphereMax;
+                hasBounds = true;
+            }
+            else
+            {
+                boundsMin = boundsMin.Min(sphereMin);
+                boundsMax = boundsMax.Max(sphereMax);
+            }
+        }
+    }
+
+    if (!hasBounds) return std::nullopt;
+
+    EditorCameraFocusBounds result;
+    result.center = (boundsMin + boundsMax) * 0.5f;
+    result.radius = (boundsMax - result.center).Length();
+    return result;
 }
 
 void EditorApp::ApplyCanvasNavigationInput(const CanvasNavigationInput& input, UINT viewportWidth, UINT viewportHeight)

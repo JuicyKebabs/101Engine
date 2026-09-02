@@ -17,4 +17,10 @@ void TestBehavior::Update()
 
         transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, 5.0f));
     }
+    else if (InputManager::GetInstance().GetInputInfo().key.d.down)
+    {
+        Transform* transform = GetOwner()->GetComponentByClass<Transform>();
+
+        transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, -5.0f));
+    }
 }

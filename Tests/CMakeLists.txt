@@ -380,3 +380,21 @@ add_test(NAME SceneEditorUpdateTests COMMAND SceneEditorUpdateTests)
 set_tests_properties(SceneEditorUpdateTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+add_executable(EditorCameraControllerTests
+    EditorCameraControllerTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorCameraController.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewCamera.cpp
+)
+
+target_include_directories(EditorCameraControllerTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(EditorCameraControllerTests PRIVATE 101Framework)
+
+add_test(NAME EditorCameraControllerTests COMMAND EditorCameraControllerTests)
+set_tests_properties(EditorCameraControllerTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

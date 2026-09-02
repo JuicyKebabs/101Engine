@@ -42,8 +42,8 @@ public:
 		HINSTANCE instance = nullptr;
 		std::wstring className = L"101EngineWindow";
 		std::wstring title = L"101Engine";
-		uint32_t clientWidth = 1280;
-		uint32_t clientHeight = 720;
+		uint32_t clientWidth = 1920;
+		uint32_t clientHeight = 1080;
 		bool resizable = true;
 		bool allowFullscreenToggle = false;
 		MessageCallback messageCallback;
