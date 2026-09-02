@@ -206,6 +206,53 @@ void SceneViewPanel::Render(
 			m_hasCanvasNavigationInput = true;
 		}
 	}
+	else if (m_viewMode == EditorViewportMode::Scene && ImGui::IsItemHovered())
+	{
+		ImGuiIO& io = ImGui::GetIO();
+
+		if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+		{
+			m_sceneNavigationInput.lookDeltaPixels +=
+				Vector2(io.MouseDelta.x, io.MouseDelta.y);
+			m_sceneNavigationInput.flyDirection.x =
+				(ImGui::IsKeyDown(ImGuiKey_D) ? 1.0f : 0.0f) -
+				(ImGui::IsKeyDown(ImGuiKey_A) ? 1.0f : 0.0f);
+			m_sceneNavigationInput.flyDirection.y =
+				(ImGui::IsKeyDown(ImGuiKey_E) ? 1.0f : 0.0f) -
+				(ImGui::IsKeyDown(ImGuiKey_Q) ? 1.0f : 0.0f);
+			m_sceneNavigationInput.flyDirection.z =
+				(ImGui::IsKeyDown(ImGuiKey_W) ? 1.0f : 0.0f) -
+				(ImGui::IsKeyDown(ImGuiKey_S) ? 1.0f : 0.0f);
+			m_sceneNavigationInput.fastMove = io.KeyShift;
+			m_hasSceneNavigationInput = true;
+		}
+
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f))
+		{
+			m_sceneNavigationInput.panDeltaPixels +=
+				Vector2(io.MouseDelta.x, io.MouseDelta.y);
+			m_hasSceneNavigationInput = true;
+		}
+
+		if (io.KeyAlt && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+		{
+			m_sceneNavigationInput.orbitDeltaPixels +=
+				Vector2(io.MouseDelta.x, io.MouseDelta.y);
+			m_hasSceneNavigationInput = true;
+		}
+
+		if (io.MouseWheel != 0.0f)
+		{
+			m_sceneNavigationInput.wheelDelta += io.MouseWheel;
+			m_hasSceneNavigationInput = true;
+		}
+
+		if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+		{
+			m_sceneNavigationInput.focusRequested = true;
+			m_hasSceneNavigationInput = true;
+		}
+	}
 
 	// Draw Canvas overlay rectangles on top of the image using the ImDrawList API
 
@@ -285,7 +332,7 @@ void SceneViewPanel::Render(
 	}
 
 	// Handle mouse click events for picking actors in the scene
-	if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
 	{
 		// Get the current mouse position in the ImGui window
 		const ImVec2 mousePosition = ImGui::GetMousePos();
@@ -358,6 +405,17 @@ bool SceneViewPanel::ConsumeCanvasNavigationInput(CanvasNavigationInput& outInpu
 
 	m_canvasNavigationInput = {};
 	m_hasCanvasNavigationInput = false;
+
+	return true;
+}
+
+bool SceneViewPanel::ConsumeSceneNavigationInput(SceneNavigationInput& outInput)
+{
+	if (!m_hasSceneNavigationInput) return false;
+
+	outInput = m_sceneNavigationInput;
+	m_sceneNavigationInput = {};
+	m_hasSceneNavigationInput = false;
 
 	return true;
 }

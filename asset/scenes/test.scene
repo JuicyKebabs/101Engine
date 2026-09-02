@@ -254,6 +254,56 @@
             "name": "UI",
             "parentId": "{6E3FD8DF-716B-4699-B8D9-0E59A9715403}",
             "tag": "None"
+        },
+        {
+            "actorId": "{7E917244-83E1-4570-AE18-9786B963160D}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            3.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{B61D1031-F6D2-42FF-82F3-C0F98EC09A80}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                },
+                {
+                    "data": {},
+                    "type": "TestBehavior"
+                }
+            ],
+            "is_active": true,
+            "name": "Mesh",
+            "parentId": "{14F2EAA1-9B7A-4F7E-81E8-081637C4FDDB}",
+            "tag": "None"
         }
     ],
     "directional_light": {

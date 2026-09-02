@@ -61,6 +61,19 @@ struct CanvasNavigationInput
 	bool fitRequested = false;					// Flag to indicate if the user requested to fit the viewport to the Canvas rectangle
 };
 
+// Semantic navigation input for a 3D editor view. Raw ImGui state is reduced
+// to this value before it reaches the camera facade.
+struct SceneNavigationInput
+{
+	Vector2 lookDeltaPixels = Vector2::Zero();
+	Vector2 orbitDeltaPixels = Vector2::Zero();
+	Vector2 panDeltaPixels = Vector2::Zero();
+	Vector3 flyDirection = Vector3::Zero();
+	float wheelDelta = 0.0f;
+	bool fastMove = false;
+	bool focusRequested = false;
+};
+
 // Struct to hold overlay data for the canvas view panel
 // This holds the variety of information displayed on the Scene and Canvas view panels
 struct ViewportOverlayData
@@ -100,6 +113,9 @@ public:
 
 	// Consume a user input for navigating the Canvas View panel
 	bool ConsumeCanvasNavigationInput(CanvasNavigationInput& outInput);
+
+	// Consume semantic navigation input for the 3D Scene View panel
+	bool ConsumeSceneNavigationInput(SceneNavigationInput& outInput);
 
 	EditorViewportMode GetViewMode() const { return m_viewMode; }
 	void SetViewMode(EditorViewportMode mode) { m_viewMode = mode; }
@@ -143,4 +159,7 @@ private:
 	// Request for reflecting user input for navigating the Canvas View panel (panning, zooming, etc.)
 	CanvasNavigationInput m_canvasNavigationInput;		// Store the user input for navigating the Canvas View panel
 	bool m_hasCanvasNavigationInput = false;			// Flag to indicate if there is user input for navigating the Canvas View panel
+
+	SceneNavigationInput m_sceneNavigationInput;
+	bool m_hasSceneNavigationInput = false;
 };

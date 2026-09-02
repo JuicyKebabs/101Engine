@@ -19,7 +19,7 @@
 #include "Command/RectTransformEditCommand.h"
 #include "Core/CanvasEditContext.h"
 
-#include "Core/EditorCamera.h"
+#include "Core/EditorViewCamera.h"
 #include "UI/HierarchyPanel.h"
 #include "UI/Inspector/InspectorPanel.h"
 #include "UI/SceneViewPanel.h"
@@ -100,10 +100,9 @@ private:
 
     EditorCommandHistory m_commandHistory;  // Command history for undo/redo
 
-    // Editor-only free-fly camera. Kept outside SceneBase so it is never
-    // written to / read from .scene files.
-    std::unique_ptr<Actor> m_pEditorCameraActor;
-    EditorCamera* m_pEditorCamera = nullptr;
+    // Camera facade owned by the Scene View and kept outside SceneBase so it
+    // is never written to / read from .scene files.
+    EditorViewCamera m_editorViewCamera;
 
     // Canvas View controls
     CanvasEditContext m_canvasEditContext;          // Stores the information for editing a Canvas in the Canvas view mode.
@@ -221,7 +220,7 @@ private:
 
     // Helper function to build CameraInfo for the current viewport size
     // Camera matrix is built based on the current viewport mode (Scene or Canvas)
-    CameraInfo BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight) const;
+    CameraInfo BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight);
 
     // Build Canvas guide rectangles for the current Scene/Canvas View mode.
     ViewportOverlayData BuildViewportOverlayData(UINT viewportWidth, UINT viewportHeight);
@@ -236,6 +235,9 @@ private:
 
     // Helper funtion to apply the user manipulation in Canvas View to the viewport of Canvas View
     void ApplyCanvasNavigationInput(const CanvasNavigationInput& input, UINT viewportWidth, UINT viewportHeight);
+
+    void ApplySceneNavigationInput(const SceneNavigationInput& input, float deltaTime);
+    std::optional<EditorCameraFocusBounds> BuildSelectedActorFocusBounds(SceneBase& scene);
 
     // Stop all ongoing edit transactions (transform, RectTransform, etc.)
     void StopAllEditTransactions();
