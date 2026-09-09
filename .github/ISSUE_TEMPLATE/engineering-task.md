@@ -1,13 +1,3 @@
----
-name: Engineering Task
-about: 101Engineの実装タスクを定義する
-title: ""
-labels: ""
-assignees: ""
----
-
-<!-- 記入例: docs/EngineeringTaskExample.md -->
-
 ## Context
 
 <!--
