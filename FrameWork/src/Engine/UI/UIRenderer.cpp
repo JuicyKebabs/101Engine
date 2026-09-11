@@ -181,3 +181,22 @@ bool UIRenderer::ResolveReferences(SceneBase& scene)
 
 	return true;
 }
+
+bool UIRenderer::GetCanvasActorReference(ActorReference& value) const
+{
+	value.Clear();
+	if (Canvas* canvas = GetCanvas())
+	{
+		Actor* actor = canvas->GetOwner();
+		return actor && value.Set(actor);
+	}
+	if (m_pendingCanvasActorId) return value.SetGuid(*m_pendingCanvasActorId);
+	return true;
+}
+
+void UIRenderer::SetCanvasActorReference(const ActorReference& value)
+{
+	SetCanvas(nullptr);
+	m_pendingCanvasActorId.reset();
+	if (value.HasValue()) m_pendingCanvasActorId = value.GetGuid();
+}

@@ -52,14 +52,11 @@ namespace
 	void RegisterTestComponent(const std::string& name)
 	{
 		TypeMetadataBuilder<T> builder(name);
-		builder.AddAccessorProperty<std::string>(
-			"name", PropertyLogicalType::String, DefaultPropertyPolicy(),
-			[](const T& component, std::string& value)
+		builder.Accessor<std::string>("name", [](const T& component, std::string& value)
 			{
 				value = component.GetName();
 				return true;
-			},
-			[](T& component, const std::string& value)
+			}, [](T& component, const std::string& value)
 			{
 				component.SetName(value);
 				return true;

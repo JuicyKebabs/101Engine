@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------------
 
 class Actor;
-class PersistentComponentMetadata;
+
 
 //camera information structure
 struct CameraInfo
@@ -78,7 +78,6 @@ struct CameraLens
 // Camera component Class
 class Camera : public Component
 {
-	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -115,6 +114,12 @@ public:
 	// Set target and follow Actor references.
 	bool SetTargetActor(Actor* target);
 	bool SetFollowTarget(Actor* target);
+	const ActorReference& GetTargetActorReference() const { return m_targetActor; }
+	const ActorReference& GetFollowActorReference() const { return m_followActor; }
+	void SetTargetActorReference(const ActorReference& target);
+	void SetFollowActorReference(const ActorReference& target);
+	bool SetAuthoredRigRotation(Quaternion rotation);
+	bool SetAuthoredPoseRotation(Quaternion rotation);
 
 	CAMERA_FOLLOW_MODE GetFollowMode() const { return m_followMode; }		// Get follow mode
 	CAMERA_ROTATION_MODE GetRotationMode() const { return m_rotationMode; }	// Get rotation mode

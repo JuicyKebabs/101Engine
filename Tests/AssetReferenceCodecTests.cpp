@@ -68,9 +68,9 @@ namespace
 
 	TypeMetadata BuildMetadata()
 	{
-		return *TypeMetadataBuilder<AssetObject>("AssetObject")
-			.AddMember("texture", &AssetObject::texture)
-			.Build();
+		TypeMetadataBuilder<AssetObject> builder("AssetObject");
+		builder.Property("texture", &AssetObject::texture);
+		return *builder.Build();
 	}
 
 	void TestReferenceStatesAndTypeMetadata()

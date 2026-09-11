@@ -1,4 +1,6 @@
+#include "Engine/Core/Math/ValueValidation.h"
 #include "Transform.h"
+#include <cmath>
 #include "Engine/Actor/Actor.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 #include "nlohmann/json.hpp"
@@ -108,6 +110,13 @@ void Transform::SetLocalRotationQuat(Quaternion quaternion)
 {
 	m_localTransform.rotation = quaternion;
 	MarkDirty();
+}
+
+bool Transform::SetAuthoredLocalRotation(Quaternion quaternion)
+{
+	if (!ValueValidation::NormalizeRotation(quaternion)) return false;
+	SetLocalRotationQuat(quaternion);
+	return true;
 }
 
 // Set local rotation using Euler angles in degrees

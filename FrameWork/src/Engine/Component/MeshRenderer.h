@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/Resource/AssetReference.h"
 #include <optional>
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderData.h"
@@ -7,7 +8,7 @@
 #include "Engine/Core/Math/Math.h"
 
 class Transform;
-class PersistentComponentMetadata;
+
 
 //---------------------------------------------------------
 // MeshRenderer class
@@ -22,7 +23,7 @@ struct MeshRendererProxy
 // MeshRendererComponent Class (for static mesh rendering)
 class MeshRenderer : public RendererComponent
 {
-	friend class PersistentComponentMetadata;
+
 public:
 	struct ParamDesc
 	{
@@ -53,6 +54,8 @@ public:
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
 	const MeshRendererProxy& GetRenderProxy();
 	bool IsConfigured() const override { return !m_templates.empty(); }
+	AssetReference<MeshAsset> GetMeshAssetReference() const;
+	void SetMeshAssetReference(const AssetReference<MeshAsset>& value);
 	Guid GetAssetId() const;
 
 	// Serialization and deserialization methods

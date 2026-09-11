@@ -45,6 +45,7 @@ namespace
 		TestMode mode = TestMode::Idle;
 		int validatedValue = 0;
 		int setterCallCount = 0;
+		int GetValidatedValue() const { return validatedValue; }
 
 		bool SetValidatedValue(int value)
 		{
@@ -84,52 +85,35 @@ namespace
 		if (!enumMetadata) return std::nullopt;
 
 		TypeMetadataBuilder<TestObject> builder("TestObject");
-		builder
-			.AddMember("enabled", &TestObject::enabled)
-			.AddMember("count", &TestObject::count)
-			.AddMember("mask", &TestObject::mask)
-			.AddMember("speed", &TestObject::speed)
-			.AddMember("precision", &TestObject::precision)
-			.AddMember("label", &TestObject::label)
-			.AddMember("uv", &TestObject::uv)
-			.AddMember("position", &TestObject::position)
-			.AddMember("direction", &TestObject::direction)
-			.AddMember(
-				"tint",
-				&TestObject::tint,
-				DefaultPropertyPolicy(),
-				PropertyLogicalType::Color)
-			.AddMember("rotation", &TestObject::rotation)
-			.AddEnumMember("mode", &TestObject::mode, *enumMetadata)
-			.AddAccessorProperty<Vector3>(
-				"callback_position",
-				PropertyLogicalType::Vector3,
-				DefaultPropertyPolicy(),
-				[](const TestObject& object, Vector3& outValue)
+		builder.Property("enabled", &TestObject::enabled);
+		builder.Property("count", &TestObject::count);
+		builder.Property("mask", &TestObject::mask);
+		builder.Property("speed", &TestObject::speed);
+		builder.Property("precision", &TestObject::precision);
+		builder.Property("label", &TestObject::label);
+		builder.Property("uv", &TestObject::uv);
+		builder.Property("position", &TestObject::position);
+		builder.Property("direction", &TestObject::direction);
+		builder.Property("tint", &TestObject::tint).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
+		builder.Property("rotation", &TestObject::rotation);
+		builder.Property("mode", &TestObject::mode).Enum(*enumMetadata);
+		builder.Accessor<Vector3>("callback_position", [](const TestObject& object, Vector3& outValue)
 				{
 					outValue = object.position;
 					return true;
-				},
-				[](TestObject& object, const Vector3& value)
+				}, [](TestObject& object, const Vector3& value)
 				{
 					object.position = value;
 					return true;
-				})
-			.AddAccessorProperty<int>(
-				"validated_value",
-				PropertyLogicalType::SignedInteger,
-				PropertyPolicy::Serializable |
-					PropertyPolicy::Inspectable |
-					PropertyPolicy::EditorReadOnly,
-				[](const TestObject& object, int& outValue)
+				});
+		builder.Accessor<int>("validated_value", [](const TestObject& object, int& outValue)
 				{
 					outValue = object.validatedValue;
 					return true;
-				},
-				[](TestObject& object, const int& value)
+				}, [](TestObject& object, const int& value)
 				{
 					return object.SetValidatedValue(value);
-				});
+				}).Inspector(InspectorMetadata{.readOnly = true});
 
 		return builder.Build();
 	}
@@ -149,16 +133,16 @@ namespace
 			const std::vector<PropertyMetadata>&>);
 
 		const PropertyMetadata* tint = metadata->FindProperty("tint");
-		Check(tint && tint->GetLogicalType() == PropertyLogicalType::Color,
-			"Color remains logically distinct from Vector4");
+		Check(tint && tint->GetLogicalType() == PropertyLogicalType::Vector4 &&
+			tint->GetInspectorMetadata()->presentation == InspectorPresentation::Color,
+			"Color uses the Vector4 value type with an Inspector presentation facet");
 		Check(tint && tint->GetPath().ToString() == "/tint",
 			"Top-level properties receive a normalized absolute path");
 
 		const PropertyMetadata* readOnly = metadata->FindProperty("validated_value");
 		Check(readOnly &&
-			HasPropertyPolicy(readOnly->GetPolicy(), PropertyPolicy::Serializable) &&
-			HasPropertyPolicy(readOnly->GetPolicy(), PropertyPolicy::Inspectable) &&
-			HasPropertyPolicy(readOnly->GetPolicy(), PropertyPolicy::EditorReadOnly),
+			readOnly->GetSerializationMetadata() &&
+			readOnly->GetInspectorMetadata() && readOnly->GetInspectorMetadata()->readOnly,
 			"Property policy is available from completed metadata");
 		Check(metadata->FindProperty("missing") == nullptr,
 			"Unknown serialized property name is not found");
@@ -181,21 +165,15 @@ namespace
 		nestedBuilder
 			.Object("rig", [](auto& rig)
 			{
-				rig.template AddAccessor<Vector3>(
-					"rotation", PropertyLogicalType::Vector3, DefaultPropertyPolicy(),
-					[](const TestObject& object, Vector3& value) { value = object.position; return true; },
-					[](TestObject& object, const Vector3& value) { object.position = value; return true; });
+				rig.template Accessor<Vector3>("rotation", [](const TestObject& object, Vector3& value) { value = object.position; return true; }, [](TestObject& object, const Vector3& value) { object.position = value; return true; });
 			})
 			.Object("pose", [](auto& pose)
 			{
-				pose.template AddAccessor<Vector3>(
-					"rotation", PropertyLogicalType::Vector3, DefaultPropertyPolicy(),
-					[](const TestObject& object, Vector3& value)
+				pose.template Accessor<Vector3>("rotation", [](const TestObject& object, Vector3& value)
 					{
 						value = { object.direction.x, object.direction.y, object.direction.z };
 						return true;
-					},
-					[](TestObject& object, const Vector3& value) { object.direction = Vector4(value.x, value.y, value.z, 0.0f); return true; });
+					}, [](TestObject& object, const Vector3& value) { object.direction = Vector4(value.x, value.y, value.z, 0.0f); return true; });
 			});
 		const auto nested = nestedBuilder.Build();
 		Check(nested && nested->GetProperties().size() == 2,
@@ -210,15 +188,16 @@ namespace
 		TypeMetadataBuilder<TestObject> duplicateLeaf("DuplicateLeaf");
 		duplicateLeaf.Object("rig", [](auto& rig)
 		{
-			rig.AddMember("value", &TestObject::count)
-				.AddMember("value", &TestObject::speed);
+			rig.Property("value", &TestObject::count);
+		rig.Property("value", &TestObject::speed);
 		});
 		Check(!duplicateLeaf.Build(), "Duplicate paths in one object are rejected");
 
 		TypeMetadataBuilder<TestObject> propertyObjectCollision("Collision");
-		propertyObjectCollision.AddMember("rig", &TestObject::count).Object("rig", [](auto& rig)
+		propertyObjectCollision.Property("rig", &TestObject::count);
+		propertyObjectCollision.Object("rig", [](auto& rig)
 		{
-			rig.AddMember("value", &TestObject::speed);
+			rig.Property("value", &TestObject::speed);
 		});
 		Check(!propertyObjectCollision.Build(),
 			"A property cannot also be an ancestor object path");
@@ -228,8 +207,8 @@ namespace
 		Check(!emptyObject.Build(), "An object scope without leaf properties is rejected");
 
 		TypeMetadataBuilder<TestObject> duplicateObject("DuplicateObject");
-		duplicateObject.Object("rig", [](auto& rig) { rig.AddMember("a", &TestObject::count); });
-		duplicateObject.Object("rig", [](auto& rig) { rig.AddMember("b", &TestObject::speed); });
+		duplicateObject.Object("rig", [](auto& rig) { rig.Property("a", &TestObject::count); });
+		duplicateObject.Object("rig", [](auto& rig) { rig.Property("b", &TestObject::speed); });
 		Check(!duplicateObject.Build(), "Duplicate object scope registration is rejected");
 	}
 
@@ -341,50 +320,31 @@ namespace
 	void TestInvalidTypeMetadataIsNeverPublished()
 	{
 		TypeMetadataBuilder<TestObject> emptyName("TestObject");
-		emptyName.AddMember("", &TestObject::count);
+		emptyName.Property("", &TestObject::count);
 		Check(!emptyName.Build(), "Empty property serialized name rejects the type metadata");
 
 		TypeMetadataBuilder<TestObject> duplicate("TestObject");
-		duplicate
-			.AddMember("value", &TestObject::count)
-			.AddMember("value", &TestObject::speed);
+		duplicate.Property("value", &TestObject::count);
+		duplicate.Property("value", &TestObject::speed);
 		Check(!duplicate.Build(), "Duplicate property serialized name rejects the type metadata");
 
 		TypeMetadataBuilder<TestObject> incomplete("TestObject");
-		incomplete.AddAccessorProperty<int>(
-			"value",
-			PropertyLogicalType::SignedInteger,
-			DefaultPropertyPolicy(),
-			{},
-			[](TestObject&, const int&) { return true; });
+		incomplete.Accessor<int>("value", {}, [](TestObject&, const int&) { return true; });
 		Check(!incomplete.Build(), "Incomplete read and write operations reject the type metadata");
 
-		TypeMetadataBuilder<TestObject> unsupported("TestObject");
-		unsupported.AddMember(
-			"value",
-			&TestObject::count,
-			DefaultPropertyPolicy(),
-			PropertyLogicalType::Invalid);
-		Check(!unsupported.Build(), "Unsupported logical type rejects the type metadata");
-
-		TypeMetadataBuilder<TestObject> mismatched("TestObject");
-		mismatched.AddMember(
-			"value",
-			&TestObject::count,
-			DefaultPropertyPolicy(),
-			PropertyLogicalType::Vector3);
-		Check(!mismatched.Build(), "Logical and C++ value type mismatch rejects the type metadata");
+		TypeMetadataBuilder<TestObject> nullMember("TestObject");
+		nullMember.Property("value", static_cast<int TestObject::*>(nullptr));
+		Check(!nullMember.Build(), "Null direct member rejects metadata");
+		TypeMetadataBuilder<TestObject> nullGetter("TestObject");
+		nullGetter.Property("value", static_cast<int (TestObject::*)() const>(nullptr), &TestObject::SetValidatedValue);
+		Check(!nullGetter.Build(), "Null getter rejects metadata");
 
 		TypeMetadataBuilder<TestObject> missingEnum("TestObject");
-		missingEnum.AddMember("mode", &TestObject::mode);
+		missingEnum.Property("mode", &TestObject::mode);
 		Check(!missingEnum.Build(), "Enum property without explicit enum metadata is rejected");
 
 		TypeMetadataBuilder<TestObject> formatOnInteger("TestObject");
-		formatOnInteger.AddAccessorProperty<int>(
-			"value", PropertyLogicalType::SignedInteger, DefaultPropertyPolicy(),
-			[](const TestObject& object, int& value) { value = object.count; return true; },
-			[](TestObject& object, const int& value) { object.count = value; return true; },
-			std::nullopt, EnumSerializationFormat::Integer);
+		formatOnInteger.Accessor<int>("value", [](const TestObject& object, int& value) { value = object.count; return true; }, [](TestObject& object, const int& value) { object.count = value; return true; }).SerializedAs(EnumSerializationFormat::Integer);
 		Check(!formatOnInteger.Build(),
 			"Enum serialization format on a non-enum property is rejected");
 
@@ -392,13 +352,40 @@ namespace
 		Check(noProperties.Build().has_value(), "A type with no registered properties can be completed");
 
 		TypeMetadataBuilder<UnsupportedObject> unsupportedCppType("UnsupportedObject");
-		unsupportedCppType.AddMember("value", &UnsupportedObject::value);
+		unsupportedCppType.Property("value", &UnsupportedObject::value);
 		Check(!unsupportedCppType.Build(), "Unsupported C++ value type rejects the type metadata");
 	}
 }
 
+void TestDeclarativeRegistration()
+{
+	TypeMetadataBuilder<TestObject> builder("DeclarativeObject");
+	auto speed = builder.Property("speed", &TestObject::speed);
+	builder.Property("value", &TestObject::GetValidatedValue, &TestObject::SetValidatedValue);
+	// Configuration remains valid after another property reallocates the builder's storage.
+	speed.Validate([](float value) { return value >= 0.0f; });
+	auto metadata = builder.Build();
+	Check(metadata.has_value(), "Inferred direct member and getter/setter metadata builds");
+	if (!metadata) return;
+	TestObject object;
+	const auto* value = metadata->FindProperty("value");
+	Check(value->Write(typeid(TestObject), &object, std::int64_t{8}) &&
+		object.validatedValue == 8 && object.setterCallCount == 1,
+		"Inferred accessor invokes the component setter");
+	Check(!value->Write(typeid(TestObject), &object, std::int64_t{-1}) && object.validatedValue == 8,
+		"Inferred accessor preserves setter rejection");
+	const auto* direct = metadata->FindProperty("speed");
+	Check(direct->GetSerializationMetadata() && direct->GetInspectorMetadata(),
+		"Ordinary properties default to serialization and Inspector facets");
+	Check(direct->Write(typeid(TestObject), &object, 3.0f) && object.speed == 3.0f,
+		"Inferred member writes the supplied value");
+	Check(!direct->Write(typeid(TestObject), &object, -2.0f) && object.speed == 3.0f,
+		"Property validator rejects invalid direct writes before mutation");
+}
+
 int main()
 {
+	TestDeclarativeRegistration();
 	TestMetadataEnumerationAndLookup();
 	TestPropertyPathsAndObjectScopes();
 	TestMemberAndCallbackOperations();

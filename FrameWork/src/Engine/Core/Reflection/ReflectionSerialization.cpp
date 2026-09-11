@@ -57,7 +57,7 @@ namespace
 			if (child == source.end())
 			{
 				if (childSchema.property &&
-					childSchema.property->GetRequirement() == PropertyRequirement::Optional)
+					childSchema.property->GetSerializationMetadata()->requirement == PropertyRequirement::Optional)
 				{
 					continue;
 				}
@@ -221,7 +221,6 @@ namespace
 			return false;
 
 		case PropertyLogicalType::Vector4:
-		case PropertyLogicalType::Color:
 			if (const Vector4* typed = std::get_if<Vector4>(&value))
 				return SerializeFloatArray({ typed->x, typed->y, typed->z, typed->w }, outJson);
 			return false;
@@ -382,7 +381,6 @@ namespace
 		}
 
 		case PropertyLogicalType::Vector4:
-		case PropertyLogicalType::Color:
 		{
 			std::array<float, 4> values;
 			if (!DeserializeFloatArray(source, values)) return false;

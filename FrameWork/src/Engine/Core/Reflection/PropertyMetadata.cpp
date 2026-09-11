@@ -74,8 +74,7 @@ bool PropertyMetadata::IsValid() const
 {
 	const bool hasIdentity = !m_serializedName.empty()
 		&& m_logicalType != PropertyLogicalType::Invalid;
-	const bool hasValidAccessors = m_valueTypeCompatible
-		&& m_valueValidator
+	const bool hasValidAccessors = m_valueValidator
 		&& m_read
 		&& m_write;
 	if (!hasIdentity || !hasValidAccessors)
@@ -87,7 +86,7 @@ bool PropertyMetadata::IsValid() const
 	{
 		const bool hasMatchingEnumType = m_enumMetadata
 			&& m_enumMetadata->GetType() == m_valueType;
-		const bool hasSerializationFormat = m_enumSerializationFormat.has_value();
+		const bool hasSerializationFormat = !m_serialization || m_serialization->enumFormat.has_value();
 		const bool hasNoAssetType = m_assetType == AssetType::Unknown;
 		return hasMatchingEnumType && hasSerializationFormat && hasNoAssetType;
 	}
@@ -96,7 +95,7 @@ bool PropertyMetadata::IsValid() const
 		return !m_enumMetadata && m_assetType != AssetType::Unknown;
 	}
 
-	const bool hasNoEnumMetadata = !m_enumMetadata && !m_enumSerializationFormat;
+	const bool hasNoEnumMetadata = !m_enumMetadata && !GetEnumSerializationFormat();
 	const bool hasNoAssetType = m_assetType == AssetType::Unknown;
 	return hasNoEnumMetadata && hasNoAssetType;
 }

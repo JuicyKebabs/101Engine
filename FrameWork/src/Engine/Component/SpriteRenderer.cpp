@@ -200,3 +200,20 @@ bool SpriteRenderer::ResolveReferences(SceneBase& scene)
 	// Attempt to set the texture asset using the resolved asset ID
 	return SetTextureAsset(assetId);
 }
+
+AssetReference<TextureAsset> SpriteRenderer::GetTextureAssetReference() const
+{
+	AssetReference<TextureAsset> value;
+	value.SetGuid(GetTextureAssetId());
+	return value;
+}
+
+void SpriteRenderer::SetTextureAssetReference(const AssetReference<TextureAsset>& value)
+{
+	m_template = {};
+	m_template.billboardType = m_billboardType;
+	m_textureAssetId = {};
+	m_pendingTextureAssetId.reset();
+	if (value.HasValue()) m_pendingTextureAssetId = value.GetGuid();
+	m_isProxyDirty = true;
+}

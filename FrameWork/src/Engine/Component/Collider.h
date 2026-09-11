@@ -7,7 +7,7 @@
 
 // Forward declaration
 class Actor;
-class PersistentComponentMetadata;
+
 
 // Enumration for collider types
 enum class ColliderType
@@ -54,7 +54,6 @@ struct AABB
 
 class Collider : public Component
 {
-	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -118,6 +117,11 @@ public:
 	const Transform3D& GetWorldTransformCurrent() const { return m_worldTransformCurrent; }
 	const Transform3D& GetWorldTransformPrevious() const { return m_worldTransformPrevious; }
 	const Transform3D& GetLocalTransform() const { return m_localTransform; }
+	Vector3 GetLocalCenter() const { return m_localTransform.position; }
+	Quaternion GetLocalRotation() const { return m_localTransform.rotation; }
+	Vector3 GetLocalScale() const { return m_localTransform.scale; }
+	bool SetAuthoredLocalRotation(Quaternion rotation);
+	void SetAuthoredType(ColliderType type);
 
 	// Setters
 	void SetLocalCenter(const Vector3& center) { m_localTransform.position = center; m_isDirty = true; }

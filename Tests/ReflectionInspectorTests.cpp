@@ -1,4 +1,7 @@
 #include "UI/Inspector/ReflectionInspector.h"
+#include "Engine/Component/Transform.h"
+#include "Engine/Scene/ComponentRegistry.h"
+#include "Engine/Core/Reflection/ReflectionSerialization.h"
 
 #include <iostream>
 #include <memory>
@@ -27,9 +30,8 @@ namespace
 	void TestRowsAndTransaction()
 	{
 		TypeMetadataBuilder<Object> builder("InspectorObject");
-		builder.AddMember("value", &Object::value)
-			.AddMember("locked", &Object::locked,
-				PropertyPolicy::Serializable | PropertyPolicy::Inspectable | PropertyPolicy::EditorReadOnly);
+		builder.Property("value", &Object::value);
+		builder.Property("locked", &Object::locked).Inspector(InspectorMetadata{.readOnly = true});
 		auto metadata = builder.Build();
 		Check(metadata.has_value(), "Inspector metadata builds");
 		if (!metadata) return;
@@ -72,7 +74,7 @@ namespace
 	void TestStableRestoreDoesNotUseDestroyedObject()
 	{
 		TypeMetadataBuilder<Object> builder("StableRestoreObject");
-		builder.AddMember("value", &Object::value);
+		builder.Property("value", &Object::value);
 		auto metadata = builder.Build();
 		Check(metadata.has_value(), "Stable restore metadata builds");
 		if (!metadata)
@@ -114,8 +116,55 @@ namespace
 	}
 }
 
+void TestTransformPilot()
+{
+	const auto* metadata = ComponentRegistry::Get().GetMetadata(typeid(Transform));
+	Check(metadata != nullptr, "Transform pilot metadata is registered");
+	if (!metadata) return;
+	Transform transform;
+	const auto* position = metadata->FindProperty("position");
+	ReflectionInspector inspector;
+	const Vector3 edited{4.0f, 5.0f, 6.0f};
+	Check(inspector.BeginEdit(*metadata, typeid(Transform), &transform, *position, Vector3::Zero()),
+		"Transform position Inspector edit begins");
+	Check(inspector.PreviewEdit(*metadata, typeid(Transform), &transform, *position, edited) &&
+		transform.GetLocalPosition().x == 4.0f, "Inspector invokes inferred Transform setter");
+	Check(inspector.CancelEdit(*metadata, typeid(Transform), &transform, *position) &&
+		transform.GetLocalPosition().x == 0.0f, "Inspector cancel restores Transform position");
+}
+
+void TestColorPresentation()
+{
+	struct Colors { Vector4 vector{0.1f, 0.2f, 0.3f, 1.0f}; Vector4 color = vector; };
+	TypeMetadataBuilder<Colors> builder("Colors");
+	builder.Property("vector", &Colors::vector);
+	builder.Property("color", &Colors::color).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
+	auto metadata = builder.Build();
+	Check(metadata.has_value(), "Vector4 and Color presentation metadata builds");
+	if (!metadata) return;
+	const auto rows = ReflectionInspector::BuildRows(*metadata, ReflectionInspectorPolicy::Editable);
+	Check(rows.size() == 2 && rows[0].editor == PropertyEditorKind::Vector4 && rows[1].editor == PropertyEditorKind::Color,
+		"Inspector chooses Color presentation independently of the value type");
+	Colors object;
+	PropertyValue vector, color;
+	Check(rows[0].property->Read(typeid(Colors), &object, vector) &&
+		rows[1].property->Read(typeid(Colors), &object, color) && vector.index() == color.index(),
+		"Color and Vector4 share a single PropertyValue alternative");
+	nlohmann::json json;
+	Check(ReflectionSerializer::Serialize(*metadata, typeid(Colors), &object, json) && json["vector"] == json["color"],
+		"Color presentation does not change the serialized Vector4 representation");
+	ReflectionInspector inspector;
+	const Vector4 edited{0.8f, 0.7f, 0.6f, 1.0f};
+	Check(inspector.BeginEdit(*metadata, typeid(Colors), &object, *rows[1].property, color) &&
+		inspector.PreviewEdit(*metadata, typeid(Colors), &object, *rows[1].property, edited) && object.color.x == edited.x &&
+		inspector.CancelEdit(*metadata, typeid(Colors), &object, *rows[1].property) && object.color.x == object.vector.x,
+		"Color Inspector edits and cancels through the ordinary Vector4 property");
+}
+
 int main()
 {
+	TestColorPresentation();
+	TestTransformPilot();
 	TestRowsAndTransaction();
 	TestDispatch();
 	TestStableRestoreDoesNotUseDestroyedObject();

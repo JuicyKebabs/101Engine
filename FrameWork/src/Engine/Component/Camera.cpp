@@ -1,3 +1,4 @@
+#include "Engine/Core/Math/ValueValidation.h"
 #include "Camera.h"
 #include "Transform.h"
 #include "Engine/Actor/Actor.h"
@@ -301,4 +302,35 @@ Actor* Camera::ResolveActorReference(const ActorReference& reference) const
 	if (!scene) return nullptr;
 
 	return reference.Resolve(*scene);
+}
+
+
+void Camera::SetTargetActorReference(const ActorReference& target)
+{
+	m_targetActor = target;
+	m_isCameraInfoDirty = true;
+}
+
+void Camera::SetFollowActorReference(const ActorReference& target)
+{
+	m_followActor = target;
+	m_isCameraInfoDirty = true;
+	m_followingTransformGeneration = static_cast<std::uint64_t>(-1);
+	m_rotatingTransformGeneration = static_cast<std::uint64_t>(-1);
+}
+
+bool Camera::SetAuthoredRigRotation(Quaternion rotation)
+{
+	if (!ValueValidation::NormalizeRotation(rotation)) return false;
+	m_cameraRig.offsetRotation = rotation;
+	m_isCameraInfoDirty = true;
+	return true;
+}
+
+bool Camera::SetAuthoredPoseRotation(Quaternion rotation)
+{
+	if (!ValueValidation::NormalizeRotation(rotation)) return false;
+	m_cameraPose.rotation = rotation;
+	m_isCameraInfoDirty = true;
+	return true;
 }

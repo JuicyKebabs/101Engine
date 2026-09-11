@@ -241,7 +241,6 @@ PropertyEditorKind ReflectionInspector::GetEditorKind(PropertyLogicalType type)
 	case PropertyLogicalType::Vector2: return PropertyEditorKind::Vector2;
 	case PropertyLogicalType::Vector3: return PropertyEditorKind::Vector3;
 	case PropertyLogicalType::Vector4: return PropertyEditorKind::Vector4;
-	case PropertyLogicalType::Color: return PropertyEditorKind::Color;
 	case PropertyLogicalType::Quaternion: return PropertyEditorKind::Quaternion;
 	case PropertyLogicalType::Enum: return PropertyEditorKind::Enum;
 	case PropertyLogicalType::ActorReference: return PropertyEditorKind::ActorReference;
@@ -259,7 +258,9 @@ std::vector<PropertyInspectorRow> ReflectionInspector::BuildRows(
 	{
 		const InspectorMetadata* inspector = property.GetInspectorMetadata();
 		if (!inspector) continue;
-		const PropertyEditorKind editor = GetEditorKind(property.GetLogicalType());
+		const PropertyEditorKind editor = property.GetLogicalType() == PropertyLogicalType::Vector4 &&
+			inspector->presentation == InspectorPresentation::Color
+			? PropertyEditorKind::Color : GetEditorKind(property.GetLogicalType());
 		const bool supported = editor != PropertyEditorKind::Unsupported;
 		const bool editablePolicy = policy == ReflectionInspectorPolicy::Editable;
 		rows.push_back({

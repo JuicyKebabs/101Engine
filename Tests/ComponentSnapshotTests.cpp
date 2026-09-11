@@ -40,14 +40,11 @@ namespace
 	void RegisterSnapshotTestComponent()
 	{
 		TypeMetadataBuilder<SnapshotTestComponent> builder("SnapshotTestComponent");
-		builder.AddAccessorProperty<std::string>(
-			"name", PropertyLogicalType::String, DefaultPropertyPolicy(),
-			[](const SnapshotTestComponent& component, std::string& value)
+		builder.Accessor<std::string>("name", [](const SnapshotTestComponent& component, std::string& value)
 			{
 				value = component.GetName();
 				return true;
-			},
-			[](SnapshotTestComponent& component, const std::string& value)
+			}, [](SnapshotTestComponent& component, const std::string& value)
 			{
 				component.SetName(value);
 				return true;

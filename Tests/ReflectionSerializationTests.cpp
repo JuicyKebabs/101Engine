@@ -60,24 +60,23 @@ namespace
 	TypeMetadata BuildTestMetadata()
 	{
 		const EnumMetadata modeMetadata = BuildModeMetadata();
-		return *TypeMetadataBuilder<TestObject>("TestObject")
-			.AddMember("vector4", &TestObject::vector4)
-			.AddMember("unsigned", &TestObject::unsignedValue)
-			.AddMember("transient", &TestObject::transient, PropertyPolicy::Inspectable)
-			.AddMember("string", &TestObject::name)
-			.AddMember("signed", &TestObject::signedValue)
-			.AddMember("rotation", &TestObject::rotation)
-			.AddMember("readOnly", &TestObject::readOnly,
-				PropertyPolicy::Serializable | PropertyPolicy::Inspectable | PropertyPolicy::EditorReadOnly)
-			.AddEnumMember("mode", &TestObject::mode, modeMetadata)
-			.AddMember("hidden", &TestObject::hidden, PropertyPolicy::Serializable)
-			.AddMember("float", &TestObject::floatValue)
-			.AddMember("enabled", &TestObject::enabled)
-			.AddMember("double", &TestObject::doubleValue)
-			.AddMember("color", &TestObject::color, DefaultPropertyPolicy(), PropertyLogicalType::Color)
-			.AddMember("vector3", &TestObject::vector3)
-			.AddMember("vector2", &TestObject::vector2)
-			.Build();
+		TypeMetadataBuilder<TestObject> builder("TestObject");
+		builder.Property("vector4", &TestObject::vector4);
+		builder.Property("unsigned", &TestObject::unsignedValue);
+		builder.Property("transient", &TestObject::transient).Serialization(std::nullopt);
+		builder.Property("string", &TestObject::name);
+		builder.Property("signed", &TestObject::signedValue);
+		builder.Property("rotation", &TestObject::rotation);
+		builder.Property("readOnly", &TestObject::readOnly).Inspector(InspectorMetadata{.readOnly = true});
+		builder.Property("mode", &TestObject::mode).Enum(modeMetadata);
+		builder.Property("hidden", &TestObject::hidden).Inspector(std::nullopt);
+		builder.Property("float", &TestObject::floatValue);
+		builder.Property("enabled", &TestObject::enabled);
+		builder.Property("double", &TestObject::doubleValue);
+		builder.Property("color", &TestObject::color).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
+		builder.Property("vector3", &TestObject::vector3);
+		builder.Property("vector2", &TestObject::vector2);
+		return *builder.Build();
 	}
 
 	bool Equal(const TestObject& lhs, const TestObject& rhs)
@@ -161,11 +160,11 @@ namespace
 		builder
 			.Object("rig", [](auto& rig)
 			{
-				rig.AddMember("rotation", &NestedObject::rigRotation);
+				rig.Property("rotation", &NestedObject::rigRotation);
 			})
 			.Object("pose", [](auto& pose)
 			{
-				pose.AddMember("rotation", &NestedObject::poseRotation);
+				pose.Property("rotation", &NestedObject::poseRotation);
 			});
 		const TypeMetadata metadata = *builder.Build();
 
@@ -209,11 +208,9 @@ namespace
 	void TestIntegerEnumFormat()
 	{
 		const EnumMetadata modeMetadata = BuildModeMetadata();
-		const TypeMetadata metadata = *TypeMetadataBuilder<TestObject>("IntegerEnum")
-			.AddEnumMember(
-				"mode", &TestObject::mode, modeMetadata,
-				DefaultPropertyPolicy(), EnumSerializationFormat::Integer)
-			.Build();
+		TypeMetadataBuilder<TestObject> metadataBuilder("IntegerEnum");
+		metadataBuilder.Property("mode", &TestObject::mode).Enum(modeMetadata).SerializedAs(EnumSerializationFormat::Integer);
+		const TypeMetadata metadata = *metadataBuilder.Build();
 
 		TestObject source;
 		nlohmann::json json;
@@ -237,9 +234,9 @@ namespace
 		Rejects(99, "Integer enum format rejects an unregistered integer");
 		Rejects(1.0, "Integer enum format rejects a floating-point value");
 
-		const TypeMetadata nameMetadata = *TypeMetadataBuilder<TestObject>("NameEnum")
-			.AddEnumMember("mode", &TestObject::mode, modeMetadata)
-			.Build();
+		TypeMetadataBuilder<TestObject> nameMetadataBuilder("NameEnum");
+		nameMetadataBuilder.Property("mode", &TestObject::mode).Enum(modeMetadata);
+		const TypeMetadata nameMetadata = *nameMetadataBuilder.Build();
 		TestObject object;
 		Check(!ReflectionDeserializer::Deserialize(
 			nameMetadata, typeid(TestObject), { { "mode", 1 } }, &object),
@@ -319,16 +316,10 @@ namespace
 			int writes = 0;
 		};
 
-		const TypeMetadata metadata = *TypeMetadataBuilder<Tracked>("Tracked")
-			.AddAccessorProperty<std::int32_t>(
-				"first", PropertyLogicalType::SignedInteger, DefaultPropertyPolicy(),
-				[](const Tracked& object, std::int32_t& value) { value = object.first; return true; },
-				[](Tracked& object, const std::int32_t& value) { ++object.writes; object.first = value; return true; })
-			.AddAccessorProperty<std::int32_t>(
-				"second", PropertyLogicalType::SignedInteger, DefaultPropertyPolicy(),
-				[](const Tracked& object, std::int32_t& value) { value = object.second; return true; },
-				[](Tracked& object, const std::int32_t& value) { ++object.writes; object.second = value; return false; })
-			.Build();
+		TypeMetadataBuilder<Tracked> metadataBuilder("Tracked");
+		metadataBuilder.Accessor<std::int32_t>("first", [](const Tracked& object, std::int32_t& value) { value = object.first; return true; }, [](Tracked& object, const std::int32_t& value) { ++object.writes; object.first = value; return true; });
+		metadataBuilder.Accessor<std::int32_t>("second", [](const Tracked& object, std::int32_t& value) { value = object.second; return true; }, [](Tracked& object, const std::int32_t& value) { ++object.writes; object.second = value; return false; });
+		const TypeMetadata metadata = *metadataBuilder.Build();
 
 		Tracked object;
 		const nlohmann::json invalid = { { "first", 10 }, { "second", "invalid" } };
@@ -394,16 +385,13 @@ namespace
 			std::int32_t optional = 7;
 		};
 
-		const TypeMetadata metadata = *TypeMetadataBuilder<CompatibleObject>("CompatibleObject")
-			.AddMember("required", &CompatibleObject::required)
-			.AddMember(
-				"optional", &CompatibleObject::optional,
-				DefaultPropertyPolicy(), PropertyLogicalType::SignedInteger,
-				PropertyRequirement::Optional)
-			.Build();
+		TypeMetadataBuilder<CompatibleObject> metadataBuilder("CompatibleObject");
+		metadataBuilder.Property("required", &CompatibleObject::required);
+		metadataBuilder.Property("optional", &CompatibleObject::optional).Optional();
+		const TypeMetadata metadata = *metadataBuilder.Build();
 		CompatibleObject object;
 
-		Check(metadata.FindProperty("required")->GetRequirement() == PropertyRequirement::Required,
+		Check(metadata.FindProperty("required")->GetSerializationMetadata()->requirement == PropertyRequirement::Required,
 			"Property requirement defaults to Required");
 		Check(ReflectionDeserializer::Deserialize(
 			metadata, typeid(CompatibleObject), nlohmann::json({ { "required", 5 } }), &object) &&

@@ -38,9 +38,9 @@ namespace
 
 	TypeMetadata BuildMetadata()
 	{
-		return *TypeMetadataBuilder<ReferenceObject>("ReferenceObject")
-			.AddMember("target", &ReferenceObject::target)
-			.Build();
+		TypeMetadataBuilder<ReferenceObject> builder("ReferenceObject");
+		builder.Property("target", &ReferenceObject::target);
+		return *builder.Build();
 	}
 
 	void TestNullReferenceRoundTrip()

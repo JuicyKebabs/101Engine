@@ -9,7 +9,7 @@
 //----------------------------------------------------------------
 
 class SceneBase;
-class PersistentComponentMetadata;
+
 
 // Enumration of mode for rendering space of UI elements in a Canvas
 enum class CanvasRenderMode
@@ -29,7 +29,6 @@ enum class CanvasScaleMode
 
 class Canvas : public Component
 {
-	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc 
 	{
@@ -162,8 +161,8 @@ private:
 		}
 	}
 
-private:
-
+public:
+	// Authoring operations preserve renderer proxy invalidation. SceneBase owns hierarchy resolution.
 	// Set the authored mode of a topmost Canvas.
 	// A topmost Canvas uses its authored value as its effective value.
 	void SetAuthoredRenderMode(CanvasRenderMode mode)
@@ -179,6 +178,7 @@ private:
 		InvalidateAllUIRendererProxies();
 	}
 
+private:
 	// Apply a mode inherited from a governing Canvas.
 	// This must not overwrite the Canvas's authored setting.
 	void SetInheritedRenderMode(CanvasRenderMode mode)
@@ -199,6 +199,7 @@ private:
 		InvalidateAllUIRendererProxies();
 	}
 
+public:
 	// Set the reference size for layout calculations in this Canvas.
 	void SetReferenceSize(const Vector2& size)
 	{

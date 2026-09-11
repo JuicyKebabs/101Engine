@@ -16,8 +16,8 @@
 // ComponentRegistry class and registration system
 // This registry allows the engine to create instances of all components (including user-defined ones) by their class name at runtime.
 // User-defined component and its factory function are stored in the registry by mapping.
-// The registration is done by the helper macro REGISTER_COMPONENT, which should be placed in the component class header file.
-// That header file has to be included in a .cpp file to make sure the registration macro is called at the global scope
+// Built-in factories and metadata are registered together in EngineComponentRegistration.cpp through RegisterReflected.
+// GameCode registers through RegisterGameComponent and releases its entries before the module is unloaded.
 //------------------------------------------------------------------------------------------------------------------------------------------
 
 class ComponentRegistry
@@ -212,15 +212,14 @@ public:
 		return it->second;
 	}
 
-	// Register metadata for a component type by its name. The metadata must match the registered type index.
-	bool RegisterMetadata(const std::string& name, std::unique_ptr<TypeMetadata> metadata)
+	// Register a reflected factory and its metadata together, before publishing either.
+	template<class T>
+	bool RegisterReflected(const std::string& name, std::unique_ptr<TypeMetadata> metadata)
 	{
-		auto entry = m_entries.find(name);
-		if (entry == m_entries.end() || !metadata || metadata->GetType() != entry->second.typeId)
-		{
-			return false;
-		}
-		entry->second.metadata = std::move(metadata);
+		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name) return false;
+		using Policy = ComponentPolicy<T>;
+		Register(name, [] { return static_cast<Component*>(new T()); }, typeid(T),
+			Policy::cardinality, Policy::family, std::move(metadata));
 		return true;
 	}
 
@@ -267,22 +266,6 @@ private:
 	std::unordered_set <std::string> m_gameComponentNames;
 };
 
-
-// Helper macro to register a component class
-// Usage: Place REGISTER_COMPONENT(YourComponentClass) in the .h file of your component class
-// .cpp file must include the .h file to ensure the registration happens at global scope
-#define REGISTER_COMPONENT(ClassName)                                   \
-    static bool _reg_##ClassName = [](){                                \
-        using Policy = ComponentPolicy<ClassName>;                      \
-        ComponentRegistry::Get().Register(                              \
-            #ClassName,                                                 \
-            [](){ return static_cast<Component*>(new ClassName()); },   \
-            std::type_index(typeid(ClassName)),                         \
-            Policy::cardinality,                                        \
-            Policy::family                                              \
-        );                                                              \
-        return true;                                                    \
-    }();
 
 // Helper macro to register a component class defined in GameCode.dll (for hot-reloading support)
 // Usage: Place REGISTER_GAME_COMPONENT(YourComponentClass) in the .h file of your component class defined in GameCode.dll

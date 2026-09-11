@@ -21,7 +21,7 @@ namespace
 std::optional<TypeMetadata> TestBehavior::BuildMetadata()
 {
 	TypeMetadataBuilder<TestBehavior> builder("TestBehavior");
-	builder.AddMember("rotationSpeed", &TestBehavior::m_rotationSpeed);
+	builder.Property("rotationSpeed", &TestBehavior::m_rotationSpeed);
 	return builder.Build();
 }
 

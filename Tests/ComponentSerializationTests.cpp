@@ -81,55 +81,42 @@ namespace
 	std::unique_ptr<TypeMetadata> BuildTestRendererMetadata()
 	{
 		TypeMetadataBuilder<TestRendererComponent> builder("TestRendererComponent");
-		builder.AddAccessorProperty<std::string>(
-			"name", PropertyLogicalType::String, DefaultPropertyPolicy(),
-			[](const TestRendererComponent& component, std::string& value)
+		builder.Accessor<std::string>("name", [](const TestRendererComponent& component, std::string& value)
 			{
 				value = component.GetName();
 				return true;
-			},
-			[](TestRendererComponent& component, const std::string& value)
+			}, [](TestRendererComponent& component, const std::string& value)
 			{
 				component.SetName(value);
 				return true;
 			});
-		builder.AddAccessorProperty<Vector4>(
-			"color", PropertyLogicalType::Color, DefaultPropertyPolicy(),
-			[](const TestRendererComponent& component, Vector4& value)
+		builder.Accessor<Vector4>("color", [](const TestRendererComponent& component, Vector4& value)
 			{
 				value = component.GetColor();
 				return true;
-			},
-			[](TestRendererComponent& component, const Vector4& value)
+			}, [](TestRendererComponent& component, const Vector4& value)
 			{
 				component.SetColor(value);
 				return true;
-			});
-		builder.AddAccessorProperty<bool>(
-			"visible", PropertyLogicalType::Bool, DefaultPropertyPolicy(),
-			[](const TestRendererComponent& component, bool& value)
+			}).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
+		builder.Accessor<bool>("visible", [](const TestRendererComponent& component, bool& value)
 			{
 				value = component.IsVisible();
 				return true;
-			},
-			[](TestRendererComponent& component, bool value)
+			}, [](TestRendererComponent& component, bool value)
 			{
 				component.SetVisible(value);
 				return true;
 			});
-		builder.AddAccessorProperty<std::uint32_t>(
-			"sortOrderInCanvas", PropertyLogicalType::UnsignedInteger,
-			DefaultPropertyPolicy(),
-			[](const TestRendererComponent& component, std::uint32_t& value)
+		builder.Accessor<std::uint32_t>("sortOrderInCanvas", [](const TestRendererComponent& component, std::uint32_t& value)
 			{
 				value = component.GetSortOrderInCanvas();
 				return true;
-			},
-			[](TestRendererComponent& component, std::uint32_t value)
+			}, [](TestRendererComponent& component, std::uint32_t value)
 			{
 				component.SetSortOrderInCanvas(value);
 				return true;
-			}, {}, {}, PropertyRequirement::Optional);
+			}).Optional();
 
 		auto metadata = builder.Build();
 		if (!metadata) return nullptr;
@@ -181,7 +168,7 @@ namespace
 
 			for (const PropertyMetadata& property : metadata->GetProperties())
 			{
-				if (property.GetRequirement() != PropertyRequirement::Optional) continue;
+				if (property.GetSerializationMetadata()->requirement != PropertyRequirement::Optional) continue;
 				const std::string& path = property.GetPath().ToString();
 				optionalRequirementsAreLimited = optionalRequirementsAreLimited &&
 					(path == "/sortOrderInCanvas" ||
@@ -611,7 +598,7 @@ namespace
 		RectTransform restored;
 		Check(restored.Deserialize(serialized), "RectTransform Deserialize succeeds");
 		Check(restored.GetName() == "SavedRectTransform" &&
-			Near(restored.GetLocalPosition(), Vector3::Zero()) &&
+			Near(restored.GetLocalPosition(), source.GetLocalPosition()) &&
 			restored.GetLocalRotationQuat().NearEqual(
 				source.GetLocalRotationQuat(), 0.001f) &&
 			Near(restored.GetLocalScale(), source.GetLocalScale()) &&
@@ -619,7 +606,7 @@ namespace
 			Near(restored.GetAnchoredPosition(), source.GetAnchoredPosition()) &&
 			Near(restored.GetPivot(), source.GetPivot()) &&
 			Near(restored.GetSize(), source.GetSize()),
-			"RectTransform round trip canonicalizes position and preserves other settings");
+			"RectTransform round trip preserves position and other settings");
 	}
 
 	void TestInvalidRectTransformUiDoesNotMutateBase()
@@ -1051,7 +1038,7 @@ namespace
 			"Transform conversion does not mutate its source component");
 	}
 
-	void TestRectTransformDeserializeClearsHiddenPosition()
+	void TestRectTransformReflectedPosition()
 	{
 		RectTransform source;
 		nlohmann::json serialized;
@@ -1061,8 +1048,14 @@ namespace
 		RectTransform restored;
 		Check(restored.Deserialize(serialized),
 			"RectTransform accepts a valid legacy Transform position");
-		Check(Near(restored.GetLocalPosition(), Vector3::Zero()),
-			"RectTransform discards hidden XYZ position during deserialization");
+		Check(Near(restored.GetLocalPosition(), Vector3{12.0f, -4.0f, 9.0f}),
+			"RectTransform preserves supplied XYZ position during deserialization");
+		const auto* metadata = ComponentRegistry::Get().GetMetadata(typeid(RectTransform));
+		const auto* property = metadata->FindProperty("position");
+		const Vector3 supplied{-2.0f, 6.0f, 11.0f};
+		Check(property->Write(typeid(RectTransform), &restored, supplied) &&
+			Near(restored.GetLocalPosition(), supplied),
+			"RectTransform Reflection setter writes the supplied position instead of zero");
 	}
 
 	void TestRectTransformToTransformConversion()
@@ -2135,7 +2128,7 @@ int main()
 	TestScreenSpaceCanvasScaleFactor();
 	TestNestedCanvasMapsReferenceResolutionToDisplaySize();
 	TestTransformToRectTransformConversion();
-	TestRectTransformDeserializeClearsHiddenPosition();
+	TestRectTransformReflectedPosition();
 	TestRectTransformToTransformConversion();
 	TestRectTransformStateReconstruction();
 	TestInvalidTransformConversionKind();

@@ -2,12 +2,11 @@
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
 
-class PersistentComponentMetadata;
+
 
 // TransformComponent Class
 class Transform : public Component
 {
-	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -52,6 +51,7 @@ public:
 	void SetLocalPosition(Vector3 position);					// Set local position
 	void SetLocalScale(Vector3 scale);							// Set local scale
 	void SetLocalRotationQuat(Quaternion quaternion);			// Set local rotation using quaternion
+	bool SetAuthoredLocalRotation(Quaternion quaternion); // Validate and normalize an authored rotation.
 	void SetLocalRotationEulerDeg(Vector3 eulerDeg);			// Set local rotation using Euler angles in degrees
 	void SetLocalRotationEulerRad(Vector3 eulerRad);			// Set local rotation using Euler angles in radians
 	void SetLocalTransform(const Transform3D& localTransform);	// Set local transform

@@ -37,7 +37,6 @@ enum class PropertyLogicalType
 	Vector2,
 	Vector3,
 	Vector4,
-	Color,
 	Quaternion,
 	Enum,
 	ActorReference,
@@ -95,9 +94,12 @@ struct NumericEditorMetadata
 	NumericUnit displayUnit = NumericUnit::None;
 };
 
+enum class InspectorPresentation { Default, Color };
+
 struct InspectorMetadata
 {
 	std::string label;
+	InspectorPresentation presentation = InspectorPresentation::Default;
 	bool readOnly = false;
 	std::optional<NumericEditorMetadata> numeric;
 };
@@ -107,31 +109,6 @@ struct SerializationMetadata
 	PropertyRequirement requirement = PropertyRequirement::Required;
 	std::optional<EnumSerializationFormat> enumFormat;
 };
-
-// Compatibility flags accepted by existing builder calls. PropertyMetadata converts these
-// flags into independent serialization and Inspector facets when it is constructed.
-enum class PropertyPolicy : std::uint8_t
-{
-	None = 0,
-	Serializable = 1u << 0,
-	Inspectable = 1u << 1,
-	EditorReadOnly = 1u << 2,
-};
-
-constexpr PropertyPolicy operator|(PropertyPolicy lhs, PropertyPolicy rhs)
-{
-	return static_cast<PropertyPolicy>(static_cast<std::uint8_t>(lhs) | static_cast<std::uint8_t>(rhs));
-}
-
-constexpr bool HasPropertyPolicy(PropertyPolicy policies, PropertyPolicy policy)
-{
-	return (static_cast<std::uint8_t>(policies) & static_cast<std::uint8_t>(policy)) != 0;
-}
-
-constexpr PropertyPolicy DefaultPropertyPolicy()
-{
-	return PropertyPolicy::Serializable | PropertyPolicy::Inspectable;
-}
 
 // Stores the runtime value of an enum property. 
 // This is used to represent enum values in a type-erased way,
@@ -189,9 +166,9 @@ private:
 };
 
 // Unique builder class for constructing EnumMetadata instances.
-// This has no function to analyze the enum type at compile time and register its entries. 
-// Instead, the user must call Add() for each entry in the enum (Has to be improved....)
-// Receive the enum type as a template parameter and provide a interface to add entries and build the metadata for that enum type.
+// Enum entries are declared explicitly once, normally in an EnumReflection specialization.
+// Property registration retrieves that declaration from the inferred enum type.
+// No compiler-specific enum introspection or source generation is used.
 template<class EnumType>
 class EnumMetadataBuilder
 {
@@ -238,6 +215,13 @@ private:
 	std::vector<EnumEntry> m_entries;
 };
 
+// Specialize once per reflected enum; property declarations infer this metadata from the C++ type.
+template<class EnumType>
+struct EnumReflection
+{
+	static std::optional<EnumMetadata> Get() { return std::nullopt; }
+};
+
 // Metadata for a property of a type.
 class PropertyMetadata
 {
@@ -253,8 +237,6 @@ public:
 	const std::string& GetSerializedName() const { return m_serializedName; }
 	const PropertyPath& GetPath() const { return m_path; }
 	PropertyLogicalType GetLogicalType() const { return m_logicalType; }
-	PropertyPolicy GetPolicy() const { return m_policy; }
-	PropertyRequirement GetRequirement() const { return m_requirement; }
 	const SerializationMetadata* GetSerializationMetadata() const
 	{
 		return m_serialization ? &*m_serialization : nullptr;
@@ -266,7 +248,7 @@ public:
 	const EnumMetadata* GetEnumMetadata() const { return m_enumMetadata ? &*m_enumMetadata : nullptr;}
 	std::optional<EnumSerializationFormat> GetEnumSerializationFormat() const
 	{
-		return m_enumSerializationFormat;
+		return m_serialization ? m_serialization->enumFormat : std::nullopt;
 	}
 	AssetType GetAssetType() const { return m_assetType; }
 
@@ -277,56 +259,13 @@ public:
 	bool Write(std::type_index objectType, void* object, const PropertyValue& value) const;
 
 private:
-	PropertyMetadata(
-		std::string serializedName,
-		PropertyPath path,
-		PropertyLogicalType logicalType,
-		PropertyPolicy policy,
-		PropertyRequirement requirement,
-		std::type_index objectType,
-		std::type_index valueType,
-		bool valueTypeCompatible,
-		AssetType assetType,
-		ValueValidator valueValidator,
-		ReadCallback read,
-		WriteCallback write,
-		std::optional<EnumMetadata> enumMetadata,
-		std::optional<EnumSerializationFormat> enumSerializationFormat,
-		std::optional<InspectorMetadata> inspectorMetadata)
-		: m_serializedName(std::move(serializedName)),
-		  m_path(std::move(path)),
-		  m_logicalType(logicalType),
-		  m_policy(policy),
-		  m_requirement(requirement),
-		  m_objectType(objectType),
-		  m_valueType(valueType),
-		  m_valueTypeCompatible(valueTypeCompatible),
-		  m_assetType(assetType),
-		  m_valueValidator(std::move(valueValidator)),
-		  m_read(std::move(read)),
-		  m_write(std::move(write)),
-		  m_enumMetadata(std::move(enumMetadata)),
-		  m_enumSerializationFormat(enumSerializationFormat)
-	{
-		if (HasPropertyPolicy(policy, PropertyPolicy::Serializable))
-		{
-			m_serialization = SerializationMetadata{ requirement, enumSerializationFormat };
-		}
-
-		if (HasPropertyPolicy(policy, PropertyPolicy::Inspectable))
-		{
-			if (inspectorMetadata)
-			{
-				m_inspector = std::move(*inspectorMetadata);
-			}
-			else
-			{
-				m_inspector = InspectorMetadata{};
-			}
-			m_inspector->readOnly = m_inspector->readOnly ||
-				HasPropertyPolicy(policy, PropertyPolicy::EditorReadOnly);
-		}
-	}
+	PropertyMetadata(std::string name, PropertyPath path, PropertyLogicalType logicalType,
+		std::type_index objectType, std::type_index valueType, AssetType assetType,
+		ValueValidator validator, ReadCallback read, WriteCallback write)
+		: m_serializedName(std::move(name)), m_path(std::move(path)), m_logicalType(logicalType),
+		  m_objectType(objectType), m_valueType(valueType), m_assetType(assetType),
+		  m_valueValidator(std::move(validator)), m_read(std::move(read)), m_write(std::move(write))
+	{}
 
 	bool IsValid() const;
 	bool IsRegisteredEnumValue(const PropertyValue& value) const;
@@ -334,12 +273,9 @@ private:
 	std::string m_serializedName;
 	PropertyPath m_path;
 	PropertyLogicalType m_logicalType = PropertyLogicalType::Invalid;
-	PropertyPolicy m_policy = PropertyPolicy::None;
-	PropertyRequirement m_requirement = PropertyRequirement::Required;
 
 	std::type_index m_objectType;		// The type of the object that owns this property. Read and write callbacks will be invoked on this type ().
 	std::type_index m_valueType;		// The type of the property value. Read and write callbacks will be invoked with this type.
-	bool m_valueTypeCompatible = false;	// Whether the value type is compatible with the logical type. This is used to validate the property metadata.
 	AssetType m_assetType = AssetType::Unknown;
 	ValueValidator m_valueValidator;
 
@@ -349,9 +285,8 @@ private:
 
 	// Treat enum properties as a special case, since they have a limited set of valid values.
 	std::optional<EnumMetadata> m_enumMetadata;
-	std::optional<EnumSerializationFormat> m_enumSerializationFormat;
-	std::optional<SerializationMetadata> m_serialization;
-	std::optional<InspectorMetadata> m_inspector;
+	std::optional<SerializationMetadata> m_serialization = SerializationMetadata{};
+	std::optional<InspectorMetadata> m_inspector = InspectorMetadata{};
 
 	template<class ObjectType>
 	friend class TypeMetadataBuilder;	// Only built by TypeMetadataBuilder
@@ -448,17 +383,6 @@ namespace PropertyMetadataDetail
 		else return AssetType::Unknown;
 	}
 	
-	// Check if a given logical type is compatible with a ValueType.
-	template<class ValueType>
-	bool IsLogicalTypeCompatible(PropertyLogicalType logicalType)
-	{
-		using T = CleanType<ValueType>;
-		const PropertyLogicalType deduced = DeducedLogicalType<T>();
-
-		// Special case: Vector4 and Color are considered compatible, since they are both represented as 4 floats.
-		return logicalType == deduced || (std::is_same_v<T, Vector4> && logicalType == PropertyLogicalType::Color);
-	}
-
 	// Convert a concrete value (given by source) to a PropertyValue. 
 	template<class ValueType>
 	bool ToPropertyValue(const ValueType& source, PropertyValue& outValue)
@@ -572,110 +496,137 @@ namespace PropertyMetadataDetail
 	}
 }
 
-// Unique builder class for constructing TypeMetadata instances.
-// Instanciate this for a specific ObjectType and use AddMember() or AddAccessorProperty() to add properties, then call Build() to get the TypeMetadata.
+// Constructs metadata from a bounded value type and Component-owned access operations.
 template<class ObjectType>
 class TypeMetadataBuilder
 {
 public:
 	class ObjectScope;
+	explicit TypeMetadataBuilder(std::string stableTypeName) : m_stableTypeName(std::move(stableTypeName)) {}
 
-	explicit TypeMetadataBuilder(std::string stableTypeName)
-		: m_stableTypeName(std::move(stableTypeName))
-	{}
-
-	// Aliases for the read and write callbacks that operate on the ObjectType and a specific ValueType.
-	template<class ValueType>
-	using ReadFunction = std::function<bool(const ObjectType&, ValueType&)>;
-
-	template<class ValueType>
-	using WriteFunction = std::function<bool(ObjectType&, const ValueType&)>;
-	
-	// Adds callbacks for a specific property, allowing custom read and write behavior.
-	// Reflected property is decided in the read and write callbacks,
-	template<class ValueType>
-	TypeMetadataBuilder& AddAccessorProperty(
-		std::string serializedName,
-		PropertyLogicalType logicalType,
-		PropertyPolicy policy,
-		ReadFunction<ValueType> read,
-		WriteFunction<ValueType> write,
-		std::optional<EnumMetadata> enumMetadata = std::nullopt,
-		std::optional<EnumSerializationFormat> enumSerializationFormat = std::nullopt,
-		PropertyRequirement requirement = PropertyRequirement::Required,
-		std::optional<InspectorMetadata> inspectorMetadata = std::nullopt)
-	{
-		AddAccessorAtPath<ValueType>(
-			{ serializedName }, logicalType, policy,
-			std::move(read), std::move(write),
-			std::move(enumMetadata), enumSerializationFormat, requirement,
-			std::move(inspectorMetadata));
-		return *this;
-	}
-
-	template<class ValueType>
-	TypeMetadataBuilder& AddAccessorProperty(
-		std::string serializedName,
-		ReadFunction<ValueType> read,
-		WriteFunction<ValueType> write,
-		PropertyPolicy policy = DefaultPropertyPolicy(),
-		PropertyRequirement requirement = PropertyRequirement::Required,
-		std::optional<InspectorMetadata> inspectorMetadata = std::nullopt)
-	{
-		return AddAccessorProperty<ValueType>(
-			std::move(serializedName),
-			PropertyMetadataDetail::DeducedLogicalType<ValueType>(),
-			policy,
-			std::move(read),
-			std::move(write),
-			std::nullopt,
-			std::nullopt,
-			requirement,
-			std::move(inspectorMetadata));
-	}
-
+	template<class Value> using ReadFunction = std::function<bool(const ObjectType&, Value&)>;
+	template<class Value> using WriteFunction = std::function<bool(ObjectType&, const Value&)>;
 	using Validator = std::function<std::optional<ReflectionError>(const ObjectType&)>;
+
+	template<class Value>
+	class PropertyConfiguration
+	{
+	public:
+		PropertyConfiguration(TypeMetadataBuilder& owner, std::size_t index)
+			: m_owner(owner), m_index(index < owner.m_properties.size() ? index : std::numeric_limits<std::size_t>::max()) {}
+
+		PropertyConfiguration& Validate(std::function<bool(const Value&)> validator)
+		{
+			if (auto* p = Get())
+				p->m_valueValidator = [validator = std::move(validator)](const PropertyValue& value)
+				{
+					Value converted{};
+					return validator && PropertyMetadataDetail::FromPropertyValue(value, converted) && validator(converted);
+				};
+			return *this;
+		}
+		PropertyConfiguration& Serialization(std::optional<SerializationMetadata> facet)
+		{
+			if (auto* p = Get()) p->m_serialization = std::move(facet);
+			return *this;
+		}
+		PropertyConfiguration& Inspector(std::optional<InspectorMetadata> facet)
+		{
+			if (auto* p = Get()) p->m_inspector = std::move(facet);
+			return *this;
+		}
+		PropertyConfiguration& Optional()
+		{
+			if (auto* p = Get(); p && p->m_serialization)
+				p->m_serialization->requirement = PropertyRequirement::Optional;
+			return *this;
+		}
+		PropertyConfiguration& SerializedAs(EnumSerializationFormat format)
+		{
+			if (auto* p = Get(); p && p->m_serialization) p->m_serialization->enumFormat = format;
+			return *this;
+		}
+		// Explicit enum metadata is useful for custom callback registrations and schema validation.
+		// Ordinary enum properties use EnumReflection<Value>::Get().
+		PropertyConfiguration& Enum(std::optional<EnumMetadata> metadata)
+		{
+			if (auto* p = Get()) p->m_enumMetadata = std::move(metadata);
+			return *this;
+		}
+	private:
+		PropertyMetadata* Get()
+		{
+			return m_index < m_owner.m_properties.size() ? &m_owner.m_properties[m_index] : nullptr;
+		}
+		TypeMetadataBuilder& m_owner;
+		std::size_t m_index;
+	};
+
+	template<class Value>
+	auto Property(std::string name, Value ObjectType::* member)
+	{
+		if (!member) return Accessor<Value>(std::move(name), {}, {});
+		return Accessor<Value>(std::move(name),
+			[member](const ObjectType& object, Value& value) { value = object.*member; return true; },
+			[member](ObjectType& object, const Value& value) { object.*member = value; return true; });
+	}
+
+	template<class Getter, class Setter>
+	auto Property(std::string name, Getter getter, Setter setter)
+	{
+		using Value = PropertyMetadataDetail::CleanType<std::invoke_result_t<Getter, const ObjectType&>>;
+		if constexpr (std::is_pointer_v<Getter> || std::is_member_pointer_v<Getter>)
+			if (!getter) return Accessor<Value>(std::move(name), {}, {});
+		if constexpr (std::is_pointer_v<Setter> || std::is_member_pointer_v<Setter>)
+			if (!setter) return Accessor<Value>(std::move(name), {}, {});
+		return Accessor<Value>(std::move(name),
+			[getter](const ObjectType& object, Value& value) { value = std::invoke(getter, object); return true; },
+			[setter](ObjectType& object, const Value& value)
+			{
+				using Result = std::invoke_result_t<Setter, ObjectType&, const Value&>;
+				static_assert(std::is_same_v<Result, bool> || std::is_void_v<Result>, "A property setter returns bool or void.");
+				if constexpr (std::is_same_v<Result, bool>) return std::invoke(setter, object, value);
+				else { std::invoke(setter, object, value); return true; }
+			});
+	}
+
+	// Select one field in a Component-owned aggregate without recursively reflecting the aggregate.
+	template<class Getter, class Setter, class Aggregate, class Value>
+	auto Property(std::string name, Getter getter, Setter setter, Value Aggregate::* member)
+	{
+		if (!member) return Accessor<Value>(std::move(name), {}, {});
+		if constexpr (std::is_pointer_v<Getter> || std::is_member_pointer_v<Getter>)
+			if (!getter) return Accessor<Value>(std::move(name), {}, {});
+		if constexpr (std::is_pointer_v<Setter> || std::is_member_pointer_v<Setter>)
+			if (!setter) return Accessor<Value>(std::move(name), {}, {});
+		return Property(std::move(name),
+			[getter, member](const ObjectType& object) { return std::invoke(getter, object).*member; },
+			[getter, setter, member](ObjectType& object, const Value& value)
+			{
+				auto aggregate = std::invoke(getter, object);
+				aggregate.*member = value;
+				return std::invoke(setter, object, aggregate);
+			});
+	}
+
+	// Fallible reads and exceptional access operations use the same property/facet representation.
+	template<class Value>
+	auto Accessor(std::string name, ReadFunction<Value> read, WriteFunction<Value> write)
+	{
+		const auto index = m_properties.size();
+		AddAccessorAtPath<Value>({std::move(name)}, std::move(read), std::move(write));
+		return PropertyConfiguration<Value>(*this, index);
+	}
 
 	TypeMetadataBuilder& SetValidator(Validator validator)
 	{
 		m_validator = std::move(validator);
 		return *this;
 	}
-
-	// Add a member directly from the ObjectType without needing to write custom read and write callbacks.
-	// Do not subscribe the member by this if the member has to be read or written in a special way 
-	// (e.g., computed properties, change of this property has to affect other properties).
-	template<class ValueType>
-	TypeMetadataBuilder& AddMember(
-		std::string serializedName,
-		ValueType ObjectType::* member,
-		PropertyPolicy policy = DefaultPropertyPolicy(),
-		PropertyLogicalType logicalType = PropertyMetadataDetail::DeducedLogicalType<ValueType>(),
-		PropertyRequirement requirement = PropertyRequirement::Required)
-	{
-		AddMemberAtPath<ValueType>({ serializedName }, member, policy, logicalType, requirement);
-		return *this;
-	}
-
-	template<class EnumType>
-	TypeMetadataBuilder& AddEnumMember(
-		std::string serializedName,
-		EnumType ObjectType::* member,
-		const EnumMetadata& enumMetadata,
-		PropertyPolicy policy = DefaultPropertyPolicy(),
-		EnumSerializationFormat format = EnumSerializationFormat::Name,
-		PropertyRequirement requirement = PropertyRequirement::Required)
-	{
-		AddEnumMemberAtPath(
-			{ serializedName }, member, enumMetadata, policy, format, requirement);
-		return *this;
-	}
-
 	template<class Callback>
-	TypeMetadataBuilder& Object(std::string objectName, Callback callback)
+	TypeMetadataBuilder& Object(std::string name, Callback callback)
 	{
-		std::vector<std::string> path{ std::move(objectName) };
-		AddObject(path, std::move(callback));
+		AddObject({std::move(name)}, std::move(callback));
 		return *this;
 	}
 
@@ -739,211 +690,78 @@ public:
 	class ObjectScope
 	{
 	public:
-		template<class ValueType>
-		ObjectScope& AddAccessor(
-			std::string serializedName,
-			PropertyLogicalType logicalType,
-			PropertyPolicy policy,
-			ReadFunction<ValueType> read,
-			WriteFunction<ValueType> write,
-			std::optional<EnumMetadata> enumMetadata = std::nullopt,
-			std::optional<EnumSerializationFormat> enumSerializationFormat = std::nullopt,
-			PropertyRequirement requirement = PropertyRequirement::Required,
-			std::optional<InspectorMetadata> inspectorMetadata = std::nullopt)
+		template<class... Access>
+		auto Property(std::string name, Access... access)
 		{
-			auto path = ChildPath(std::move(serializedName));
-			m_owner.template AddAccessorAtPath<ValueType>(
-				std::move(path), logicalType, policy,
-				std::move(read), std::move(write),
-				std::move(enumMetadata), enumSerializationFormat, requirement,
-				std::move(inspectorMetadata));
-			return *this;
+			const auto index = m_owner.m_properties.size();
+			auto configuration = m_owner.Property(name, access...);
+			Relocate(index, std::move(name));
+			return configuration;
 		}
-
-		template<class ValueType>
-		ObjectScope& AddAccessor(
-			std::string serializedName,
-			ReadFunction<ValueType> read,
-			WriteFunction<ValueType> write,
-			PropertyPolicy policy = DefaultPropertyPolicy(),
-			PropertyRequirement requirement = PropertyRequirement::Required,
-			std::optional<InspectorMetadata> inspectorMetadata = std::nullopt)
+		template<class Value>
+		auto Accessor(std::string name, ReadFunction<Value> read, WriteFunction<Value> write)
 		{
-			return AddAccessor<ValueType>(
-				std::move(serializedName),
-				PropertyMetadataDetail::DeducedLogicalType<ValueType>(),
-				policy,
-				std::move(read),
-				std::move(write),
-				std::nullopt,
-				std::nullopt,
-				requirement,
-				std::move(inspectorMetadata));
+			const auto index = m_owner.m_properties.size();
+			auto configuration = m_owner.template Accessor<Value>(name, std::move(read), std::move(write));
+			Relocate(index, std::move(name));
+			return configuration;
 		}
-
-		template<class ValueType>
-		ObjectScope& AddMember(
-			std::string serializedName,
-			ValueType ObjectType::* member,
-			PropertyPolicy policy = DefaultPropertyPolicy(),
-			PropertyLogicalType logicalType = PropertyMetadataDetail::DeducedLogicalType<ValueType>(),
-			PropertyRequirement requirement = PropertyRequirement::Required)
-		{
-			m_owner.template AddMemberAtPath<ValueType>(
-				ChildPath(std::move(serializedName)), member, policy, logicalType, requirement);
-			return *this;
-		}
-
-		template<class EnumType>
-		ObjectScope& AddEnumMember(
-			std::string serializedName,
-			EnumType ObjectType::* member,
-			const EnumMetadata& enumMetadata,
-			PropertyPolicy policy = DefaultPropertyPolicy(),
-			EnumSerializationFormat format = EnumSerializationFormat::Name,
-			PropertyRequirement requirement = PropertyRequirement::Required)
-		{
-			m_owner.AddEnumMemberAtPath(
-				ChildPath(std::move(serializedName)), member,
-				enumMetadata, policy, format, requirement);
-			return *this;
-		}
-
 		template<class Callback>
-		ObjectScope& Object(std::string objectName, Callback callback)
+		ObjectScope& Object(std::string name, Callback callback)
 		{
-			m_owner.AddObject(ChildPath(std::move(objectName)), std::move(callback));
+			m_owner.AddObject(ChildPath(std::move(name)), std::move(callback));
 			return *this;
 		}
-
 	private:
 		ObjectScope(TypeMetadataBuilder& owner, std::vector<std::string> path)
-			: m_owner(owner), m_path(std::move(path))
-		{}
-
+			: m_owner(owner), m_path(std::move(path)) {}
 		std::vector<std::string> ChildPath(std::string name) const
 		{
 			auto path = m_path;
 			path.push_back(std::move(name));
 			return path;
 		}
-
+		void Relocate(std::size_t index, std::string name)
+		{
+			const auto path = PropertyPath::FromMembers(ChildPath(std::move(name)));
+			if (!path) m_owner.m_registrationValid = false;
+			else if (index < m_owner.m_properties.size()) m_owner.m_properties[index].m_path = *path;
+		}
 		TypeMetadataBuilder& m_owner;
 		std::vector<std::string> m_path;
-
 		friend class TypeMetadataBuilder;
 	};
 
 private:
-	template<class ValueType>
-	void AddAccessorAtPath(
-		std::vector<std::string> pathMembers,
-		PropertyLogicalType logicalType,
-		PropertyPolicy policy,
-		ReadFunction<ValueType> read,
-		WriteFunction<ValueType> write,
-		std::optional<EnumMetadata> enumMetadata,
-		std::optional<EnumSerializationFormat> enumSerializationFormat,
-		PropertyRequirement requirement,
-		std::optional<InspectorMetadata> inspectorMetadata)
+	template<class Value>
+	void AddAccessorAtPath(std::vector<std::string> members, ReadFunction<Value> read, WriteFunction<Value> write)
 	{
-		using T = PropertyMetadataDetail::CleanType<ValueType>;
-		const auto path = PropertyPath::FromMembers(pathMembers);
-		if (!path)
-		{
-			m_registrationValid = false;
-			return;
-		}
-
-		PropertyMetadata::ValueValidator valueValidator = [](const PropertyValue& value)
-		{
-			T converted{};
-			return PropertyMetadataDetail::FromPropertyValue(value, converted);
-		};
-
+		const auto path = PropertyPath::FromMembers(members);
+		if (!path) { m_registrationValid = false; return; }
 		PropertyMetadata::ReadCallback erasedRead;
 		PropertyMetadata::WriteCallback erasedWrite;
 		if (read)
-		{
-			erasedRead = [read = std::move(read)](const void* object, PropertyValue& outValue)
+			erasedRead = [read = std::move(read)](const void* object, PropertyValue& out)
 			{
-				T value{};
-				if (!read(*static_cast<const ObjectType*>(object), value)) return false;
-				return PropertyMetadataDetail::ToPropertyValue(value, outValue);
+				Value value{};
+				return read(*static_cast<const ObjectType*>(object), value) && PropertyMetadataDetail::ToPropertyValue(value, out);
 			};
-		}
 		if (write)
-		{
 			erasedWrite = [write = std::move(write)](void* object, const PropertyValue& value)
 			{
-				T converted{};
-				if (!PropertyMetadataDetail::FromPropertyValue(value, converted)) return false;
-				return write(*static_cast<ObjectType*>(object), converted);
+				Value converted{};
+				return PropertyMetadataDetail::FromPropertyValue(value, converted) && write(*static_cast<ObjectType*>(object), converted);
 			};
-		}
-
-		m_properties.push_back(PropertyMetadata(
-			pathMembers.back(), *path, logicalType, policy, requirement,
-			std::type_index(typeid(ObjectType)), std::type_index(typeid(T)),
-			PropertyMetadataDetail::IsLogicalTypeCompatible<T>(logicalType),
-			PropertyMetadataDetail::DeducedAssetType<T>(),
-			std::move(valueValidator), std::move(erasedRead), std::move(erasedWrite),
-			std::move(enumMetadata), enumSerializationFormat,
-			std::move(inspectorMetadata)));
-	}
-
-	template<class ValueType>
-	void AddMemberAtPath(
-		std::vector<std::string> pathMembers,
-		ValueType ObjectType::* member,
-		PropertyPolicy policy,
-		PropertyLogicalType logicalType,
-		PropertyRequirement requirement)
-	{
-		if (member == nullptr)
+		PropertyMetadata property(members.back(), *path, PropertyMetadataDetail::DeducedLogicalType<Value>(),
+			typeid(ObjectType), typeid(Value), PropertyMetadataDetail::DeducedAssetType<Value>(),
+			[](const PropertyValue& value) { Value converted{}; return PropertyMetadataDetail::FromPropertyValue(value, converted); },
+			std::move(erasedRead), std::move(erasedWrite));
+		if constexpr (std::is_enum_v<Value>)
 		{
-			AddAccessorAtPath<ValueType>(
-				std::move(pathMembers), logicalType, policy, {}, {}, {}, {},
-				requirement, std::nullopt);
-			return;
+			property.m_enumMetadata = EnumReflection<Value>::Get();
+			property.m_serialization->enumFormat = EnumSerializationFormat::Name;
 		}
-
-		AddAccessorAtPath<ValueType>(
-			std::move(pathMembers), logicalType, policy,
-			[member](const ObjectType& object, ValueType& outValue)
-			{
-				outValue = object.*member;
-				return true;
-			},
-			[member](ObjectType& object, const ValueType& value)
-			{
-				object.*member = value;
-				return true;
-			}, {}, {}, requirement, std::nullopt);
-	}
-
-	template<class EnumType>
-	void AddEnumMemberAtPath(
-		std::vector<std::string> pathMembers,
-		EnumType ObjectType::* member,
-		const EnumMetadata& enumMetadata,
-		PropertyPolicy policy,
-		EnumSerializationFormat format,
-		PropertyRequirement requirement)
-	{
-		static_assert(std::is_enum_v<EnumType>, "AddEnumMember requires an enum member.");
-		AddAccessorAtPath<EnumType>(
-			std::move(pathMembers), PropertyLogicalType::Enum, policy,
-			[member](const ObjectType& object, EnumType& outValue)
-			{
-				outValue = object.*member;
-				return true;
-			},
-			[member](ObjectType& object, const EnumType& value)
-			{
-				object.*member = value;
-				return true;
-			}, enumMetadata, format, requirement, std::nullopt);
+		m_properties.push_back(std::move(property));
 	}
 
 	template<class Callback>

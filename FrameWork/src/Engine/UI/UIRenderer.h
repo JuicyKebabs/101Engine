@@ -1,12 +1,13 @@
 #pragma once
 #include <optional>
+#include "Engine/Actor/ActorReference.h"
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/GUID/Guid.h"
 
 class Canvas;
-class PersistentComponentMetadata;
+
 
 struct UIRendererProxy
 {
@@ -18,7 +19,6 @@ struct UIRendererProxy
 
 class UIRenderer : public RendererComponent
 {
-	friend class PersistentComponentMetadata;
 public:
 	UIRenderer() = default;
 	~UIRenderer() = default;
@@ -47,6 +47,8 @@ public:
 	void SetOrder(UINT order) { SetSortOrderInCanvas(order); m_isProxyDirty = true; }
 
 	Canvas* GetCanvas() const { return GetGoverningCanvas(); }
+	bool GetCanvasActorReference(ActorReference& value) const;
+	void SetCanvasActorReference(const ActorReference& value);
 	void OnCanvasDestroyed() { SetGoverningCanvas(nullptr); }
 
 	// Serialization and deserialization methods

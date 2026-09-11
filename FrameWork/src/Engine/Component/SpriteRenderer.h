@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/Resource/AssetReference.h"
 #include <optional>
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
@@ -8,7 +9,7 @@
 #include "Engine/Core/GUID/Guid.h"
 
 //---------------------------------------------------
-class PersistentComponentMetadata;
+
 
 // SpriteRenderer class
 // A component for rendering 2D sprites in the scene
@@ -25,7 +26,7 @@ struct SpriteRendererProxy
 
 class SpriteRenderer : public RendererComponent
 {
-	friend class PersistentComponentMetadata;
+
 public:
 	struct ParamDesc
 	{
@@ -61,6 +62,8 @@ public:
 	}
 
 	bool SetTextureAsset(const Guid& assetId);							// Set the texture asset for this sprite through AssetManager
+	AssetReference<TextureAsset> GetTextureAssetReference() const;
+	void SetTextureAssetReference(const AssetReference<TextureAsset>& value);
 	Guid GetTextureAssetId() const {
 		if (m_textureAssetId.IsValid()) return m_textureAssetId;
 		return m_pendingTextureAssetId.value_or(Guid{});

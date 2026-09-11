@@ -241,3 +241,19 @@ Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 		return transform->GetWorldMatrix();
 	}
 }
+
+AssetReference<MeshAsset> MeshRenderer::GetMeshAssetReference() const
+{
+	AssetReference<MeshAsset> value;
+	value.SetGuid(GetAssetId());
+	return value;
+}
+
+void MeshRenderer::SetMeshAssetReference(const AssetReference<MeshAsset>& value)
+{
+	m_templates.clear();
+	m_meshAssetId = {};
+	m_pendingMeshAssetId.reset();
+	if (value.HasValue()) m_pendingMeshAssetId = value.GetGuid();
+	m_isProxyDirty = true;
+}

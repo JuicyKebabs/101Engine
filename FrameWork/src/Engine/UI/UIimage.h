@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/Resource/AssetReference.h"
 #include <optional>
 #include "UIRenderer.h"
 #include "Engine/Graphics/RenderData.h"
@@ -7,7 +8,7 @@
 
 class UIImage : public UIRenderer
 {
-	friend class PersistentComponentMetadata;
+
 public:
 	struct ParamDesc
 	{
@@ -44,6 +45,8 @@ public:
 
 	// Setters and getters for texture asset
 	bool SetTextureAsset(const Guid& assetId);
+	AssetReference<TextureAsset> GetTextureAssetReference() const;
+	void SetTextureAssetReference(const AssetReference<TextureAsset>& value);
 	Guid GetTextureAssetId() const {
 		if (m_textureAssetId.IsValid()) return m_textureAssetId;
 		return m_pendingTextureAssetId.value_or(Guid{});

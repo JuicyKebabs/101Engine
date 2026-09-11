@@ -4,7 +4,7 @@
 #include "Engine/Core/Math/Math.h"
 
 class Canvas;
-class PersistentComponentMetadata;
+
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------
 // RendererComponent class
@@ -32,7 +32,6 @@ struct CommonRendererProxy
 // Base RendererComponent Class (for common rendering properties and functionality)
 class RendererComponent : public Component
 {
-	friend class PersistentComponentMetadata;
 public:
 	RendererComponent() = default;
 	~RendererComponent() = default;

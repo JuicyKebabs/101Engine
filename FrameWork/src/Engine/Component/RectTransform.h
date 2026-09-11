@@ -2,7 +2,7 @@
 #include "Engine/Component/Transform.h"
 
 class Actor;
-class PersistentComponentMetadata;
+
 
 // Anchor modes enumeration
 enum class AnchorMode
@@ -20,7 +20,6 @@ enum class AnchorMode
 
 class RectTransform : public Transform
 {
-	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{

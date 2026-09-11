@@ -113,3 +113,19 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 
 	return true;
 }
+
+AssetReference<TextureAsset> UIImage::GetTextureAssetReference() const
+{
+	AssetReference<TextureAsset> value;
+	value.SetGuid(GetTextureAssetId());
+	return value;
+}
+
+void UIImage::SetTextureAssetReference(const AssetReference<TextureAsset>& value)
+{
+	m_renderTemplate.clear();
+	m_textureAssetId = {};
+	m_pendingTextureAssetId.reset();
+	if (value.HasValue()) m_pendingTextureAssetId = value.GetGuid();
+	m_isProxyDirty = true;
+}

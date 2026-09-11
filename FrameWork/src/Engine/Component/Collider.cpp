@@ -1,3 +1,4 @@
+#include "Engine/Core/Math/ValueValidation.h"
 #include <cmath>
 #include "Collider.h"
 #include "Engine/Actor/Actor.h"
@@ -310,4 +311,22 @@ void Collider::MakeSweptAABB()
 	s.max.z = (std::max)(m_previousAABB.max.z, m_currentAABB.max.z);
 
 	m_sweptAABB = s;
+}
+
+bool Collider::SetAuthoredLocalRotation(Quaternion rotation)
+{
+	if (!ValueValidation::NormalizeRotation(rotation)) return false;
+	SetLocalRotation(rotation);
+	return true;
+}
+
+void Collider::SetAuthoredType(ColliderType type)
+{
+	SetType(type);
+	m_collisionInfos.clear();
+	m_isDetected = false;
+	m_deleteFlag = false;
+	m_isActive = true;
+	m_transformGeneration = static_cast<std::uint64_t>(-1);
+	m_isDirty = true;
 }
