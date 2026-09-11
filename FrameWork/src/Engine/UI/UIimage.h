@@ -7,6 +7,7 @@
 
 class UIImage : public UIRenderer
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -49,8 +50,6 @@ public:
 	}
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:

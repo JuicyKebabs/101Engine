@@ -105,6 +105,21 @@ namespace
 		Check(!history.Redo(), "Cleared redo history cannot be replayed");
 	}
 
+	void TestRecordExecutedDoesNotExecuteTwice()
+	{
+		EditorCommandHistory history;
+		std::vector<std::string> log{ "Preview A" };
+
+		Check(history.RecordExecuted(std::make_unique<RecordingCommand>("A", log)),
+			"RecordExecuted accepts an already-applied command");
+		Check(log == std::vector<std::string>{ "Preview A" },
+			"RecordExecuted does not execute the command again");
+		Check(history.Undo(), "An already-applied command can be undone");
+		Check(history.Redo(), "An already-applied command can be redone");
+		Check(log == std::vector<std::string>{ "Preview A", "Undo A", "Execute A" },
+			"Redo executes an already-applied command after Undo");
+	}
+
 	void TestFailuresPreserveHistory()
 	{
 		std::vector<std::string> log;
@@ -164,6 +179,7 @@ int main()
 	TestExecuteUndoRedo();
 	TestLastInFirstOutOrder();
 	TestNewCommandClearsRedoBranch();
+	TestRecordExecutedDoesNotExecuteTwice();
 	TestFailuresPreserveHistory();
 	TestEmptyNullAndClear();
 

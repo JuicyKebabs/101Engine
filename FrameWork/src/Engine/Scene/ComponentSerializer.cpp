@@ -1,5 +1,7 @@
 #include "ComponentSerializer.h"
+#include "Engine/Actor/Actor.h"
 #include "Engine/Component/Component.h"
+#include "Engine/Component/ComponentReflection.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "nlohmann/json.hpp"
@@ -22,9 +24,23 @@ bool ComponentSerializer::SerializeRecord(const Component* component, nlohmann::
 
 	// Serialize the component's data into a JSON object
 	json componentData;
-	if (!component->Serialize(componentData))
+	const Actor* owner = component->GetOwner();
+	const SceneBase* scene = nullptr;
+	if (owner)
 	{
-		DBG("ComponentSerializer::SerializeRecord: Failed to serialize component '%s'.", typeName.c_str());
+		scene = owner->GetOwner();
+	}
+	ReflectionError error;
+	if (!SerializeReflectedComponent(*component, componentData, scene, &error))
+	{
+		std::string path = "<type>";
+		if (error.path)
+		{
+			path = error.path->ToString();
+		}
+		DBG(
+			"ComponentSerializer::SerializeRecord: Failed to serialize component '%s' at '%s': %s",
+			typeName.c_str(), path.c_str(), error.message.c_str());
 		return false;
 	}
 

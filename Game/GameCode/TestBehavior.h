@@ -9,6 +9,9 @@ public:
     void Start() override;
 
     void Update() override;
-};
 
-REGISTER_GAME_COMPONENT(TestBehavior)
+	static std::optional<TypeMetadata> BuildMetadata();
+
+private:
+	float m_rotationSpeed = 1.0f;
+};

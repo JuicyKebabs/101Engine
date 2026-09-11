@@ -2,9 +2,12 @@
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
 
+class PersistentComponentMetadata;
+
 // TransformComponent Class
 class Transform : public Component
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -46,11 +49,11 @@ public:
 	void RotateLocalByZDeg(float angleDeg);	// Rotate local transform around Z axis by an angle in degrees
 
 	// Setters (all for local transform)
-	void SetLocalPosition(Vector3 position);			// Set local position
-	void SetLocalScale(Vector3 scale);					// Set local scale
-	void SetLocalRotationQuat(Quaternion quaternion);	// Set local rotation using quaternion
-	void SetLocalRotationEulerDeg(Vector3 eulerDeg);	// Set local rotation using Euler angles in degrees
-	void SetLocalRotationEulerRad(Vector3 eulerRad);	// Set local rotation using Euler angles in radians
+	void SetLocalPosition(Vector3 position);					// Set local position
+	void SetLocalScale(Vector3 scale);							// Set local scale
+	void SetLocalRotationQuat(Quaternion quaternion);			// Set local rotation using quaternion
+	void SetLocalRotationEulerDeg(Vector3 eulerDeg);			// Set local rotation using Euler angles in degrees
+	void SetLocalRotationEulerRad(Vector3 eulerRad);			// Set local rotation using Euler angles in radians
 	void SetLocalTransform(const Transform3D& localTransform);	// Set local transform
 
 	// Local Getters 
@@ -95,8 +98,6 @@ public:
 	uint64_t GetWorldGeneration() const;	// Get world transform generation counter (incremented every time world transform is updated)
 
 	// Serialization and deserialization
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 
 protected:
 	Transform3D m_localTransform{};	// Local transform data (position, rotation, scale)

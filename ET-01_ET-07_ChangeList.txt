@@ -1,0 +1,320 @@
+ET-01 ～ ET-07 新規実装・設計レビュー反映箇所一覧
+==================================================
+
+基準
+----
+- 現在の作業ツリーとHEADとの差分を基準に集計。
+- 行番号は現在の作業ツリー上の番号であり、今後の編集により変動する。
+- ET完了後の動作確認用変更であるTestBehavior.cpp、TestBehavior.h、asset/scenes/test.sceneは除外。
+
+
+1. 新規ファイル
+---------------
+
+[Reflection基盤]
+FrameWork/src/Engine/Core/Reflection/PropertyMetadata.h : 1-985
+FrameWork/src/Engine/Core/Reflection/PropertyMetadata.cpp : 1-329
+FrameWork/src/Engine/Core/Reflection/PropertyPath.h : 1-27
+FrameWork/src/Engine/Core/Reflection/PropertyPath.cpp : 1-69
+FrameWork/src/Engine/Core/Reflection/ReflectionSerialization.h : 1-62
+FrameWork/src/Engine/Core/Reflection/ReflectionSerialization.cpp : 1-692
+
+[Actor参照]
+FrameWork/src/Engine/Core/Reflection/ActorReferenceCodec.h : 1-75
+FrameWork/src/Engine/Core/Reflection/ActorReferenceCodec.cpp : 1-71
+FrameWork/src/Engine/Scene/SceneActorReferenceContext.h : 1-27
+FrameWork/src/Engine/Scene/SceneActorReferenceContext.cpp : 1-21
+
+[Asset参照]
+FrameWork/src/Engine/Resource/AssetType.h : 1-20
+FrameWork/src/Engine/Resource/AssetReference.h : 1-109
+FrameWork/src/Engine/Core/Reflection/AssetReferenceCodec.h : 1-50
+FrameWork/src/Engine/Core/Reflection/AssetReferenceCodec.cpp : 1-84
+FrameWork/src/Engine/Resource/AssetManagerAssetReferenceContext.h : 1-30
+FrameWork/src/Engine/Resource/AssetManagerAssetReferenceContext.cpp : 1-29
+
+[Component Reflection / Metadata]
+FrameWork/src/Engine/Component/ComponentReflection.h : 1-15
+FrameWork/src/Engine/Component/ComponentReflection.cpp : 1-158
+FrameWork/src/Engine/Component/PersistentComponentMetadata.h : 1-34
+FrameWork/src/Engine/Component/PersistentComponentMetadata.cpp : 1-341
+FrameWork/src/Engine/Component/PersistentCameraMetadata.cpp : 1-336
+FrameWork/src/Engine/Component/PersistentColliderMetadata.cpp : 1-125
+FrameWork/src/Engine/Component/PersistentTransformMetadata.cpp : 1-179
+
+[Inspector / Command]
+Editor/src/UI/Inspector/ReflectionInspector.h : 1-131
+Editor/src/UI/Inspector/ReflectionInspector.cpp : 1-460
+Editor/src/Command/ComponentPropertyEditCommand.h : 1-38
+Editor/src/Command/ComponentPropertyEditCommand.cpp : 1-52
+
+[テスト]
+Tests/PropertyMetadataTests.cpp : 1-417
+Tests/ReflectionSerializationTests.cpp : 1-438
+Tests/ActorReferenceCodecTests.cpp : 1-151
+Tests/AssetReferenceCodecTests.cpp : 1-223
+Tests/ReflectionInspectorTests.cpp : 1-123
+Tests/ComponentPropertyEditCommandTests.cpp : 1-67
+
+
+2. 変更ファイルと現行行
+-----------------------
+
+[Editor]
+Editor/CMakeLists.txt
+  9 : imgui_stdlib.cpp追加
+
+Editor/src/Core/EditorApp.cpp
+  43 : Property編集Command追加
+  45付近 : 旧個別Inspector include削除
+  138付近 : 旧Inspector登録呼び出し削除
+  986付近 : RegisterComponentInspectors()削除
+  1515 : InspectorContextへScene設定
+  1520付近 : 旧Transform / RectTransform callback削除
+  1557-1567 : Property編集Command生成
+  2795 : 進行中Reflection編集のキャンセル
+
+Editor/src/Core/EditorApp.h
+  184付近 : RegisterComponentInspectors()宣言削除
+
+Editor/src/UI/Inspector/InspectorContext.h
+  8 : SceneBase前方宣言
+  24 : 現在のSceneを追加
+
+Editor/src/UI/Inspector/InspectorPanel.h
+  7, 9 : Reflection Inspector / Command参照
+  26-30 : Property編集callback
+  36 : 編集中断API
+  48 : ReflectionInspector保持
+  53-59 : Component描画引数へidentity情報追加
+
+Editor/src/UI/Inspector/InspectorPanel.cpp
+  5-6 : Scene / AssetPicker参照
+  54 : occurrence indexとActor GUIDをComponent描画へ渡す
+  127-133 : DrawComponent引数変更
+  140 : Component型取得
+  186-191 : Metadata未登録 / Propertyなし表示
+  193-260 : Reflection描画、Property Command、Actor / Asset picker統合
+
+[Component]
+FrameWork/src/Engine/Component/Behavior.h
+  3 : Component Reflection参照
+  29, 34 : ReflectionによるSerialize / Deserialize
+  41 : 構造整理
+
+FrameWork/src/Engine/Component/Camera.cpp
+  2-3 : Reflection参照
+  275, 280 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/Component/Camera.h
+  13 : Metadataクラス前方宣言
+  81 : Metadataから内部状態へアクセスするfriend宣言
+
+FrameWork/src/Engine/Component/Collider.cpp
+  3-4 : Reflection参照
+  319, 324 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/Component/Collider.h
+  10 : Metadataクラス前方宣言
+  57 : friend宣言
+
+FrameWork/src/Engine/Component/MeshRenderer.cpp
+  2-3 : Reflection参照
+  172, 177 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/Component/MeshRenderer.h
+  10 : Metadataクラス前方宣言
+  25 : friend宣言
+
+FrameWork/src/Engine/Component/RectTransform.cpp
+  3-4 : Reflection参照
+  193, 198 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/Component/RectTransform.h
+  5 : Metadataクラス前方宣言
+  23 : friend宣言
+
+FrameWork/src/Engine/Component/RendererComponent.h
+  7 : Metadataクラス前方宣言
+  35 : friend宣言
+
+FrameWork/src/Engine/Component/SpriteRenderer.cpp
+  3-4 : Reflection参照
+  179, 184 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/Component/SpriteRenderer.h
+  11-12 : 前方宣言
+  28 : friend宣言
+
+FrameWork/src/Engine/Component/Transform.cpp
+  2-3 : Reflection参照
+  350, 355 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/Component/Transform.h
+  5-6, 10 : Reflection関連宣言
+  52-56 : Metadata用アクセサー
+  113 : friend宣言
+
+FrameWork/src/Engine/EngineComponentRegistration.cpp
+  2 : Persistent Metadata参照
+  19-33 : 標準ComponentのMetadata登録
+
+[Resource / Scene]
+FrameWork/src/Engine/Resource/AssetManager.h
+  3 : 共通AssetType参照
+  21付近 : 旧ローカルAssetType定義削除
+  77 : AssetReferenceContextアクセス用friend宣言
+
+FrameWork/src/Engine/Scene/ComponentRegistry.h
+  3 : Property Metadata参照
+  33-44 : 登録EntryへMetadata所有権追加
+  58-83 : 登録APIへMetadata引数追加
+  215-238 : RegisterMetadata / GetMetadata
+  291-297 : Game Component登録macroでMetadata生成
+
+FrameWork/src/Engine/Scene/ComponentSerializer.cpp
+  2, 4 : Actor / Component Reflection参照
+  27-29 : Reflection Serializer呼び出し
+
+FrameWork/src/Engine/Scene/ComponentDeserializer.cpp
+  3 : Component Reflection参照
+  27, 37, 47 : Metadata確認とReflection Deserialize
+
+[UI Component]
+FrameWork/src/Engine/UI/Canvas.cpp
+  2 : Reflection参照
+  171, 177 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/UI/Canvas.h
+  12 : Metadataクラス前方宣言
+  32 : friend宣言
+
+FrameWork/src/Engine/UI/UIImage.cpp
+  2 : Reflection参照
+  61, 66 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/UI/UIimage.h
+  10 : friend宣言
+
+FrameWork/src/Engine/UI/UIRenderer.cpp
+  4 : Reflection参照
+  168, 173 : Serialize / DeserializeをReflectionへ置換
+
+FrameWork/src/Engine/UI/UIRenderer.h
+  9 : Metadataクラス前方宣言
+  21 : friend宣言
+
+[テスト構成・既存テスト]
+Tests/CMakeLists.txt
+  16-75 : ET-01～04のテスト登録
+  461-490 : ET-06 / 07のテスト登録
+
+Tests/ComponentCommandTests.cpp
+  10 : Metadata参照
+  54-68 : テストComponent Metadata構築
+  74-75 : Metadata付き登録
+
+Tests/ComponentSerializationTests.cpp
+  17 : ComponentRegistry参照
+  99-142 : 標準Component Metadata登録検証
+  1990 : テスト呼び出し
+
+Tests/ComponentSnapshotTests.cpp
+  3 : Metadata参照
+  42-56 : テストComponent Metadata構築
+  62-63 : Metadata付き登録
+
+
+3. 削除ファイル
+---------------
+
+[旧Inspector Registry]
+Editor/src/UI/Inspector/ComponentInspectorRegistry.h : 旧1-57
+Editor/src/UI/Inspector/ComponentInspectorRegistry.cpp : 旧1-20
+
+[旧Component別Inspector]
+Editor/src/UI/Inspector/Components/CameraInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/CameraInspector.cpp : 旧1-92
+Editor/src/UI/Inspector/Components/CanvasInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/CanvasInspector.cpp : 旧1-117
+Editor/src/UI/Inspector/Components/ColliderInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/ColliderInspector.cpp : 旧1-50
+Editor/src/UI/Inspector/Components/MeshRendererInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/MeshRendererInspector.cpp : 旧1-52
+Editor/src/UI/Inspector/Components/RectTransformInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/RectTransformInspector.cpp : 旧1-102
+Editor/src/UI/Inspector/Components/SpriteRendererInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/SpriteRendererInspector.cpp : 旧1-64
+Editor/src/UI/Inspector/Components/TransformInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/TransformInspector.cpp : 旧1-64
+Editor/src/UI/Inspector/Components/UIImageInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/UIImageInspector.cpp : 旧1-39
+Editor/src/UI/Inspector/Components/UIRendererInspector.h : 旧1-15
+Editor/src/UI/Inspector/Components/UIRendererInspector.cpp : 旧1-27
+
+
+4. 設計レビュー後の追加修正
+---------------------------
+
+[Reflectionの責務分離]
+- PropertyMetadataへSerializationMetadataとInspectorMetadataを追加し、永続化設定と編集UI設定を独立したfacetとして保持。
+- PropertyMetadataはProperty単位の値検証とアクセサーを担当し、TypeMetadataはオブジェクト全体の不変条件を担当。
+- TypeMetadataBuilder::SetValidator()を追加し、型全体の検証規則をMetadata登録時に定義可能に変更。
+- ReflectionErrorCode、ReflectionError、PropertyPathによる構造化エラーを追加。
+- 既存のPropertyPolicyは互換入力として残し、内部で各facetへ変換。
+
+[原子的なDeserializeと状態反映]
+- ReflectionDeserializerは全Propertyの解析・値検証を完了してから書き込みを開始。
+- 書き込み失敗または型全体の検証失敗時に、適用済みPropertyを変更前の値へロールバック。
+- TypeMetadata::CopySerializableState()を追加し、検証用Componentから実Componentへの反映も原子的に実行。
+- DeserializeReflectedComponent()は登録済みfactoryから既定状態の候補Componentを生成して検証し、成功時のみ対象へ反映。
+- 任意PropertyがJSONに存在しない場合、既存互換どおりComponentの既定値を使用。
+
+[Cameraの不変条件とFOV単位]
+- CameraのnearZ < farZをTypeMetadataの型不変条件として実装し、Property適用順序への依存を除去。
+- nearZとfarZのsetterは単項目としての有限値・正値のみを検証。
+- FOVは内部状態とJSONではラジアンを維持し、Inspectorでは度へ変換して表示・編集。
+- NumericEditorMetadataに表示単位、保存単位、操作速度、最小値、最大値を定義。
+
+[Component Serialize / Deserialize共通化]
+- Component::Serialize()とComponent::Deserialize()を非virtualの共通入口へ変更。
+- Camera、Collider、Transform、RectTransform、Renderer系、UI系、Behaviorから個別overrideを削除。
+- ComponentSerializer / ComponentDeserializerとComponentReflectionを正式な共通永続化経路として使用。
+- Scene v3 JSON形式およびActorReference / AssetReferenceの遅延解決方式は維持。
+
+[Inspector編集トランザクション]
+- ReflectionInspectorの編集トランザクションへTypeMetadataを関連付け、Preview時にも型全体を検証。
+- 編集取消時は生ポインターだけに依存せず、Actor GUID、Component型、同型Componentの出現位置、PropertyPathから対象を再解決。
+- Hierarchy選択変更、Viewport選択・選択解除、Component削除、Scene切替、Hot Reload前に進行中編集を終了。
+- 対象Component破棄後でも安定したresolver経由で取消値を復元できるテストを追加。
+
+[Command履歴]
+- EditorCommandHistory::RecordExecuted()を追加。
+- Inspector Previewで既に反映済みの変更は再Executeせず履歴へ記録し、setterの二重実行を防止。
+- Undo / Redo時のProperty反映はComponentPropertyIdentityから対象を再解決し、TypeMetadata経由で検証。
+
+[Metadata配置と可読性]
+- 複雑なComponent Metadataを次の単位へ分割。
+  - PersistentCameraMetadata.cpp
+  - PersistentColliderMetadata.cpp
+  - PersistentTransformMetadata.cpp
+  - PersistentComponentMetadata.cpp（Renderer / UI系と共通登録処理）
+- 長い条件式を意味のある中間変数や検証関数へ分解。
+- ネストした三項演算子を段階的なif文へ置換。
+- 複数の処理を1行にまとめたsetterやInspector処理を、検証・更新・終了の順序が読める形へ整理。
+- Component別Serialize / Deserialize削除後に残った不要includeを削除。
+
+[追加・更新テスト]
+- CameraのnearZ / farZ不変条件がJSON内のProperty順序に依存しないことを確認。
+- Camera不変条件違反時に全状態が復元されることを確認。
+- FOVのラジアン保存・度表示Metadataを確認。
+- Deserialize書き込み失敗時のロールバックと構造化エラーを確認。
+- 破棄済み編集対象に生ポインターでアクセスせず取消できることを確認。
+- RecordExecuted()がCommandを二重実行しないことを確認。
+
+[検証結果]
+- CMake Debug全体ビルド成功。
+- 101Editor Debugビルド成功。
+- CTest 31件すべて成功（31/31）。
+- git diff --checkで差分エラーなし。
+- 既存のCMake依存パス警告およびDirectXTex PDB警告は継続しているが、今回の変更によるビルド失敗はなし。

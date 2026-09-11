@@ -6,6 +6,7 @@
 #include "Engine/Core/GUID/Guid.h"
 
 class Canvas;
+class PersistentComponentMetadata;
 
 struct UIRendererProxy
 {
@@ -17,6 +18,7 @@ struct UIRendererProxy
 
 class UIRenderer : public RendererComponent
 {
+	friend class PersistentComponentMetadata;
 public:
 	UIRenderer() = default;
 	~UIRenderer() = default;
@@ -48,8 +50,6 @@ public:
 	void OnCanvasDestroyed() { SetGoverningCanvas(nullptr); }
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 	bool ResolveReferences(SceneBase& scene) override;
 
 protected:

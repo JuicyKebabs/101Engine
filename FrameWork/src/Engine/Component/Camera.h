@@ -10,6 +10,7 @@
 //------------------------------------------------------------------------------
 
 class Actor;
+class PersistentComponentMetadata;
 
 //camera information structure
 struct CameraInfo
@@ -77,6 +78,7 @@ struct CameraLens
 // Camera component Class
 class Camera : public Component
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -123,8 +125,6 @@ public:
 	void SetAsMainCamera();	// Set this camera as the main camera in the scene (if applicable)
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:

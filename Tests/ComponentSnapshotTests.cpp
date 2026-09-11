@@ -1,5 +1,6 @@
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Component/Component.h"
+#include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/ComponentSnapshot.h"
 #include "Engine/Scene/SceneBase.h"
@@ -38,12 +39,28 @@ namespace
 
 	void RegisterSnapshotTestComponent()
 	{
+		TypeMetadataBuilder<SnapshotTestComponent> builder("SnapshotTestComponent");
+		builder.AddAccessorProperty<std::string>(
+			"name", PropertyLogicalType::String, DefaultPropertyPolicy(),
+			[](const SnapshotTestComponent& component, std::string& value)
+			{
+				value = component.GetName();
+				return true;
+			},
+			[](SnapshotTestComponent& component, const std::string& value)
+			{
+				component.SetName(value);
+				return true;
+			});
+		auto metadata = builder.Build();
+
 		ComponentRegistry::Get().Register(
 			"SnapshotTestComponent",
 			[]() { return static_cast<Component*>(new SnapshotTestComponent()); },
 			std::type_index(typeid(SnapshotTestComponent)),
 			ComponentCardinality::Multiple,
-			ComponentFamily::None
+			ComponentFamily::None,
+			metadata ? std::make_unique<TypeMetadata>(std::move(*metadata)) : nullptr
 		);
 	}
 

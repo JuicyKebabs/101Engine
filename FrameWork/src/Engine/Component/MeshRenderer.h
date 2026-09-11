@@ -7,6 +7,7 @@
 #include "Engine/Core/Math/Math.h"
 
 class Transform;
+class PersistentComponentMetadata;
 
 //---------------------------------------------------------
 // MeshRenderer class
@@ -21,6 +22,7 @@ struct MeshRendererProxy
 // MeshRendererComponent Class (for static mesh rendering)
 class MeshRenderer : public RendererComponent
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -54,8 +56,6 @@ public:
 	Guid GetAssetId() const;
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:

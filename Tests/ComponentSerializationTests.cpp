@@ -14,6 +14,7 @@
 #include "Engine/Resource/AssetManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Resource/TextureManager.h"
+#include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIImage.h"
@@ -77,6 +78,75 @@ namespace
 		void OnDestroyOverride() override {}
 	};
 
+	std::unique_ptr<TypeMetadata> BuildTestRendererMetadata()
+	{
+		TypeMetadataBuilder<TestRendererComponent> builder("TestRendererComponent");
+		builder.AddAccessorProperty<std::string>(
+			"name", PropertyLogicalType::String, DefaultPropertyPolicy(),
+			[](const TestRendererComponent& component, std::string& value)
+			{
+				value = component.GetName();
+				return true;
+			},
+			[](TestRendererComponent& component, const std::string& value)
+			{
+				component.SetName(value);
+				return true;
+			});
+		builder.AddAccessorProperty<Vector4>(
+			"color", PropertyLogicalType::Color, DefaultPropertyPolicy(),
+			[](const TestRendererComponent& component, Vector4& value)
+			{
+				value = component.GetColor();
+				return true;
+			},
+			[](TestRendererComponent& component, const Vector4& value)
+			{
+				component.SetColor(value);
+				return true;
+			});
+		builder.AddAccessorProperty<bool>(
+			"visible", PropertyLogicalType::Bool, DefaultPropertyPolicy(),
+			[](const TestRendererComponent& component, bool& value)
+			{
+				value = component.IsVisible();
+				return true;
+			},
+			[](TestRendererComponent& component, bool value)
+			{
+				component.SetVisible(value);
+				return true;
+			});
+		builder.AddAccessorProperty<std::uint32_t>(
+			"sortOrderInCanvas", PropertyLogicalType::UnsignedInteger,
+			DefaultPropertyPolicy(),
+			[](const TestRendererComponent& component, std::uint32_t& value)
+			{
+				value = component.GetSortOrderInCanvas();
+				return true;
+			},
+			[](TestRendererComponent& component, std::uint32_t value)
+			{
+				component.SetSortOrderInCanvas(value);
+				return true;
+			}, {}, {}, PropertyRequirement::Optional);
+
+		auto metadata = builder.Build();
+		if (!metadata) return nullptr;
+		return std::make_unique<TypeMetadata>(std::move(*metadata));
+	}
+
+	void RegisterTestRendererMetadata()
+	{
+		ComponentRegistry::Get().Register(
+			"TestRendererComponent",
+			[] { return static_cast<Component*>(new TestRendererComponent); },
+			typeid(TestRendererComponent),
+			ComponentCardinality::Multiple,
+			ComponentFamily::None,
+			BuildTestRendererMetadata());
+	}
+
 	CameraLens MakeValidCameraLens()
 	{
 		CameraLens lens;
@@ -93,6 +163,50 @@ namespace
 	{
 		Check(std::has_virtual_destructor_v<Component>,
 			"Component has a virtual destructor");
+	}
+
+	void TestPersistentComponentMetadataRegistration()
+	{
+		const std::vector<std::string> typeNames{
+			"Transform", "RectTransform", "Camera", "Collider", "MeshRenderer",
+			"SpriteRenderer", "UIRenderer", "UIImage", "Canvas"
+		};
+		bool allRegistered = true;
+		bool optionalRequirementsAreLimited = true;
+		for (const std::string& typeName : typeNames)
+		{
+			const TypeMetadata* metadata = ComponentRegistry::Get().GetMetadata(typeName);
+			allRegistered = allRegistered && metadata && !metadata->GetProperties().empty();
+			if (!metadata) continue;
+
+			for (const PropertyMetadata& property : metadata->GetProperties())
+			{
+				if (property.GetRequirement() != PropertyRequirement::Optional) continue;
+				const std::string& path = property.GetPath().ToString();
+				optionalRequirementsAreLimited = optionalRequirementsAreLimited &&
+					(path == "/sortOrderInCanvas" ||
+					(typeName == "Canvas" &&
+						(path == "/scaleMode" || path == "/matchWidthOrHeight")));
+			}
+		}
+
+		const TypeMetadata* camera = ComponentRegistry::Get().GetMetadata("Camera");
+		const TypeMetadata* mesh = ComponentRegistry::Get().GetMetadata("MeshRenderer");
+		const PropertyMetadata* target = camera
+			? camera->FindPropertyByPath(*PropertyPath::FromString("/targetActorId")) : nullptr;
+		const PropertyMetadata* lens = camera
+			? camera->FindPropertyByPath(*PropertyPath::FromString("/lens/projectionType")) : nullptr;
+		const PropertyMetadata* meshAsset = mesh
+			? mesh->FindPropertyByPath(*PropertyPath::FromString("/meshAssetId")) : nullptr;
+
+		Check(allRegistered,
+			"Every built-in persistent Component has TypeMetadata");
+		Check(optionalRequirementsAreLimited,
+			"Only the three approved Scene v3 compatibility fields are Optional");
+		Check(target && target->GetLogicalType() == PropertyLogicalType::ActorReference &&
+			lens && lens->GetLogicalType() == PropertyLogicalType::Enum &&
+			meshAsset && meshAsset->GetLogicalType() == PropertyLogicalType::AssetReference,
+			"Nested, Actor, Enum, and Asset properties keep their logical metadata types");
 	}
 
 	void TestTransformRoundTrip()
@@ -249,6 +363,57 @@ namespace
 		nlohmann::json after;
 		camera.Serialize(after);
 		Check(after == before, "Rejected JSON leaves the Camera unchanged");
+	}
+
+	void TestCameraLensInvariantIsOrderIndependent()
+	{
+		Camera camera;
+		camera.SetCameraLens(MakeValidCameraLens());
+
+		nlohmann::json before;
+		camera.Serialize(before);
+
+		nlohmann::json invalid = before;
+		invalid["lens"]["nearZ"] = 400.0f;
+		invalid["lens"]["farZ"] = 300.0f;
+
+		Check(!camera.Deserialize(invalid),
+			"Camera rejects nearZ greater than farZ regardless of property order");
+
+		nlohmann::json afterInvalid;
+		camera.Serialize(afterInvalid);
+		Check(afterInvalid == before,
+			"Camera invariant failure restores every previously applied property");
+
+		nlohmann::json valid = before;
+		valid["lens"]["nearZ"] = 0.01f;
+		valid["lens"]["farZ"] = 0.05f;
+		Check(camera.Deserialize(valid),
+			"Camera accepts a valid near and far pair independent of application order");
+
+		const CameraLens lens = camera.GetCameraLens();
+		Check(Near(lens.nearZ, 0.01f) && Near(lens.farZ, 0.05f),
+			"Camera applies the complete validated lens state");
+	}
+
+	void TestCameraFovInspectorMetadata()
+	{
+		const TypeMetadata* metadata = ComponentRegistry::Get().GetMetadata("Camera");
+		const auto path = PropertyPath::FromString("/lens/fov");
+		const PropertyMetadata* property = nullptr;
+		if (metadata && path) property = metadata->FindPropertyByPath(*path);
+
+		const InspectorMetadata* inspector = nullptr;
+		if (property) inspector = property->GetInspectorMetadata();
+
+		const NumericEditorMetadata* numeric = nullptr;
+		if (inspector && inspector->numeric) numeric = &*inspector->numeric;
+
+		const bool usesDegreeDisplay = numeric &&
+			numeric->storageUnit == NumericUnit::Radians &&
+			numeric->displayUnit == NumericUnit::Degrees;
+		Check(usesDegreeDisplay,
+			"Camera FOV stores radians and exposes degrees to the Inspector");
 	}
 
 	void TestCameraReferenceResolution()
@@ -1941,12 +2106,16 @@ namespace
 
 int main()
 {
+	RegisterTestRendererMetadata();
 	TestComponentContract();
+	TestPersistentComponentMetadataRegistration();
 	TestTransformRoundTrip();
 	TestInvalidJsonDoesNotPartiallyMutate();
 	TestSetParamsPropagatesDirtyToChildren();
 	TestCameraRoundTrip();
 	TestInvalidCameraJsonDoesNotPartiallyMutate();
+	TestCameraLensInvariantIsOrderIndependent();
+	TestCameraFovInspectorMetadata();
 	TestCameraReferenceResolution();
 	TestCameraMissingReferenceFails();
 	TestDefaultCameraRoundTrip();
