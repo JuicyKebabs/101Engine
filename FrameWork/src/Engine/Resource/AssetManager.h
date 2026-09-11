@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine/Core/GUID/Guid.h"
+#include "Engine/Resource/AssetType.h"
 #include "Engine/Resource/MeshHandle.h"
 #include "Engine/Resource/Texture.h"
 #include <unordered_map>
@@ -17,20 +18,6 @@
 // Forward declarations
 class TextureManager;
 class MeshManager;
-
-enum class AssetType
-{
-	Mesh,
-	Texture,
-	//Material,
-	//Shader,
-	//Audio,
-	//Font,
-	//Animation,
-	//Scene,
-	//Script,
-	Unknown
-};
 
 struct AssetEntry
 {

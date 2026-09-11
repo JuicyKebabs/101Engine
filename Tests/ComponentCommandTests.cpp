@@ -7,6 +7,7 @@
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
 
@@ -50,12 +51,28 @@ namespace
 	template<class T>
 	void RegisterTestComponent(const std::string& name)
 	{
+		TypeMetadataBuilder<T> builder(name);
+		builder.AddAccessorProperty<std::string>(
+			"name", PropertyLogicalType::String, DefaultPropertyPolicy(),
+			[](const T& component, std::string& value)
+			{
+				value = component.GetName();
+				return true;
+			},
+			[](T& component, const std::string& value)
+			{
+				component.SetName(value);
+				return true;
+			});
+		auto metadata = builder.Build();
+
 		ComponentRegistry::Get().Register(
 			name,
 			[]() { return static_cast<Component*>(new T()); },
 			std::type_index(typeid(T)),
 			ComponentCardinality::Multiple,
-			ComponentFamily::None
+			ComponentFamily::None,
+			metadata ? std::make_unique<TypeMetadata>(std::move(*metadata)) : nullptr
 		);
 	}
 

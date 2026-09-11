@@ -35,8 +35,8 @@ public:
 	bool IsDestroyed() const { return m_destroyed; }			// Check if the component is marked for destruction
 
 	// Serialization and deserialization methods for saving and loading component state
-	virtual bool Serialize(nlohmann::json& outJson) const;
-	virtual bool Deserialize(const nlohmann::json& json);
+	bool Serialize(nlohmann::json& outJson) const;
+	bool Deserialize(const nlohmann::json& json);
 	virtual bool ResolveReferences(SceneBase& scene);
 
 protected:

@@ -80,6 +80,21 @@
             "components": [
                 {
                     "data": {
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{99961728-DF68-4A89-BCC1-F3B12F4432F5}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                },
+                {
+                    "data": {
                         "name": "",
                         "position": [
                             0.0,
@@ -102,21 +117,8 @@
                 },
                 {
                     "data": {
-                        "color": [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0
-                        ],
-                        "meshAssetId": "{99961728-DF68-4A89-BCC1-F3B12F4432F5}",
-                        "name": "",
-                        "sortOrderInCanvas": 0,
-                        "visible": true
+                        "rotationSpeed": 10.0
                     },
-                    "type": "MeshRenderer"
-                },
-                {
-                    "data": {},
                     "type": "TestBehavior"
                 }
             ],
@@ -245,7 +247,7 @@
                             1.0,
                             1.0
                         ],
-                        "visible": true
+                        "visible": false
                     },
                     "type": "UIImage"
                 }
@@ -258,6 +260,21 @@
         {
             "actorId": "{7E917244-83E1-4570-AE18-9786B963160D}",
             "components": [
+                {
+                    "data": {
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{B61D1031-F6D2-42FF-82F3-C0F98EC09A80}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                },
                 {
                     "data": {
                         "name": "",
@@ -282,21 +299,8 @@
                 },
                 {
                     "data": {
-                        "color": [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0
-                        ],
-                        "meshAssetId": "{B61D1031-F6D2-42FF-82F3-C0F98EC09A80}",
-                        "name": "",
-                        "sortOrderInCanvas": 0,
-                        "visible": true
+                        "rotationSpeed": 1.0
                     },
-                    "type": "MeshRenderer"
-                },
-                {
-                    "data": {},
                     "type": "TestBehavior"
                 }
             ],

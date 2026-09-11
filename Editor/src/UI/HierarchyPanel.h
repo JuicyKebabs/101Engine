@@ -12,6 +12,7 @@ public:
 		std::function<bool(const Guid& actorGuid)> onDeleteActor;								// Callback for when an actor is deleted
 		std::function<bool(const Guid& actorGuid, const Guid& newParentGuid)> onReparentActor;	// Callback for when an actor is reparented
 		std::function<void(const Guid& actorGuid)> onOpenCanvas;								// Callback for opening a Canvas as an edit scope
+		std::function<void()> onSelectionChanging;
 		bool canEdit = true;	// Flag to indicate if the hierarchy panel is editable (e.g., in edit mode)
 	};
 
@@ -62,4 +63,5 @@ private:
 		const Guid& newParentGuid,
 		const Callbacks& callbacks
 	);
+	void ChangeSelection(const Guid& actorGuid, const Callbacks& callbacks);
 };

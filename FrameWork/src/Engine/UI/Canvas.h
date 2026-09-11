@@ -9,6 +9,7 @@
 //----------------------------------------------------------------
 
 class SceneBase;
+class PersistentComponentMetadata;
 
 // Enumration of mode for rendering space of UI elements in a Canvas
 enum class CanvasRenderMode
@@ -28,6 +29,7 @@ enum class CanvasScaleMode
 
 class Canvas : public Component
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc 
 	{
@@ -114,8 +116,6 @@ public:
 	}
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 
 private:
 	std::vector<UIRenderer*> m_uiList;

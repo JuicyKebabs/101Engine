@@ -4,6 +4,7 @@
 #include "Engine/Core/Math/Math.h"
 
 class Canvas;
+class PersistentComponentMetadata;
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------
 // RendererComponent class
@@ -31,6 +32,7 @@ struct CommonRendererProxy
 // Base RendererComponent Class (for common rendering properties and functionality)
 class RendererComponent : public Component
 {
+	friend class PersistentComponentMetadata;
 public:
 	RendererComponent() = default;
 	~RendererComponent() = default;
@@ -60,10 +62,6 @@ public:
 	uint32_t GetSortOrderInCanvas() const { return m_sortOrderInCanvas; }
 
 	RenderSpace GetRenderSpace() const;
-
-	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 
 protected:
 	Vector4 m_color{ 1,1,1,1 };		// Color for rendering (can be used to tint the rendered object)
