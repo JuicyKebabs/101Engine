@@ -1,5 +1,5 @@
-ET-01 ～ ET-07 新規実装・変更箇所一覧
-========================================
+ET-01 ～ ET-07 新規実装・設計レビュー反映箇所一覧
+==================================================
 
 基準
 ----
@@ -12,12 +12,12 @@ ET-01 ～ ET-07 新規実装・変更箇所一覧
 ---------------
 
 [Reflection基盤]
-FrameWork/src/Engine/Core/Reflection/PropertyMetadata.h : 1-814
-FrameWork/src/Engine/Core/Reflection/PropertyMetadata.cpp : 1-96
+FrameWork/src/Engine/Core/Reflection/PropertyMetadata.h : 1-985
+FrameWork/src/Engine/Core/Reflection/PropertyMetadata.cpp : 1-329
 FrameWork/src/Engine/Core/Reflection/PropertyPath.h : 1-27
 FrameWork/src/Engine/Core/Reflection/PropertyPath.cpp : 1-69
-FrameWork/src/Engine/Core/Reflection/ReflectionSerialization.h : 1-59
-FrameWork/src/Engine/Core/Reflection/ReflectionSerialization.cpp : 1-576
+FrameWork/src/Engine/Core/Reflection/ReflectionSerialization.h : 1-62
+FrameWork/src/Engine/Core/Reflection/ReflectionSerialization.cpp : 1-692
 
 [Actor参照]
 FrameWork/src/Engine/Core/Reflection/ActorReferenceCodec.h : 1-75
@@ -35,22 +35,25 @@ FrameWork/src/Engine/Resource/AssetManagerAssetReferenceContext.cpp : 1-29
 
 [Component Reflection / Metadata]
 FrameWork/src/Engine/Component/ComponentReflection.h : 1-15
-FrameWork/src/Engine/Component/ComponentReflection.cpp : 1-130
+FrameWork/src/Engine/Component/ComponentReflection.cpp : 1-158
 FrameWork/src/Engine/Component/PersistentComponentMetadata.h : 1-34
-FrameWork/src/Engine/Component/PersistentComponentMetadata.cpp : 1-643
+FrameWork/src/Engine/Component/PersistentComponentMetadata.cpp : 1-341
+FrameWork/src/Engine/Component/PersistentCameraMetadata.cpp : 1-336
+FrameWork/src/Engine/Component/PersistentColliderMetadata.cpp : 1-125
+FrameWork/src/Engine/Component/PersistentTransformMetadata.cpp : 1-179
 
 [Inspector / Command]
-Editor/src/UI/Inspector/ReflectionInspector.h : 1-122
-Editor/src/UI/Inspector/ReflectionInspector.cpp : 1-328
+Editor/src/UI/Inspector/ReflectionInspector.h : 1-131
+Editor/src/UI/Inspector/ReflectionInspector.cpp : 1-460
 Editor/src/Command/ComponentPropertyEditCommand.h : 1-38
-Editor/src/Command/ComponentPropertyEditCommand.cpp : 1-44
+Editor/src/Command/ComponentPropertyEditCommand.cpp : 1-52
 
 [テスト]
 Tests/PropertyMetadataTests.cpp : 1-417
-Tests/ReflectionSerializationTests.cpp : 1-433
+Tests/ReflectionSerializationTests.cpp : 1-438
 Tests/ActorReferenceCodecTests.cpp : 1-151
 Tests/AssetReferenceCodecTests.cpp : 1-223
-Tests/ReflectionInspectorTests.cpp : 1-71
+Tests/ReflectionInspectorTests.cpp : 1-123
 Tests/ComponentPropertyEditCommandTests.cpp : 1-67
 
 
@@ -248,3 +251,70 @@ Editor/src/UI/Inspector/Components/UIImageInspector.h : 旧1-15
 Editor/src/UI/Inspector/Components/UIImageInspector.cpp : 旧1-39
 Editor/src/UI/Inspector/Components/UIRendererInspector.h : 旧1-15
 Editor/src/UI/Inspector/Components/UIRendererInspector.cpp : 旧1-27
+
+
+4. 設計レビュー後の追加修正
+---------------------------
+
+[Reflectionの責務分離]
+- PropertyMetadataへSerializationMetadataとInspectorMetadataを追加し、永続化設定と編集UI設定を独立したfacetとして保持。
+- PropertyMetadataはProperty単位の値検証とアクセサーを担当し、TypeMetadataはオブジェクト全体の不変条件を担当。
+- TypeMetadataBuilder::SetValidator()を追加し、型全体の検証規則をMetadata登録時に定義可能に変更。
+- ReflectionErrorCode、ReflectionError、PropertyPathによる構造化エラーを追加。
+- 既存のPropertyPolicyは互換入力として残し、内部で各facetへ変換。
+
+[原子的なDeserializeと状態反映]
+- ReflectionDeserializerは全Propertyの解析・値検証を完了してから書き込みを開始。
+- 書き込み失敗または型全体の検証失敗時に、適用済みPropertyを変更前の値へロールバック。
+- TypeMetadata::CopySerializableState()を追加し、検証用Componentから実Componentへの反映も原子的に実行。
+- DeserializeReflectedComponent()は登録済みfactoryから既定状態の候補Componentを生成して検証し、成功時のみ対象へ反映。
+- 任意PropertyがJSONに存在しない場合、既存互換どおりComponentの既定値を使用。
+
+[Cameraの不変条件とFOV単位]
+- CameraのnearZ < farZをTypeMetadataの型不変条件として実装し、Property適用順序への依存を除去。
+- nearZとfarZのsetterは単項目としての有限値・正値のみを検証。
+- FOVは内部状態とJSONではラジアンを維持し、Inspectorでは度へ変換して表示・編集。
+- NumericEditorMetadataに表示単位、保存単位、操作速度、最小値、最大値を定義。
+
+[Component Serialize / Deserialize共通化]
+- Component::Serialize()とComponent::Deserialize()を非virtualの共通入口へ変更。
+- Camera、Collider、Transform、RectTransform、Renderer系、UI系、Behaviorから個別overrideを削除。
+- ComponentSerializer / ComponentDeserializerとComponentReflectionを正式な共通永続化経路として使用。
+- Scene v3 JSON形式およびActorReference / AssetReferenceの遅延解決方式は維持。
+
+[Inspector編集トランザクション]
+- ReflectionInspectorの編集トランザクションへTypeMetadataを関連付け、Preview時にも型全体を検証。
+- 編集取消時は生ポインターだけに依存せず、Actor GUID、Component型、同型Componentの出現位置、PropertyPathから対象を再解決。
+- Hierarchy選択変更、Viewport選択・選択解除、Component削除、Scene切替、Hot Reload前に進行中編集を終了。
+- 対象Component破棄後でも安定したresolver経由で取消値を復元できるテストを追加。
+
+[Command履歴]
+- EditorCommandHistory::RecordExecuted()を追加。
+- Inspector Previewで既に反映済みの変更は再Executeせず履歴へ記録し、setterの二重実行を防止。
+- Undo / Redo時のProperty反映はComponentPropertyIdentityから対象を再解決し、TypeMetadata経由で検証。
+
+[Metadata配置と可読性]
+- 複雑なComponent Metadataを次の単位へ分割。
+  - PersistentCameraMetadata.cpp
+  - PersistentColliderMetadata.cpp
+  - PersistentTransformMetadata.cpp
+  - PersistentComponentMetadata.cpp（Renderer / UI系と共通登録処理）
+- 長い条件式を意味のある中間変数や検証関数へ分解。
+- ネストした三項演算子を段階的なif文へ置換。
+- 複数の処理を1行にまとめたsetterやInspector処理を、検証・更新・終了の順序が読める形へ整理。
+- Component別Serialize / Deserialize削除後に残った不要includeを削除。
+
+[追加・更新テスト]
+- CameraのnearZ / farZ不変条件がJSON内のProperty順序に依存しないことを確認。
+- Camera不変条件違反時に全状態が復元されることを確認。
+- FOVのラジアン保存・度表示Metadataを確認。
+- Deserialize書き込み失敗時のロールバックと構造化エラーを確認。
+- 破棄済み編集対象に生ポインターでアクセスせず取消できることを確認。
+- RecordExecuted()がCommandを二重実行しないことを確認。
+
+[検証結果]
+- CMake Debug全体ビルド成功。
+- 101Editor Debugビルド成功。
+- CTest 31件すべて成功（31/31）。
+- git diff --checkで差分エラーなし。
+- 既存のCMake依存パス警告およびDirectXTex PDB警告は継続しているが、今回の変更によるビルド失敗はなし。
