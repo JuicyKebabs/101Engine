@@ -6,6 +6,7 @@ set(IMGUI_SOURCES
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_tables.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_widgets.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_demo.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/misc/cpp/imgui_stdlib.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/backends/imgui_impl_dx12.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/backends/imgui_impl_win32.cpp
 )

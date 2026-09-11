@@ -40,17 +40,9 @@
 #include "Command/ReparentActorCommand.h"
 #include "Command/AddComponentCommand.h"
 #include "Command/RemoveComponentCommand.h"
+#include "Command/ComponentPropertyEditCommand.h"
 #include "Command/TransformEditCommand.h"
 #include "UI/EditorTheme.h"
-#include "UI/Inspector/Components/TransformInspector.h"
-#include "UI/Inspector/Components/MeshRendererInspector.h"
-#include "UI/Inspector/Components/SpriteRendererInspector.h"
-#include "UI/Inspector/Components/RectTransformInspector.h"
-#include "UI/Inspector/Components/ColliderInspector.h"
-#include "UI/Inspector/Components/CameraInspector.h"
-#include "UI/Inspector/Components/CanvasInspector.h"
-#include "UI/Inspector/Components/UIRendererInspector.h"
-#include "UI/Inspector/Components/UIImageInspector.h"
 #include "Scene/ScenePicker.h"
 #include "Scene/SceneCloner.h"
 
@@ -144,7 +136,6 @@ bool EditorApp::Initialize()
     PrepareInstance();              // Prepare instance
     InitInstance();                 // Initialize instance
     InitImGui();                    // Initialize ImGui
-	RegisterComponentInspectors();  // Register component inspectors for the editor
 
     NewScene();            // Start with a fresh scene (MainCamera-tagged DefaultCamera)
 
@@ -863,6 +854,7 @@ void EditorApp::ExitPlayMode()
         }
         else
 		{// In case of the selected actor is no longer valid in the edit scene or the edit scene is null
+			StopAllEditTransactions();
             m_hierarchyPanel.ClearSelection();
         }
 	}
@@ -991,21 +983,6 @@ void EditorApp::InitImGui()
     );
 
     io.Fonts->Build();
-}
-
-void EditorApp::RegisterComponentInspectors()
-{
-    auto& registry =  m_inspectorPanel.GetComponentInspectorRegistry();
-
-    registry.Register<Transform>(&TransformInspector::Draw);
-	registry.Register<MeshRenderer>(&MeshRendererInspector::Draw);
-	registry.Register<SpriteRenderer>(&SpriteRendererInspector::Draw);
-	registry.Register<RectTransform>(&RectTransformInspector::Draw);
-	registry.Register<Collider>(&ColliderInspector::Draw);
-	registry.Register<Camera>(&CameraInspector::Draw);
-	registry.Register<Canvas>(&CanvasInspector::Draw);
-	registry.Register<UIRenderer>(&UIRendererInspector::Draw);
-	registry.Register<UIImage>(&UIImageInspector::Draw);
 }
 
 void EditorApp::Update(float deltaTime)
@@ -1372,6 +1349,10 @@ void EditorApp::BuildDefaultDockLayout(unsigned int dockSpaceId)
 void EditorApp::RenderHierarchyPanel()
 {
     HierarchyPanel::Callbacks callbacks;
+	callbacks.onSelectionChanging = [this]()
+	{
+		StopAllEditTransactions();
+	};
 
 	callbacks.onRenameActor = [this](const Guid& targetActorGuid, const std::string& newName) -> bool
 		{
@@ -1536,23 +1517,11 @@ void EditorApp::RenderInspectorPanel()
 {
     InspectorContext context;
 	context.assetManager = m_pAssetManager.get();
+	context.scene = GetActiveScene();
 
     InspectorState inspectorState = InspectorState::ReadOnly;
     if (m_pEditScene && m_editorMode == EditorMode::Edit) inspectorState = InspectorState::Editable;
     context.state = inspectorState;
-
-    if (inspectorState == InspectorState::Editable)
-    {
-        // Transform editing callbacks
-        context.onTransformEditBegin = [this](const Guid& actorGuid, const Transform3D& before) { BeginTransformEdit(actorGuid, before); };
-        context.onTransformEditEnd = [this](const Guid& actorGuid, const Transform3D& after) { EndTransformEdit(actorGuid, after); };
-        context.onCancelTransformEdit = [this]() { CancelTransformEdit(); };
-
-        // RectTransform editing callbacks
-        context.onRectTransformEditBegin = [this](const Guid& actorGuid, const RectTransformEditState& before) { BeginRectTransformEdit(actorGuid, before); };
-        context.onRectTransformEditEnd = [this](const Guid& actorGuid, const RectTransformEditState& after) { EndRectTransformEdit(actorGuid, after); };
-        context.onCancelRectTransformEdit = [this]() { CancelRectTransformEdit(); };
-    }
 
     InspectorPanel::Callbacks callbacks;
 
@@ -1572,15 +1541,16 @@ void EditorApp::RenderInspectorPanel()
         };
 
 	// Callback for removing a component from an actor.
-    callbacks.onRemoveComponent =
+	callbacks.onRemoveComponent =
         [this, inspectorState](
             const Guid& actorGuid,
             const std::string& componentName,
             std::size_t occurrenceIndex)
-        {
-            if (!m_pEditScene || inspectorState != InspectorState::Editable) return false;
+		{
+			if (!m_pEditScene || inspectorState != InspectorState::Editable) return false;
+			m_inspectorPanel.CancelActiveEdit();
 
-            return m_commandHistory.Execute(
+			return m_commandHistory.Execute(
                 std::make_unique<RemoveComponentCommand>(
                     m_pEditScene.get(),
                     actorGuid,
@@ -1589,6 +1559,17 @@ void EditorApp::RenderInspectorPanel()
                 )
             );
         };
+
+	callbacks.onEditProperty =
+		[this, inspectorState](
+			const ComponentPropertyIdentity& identity,
+			const PropertyValue& before,
+			const PropertyValue& after)
+		{
+			if (!m_pEditScene || inspectorState != InspectorState::Editable) return false;
+			return m_commandHistory.RecordExecuted(std::make_unique<ComponentPropertyEditCommand>(
+				m_pEditScene.get(), identity, before, after));
+		};
 
 	SceneBase* activeScene = GetActiveScene();
 	m_inspectorPanel.Render(m_hierarchyPanel.GetSelectedActor(activeScene), context, callbacks);
@@ -1690,12 +1671,14 @@ void EditorApp::RenderSceneViewPanel()
         // Get the picked Actor information
         const std::optional<ScenePickHit> hit = ScenePicker::Pick(*activeScene, pickCameraInfo, pickUV, targetRenderSpace, editingCanvas);
 
-        if (hit)
-        {
-            m_hierarchyPanel.SelectActor(hit->actorGuid);
+		if (hit)
+		{
+			StopAllEditTransactions();
+			m_hierarchyPanel.SelectActor(hit->actorGuid);
         }
         else
         {
+			StopAllEditTransactions();
             m_hierarchyPanel.ClearSelection();
         }
     }
@@ -2817,6 +2800,7 @@ void EditorApp::ApplyCanvasNavigationInput(const CanvasNavigationInput& input, U
 
 void EditorApp::StopAllEditTransactions()
 {
+	m_inspectorPanel.CancelActiveEdit();
 	CancelTransformEdit();
 	CancelRectTransformEdit();
 }

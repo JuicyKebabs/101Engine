@@ -5,6 +5,7 @@
 #include "Command/RectTransformEditCommand.h"
 
 class AssetManager;
+class SceneBase;
 
 //------------------------------------------------------------------
 // InspectorContext
@@ -20,6 +21,7 @@ enum class InspectorState
 struct InspectorContext
 {
 	AssetManager* assetManager = nullptr;	// For drawing asset pull-downs and asset previews.
+	SceneBase* scene = nullptr;
 
 	// Transform editing events.
 	std::function<void(const Guid& actorGuid, const Transform3D& before)> onTransformEditBegin;

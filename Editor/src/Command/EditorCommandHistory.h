@@ -14,6 +14,7 @@ class EditorCommandHistory
 {
 public:
 	bool Execute(std::unique_ptr<IEditorCommand> command);
+	bool RecordExecuted(std::unique_ptr<IEditorCommand> command);
 	bool Undo();
 	bool Redo();
 

@@ -7,6 +7,7 @@
 
 // Forward declaration
 class Actor;
+class PersistentComponentMetadata;
 
 // Enumration for collider types
 enum class ColliderType
@@ -53,6 +54,7 @@ struct AABB
 
 class Collider : public Component
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -129,8 +131,6 @@ public:
 	void SetActive(bool flag) { m_isActive = flag; m_isDirty = true; }
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 
 private:
 	std::vector<CollisionInfo> m_collisionInfos;

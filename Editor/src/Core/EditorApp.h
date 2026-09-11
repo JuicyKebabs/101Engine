@@ -182,7 +182,6 @@ private:
     void PrepareInstance();
     void InitInstance();
     void InitImGui();
-    void RegisterComponentInspectors();
 
     void Update(float deltaTime);
     void Render();

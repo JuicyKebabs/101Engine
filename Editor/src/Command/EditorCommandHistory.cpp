@@ -16,6 +16,15 @@ bool EditorCommandHistory::Execute(std::unique_ptr<IEditorCommand> command)
 	return true;
 }
 
+bool EditorCommandHistory::RecordExecuted(std::unique_ptr<IEditorCommand> command)
+{
+	if (!command) return false;
+
+	m_undoStack.push_back(std::move(command));
+	m_redoStack.clear();
+	return true;
+}
+
 bool EditorCommandHistory::Undo()
 {
 	if (m_undoStack.empty()) return false;

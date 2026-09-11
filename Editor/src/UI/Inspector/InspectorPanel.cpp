@@ -2,6 +2,8 @@
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Scene/SceneBase.h"
+#include "UI/Inspector/AssetPicker.h"
 #include "UI/EditorUI.h"
 #include "imgui.h"
 #include <typeindex>
@@ -48,8 +50,15 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
         const std::type_index typeId = typeid(*component);
         const std::size_t occurrenceIndex = occurrenceCounts[typeId]++;
 
-		// Draw the component using the registered drawer function
-        if (DrawComponent(*component, context, readOnly))
+		// Draw the component using reflection metadata.
+		const bool removeRequested = DrawComponent(
+			*component,
+			occurrenceIndex,
+			selectedActor->GetGuid(),
+			context,
+			callbacks,
+			readOnly);
+        if (removeRequested)
 		{// If the "Remove" button was clicked, prepare a removal request
             const std::string componentName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
 
@@ -122,14 +131,20 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
     ImGui::End();
 }
 
-bool InspectorPanel::DrawComponent(Component& component, const InspectorContext& context, bool readOnly)
+bool InspectorPanel::DrawComponent(
+	Component& component,
+	std::size_t occurrenceIndex,
+	const Guid& actorGuid,
+	const InspectorContext& context,
+	const Callbacks& callbacks,
+	bool readOnly)
 {
 	const std::type_index typeId = std::type_index(typeid(component));
 
 	// Get the registered name of the component type from the ComponentRegistry
 	std::string componentName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
 
-	// Get the component policy to check its cardinality
+	// Get the component policy to judge if it can be removed (not unique required)
 	const auto policy = ComponentRegistry::Get().GetPolicy(typeId);
 
 	// Flag to indicate if the component can be removed (not unique required)
@@ -175,13 +190,124 @@ bool InspectorPanel::DrawComponent(Component& component, const InspectorContext&
 	// Draw the inspector UI for the component if the header is opened
     if (opened)
     {
-		EditorUI::DisabledScope disabledScope(readOnly);
-		// Draw the component's inspector UI using the registered drawer function
-		const bool drawn = m_componentInspectorRegistry.Draw(component, context);
-
-		if (!drawn)
+		const TypeMetadata* metadata = ComponentRegistry::Get().GetMetadata(typeId);
+		if (!metadata)
 		{
-			ImGui::TextDisabled("No inspector is registered for this component.");
+			ImGui::TextDisabled("Reflection metadata is not registered for this component.");
+		}
+		else
+		{
+			ReflectionInspectorPolicy inspectorPolicy = ReflectionInspectorPolicy::Editable;
+			if (readOnly)
+			{
+				inspectorPolicy = ReflectionInspectorPolicy::ReadOnly;
+			}
+			if (ReflectionInspector::BuildRows(*metadata, inspectorPolicy).empty())
+			{
+				ImGui::TextDisabled("No inspectable properties.");
+			}
+			else
+			{
+				ReflectionInspectorCallbacks reflectionCallbacks;
+				SceneBase* editScene = context.scene;
+				const Guid editActorGuid = actorGuid;
+				const std::size_t editOccurrenceIndex = occurrenceIndex;
+				reflectionCallbacks.restoreValue = [
+					editScene, editActorGuid, typeId, editOccurrenceIndex](
+					const PropertyMetadata& property,
+					const PropertyValue& value)
+				{
+					ComponentPropertyIdentity identity{
+						editActorGuid,
+						typeId,
+						editOccurrenceIndex,
+						property.GetPath() };
+					return ApplyComponentPropertyValue(editScene, identity, value);
+				};
+				reflectionCallbacks.onEditCommit = [&, typeId](
+					const PropertyMetadata& property,
+					const PropertyValue& before,
+					const PropertyValue& after)
+				{
+					if (!callbacks.onEditProperty) return false;
+					return callbacks.onEditProperty(
+						ComponentPropertyIdentity{ actorGuid, typeId, occurrenceIndex, property.GetPath() },
+						before, after);
+				};
+
+				ReflectionInspectorServices services;
+				services.drawActorReference = [&context](
+					const char* label, const PropertyMetadata&, const ActorReference& current, ActorReference& selected)
+				{
+					if (!context.scene)
+					{
+						return false;
+					}
+					Actor* currentActor = current.Resolve(*context.scene);
+					const char* preview = "<None>";
+					if (current.HasValue())
+					{
+						preview = "<Missing Actor>";
+						if (currentActor)
+						{
+							preview = currentActor->GetName().c_str();
+						}
+					}
+					if (!ImGui::BeginCombo(label, preview)) return false;
+					bool changed = false;
+					if (ImGui::Selectable("<None>", !current.HasValue()) && current.HasValue())
+					{
+						selected.Clear();
+						changed = true;
+					}
+					for (Actor* actor : context.scene->GetAllActors())
+					{
+						if (!actor)
+						{
+							continue;
+						}
+						if (actor->IsDestroyed())
+						{
+							continue;
+						}
+						if (actor->GetOwner() != context.scene)
+						{
+							continue;
+						}
+						const bool isSelected = current.GetGuid() == actor->GetGuid();
+						ImGui::PushID(actor);
+						if (ImGui::Selectable(actor->GetName().c_str(), isSelected) && !isSelected)
+						{
+							selected.Set(actor);
+							changed = true;
+						}
+						ImGui::PopID();
+					}
+					ImGui::EndCombo();
+					return changed;
+				};
+				services.drawAssetReference = [&context](
+					const char* label, const PropertyMetadata& property,
+					const AssetReferenceValue& current, AssetReferenceValue& selected)
+				{
+					if (!context.assetManager) return false;
+					Guid selectedGuid;
+					const bool selectionChanged = AssetPicker::Draw(
+						label,
+						*context.assetManager,
+						property.GetAssetType(),
+						current.guid,
+						selectedGuid);
+					if (!selectionChanged)
+						return false;
+					selected = { selectedGuid, property.GetAssetType(), false };
+					return true;
+				};
+
+				m_reflectionInspector.Draw(
+					*metadata, typeId, &component, inspectorPolicy,
+					reflectionCallbacks, services);
+			}
 		}
     }
 

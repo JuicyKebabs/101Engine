@@ -13,6 +13,66 @@ set_tests_properties(ActorPoolTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_executable(PropertyMetadataTests
+    PropertyMetadataTests.cpp
+)
+
+target_include_directories(PropertyMetadataTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(PropertyMetadataTests PRIVATE 101Framework)
+
+add_test(NAME PropertyMetadataTests COMMAND PropertyMetadataTests)
+set_tests_properties(PropertyMetadataTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(ReflectionSerializationTests
+    ReflectionSerializationTests.cpp
+)
+
+target_include_directories(ReflectionSerializationTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(ReflectionSerializationTests PRIVATE 101Framework)
+
+add_test(NAME ReflectionSerializationTests COMMAND ReflectionSerializationTests)
+set_tests_properties(ReflectionSerializationTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(ActorReferenceCodecTests
+    ActorReferenceCodecTests.cpp
+)
+
+target_include_directories(ActorReferenceCodecTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(ActorReferenceCodecTests PRIVATE 101Framework)
+
+add_test(NAME ActorReferenceCodecTests COMMAND ActorReferenceCodecTests)
+set_tests_properties(ActorReferenceCodecTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(AssetReferenceCodecTests
+    AssetReferenceCodecTests.cpp
+)
+
+target_include_directories(AssetReferenceCodecTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(AssetReferenceCodecTests PRIVATE 101Framework)
+
+add_test(NAME AssetReferenceCodecTests COMMAND AssetReferenceCodecTests)
+set_tests_properties(AssetReferenceCodecTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 add_executable(ActorFactoryTests
     ActorFactoryTests.cpp
 )
@@ -398,3 +458,33 @@ add_test(NAME EditorCameraControllerTests COMMAND EditorCameraControllerTests)
 set_tests_properties(EditorCameraControllerTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+add_executable(ReflectionInspectorTests
+    ReflectionInspectorTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/UI/Inspector/ReflectionInspector.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_draw.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_tables.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_widgets.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/ImGui/misc/cpp/imgui_stdlib.cpp
+)
+target_include_directories(ReflectionInspectorTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+target_link_libraries(ReflectionInspectorTests PRIVATE 101Framework)
+add_test(NAME ReflectionInspectorTests COMMAND ReflectionInspectorTests)
+set_tests_properties(ReflectionInspectorTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ComponentPropertyEditCommandTests
+    ComponentPropertyEditCommandTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/ComponentPropertyEditCommand.cpp
+)
+target_include_directories(ComponentPropertyEditCommandTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+target_link_libraries(ComponentPropertyEditCommandTests PRIVATE 101Framework)
+add_test(NAME ComponentPropertyEditCommandTests COMMAND ComponentPropertyEditCommandTests)
+set_tests_properties(ComponentPropertyEditCommandTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -2,6 +2,7 @@
 #include "Engine/Component/Transform.h"
 
 class Actor;
+class PersistentComponentMetadata;
 
 // Anchor modes enumeration
 enum class AnchorMode
@@ -19,6 +20,7 @@ enum class AnchorMode
 
 class RectTransform : public Transform
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -56,8 +58,6 @@ public:
 	const Vector2& GetSize() const { return m_size; }							// Get the size delta
 
 	// Serialization and deserialization methods for
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 
 private:
 	AnchorMode m_anchorMode = AnchorMode::MiddleCenter;	// Anchor mode (determines how the anchored position is calculated)

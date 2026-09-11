@@ -1,5 +1,6 @@
 #include "ComponentDeserializer.h"
 #include "Engine/Component/Component.h"
+#include "Engine/Component/ComponentReflection.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Debug/Debug.h"
 
@@ -14,16 +15,17 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 		return nullptr;
 	}
 
-	if (!componentJson.contains("type") ||
-		!componentJson["type"].is_string() ||
-		!componentJson.contains("data") ||
-		!componentJson["data"].is_object())
+	const bool hasType = componentJson.contains("type");
+	const bool hasData = componentJson.contains("data");
+	const bool hasValidType = hasType && componentJson["type"].is_string();
+	const bool hasValidData = hasData && componentJson["data"].is_object();
+	if (!hasValidType || !hasValidData)
 	{
 		DBG("ComponentDeserializer::DeserializeRecord: Component record must contain a string 'type' and an object 'data'.");
 		return nullptr;
 	}
 
-	// get the component type name and data from the JSON record
+	// Get the component type name and data from the JSON record
 	const std::string componentTypeName = componentJson["type"].get<std::string>();
 	const json& componentData = componentJson["data"];
 
@@ -33,7 +35,7 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 		return nullptr;
 	}
 
-	// Create the component instance
+	// Create the component instance with the registered factory function for the given type name
 	std::unique_ptr<Component> component(ComponentRegistry::Get().Create(componentTypeName));
 
 	if (!component)
@@ -43,9 +45,17 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 	}
 
 	// Deserialize the component data
-	if (!component->Deserialize(componentData))
+	ReflectionError error;
+	if (!DeserializeReflectedComponent(*component, componentData, &error))
 	{
-		DBG("ComponentDeserializer::DeserializeRecord: Failed to deserialize component '%s'.", componentTypeName.c_str());
+		std::string path = "<type>";
+		if (error.path)
+		{
+			path = error.path->ToString();
+		}
+		DBG(
+			"ComponentDeserializer::DeserializeRecord: Failed to deserialize component '%s' at '%s': %s",
+			componentTypeName.c_str(), path.c_str(), error.message.c_str());
 		return nullptr;
 	}
 

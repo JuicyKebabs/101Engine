@@ -8,6 +8,8 @@
 #include "Engine/Core/GUID/Guid.h"
 
 //---------------------------------------------------
+class PersistentComponentMetadata;
+
 // SpriteRenderer class
 // A component for rendering 2D sprites in the scene
 //---------------------------------------------------
@@ -23,6 +25,7 @@ struct SpriteRendererProxy
 
 class SpriteRenderer : public RendererComponent
 {
+	friend class PersistentComponentMetadata;
 public:
 	struct ParamDesc
 	{
@@ -88,8 +91,6 @@ public:
 	bool IsConfigured() const override { return m_template.materialDesc.textureHandle != InvalidTextureHandle; }	// Check if the render template is valid (has a texture)
 
 	// Serialization and deserialization methods
-	bool Serialize(nlohmann::json& outJson) const override;
-	bool Deserialize(const nlohmann::json& json) override;
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:

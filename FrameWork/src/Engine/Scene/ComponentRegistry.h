@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine/Component/Component.h"
+#include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/Actor.h"
 #include <functional>
@@ -29,16 +30,18 @@ private:
 	// type ID, or policy they need through the corresponding public API.
 	struct Entry
 	{
-		Factory factory;
-		std::type_index typeId;
+		Factory factory;						// Factory function to create a Component instance
+		std::type_index typeId;					// Type index of the Component type
+		std::unique_ptr<TypeMetadata> metadata;	// Metadata for the Component type
 
-		// Constructor forn initialization
 		Entry(
 			Factory componentFactory,
-			std::type_index componentTypeId
+			std::type_index componentTypeId,
+			std::unique_ptr<TypeMetadata> componentMetadata = {}
 		)
 		  : factory(std::move(componentFactory)),
-			typeId(componentTypeId)
+			typeId(componentTypeId),
+			metadata(std::move(componentMetadata))
 		{}
 	};
 
@@ -52,10 +55,11 @@ public:
 		Factory factory, 
 		std::type_index typeId,
 		ComponentCardinality cardinality,
-		ComponentFamily family
+		ComponentFamily family,
+		std::unique_ptr<TypeMetadata> metadata = {}
 	) 
 	{ 
-		m_entries.insert_or_assign(name, Entry(std::move(factory), typeId));
+		m_entries.insert_or_assign(name, Entry(std::move(factory), typeId, std::move(metadata)));
 		RegisterPolicy(typeId, { cardinality, family });
 		DBG("ComponentRegistry: REGISTER name='%s' typeid.name()='%s'", name.c_str(), typeId.name());
 		m_typeNames[typeId.name()] = name;
@@ -70,9 +74,13 @@ public:
 	}
 
 	// Specialized registration function for components defined in GameCode.dll
-	void RegisterGameComponent(const std::string& name, Factory factory, std::type_index typeId)
+	void RegisterGameComponent(
+		const std::string& name,
+		Factory factory,
+		std::type_index typeId,
+		std::unique_ptr<TypeMetadata> metadata)
 	{
-		Register(name, factory, typeId, ComponentCardinality::Multiple, ComponentFamily::None);
+		Register(name, factory, typeId, ComponentCardinality::Multiple, ComponentFamily::None, std::move(metadata));
 		m_gameComponentNames.insert(name);
 		DBG("ComponentRegistry: REGISTERED GameCode component '%s'", name.c_str());
 	}
@@ -204,6 +212,30 @@ public:
 		return it->second;
 	}
 
+	// Register metadata for a component type by its name. The metadata must match the registered type index.
+	bool RegisterMetadata(const std::string& name, std::unique_ptr<TypeMetadata> metadata)
+	{
+		auto entry = m_entries.find(name);
+		if (entry == m_entries.end() || !metadata || metadata->GetType() != entry->second.typeId)
+		{
+			return false;
+		}
+		entry->second.metadata = std::move(metadata);
+		return true;
+	}
+
+	const TypeMetadata* GetMetadata(const std::string& name) const
+	{
+		auto entry = m_entries.find(name);
+		return entry != m_entries.end() ? entry->second.metadata.get() : nullptr;
+	}
+
+	const TypeMetadata* GetMetadata(std::type_index typeId) const
+	{
+		const std::string name = GetNameByTypeIndex(typeId);
+		return name.empty() ? nullptr : GetMetadata(name);
+	}
+
 	// Check if a component can be added to the given actor 
 	// based on its name and the actor's existing components
 	// Used by inspector panel to determine if a component can be added to an actor
@@ -256,10 +288,13 @@ private:
 // Usage: Place REGISTER_GAME_COMPONENT(YourComponentClass) in the .h file of your component class defined in GameCode.dll
 #define REGISTER_GAME_COMPONENT(ClassName)                              \
 	static bool _reg_##ClassName = [](){                                \
+		auto metadata = TypeMetadataBuilder<ClassName>(#ClassName).Build(); \
+		if (!metadata) return false;                                     \
 		ComponentRegistry::Get().RegisterGameComponent(                 \
 			#ClassName,                                                 \
 			[](){ return static_cast<Component*>(new ClassName()); },   \
-			std::type_index(typeid(ClassName))                          \
+			std::type_index(typeid(ClassName)),                         \
+			std::make_unique<TypeMetadata>(std::move(*metadata))        \
 		);                                                              \
 		return true;                                                    \
 	}();

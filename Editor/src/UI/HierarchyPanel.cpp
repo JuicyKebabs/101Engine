@@ -48,7 +48,7 @@ void HierarchyPanel::Render(SceneBase* scene, const Callbacks& callbacks)
             // Clicking on empty space deselects the current actor
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             {
-				m_selectedActorGuid = {};
+				ChangeSelection({}, callbacks);
             }
         }
     }
@@ -176,12 +176,17 @@ void HierarchyPanel::Render(SceneBase* scene, const Callbacks& callbacks)
         ImGui::Separator();
 
 		// Delete button triggers the callback to delete the actor
-        if (ImGui::Button("Delete", ImVec2(120, 0)))
-        {
-            bool deleted = false;
+		if (ImGui::Button("Delete", ImVec2(120, 0)))
+		{
+			bool deleted = false;
 
-            if (actorToDelete && callbacks.onDeleteActor)
-            {
+			if (actorToDelete && callbacks.onDeleteActor)
+			{
+				const bool deletesSelection = m_selectedActorGuid == m_actorToDeleteGuid;
+				if (deletesSelection && callbacks.onSelectionChanging)
+				{
+					callbacks.onSelectionChanging();
+				}
 				deleted = callbacks.onDeleteActor(m_actorToDeleteGuid);
             }
 
@@ -228,7 +233,7 @@ void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene, const Callb
     // Left-click to select
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
     {
-		m_selectedActorGuid = actor->GetGuid();
+		ChangeSelection(actor->GetGuid(), callbacks);
 
 		if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
 			actor->GetComponentByClass<Canvas>() &&
@@ -247,7 +252,7 @@ void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene, const Callb
 	// Right-click to open the context menu for this actor
     if (ImGui::BeginPopupContextItem())
     {
-		m_selectedActorGuid = actor->GetGuid();
+		ChangeSelection(actor->GetGuid(), callbacks);
 
 		if (ImGui::MenuItem("Rename Actor", nullptr, false, callbacks.canEdit))
 		{
@@ -301,13 +306,22 @@ void HierarchyPanel::RenderRootDropTarget(const Callbacks& callbacks)
 	// Render a selectable item for the root of the hierarchy
     if (ImGui::Selectable("Scene Root", selected, ImGuiSelectableFlags_SpanAllColumns))
     {
-		m_selectedActorGuid = {};
+		ChangeSelection({}, callbacks);
     }
 
 	// Handle dropping an Actor onto the root of the hierarchy, which makes it a root Actor.
 	HandleActorDropTarget({}, callbacks);
 
     ImGui::Separator();
+}
+
+void HierarchyPanel::ChangeSelection(
+	const Guid& actorGuid,
+	const Callbacks& callbacks)
+{
+	if (m_selectedActorGuid == actorGuid) return;
+	if (callbacks.onSelectionChanging) callbacks.onSelectionChanging();
+	m_selectedActorGuid = actorGuid;
 }
 
 void HierarchyPanel::HandleActorDragSource(Actor* actor, const Callbacks& callbacks)
