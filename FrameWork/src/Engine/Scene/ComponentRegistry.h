@@ -85,6 +85,21 @@ public:
 		DBG("ComponentRegistry: REGISTERED GameCode component '%s'", name.c_str());
 	}
 
+	// Use authored metadata when provided; components without properties need no metadata builder.
+	template<class T>
+	bool RegisterGameComponent(const std::string& name)
+	{
+		auto metadata = [&]
+		{
+			if constexpr (requires { T::BuildMetadata(); }) return T::BuildMetadata();
+			else return TypeMetadataBuilder<T>(name).Build();
+		}();
+		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name) return false;
+		RegisterGameComponent(name, [] { return static_cast<Component*>(new T()); }, typeid(T),
+			std::make_unique<TypeMetadata>(std::move(*metadata)));
+		return true;
+	}
+
 	// Unregister all components that were registered from GameCode.dll (used for hot-reloading)
 	void UnregisterAllGameComponents()
 	{
@@ -267,17 +282,6 @@ private:
 };
 
 
-// Helper macro to register a component class defined in GameCode.dll (for hot-reloading support)
-// Usage: Place REGISTER_GAME_COMPONENT(YourComponentClass) in the .h file of your component class defined in GameCode.dll
-#define REGISTER_GAME_COMPONENT(ClassName)                              \
-	static bool _reg_##ClassName = [](){                                \
-		auto metadata = TypeMetadataBuilder<ClassName>(#ClassName).Build(); \
-		if (!metadata) return false;                                     \
-		ComponentRegistry::Get().RegisterGameComponent(                 \
-			#ClassName,                                                 \
-			[](){ return static_cast<Component*>(new ClassName()); },   \
-			std::type_index(typeid(ClassName)),                         \
-			std::make_unique<TypeMetadata>(std::move(*metadata))        \
-		);                                                              \
-		return true;                                                    \
-	}();
+// Place once in the component's .cpp file. Uses ClassName::BuildMetadata() when provided.
+#define REGISTER_GAME_COMPONENT(ClassName) \
+	static const bool registered##ClassName = ComponentRegistry::Get().RegisterGameComponent<ClassName>(#ClassName);

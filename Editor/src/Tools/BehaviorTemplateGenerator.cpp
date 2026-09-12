@@ -46,8 +46,8 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
         header << "    void Update() override;\n";
         header << "    void LateUpdate() override;\n";
         header << "    void Destroy() override;\n";
+        header << "    static std::optional<TypeMetadata> BuildMetadata();\n";
         header << "};\n\n";
-        header << "REGISTER_GAME_COMPONENT(" << className << ")\n";
     }
 
     // Generate .cpp
@@ -61,6 +61,15 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
 
         source << "#include \"" << className << ".h\"\n";
         source << "#include \"Engine/Scene/ComponentRegistry.h\"\n\n";
+        source << "REGISTER_GAME_COMPONENT(" << className << ")\n\n";
+        source << "std::optional<TypeMetadata> " << className << "::BuildMetadata()\n";
+        source << "{\n";
+        source << "    TypeMetadataBuilder<" << className << "> builder(\"" << className << "\");\n\n";
+        source << "    /*---- Describe the property registration process ----*/\n";
+        source << "    // Example: register a private member declared in " << className << ".\n";
+        source << "    // builder.Property(\"speed\", &" << className << "::m_speed);\n\n";
+        source << "    return builder.Build();\n";
+        source << "}\n\n";
         source << "void " << className << "::Start() {}\n";
         source << "void " << className << "::PreUpdate() {}\n";
         source << "void " << className << "::Update() {}\n";

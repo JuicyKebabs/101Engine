@@ -9,6 +9,5 @@ public:
     void Update() override;
     void LateUpdate() override;
     void Destroy() override;
+    static std::optional<TypeMetadata> BuildMetadata();
 };
-
-REGISTER_GAME_COMPONENT(Test)

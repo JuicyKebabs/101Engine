@@ -3,20 +3,7 @@
 #include "Engine/Core/Time/Time.h"
 #include "Engine/Component/Transform.h"
 
-namespace
-{
-	const bool registered = []
-	{
-		auto metadata = TestBehavior::BuildMetadata();
-		if (!metadata) return false;
-		ComponentRegistry::Get().RegisterGameComponent(
-			"TestBehavior",
-			[] { return static_cast<Component*>(new TestBehavior()); },
-			std::type_index(typeid(TestBehavior)),
-			std::make_unique<TypeMetadata>(std::move(*metadata)));
-		return true;
-	}();
-}
+REGISTER_GAME_COMPONENT(TestBehavior)
 
 std::optional<TypeMetadata> TestBehavior::BuildMetadata()
 {
@@ -24,6 +11,7 @@ std::optional<TypeMetadata> TestBehavior::BuildMetadata()
 	builder.Property("rotationSpeed", &TestBehavior::m_rotationSpeed);
 	return builder.Build();
 }
+
 
 void TestBehavior::Start()
 {

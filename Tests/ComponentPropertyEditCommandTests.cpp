@@ -4,7 +4,13 @@
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Core/Path/PathManager.h"
+#include "Tools/BehaviorTemplateGenerator.h"
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 
 namespace
 {
@@ -26,6 +32,34 @@ namespace
 		void LateUpdateOverride(float) override {}
 		void OnDestroyOverride() override {}
 	};
+
+	void TestGeneratedBehavior()
+	{
+		const auto previousRoot = PathManager::IsInitialized() ? std::filesystem::path(PathManager::GetProjectRoot()) : std::filesystem::current_path();
+		const auto root = std::filesystem::temp_directory_path() /
+			("101EngineBehaviorTemplate-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		std::filesystem::create_directories(root);
+		std::ofstream(root / "project.101").close();
+		Check(PathManager::Initialize((root / "test.exe").string()), "Template test uses an isolated project");
+		Check(BehaviorTemplateGenerator::Generate("GeneratedBehavior"), "Behavior template generates source files");
+		auto read = [](const std::filesystem::path& path)
+		{
+			std::ifstream file(path);
+			return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+		};
+		const auto header = read(root / "Game/GameCode/GeneratedBehavior.h");
+		const auto source = read(root / "Game/GameCode/GeneratedBehavior.cpp");
+		Check(header.find("REGISTER_GAME_COMPONENT") == std::string::npos &&
+			header.find("static std::optional<TypeMetadata> BuildMetadata();") != std::string::npos,
+			"Generated header declares metadata without registering the component");
+		Check(source.find("REGISTER_GAME_COMPONENT(GeneratedBehavior)") < source.find("GeneratedBehavior::BuildMetadata()") &&
+			source.find("std::optional<TypeMetadata> GeneratedBehavior::BuildMetadata()\n{") != std::string::npos &&
+			source.find("TypeMetadataBuilder<GeneratedBehavior> builder(\"GeneratedBehavior\");") != std::string::npos &&
+			source.find("// builder.Property(\"speed\", &GeneratedBehavior::m_speed);") != std::string::npos,
+			"Generated source includes registration, a member builder, and a commented private-member example");
+		Check(PathManager::Initialize((previousRoot / "test.exe").string()), "Template test restores the project path");
+		std::filesystem::remove_all(root);
+	}
 
 	void TestExecuteUndoRedo()
 	{
@@ -81,19 +115,32 @@ void TestTransformPilot()
 
 void TestRegistryMetadataLifetime()
 {
-	struct RegistrationProbe : TestComponent { int setting = 0; };
+	struct RegistrationProbe : TestComponent
+	{
+		int setting = 0;
+		static std::optional<TypeMetadata> BuildMetadata()
+		{
+			TypeMetadataBuilder<RegistrationProbe> builder("ReloadProbe");
+			builder.Property("setting", &RegistrationProbe::setting);
+			return builder.Build();
+		}
+	};
 	auto& registry = ComponentRegistry::Get();
 	TypeMetadataBuilder<RegistrationProbe> wrongName("DifferentName");
 	wrongName.Property("setting", &RegistrationProbe::setting);
 	Check(!registry.RegisterReflected<RegistrationProbe>("RegistrationProbe",
 		std::make_unique<TypeMetadata>(*wrongName.Build())) && !registry.Has("RegistrationProbe"),
 		"Reflected registration rejects mismatched metadata before publishing a factory");
+	Check(!registry.RegisterGameComponent<RegistrationProbe>("WrongGameName") && !registry.Has("WrongGameName"),
+		"GameCode shorthand rejects mismatched metadata before publishing a factory");
+	Check(registry.RegisterGameComponent<TestComponent>("EmptyProbe") && registry.GetMetadata("EmptyProbe"),
+		"GameCode shorthand supports components without BuildMetadata");
+	registry.UnregisterAllGameComponents();
+	Check(!registry.Has("EmptyProbe"), "GameCode shorthand without authored metadata is unregistered");
 	for (int cycle = 0; cycle < 2; ++cycle)
 	{
-		TypeMetadataBuilder<RegistrationProbe> builder("ReloadProbe");
-		builder.Property("setting", &RegistrationProbe::setting);
-		registry.RegisterGameComponent("ReloadProbe", [] { return static_cast<Component*>(new RegistrationProbe); },
-			typeid(RegistrationProbe), std::make_unique<TypeMetadata>(*builder.Build()));
+		Check(registry.RegisterGameComponent<RegistrationProbe>("ReloadProbe"),
+			"GameCode shorthand registers authored metadata");
 		std::unique_ptr<Component> instance(registry.Create("ReloadProbe"));
 		Check(instance && registry.GetMetadata("ReloadProbe") &&
 			registry.GetMetadata("ReloadProbe")->FindProperty("setting"),
@@ -108,6 +155,7 @@ void TestRegistryMetadataLifetime()
 
 int main()
 {
+	TestGeneratedBehavior();
 	TestRegistryMetadataLifetime();
 	TestTransformPilot();
 	TestExecuteUndoRedo();

@@ -478,6 +478,7 @@ set_tests_properties(ReflectionInspectorTests PROPERTIES WORKING_DIRECTORY ${CMA
 
 add_executable(ComponentPropertyEditCommandTests
     ComponentPropertyEditCommandTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Tools/BehaviorTemplateGenerator.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/ComponentPropertyEditCommand.cpp
 )
