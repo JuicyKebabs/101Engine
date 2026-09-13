@@ -13,7 +13,7 @@ void PersistentComponentMetadata::AddRendererProperties(TypeMetadataBuilder<T>& 
 {
 	PersistentMetadata::AddComponentName(builder);
 	builder.Property("color", &T::GetColor, &T::SetColor).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
-	builder.Property("visible", &T::IsVisible, &T::SetVisible);
+	builder.Property("visible", &T::GetVisible, &T::SetVisible);
 	// UI order is authoritative; retain the legacy JSON field without applying it twice.
 	builder.Property("sortOrderInCanvas", &T::GetSortOrderInCanvas,
 		[writeLegacySortOrder](T& c, std::uint32_t v) { if (writeLegacySortOrder) c.SetSortOrderInCanvas(v); }).Optional();

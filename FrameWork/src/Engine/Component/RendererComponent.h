@@ -54,6 +54,7 @@ public:
 	void SetSortOrderInCanvas(uint32_t order) { m_sortOrderInCanvas = order; m_isProxyDirty = true; }
 	
 	// Getters
+	bool GetVisible() const { return m_isVisible; }
 	Vector4 GetColor() const { return m_color; }
 	virtual bool IsVisible() const;
 	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources

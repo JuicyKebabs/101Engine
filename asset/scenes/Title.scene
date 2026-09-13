@@ -77,6 +77,77 @@
             "tag": "MainCamera"
         },
         {
+            "actorId": "{A89AA771-B84F-431B-822F-81752F569265}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "canvasActorId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{F6251694-900E-42FF-A5B2-5DC6490E3550}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "StartGame",
+            "parentId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
+            "tag": "None"
+        },
+        {
             "actorId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
             "components": [
                 {
@@ -196,7 +267,7 @@
                             1.0,
                             1.0
                         ],
-                        "visible": false
+                        "visible": true
                     },
                     "type": "UIImage"
                 }

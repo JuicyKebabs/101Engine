@@ -257,7 +257,7 @@
                             1.0,
                             1.0
                         ],
-                        "visible": false
+                        "visible": true
                     },
                     "type": "UIImage"
                 }

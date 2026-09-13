@@ -24,7 +24,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::RectTransform(std::st
 	TypeMetadataBuilder<::RectTransform> builder(std::move(stableTypeName));
 	PersistentMetadata::AddComponentName(builder);
 	builder.Property("position", &::RectTransform::GetLocalPosition, &::RectTransform::SetLocalPosition)
-		.Validate(ValueValidation::Finite3);
+		.Validate(ValueValidation::Finite3).Inspector(std::nullopt);
 	builder.Property("rotation", &::RectTransform::GetLocalRotationQuat, &::RectTransform::SetAuthoredLocalRotation);
 	builder.Property("scale", &::RectTransform::GetLocalScale, &::RectTransform::SetLocalScale)
 		.Validate(ValueValidation::Finite3);
