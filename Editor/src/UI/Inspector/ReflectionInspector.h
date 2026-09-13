@@ -108,6 +108,7 @@ public:
 		const ReflectionInspectorCallbacks& callbacks = {});
 
 	bool CancelActiveEdit(const ReflectionInspectorCallbacks& callbacks = {});
+	bool HasActiveEdit() const { return m_transaction.has_value(); }
 
 private:
 	struct Transaction

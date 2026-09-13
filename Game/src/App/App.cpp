@@ -64,7 +64,7 @@ bool App::Initialize()
 
 	PrepareInstance(); // Prepare instance
 
-	InitInstance(); // Initialize instance
+	if (!InitInstance()) return false;
 
 	return true;
 }
@@ -154,6 +154,9 @@ void App::Run()
 void App::Terminate()
 {
 	m_pSceneManager->Finalize();
+	m_pSceneManager.reset();
+	m_pActorImprintSystem.reset();
+	m_engineContext.pActorImprintSystem = nullptr;
 	ComponentRegistry::Get().UnregisterAllGameComponents();
 
 	if (m_hGameCodeDll)
@@ -223,18 +226,20 @@ void App::PrepareInstance()
 	m_pTextureManager = std::make_unique<TextureManager>();
 	m_pMeshManager = std::make_unique<MeshManager>();	
 	m_pAssetManager = std::make_unique<AssetManager>();
+	m_pActorImprintSystem = std::make_unique<ActorImprintSystem>(*m_pAssetManager);
 
 	// Set up engine context structure
 	m_engineContext = {
 		m_pRenderer.get(),
 		m_pTextureManager.get(),
 		m_pMeshManager.get(),
-		m_pAssetManager.get()
+		m_pAssetManager.get(),
+		m_pActorImprintSystem.get()
 	};
 }
 
 // Initialize instance
-void App::InitInstance()
+bool App::InitInstance()
 {
 	// Initialize DirectX12 engine
 	m_pEngine->InitCore(
@@ -259,11 +264,11 @@ void App::InitInstance()
 	);
 
 	// Initialize asset manager
-	m_pAssetManager->Initialize(
+	if (!m_pAssetManager->Initialize(
 		PathManager::Resolve("asset"),
 		m_pTextureManager.get(),
 		m_pMeshManager.get()
-		);
+		)) return false;
 
 	// Initialize engine bindings
 	m_pEngine->InitBindings(m_pTextureManager.get());
@@ -287,6 +292,7 @@ void App::InitInstance()
 
 	// Initialize input management class
 	m_inputManager.Initialize();
+	return true;
 }
 
 // Update
@@ -302,10 +308,13 @@ void App::Update()
 	m_pSceneManager->PreUpdate(deltaTime);	// Pre-update scene management class (for late update)
 	m_pSceneManager->Update(deltaTime);		// Update scene management class
 	m_pSceneManager->LateUpdate(deltaTime);	// Post-update scene management class (for late update)
-	m_pRenderer->Update(					// Update renderer
-		m_pEngine->GetCurrentBufferIndex(),
-		*m_pSceneManager->GetCameraInfo()
-	);
+	if (const CameraInfo* cameraInfo = m_pSceneManager->GetCameraInfo())
+	{
+		m_pRenderer->Update(					// Update renderer
+			m_pEngine->GetCurrentBufferIndex(),
+			*cameraInfo
+		);
+	}
 }
 
 // Draw

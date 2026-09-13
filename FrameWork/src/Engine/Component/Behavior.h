@@ -1,6 +1,7 @@
 #pragma once
 #include "Component.h"
 #include "Engine/Scene/ComponentRegistry.h"
+#include "Engine/Resource/AssetReference.h"
 #include <vector>
 #include <memory>
 
@@ -26,5 +27,7 @@ public:
 protected:
 
 	// Helper function to change the scene from within a behavior component
-	void ChangeScene(const std::string& sceneName);
+	bool ChangeScene(const std::string& sceneName);
+	bool ChangeScene(const Guid& sceneAssetGuid);
+	bool ChangeScene(const AssetReference<SceneAsset>& sceneAsset);
 };

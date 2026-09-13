@@ -41,6 +41,7 @@ bool ActorSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 		DBG("ActorSubtreeSnapshot::Capture: Root Actor has an invalid Guid.");
 		return false;
 	}
+	if (!scene->CanCaptureOrdinarySubtree(rootActor)) return false;
 
 	std::vector<json> capturedRecords;			// Temporary result buffer for serialized Actor records
 	std::vector<Actor*> pendingActors;			// Stack to hold actors pending serialization

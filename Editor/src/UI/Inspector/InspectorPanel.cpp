@@ -6,6 +6,7 @@
 #include "UI/Inspector/AssetPicker.h"
 #include "UI/EditorUI.h"
 #include "imgui.h"
+#include <algorithm>
 #include <typeindex>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +17,8 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 
     if (!selectedActor)
     {
+		m_propertyEditDiagnostic.clear();
+		m_propertyEditDiagnosticActorGuid = {};
         ImGui::Text("No actor selected.");
         ImGui::End();
         return;
@@ -23,9 +26,40 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 
     // Basic info
     ImGui::Text("Name: %s", selectedActor->GetName().c_str());
-    ImGui::Text("Tag: %s", TagRegistry::Get().GetName(selectedActor->GetTag()).c_str());
+	if (m_propertyEditDiagnosticActorGuid != selectedActor->GetGuid())
+	{
+		m_propertyEditDiagnostic.clear();
+		m_propertyEditDiagnosticActorGuid = {};
+	}
 
 	bool readOnly = (context.state == InspectorState::ReadOnly);
+	{
+		EditorUI::DisabledScope disabledScope(readOnly);
+		auto tags = TagRegistry::Get().GetRegisteredTags();
+		const TagId currentTag = selectedActor->GetTag();
+		if (std::none_of(tags.begin(), tags.end(),
+			[currentTag](const auto& entry) { return entry.first == currentTag; }))
+		{
+			tags.emplace_back(currentTag, TagRegistry::Get().GetName(currentTag));
+		}
+		const std::string currentName = TagRegistry::Get().GetName(currentTag);
+		if (ImGui::BeginCombo("Tag", currentName.c_str()))
+		{
+			for (const auto& [tagId, tagName] : tags)
+			{
+				const bool selected = tagId == currentTag;
+				if (ImGui::Selectable(tagName.c_str(), selected) && !selected &&
+					callbacks.onChangeActorTag &&
+					!callbacks.onChangeActorTag(selectedActor->GetGuid(), tagId))
+				{
+					m_propertyEditDiagnostic = "The Actor tag edit could not be committed to the active Document.";
+					m_propertyEditDiagnosticActorGuid = selectedActor->GetGuid();
+				}
+				if (selected) ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+	}
 
     {
         EditorUI::DisabledScope disabledScope(readOnly);
@@ -37,6 +71,13 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
     }
 
     ImGui::Separator();
+	if (!m_propertyEditDiagnostic.empty())
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.45f, 0.35f, 1.0f));
+		ImGui::TextWrapped("%s", m_propertyEditDiagnostic.c_str());
+		ImGui::PopStyleColor();
+		ImGui::Separator();
+	}
 
     std::unordered_map<std::type_index, std::size_t> occurrenceCounts;
 
@@ -209,6 +250,13 @@ bool InspectorPanel::DrawComponent(
 			else
 			{
 				ReflectionInspectorCallbacks reflectionCallbacks;
+				reflectionCallbacks.onEditBegin = [this](
+					const PropertyMetadata&,
+					const PropertyValue&)
+				{
+					m_propertyEditDiagnostic.clear();
+					m_propertyEditDiagnosticActorGuid = {};
+				};
 				SceneBase* editScene = context.scene;
 				const Guid editActorGuid = actorGuid;
 				const std::size_t editOccurrenceIndex = occurrenceIndex;
@@ -300,13 +348,27 @@ bool InspectorPanel::DrawComponent(
 						selectedGuid);
 					if (!selectionChanged)
 						return false;
-					selected = { selectedGuid, property.GetAssetType(), false };
+					// AssetPicker only exposes catalog entries of the requested type, so
+					// this is a validated live edit rather than a deferred load value.
+					selected = { selectedGuid, property.GetAssetType(), true };
 					return true;
 				};
 
-				m_reflectionInspector.Draw(
+				const ReflectionInspectorResult result = m_reflectionInspector.Draw(
 					*metadata, typeId, &component, inspectorPolicy,
 					reflectionCallbacks, services);
+				if (result.restoreFailures > 0)
+				{
+					m_propertyEditDiagnostic =
+						"Property change failed, and the previous value could not be restored.";
+					m_propertyEditDiagnosticActorGuid = actorGuid;
+				}
+				else if (result.writeFailures > 0)
+				{
+					m_propertyEditDiagnostic =
+						"Property change failed because the new value could not be applied. The previous value was preserved.";
+					m_propertyEditDiagnosticActorGuid = actorGuid;
+				}
 			}
 		}
     }

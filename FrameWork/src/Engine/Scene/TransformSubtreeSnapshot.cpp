@@ -133,6 +133,7 @@ bool TransformSubtreeSnapshot::Restore(SceneBase* scene) const
 		}
 
 		// Create a new Transform-family component based on the captured snapshot
+		if (!scene->CanReplaceTransform(actor, record.transform.sourceKind)) return false;
 		std::unique_ptr<Transform> transform =
 			TransformConversion::Create(
 				record.transform.sourceKind,

@@ -5,61 +5,79 @@
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
+#include <utility>
 
 bool UIImage::SetTextureAsset(const Guid& assetId)
 {
+	PreparedTextureAssetState prepared;
+	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitTextureAssetState(std::move(prepared));
+	return true;
+}
+
+UIImage::AssetPrepareResult UIImage::PrepareTextureAssetState(
+	const Guid& assetId,
+	PreparedTextureAssetState& outState) const
+{
 	if (!assetId.IsValid())
 	{
-		m_textureAssetId = Guid{};
-		m_pendingTextureAssetId.reset();
-		m_renderTemplate.clear();
-		m_isProxyDirty = true;
-
-		return true;
+		outState = {};
+		return AssetPrepareResult::Ready;
 	}
 
-	// Get the engine context to access the asset and texture managers
-	EngineContext* context = GetEngineContext();
+	const EngineContext* context = GetEngineContext();
 	if (!context || !context->pAssetManager || !context->pTextureManager)
 	{
-		return false;
+		return AssetPrepareResult::Failed;
 	}
 
-	// Get the asset entry for the given asset ID and check if it's a valid texture asset
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-	if (!assetEntry || assetEntry->type != AssetType::Texture)
+	if (!assetEntry)
 	{
-		return false;
+		return AssetPrepareResult::MissingAsset;
+	}
+	if (assetEntry->type != AssetType::Texture)
+	{
+		return AssetPrepareResult::Failed;
 	}
 
-	// Get the texture handle for the asset ID and check if it's valid
 	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
 	if (textureHandle == InvalidTextureHandle)
 	{
-		return false;
+		return AssetPrepareResult::Failed;
 	}
 
-	// Build the render template with a single UIRenderElement using the texture handle
 	UIRenderElement element;
 	element.materialDesc.textureHandle = textureHandle;
 	element.materialDesc.psoKey = PSO_KEY_DEFAULT::UI;
 	element.materialDesc.baseColor = { 1, 1, 1, 1 };
 	element.materialDesc.lightingEnabled = false;
 
-	// Set the required member variables and mark the proxy as dirty
-	m_renderTemplate = { element };
-	m_textureAssetId = assetId;
+	PreparedTextureAssetState prepared;
+	prepared.assetId = assetId;
+	prepared.renderTemplate = { std::move(element) };
+	outState = std::move(prepared);
+	return AssetPrepareResult::Ready;
+}
+
+void UIImage::CommitTextureAssetState(PreparedTextureAssetState&& state)
+{
+	m_textureAssetId = state.assetId;
+	m_renderTemplate.swap(state.renderTemplate);
 	m_pendingTextureAssetId.reset();
 	m_isProxyDirty = true;
-
-	return true;
 }
 
 
 bool UIImage::ResolveReferences(SceneBase& scene)
 {
 	Canvas* resolvedCanvas = GetGoverningCanvas();
-	bool textureCanBeResolved = false;
+	PreparedTextureAssetState preparedTexture;
+	AssetPrepareResult textureResult = AssetPrepareResult::Ready;
 
 	// Resolve the canvas actor if a pending canvas actor ID is set
 	if (m_pendingCanvasActorId.has_value())
@@ -80,26 +98,13 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 
 		if (!owner || owner->GetOwner() != &scene) return false;
 
-		EngineContext* context = owner->GetOwner()->GetEngineContext();
-		if (!context || !context->pAssetManager || !context->pTextureManager) return false;
-
-		const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(*m_pendingTextureAssetId);
-		if (!assetEntry || assetEntry->type != AssetType::Texture)
-		{
-			m_renderTemplate.clear();
-			m_textureAssetId = {};
-			m_isProxyDirty = true;
-		}
-		else
-		{
-			textureCanBeResolved = true;
-		}
+		textureResult = PrepareTextureAssetState(*m_pendingTextureAssetId, preparedTexture);
+		if (textureResult == AssetPrepareResult::Failed) return false;
 	}
 
-	// Set the resolved texture asset
-	if (textureCanBeResolved)
+	if (m_pendingTextureAssetId.has_value() && textureResult == AssetPrepareResult::Ready)
 	{
-		if (!SetTextureAsset(*m_pendingTextureAssetId)) return false;
+		CommitTextureAssetState(std::move(preparedTexture));
 	}
 
 	// Set the resolved canvas
@@ -117,15 +122,37 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 AssetReference<TextureAsset> UIImage::GetTextureAssetReference() const
 {
 	AssetReference<TextureAsset> value;
-	value.SetGuid(GetTextureAssetId());
+	value.SetValue({ GetTextureAssetId(), AssetType::Texture, m_textureAssetId.IsValid() });
 	return value;
 }
 
-void UIImage::SetTextureAssetReference(const AssetReference<TextureAsset>& value)
+bool UIImage::SetPendingTextureAssetReference(const AssetReference<TextureAsset>& value)
 {
 	m_renderTemplate.clear();
 	m_textureAssetId = {};
 	m_pendingTextureAssetId.reset();
 	if (value.HasValue()) m_pendingTextureAssetId = value.GetGuid();
 	m_isProxyDirty = true;
+	return true;
+}
+
+bool UIImage::TrySetTextureAssetReference(const AssetReference<TextureAsset>& value)
+{
+	Actor* owner = GetOwner();
+	// Preserve deferred deserialization while allowing validated Inspector
+	// selections to prepare their runtime state immediately.
+	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
+	{
+		return SetPendingTextureAssetReference(value);
+	}
+
+	PreparedTextureAssetState prepared;
+	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitTextureAssetState(std::move(prepared));
+	return true;
 }

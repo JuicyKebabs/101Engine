@@ -39,6 +39,7 @@ bool ReparentActorCommand::Execute()
 	// Resolve the new parent Actor
 	Actor* newParent = nullptr;
 	if (!ResolveParent(m_newParentGuid, newParent)) return false;
+	if (!m_scene->CanReparent(actor, newParent).Report(&m_structuralResult)) return false;
 
 	if (!m_hasExecuted)
 	{// Initial execution
@@ -57,7 +58,7 @@ bool ReparentActorCommand::Execute()
 		if (!m_beforeSnapshot.Capture(actor, m_scene)) return false;
 
 		// Attempt to reparent the Actor
-		if (!m_scene->ReparentActor(actor, newParent))
+		if (!m_scene->ReparentActor(actor, newParent, &m_structuralResult))
 		{// Rollback to the state which was captured before reparenting
 			RollbackState(
 				actor,
@@ -211,7 +212,8 @@ bool ReparentActorCommand::ApplyStoredState(
 	}
 
 	// Attempt to reparent the Actor to the target parent
-	if (!m_scene->ReparentActor(actor, targetParent))
+	if (!m_scene->CanReparent(actor, targetParent).Report(&m_structuralResult)) return false;
+	if (!m_scene->ReparentActor(actor, targetParent, &m_structuralResult))
 	{// Rollback to the state given by rollbackParentGuid and rollbackSnapshot
 		RollbackState(
 			actor,

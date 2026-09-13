@@ -18,6 +18,7 @@ Actor::~Actor()
 // Post-update (for late update)
 void Actor::PreUpdate(float deltaTime)
 {
+	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked()) return;
 	AttachPendingComponents();
 
 	// Post-update all components
@@ -36,6 +37,7 @@ void Actor::PreUpdate(float deltaTime)
 // Update
 void Actor::Update(float deltaTime)
 {
+	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked()) return;
 	// Update all components
 	for (const auto& component : m_componentPtrs) { component->Update(deltaTime); }
 }
@@ -43,6 +45,7 @@ void Actor::Update(float deltaTime)
 // Late update
 void Actor::LateUpdate(float deltaTime)
 {
+	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked()) return;
 	// Late update all components
 	std::vector<Component*> destroyedComponents;
 	for (const auto& component : m_componentPtrs) 
@@ -63,22 +66,22 @@ void Actor::LateUpdate(float deltaTime)
 }
 
 // Mark as actor as destroyed
-void Actor::Destroy()
+void Actor::Destroy(StructuralMutationResult* result)
 {
-	if (m_destroyed) return;
 	if (m_pOwner)
 	{
 		// SceneBase owns hierarchy policy and keeps Actor/ActorPool state in sync.
-		m_pOwner->RemoveActor(this, /*cascadeToChildren=*/true);
+		m_pOwner->RemoveActor(this, /*cascadeToChildren=*/true, result);
 		return;
 	}
 
 	// An unregistered actor has no pool to notify.
 	m_destroyed = true;
+	StructuralMutationResult{}.Report(result);
 }
 
 // Check if actor is destroyed
-bool Actor::IsDestroyed()
+bool Actor::IsDestroyed() const
 {
 	return m_destroyed;
 }
@@ -101,8 +104,9 @@ void Actor::OnDestroy()
 	}
 }
 
-Component* Actor::AddComponent(std::unique_ptr<Component> component)
+Component* Actor::AddComponent(std::unique_ptr<Component> component, StructuralMutationResult* result)
 {
+	if (m_pOwner) return m_pOwner->AddActorComponent(this, std::move(component), result);
 	if (!component) return nullptr;
 
 	const std::type_index typeId = std::type_index(typeid(*component));
@@ -125,7 +129,7 @@ Component* Actor::AddComponentInternal(
 	if (!component) return nullptr;
 
 	// Check if it is allowed to add this component type based on its cardinality and family constraints
-	if (!CanAddComponent(typeId))
+	if (!CanAddComponentLocal(typeId))
 	{
 		DBG("Actor::AddComponent: Component type '%s' is not allowed on Actor '%s'.", typeId.name(), m_name.c_str());
 		return nullptr;
@@ -158,7 +162,7 @@ Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, st
 
 	// Check if it's allowed to add given component type
 	// based on its cardinality and family constraints
-	if (!CanAddComponent(typeId))
+	if (!CanAddComponentLocal(typeId))
 	{
 		return nullptr;
 	}
@@ -358,6 +362,12 @@ bool Actor::HasComponentByName(const std::string& name) const
 
 bool Actor::CanAddComponent(std::type_index typeId) const
 {
+	if (m_pOwner) return static_cast<bool>(m_pOwner->CanAddComponent(this, typeId));
+	return CanAddComponentLocal(typeId);
+}
+
+bool Actor::CanAddComponentLocal(std::type_index typeId) const
+{
 	const auto policy = ComponentRegistry::Get().GetPolicy(typeId);
 	if (!policy) return false;
 
@@ -472,28 +482,33 @@ void Actor::FlushColliderTransforms()
 }
 
 // Add pending components to the main component container
+void Actor::PrepareComponentsForAttach()
+{
+	m_componentPtrs.reserve(m_componentPtrs.size() + m_pendingComponents.size());
+	for (auto& pending : m_pendingComponents)
+	{
+		Component* component = pending.instance.get();
+		m_components[pending.typeId].instances.push_back(std::move(pending.instance));
+		m_componentPtrs.push_back(component);
+	}
+	m_pendingComponents.clear();
+}
+
 void Actor::AttachPendingComponents()
 {
 	if (!m_pOwner) return;
-
-	for (auto& pending : m_pendingComponents)
-	{
-		auto& instance = pending.instance;
-		Component* component = instance.get();
-
-		m_componentPtrs.push_back(component);
-
-		auto& bucket = m_components[pending.typeId];
-		bucket.instances.push_back(std::move(instance));
-
-		component->OnAttach();
-	}
-
-	m_pendingComponents.clear();
+	if (m_pOwner->m_unpublishedCandidate) return;
+	const std::size_t firstAttached = m_componentPtrs.size();
+	PrepareComponentsForAttach();
+	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
+	for (std::size_t i = firstAttached; i < m_componentPtrs.size(); ++i)
+		m_componentPtrs[i]->OnAttach();
 }
 // Remove components marked for destruction
 void Actor::RemoveDestroyedComponents(Component* component)
 {
+	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
+	const bool affectsUIHierarchy = dynamic_cast<Canvas*>(component) || dynamic_cast<RendererComponent*>(component);
 	component->OnDetach();
 	component->OnDestroy();
 
@@ -515,17 +530,25 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	{
 		m_componentPtrs.erase(ptrIt);
 	}
+	if (affectsUIHierarchy && m_pOwner && !IsDestroyed())
+		m_pOwner->ApplyUIHierarchyConstraints(this, m_pOwner->FindClosestCanvas(GetParent()));
 }
 
-Actor* Actor::AddChild(std::unique_ptr<Actor> child)
+Actor* Actor::AddChild(std::unique_ptr<Actor> child, StructuralMutationResult* result)
 {
-	if (!m_pOwner || !child) return nullptr;
-	return m_pOwner->AddChildActor(std::move(child), m_handle);
+	if (!m_pOwner || !child)
+	{
+		StructuralMutationResult{ StructuralMutationReason::InvalidActor }.Report(result);
+		return nullptr;
+	}
+	return m_pOwner->AddChildActor(std::move(child), m_handle, result);
 }
 
 void Actor::AttachComponents()
 {
 	if (!m_pOwner) return;
+	if (m_pOwner->m_unpublishedCandidate) return;
+	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
 
 	AttachPendingComponents();
 
@@ -538,6 +561,7 @@ void Actor::AttachComponents()
 bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 {
 	if (!transform) return false;
+	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
 
 	transform->SetOwner(this);
 

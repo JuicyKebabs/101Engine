@@ -83,6 +83,8 @@ StyleCopReport.xml
 *_h.h
 *.ilk
 *.meta
+# Asset sidecars are the authoritative GUID identity used by serialized references.
+!/asset/**/*.meta
 *.obj
 *.iobj
 *.pch
@@ -380,6 +382,9 @@ cmake_install.cmake
 
 # Per-user editor state
 /Saved/
+
+# Editor hot-reload snapshot; regenerated before each restore attempt.
+/asset/scenes/_hotreload_temp.scene
 
 # Don't exclude Debug.h
 !FrameWork/src/Engine/Core/Debug/

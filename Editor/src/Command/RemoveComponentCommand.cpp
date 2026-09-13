@@ -28,6 +28,7 @@ bool RemoveComponentCommand::Execute()
 	// Resolve component from actor by its occurrence index
 	Component* component = ResolveComponent(actor);
 	if (!component) return false;
+	if (!m_scene->CanRemoveComponent(actor, component).Report(&m_structuralResult)) return false;
 
 	if (!m_hasSnapshot)
 	{// First execution
@@ -42,7 +43,7 @@ bool RemoveComponentCommand::Execute()
 	}
 
 	// Remove the component from the actor immediately
-	if (!m_scene->RemoveActorComponentImmediate(actor, component))
+	if (!m_scene->RemoveActorComponentImmediate(actor, component, &m_structuralResult))
 	{
 		return false;
 	}
@@ -61,7 +62,7 @@ bool RemoveComponentCommand::Undo()
 	}
 
 	// Restore the component from the snapshot
-	Component* restored = m_componentSnapshot.Restore(m_scene);
+	Component* restored = m_componentSnapshot.Restore(m_scene, &m_structuralResult);
 	if (!restored) return false;
 
 	m_isRemoved = false;	// Mark as not removed to allow re-execution

@@ -1,0 +1,29 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 11,
+          "properties": {
+            "name": "Transform",
+            "position": [0.0, 0.0, 0.0],
+            "rotation": [0.0, 0.0, 0.0, 1.0],
+            "scale": [1.0, 1.0, 1.0]
+          },
+          "type": "Transform"
+        }
+      ],
+      "localObjectId": 10,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "Root",
+        "tag": "None"
+      }
+    }
+  ],
+  "definitionRevision": "{10AFAAA1-ABCD-4321-ABCD-123456789ABC}",
+  "nextLocalObjectId": 12,
+  "rootActorLocalObjectId": 10,
+  "version": 1
+}

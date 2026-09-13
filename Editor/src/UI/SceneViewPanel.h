@@ -2,22 +2,18 @@
 #include <d3d12.h>
 #include <vector>
 #include <string>
+#include <span>
 #include "imgui.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Core/Guid/Guid.h"
+#include "Core/EditorViewportContext.h"
+#include "UI/DocumentTabBar.h"
 
 //--------------------------------------------------------------------------------------------
 // SceneViewPanel class
 // This class is responsible for rendering the scene view panel in the application.
 // Receive GPU handle of the render target and render the scene view panel using ImGui::Imgui.
 //--------------------------------------------------------------------------------------------
-
-// Enumration to define the editor viewport mode
-enum class EditorViewportMode
-{
-	Scene,	// Editing the scene in world space (Default)
-	Canvas,	// Editing contents in a selected Canvas on the 2D screen space
-};
 
 // Enumration of the type of displaying canvas rectangle in the canvas view panel
 enum class ViewportCanvasRole
@@ -99,7 +95,10 @@ public:
 	void Render(
 		D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
 		UINT textureWidth, UINT textureHeight,
-		const ViewportOverlayData& overlayData
+		EditorViewportContext* viewportContext,
+		const ViewportOverlayData& overlayData,
+		std::span<const EditorDocumentInfo> documents,
+		const DocumentTabBar::Callbacks& documentCallbacks
 	);
 
 	// Consume a resize request from the scene view panel and return the new width and height
@@ -117,9 +116,6 @@ public:
 	// Consume semantic navigation input for the 3D Scene View panel
 	bool ConsumeSceneNavigationInput(SceneNavigationInput& outInput);
 
-	EditorViewportMode GetViewMode() const { return m_viewMode; }
-	void SetViewMode(EditorViewportMode mode) { m_viewMode = mode; }
-
 	bool IsHovered() const { return m_isHovered; }
 	bool IsFocused() const { return m_isFocused; }
 
@@ -129,9 +125,6 @@ public:
 
 private:
 	static constexpr float kRenderScale = 1.0f; // Scale factor for rendering the scene view panel
-
-	// Current editor viewport mode (Scene or Canvas)
-	EditorViewportMode m_viewMode = EditorViewportMode::Scene;
 
 	bool m_isHovered = false;
 	bool m_isFocused = false;
@@ -162,4 +155,5 @@ private:
 
 	SceneNavigationInput m_sceneNavigationInput;
 	bool m_hasSceneNavigationInput = false;
+	DocumentTabBar m_documentTabBar;
 };

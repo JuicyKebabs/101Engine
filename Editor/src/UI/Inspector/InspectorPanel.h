@@ -28,12 +28,15 @@ public:
 			const ComponentPropertyIdentity& identity,
 			const PropertyValue& before,
 			const PropertyValue& after)> onEditProperty;
+
+		std::function<bool(const Guid& actorGuid, TagId newTag)> onChangeActorTag;
     };
 
 public:
     void Render(Actor* selectedActor, const InspectorContext& context, const Callbacks& callbacks);
 
 	bool CancelActiveEdit() { return m_reflectionInspector.CancelActiveEdit(); }
+	bool HasActiveEdit() const { return m_reflectionInspector.HasActiveEdit(); }
 
 private:
 	// Structure to hold requests for component removal
@@ -46,6 +49,8 @@ private:
     };
 
 	ReflectionInspector m_reflectionInspector;
+	std::string m_propertyEditDiagnostic;
+	Guid m_propertyEditDiagnosticActorGuid;
 
 private:
 	// Helper function to draw the inspector UI for a single component

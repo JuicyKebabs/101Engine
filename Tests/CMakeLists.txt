@@ -118,6 +118,21 @@ set_tests_properties(SceneLoaderTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_executable(SceneManagerCandidateTests
+    SceneManagerCandidateTests.cpp
+)
+
+target_include_directories(SceneManagerCandidateTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(SceneManagerCandidateTests PRIVATE 101Framework)
+
+add_test(NAME SceneManagerCandidateTests COMMAND SceneManagerCandidateTests)
+set_tests_properties(SceneManagerCandidateTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 add_executable(EditorCommandHistoryTests
     EditorCommandHistoryTests.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
@@ -125,10 +140,42 @@ add_executable(EditorCommandHistoryTests
 
 target_include_directories(EditorCommandHistoryTests PRIVATE
     ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
 )
 
 add_test(NAME EditorCommandHistoryTests COMMAND EditorCommandHistoryTests)
 set_tests_properties(EditorCommandHistoryTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(EditorDocumentTests
+    EditorDocumentTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/CanvasEditContext.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorCameraController.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorSelection.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewCamera.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewportContext.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Document/EditorDocumentManager.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/EditorDocumentWorkflow.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Document/IEditorDocument.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Document/SceneEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/UI/DocumentTabBar.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_draw.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_tables.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_widgets.cpp
+)
+
+target_include_directories(EditorDocumentTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(EditorDocumentTests PRIVATE 101Framework)
+
+add_test(NAME EditorDocumentTests COMMAND EditorDocumentTests)
+set_tests_properties(EditorDocumentTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
@@ -167,6 +214,21 @@ add_test(NAME RenameActorCommandTests COMMAND RenameActorCommandTests)
 set_tests_properties(RenameActorCommandTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+add_executable(ActorTagEditingTests
+	ActorTagEditingTests.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/ChangeActorTagCommand.cpp
+)
+
+target_include_directories(ActorTagEditingTests PRIVATE
+	${CMAKE_SOURCE_DIR}/Editor/src
+	${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(ActorTagEditingTests PRIVATE 101Framework)
+add_test(NAME ActorTagEditingTests COMMAND ActorTagEditingTests)
+set_tests_properties(ActorTagEditingTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(ComponentSerializationTests
     ComponentSerializationTests.cpp
@@ -426,6 +488,23 @@ set_tests_properties(SceneClonerTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_executable(ActorImprintScenePersistenceTests
+    ActorImprintScenePersistenceTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Scene/SceneCloner.cpp
+)
+
+target_include_directories(ActorImprintScenePersistenceTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(ActorImprintScenePersistenceTests PRIVATE 101Framework)
+
+add_test(NAME ActorImprintScenePersistenceTests COMMAND ActorImprintScenePersistenceTests)
+set_tests_properties(ActorImprintScenePersistenceTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 add_executable(SceneEditorUpdateTests
     SceneEditorUpdateTests.cpp
 )
@@ -489,3 +568,178 @@ target_include_directories(ComponentPropertyEditCommandTests PRIVATE
 target_link_libraries(ComponentPropertyEditCommandTests PRIVATE 101Framework)
 add_test(NAME ComponentPropertyEditCommandTests COMMAND ComponentPropertyEditCommandTests)
 set_tests_properties(ComponentPropertyEditCommandTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintObjectGraphTests ActorImprintObjectGraphTests.cpp)
+target_include_directories(ActorImprintObjectGraphTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintObjectGraphTests PRIVATE 101Framework)
+add_test(NAME ActorImprintObjectGraphTests COMMAND ActorImprintObjectGraphTests)
+set_tests_properties(ActorImprintObjectGraphTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintAssetTests ActorImprintAssetTests.cpp)
+target_include_directories(ActorImprintAssetTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintAssetTests PRIVATE 101Framework)
+add_test(NAME ActorImprintAssetTests COMMAND ActorImprintAssetTests)
+set_tests_properties(ActorImprintAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintSystemTests ActorImprintSystemTests.cpp)
+target_include_directories(ActorImprintSystemTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintSystemTests PRIVATE 101Framework)
+add_test(NAME ActorImprintSystemTests COMMAND ActorImprintSystemTests)
+set_tests_properties(ActorImprintSystemTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintDetachedActorsTests ActorImprintDetachedActorsTests.cpp)
+target_include_directories(ActorImprintDetachedActorsTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintDetachedActorsTests PRIVATE 101Framework)
+add_test(NAME ActorImprintDetachedActorsTests COMMAND ActorImprintDetachedActorsTests)
+set_tests_properties(ActorImprintDetachedActorsTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintMaterializationTests ActorImprintMaterializationTests.cpp)
+target_include_directories(ActorImprintMaterializationTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintMaterializationTests PRIVATE 101Framework)
+add_test(NAME ActorImprintMaterializationTests COMMAND ActorImprintMaterializationTests)
+set_tests_properties(ActorImprintMaterializationTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintStructuralMutationTests
+    ActorImprintStructuralMutationTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/CreateActorCommand.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/DeleteActorCommand.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/AddComponentCommand.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/RemoveComponentCommand.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/ReparentActorCommand.cpp
+)
+target_include_directories(ActorImprintStructuralMutationTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src ${CMAKE_SOURCE_DIR}/Editor/src)
+target_link_libraries(ActorImprintStructuralMutationTests PRIVATE 101Framework)
+add_test(NAME ActorImprintStructuralMutationTests COMMAND ActorImprintStructuralMutationTests)
+set_tests_properties(ActorImprintStructuralMutationTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintInstanceRecordTests ActorImprintInstanceRecordTests.cpp)
+target_include_directories(ActorImprintInstanceRecordTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintInstanceRecordTests PRIVATE 101Framework)
+add_test(NAME ActorImprintInstanceRecordTests COMMAND ActorImprintInstanceRecordTests)
+set_tests_properties(ActorImprintInstanceRecordTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintInstancePersistenceTests ActorImprintInstancePersistenceTests.cpp)
+target_include_directories(ActorImprintInstancePersistenceTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintInstancePersistenceTests PRIVATE 101Framework)
+add_test(NAME ActorImprintInstancePersistenceTests COMMAND ActorImprintInstancePersistenceTests)
+set_tests_properties(ActorImprintInstancePersistenceTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintReloadTests ActorImprintReloadTests.cpp)
+target_include_directories(ActorImprintReloadTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(ActorImprintReloadTests PRIVATE 101Framework)
+add_test(NAME ActorImprintReloadTests COMMAND ActorImprintReloadTests)
+set_tests_properties(ActorImprintReloadTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintEditingTests
+	ActorImprintEditingTests.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingObjectMap.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingSnapshot.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/AddComponentCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/ChangeActorTagCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/ComponentPropertyEditCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/CreateActorCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/DeleteActorCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/RemoveComponentCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/ReparentActorCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/RenameActorCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/CanvasEditContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/AtomicFileReplacement.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorCameraController.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorSelection.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewCamera.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewportContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/ActorImprintEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/EditorDocumentManager.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/IEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Tag/TagManagementWorkflow.cpp
+)
+target_include_directories(ActorImprintEditingTests PRIVATE
+	${CMAKE_SOURCE_DIR}/Editor/src
+	${CMAKE_SOURCE_DIR}/Framework/src
+)
+target_link_libraries(ActorImprintEditingTests PRIVATE 101Framework)
+add_test(NAME ActorImprintEditingTests COMMAND ActorImprintEditingTests)
+set_tests_properties(ActorImprintEditingTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintWorkflowTests
+	ActorImprintWorkflowTests.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintAssetWorkflow.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingObjectMap.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingSnapshot.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/InstantiateActorImprintCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/AtomicFileReplacement.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/CanvasEditContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorCameraController.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorSelection.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewCamera.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewportContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/ActorImprintEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/EditorDocumentManager.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/IEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/UI/Inspector/AssetPicker.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/UI/ActorImprintsPanel.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/UI/EditorUI.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/UI/HierarchyPanel.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_draw.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_tables.cpp
+	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_widgets.cpp
+)
+target_include_directories(ActorImprintWorkflowTests PRIVATE
+	${CMAKE_SOURCE_DIR}/Editor/src
+	${CMAKE_SOURCE_DIR}/Framework/src
+)
+target_link_libraries(ActorImprintWorkflowTests PRIVATE 101Framework)
+add_test(NAME ActorImprintWorkflowTests COMMAND ActorImprintWorkflowTests)
+set_tests_properties(ActorImprintWorkflowTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(ActorImprintEndToEndTests
+	ActorImprintEndToEndTests.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintAssetWorkflow.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingObjectMap.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingSnapshot.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/AddComponentCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/ComponentPropertyEditCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/CreateActorCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/InstantiateActorImprintCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/RenameActorCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/AtomicFileReplacement.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/CanvasEditContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorCameraController.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorSelection.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewCamera.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorViewportContext.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/ActorImprintEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/EditorDocumentManager.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/IEditorDocument.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Document/SceneEditorDocument.cpp
+)
+target_include_directories(ActorImprintEndToEndTests PRIVATE
+	${CMAKE_SOURCE_DIR}/Editor/src
+	${CMAKE_SOURCE_DIR}/Framework/src
+)
+target_link_libraries(ActorImprintEndToEndTests PRIVATE 101Framework)
+add_test(NAME ActorImprintEndToEndTests COMMAND ActorImprintEndToEndTests)
+set_tests_properties(ActorImprintEndToEndTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(SceneAssetTests
+	SceneAssetTests.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Scene/SceneAssetWorkflow.cpp
+)
+target_include_directories(SceneAssetTests PRIVATE
+	${CMAKE_SOURCE_DIR}/Editor/src
+	${CMAKE_SOURCE_DIR}/Framework/src
+)
+target_link_libraries(SceneAssetTests PRIVATE 101Framework)
+add_test(NAME SceneAssetTests COMMAND SceneAssetTests)
+set_tests_properties(SceneAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

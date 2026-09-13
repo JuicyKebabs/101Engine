@@ -12,13 +12,22 @@
 #include "Engine/Graphics/CameraSystem.h"
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
+#include "Engine/ActorImprint/ActorImprintInstanceRegistry.h"
+#include "StructuralMutationResult.h"
 
 // Forward declarations
 class SceneManager;
 class SceneLoader;
 class Component;
 class ActorSubtreeRestorer;
+class ActorImprintInstanceSerializer;
 enum class TransformKind;
+
+enum class SceneStructurePolicy
+{
+	Unrestricted,
+	SingleRootClosedSubtree,
+};
 
 
 //----------------------------------------------------------------------------------------
@@ -51,39 +60,30 @@ public:
 	void EditorUpdate(float deltaTime);		// Update limited elements for editor
 
 	// Add an actor to the scene
-	Actor* AddRootActor(std::unique_ptr<Actor> actor);
+	Actor* AddRootActor(std::unique_ptr<Actor> actor,
+		StructuralMutationResult* result = nullptr);
 
 	// Add a child actor to the scene
 	// Called by Actor::AddChildActor to add a child actor to the scene
-	Actor* AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle);
+	Actor* AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle,
+		StructuralMutationResult* result = nullptr);
+	StructuralMutationResult CanDestroy(const Actor* actor, bool cascadeToChildren = true) const;
+	StructuralMutationResult CanDestroy(ActorHandle actor, bool cascadeToChildren = true) const;
+	StructuralMutationResult CanAddComponent(const Actor* actor, std::type_index type) const;
+	StructuralMutationResult CanRemoveComponent(const Actor* actor, const Component* component) const;
+	StructuralMutationResult CanReparent(const Actor* actor, const Actor* newParent) const;
+	StructuralMutationResult CanAddChildActor(const Actor* parent) const;
+	StructuralMutationResult CanAddRootActor() const;
+	StructuralMutationResult CanCaptureOrdinarySubtree(const Actor* root) const;
+	StructuralMutationResult CanReplaceTransform(const Actor* actor, TransformKind kind) const;
+	StructuralMutationResult CanReferenceActor(const Guid& guid) const;
+	Component* AddActorComponent(Actor* actor, std::unique_ptr<Component> component,
+		StructuralMutationResult* result = nullptr);
+	bool RemoveActorComponent(Actor* actor, Component* component, StructuralMutationResult* result = nullptr);
 
 	// Remove an actor from the scene (mark it for destruction)
 	// Actual release happens at the end of the LateUpdate via ActorPool::CollectGarbage
-	void RemoveActor(Actor* actor, bool cascadeToChildren = true)
-	{
-		if (!actor || actor->GetOwner() != this || actor->IsDestroyed()) return;
-
-		auto children = actor->GetDirectChildren();
-		if (cascadeToChildren)
-		{
-			// Recursively remove all children of the actor
-			for (auto* child : children)
-			{
-				RemoveActor(child, true);
-			}
-		}
-		else
-		{
-			// A surviving child must not retain a handle to a deleted parent.
-			for (auto* child : children)
-			{
-				child->SetParentHandle(ActorHandle::Null());
-			}
-		}
-
-		actor->MarkForDestruction();
-		m_actorPool.Destroy(actor->GetHandle());
-	}
+	bool RemoveActor(Actor* actor, bool cascadeToChildren = true, StructuralMutationResult* result = nullptr);
 
 	// Remove an actor from the scene by name
 	void RemoveActor(const std::string& name)
@@ -102,10 +102,16 @@ public:
 		}
 	}
 
-	Actor* ResolveActor(ActorHandle handle) const { return m_actorPool.Resolve(handle); }		// Resolve an actor handle to an actor pointer
+	Actor* ResolveActor(ActorHandle handle) const
+	{
+		if (Actor* actor = m_actorPool.Resolve(handle)) return actor;
+		return m_actorLookupFallback ? m_actorLookupFallback->ResolveActor(handle) : nullptr;
+	}		// Resolve an actor handle to an actor pointer
 	Actor* ResolveActor(const Guid& guid) const { return ResolveActor(FindActorHandle(guid)); }	// Resolve an actor GUID to an actor pointer
 
 	const ActorPool& GetActorPool() const { return m_actorPool; }	// Get actor pool
+	const ActorImprintInstanceRegistry& GetImprintInstances() const { return m_imprintInstances; }
+	bool IsStructuralMutationBlocked() const { return m_actorBatchActive; }
 
 	// Get root actors (actors without parents, owned by the scene)
 	std::vector<Actor*> GetRootActors() const
@@ -132,17 +138,8 @@ public:
 	ActorHandle FindActorHandle(const Guid& guid) const
 	{
 		auto it = m_actorGuidMap.find(guid);
-		if (it == m_actorGuidMap.end())
-		{
-			return ActorHandle::Null();
-		}
-
-		if (!m_actorPool.IsValid(it->second))
-		{
-			return ActorHandle::Null();
-		}
-
-		return it->second;
+		if (it != m_actorGuidMap.end() && m_actorPool.IsValid(it->second)) return it->second;
+		return m_actorLookupFallback ? m_actorLookupFallback->FindActorHandle(guid) : ActorHandle::Null();
 	}
 
 	// Adding given component to given actor immediately, without waiting for the next update cycle
@@ -150,16 +147,17 @@ public:
 	Component* AddActorComponentImmediate(
 		Actor* actor,
 		std::unique_ptr<Component> component,
-		std::size_t occurrenceIndex
+		std::size_t occurrenceIndex,
+		StructuralMutationResult* result = nullptr
 	);
 
 	// Removing given component from given actor immediately, without waiting for the next update cycle
 	// Never call this from runtime game code. This function is intended for Editor commands.
-	bool RemoveActorComponentImmediate(Actor* actor, Component* component);
+	bool RemoveActorComponentImmediate(Actor* actor, Component* component, StructuralMutationResult* result = nullptr);
 
 	// Change the parent of an actor to a new parent
 	// Passing nullptr as newParent will make the actor a root actor
-	bool ReparentActor(Actor* actor, Actor* newParent);
+	bool ReparentActor(Actor* actor, Actor* newParent, StructuralMutationResult* result = nullptr);
 
 	// Set the render mode of a canvas
 	// This ensure that all canvas in the hierarchy of the given actor have the same render mode as the governing canvas
@@ -188,12 +186,41 @@ public:
 	Vector2 GetViewportSize() const { return m_viewportSize; }							// Get viewport size
 	SceneManager* GetSceneManager() const { return m_pSceneManager; }					// Get scene manager
 	EngineContext* GetEngineContext() const { return m_pEngineContext; }				// Get engine context
+	SceneStructurePolicy GetStructurePolicy() const { return m_structurePolicy; }
+	// Enables the authoring-only invariant after an initial closed subtree has
+	// been populated. Once enabled, every public structural mutation query and
+	// execution path preserves exactly one root.
+	bool EnableSingleRootClosedSubtreePolicy();
 
 protected:
 	DirectionalLight m_directionalLight;	// Directional light
 
 private:
 	ActorPool m_actorPool;	// Actor pool (used for allocating actors)
+	ActorImprintInstanceRegistry m_imprintInstances{ *this };
+	bool m_actorBatchActive = false;
+	// Reuses the transaction gate while lifecycle callbacks run. Nested scopes
+	// preserve an already-active construction transaction.
+	class StructuralMutationScope
+	{
+	public:
+		explicit StructuralMutationScope(SceneBase* scene) noexcept
+			: m_scene(scene), m_previous(scene && scene->m_actorBatchActive)
+		{
+			if (m_scene) m_scene->m_actorBatchActive = true;
+		}
+		~StructuralMutationScope() { if (m_scene) m_scene->m_actorBatchActive = m_previous; }
+		StructuralMutationScope(const StructuralMutationScope&) = delete;
+		StructuralMutationScope& operator=(const StructuralMutationScope&) = delete;
+	private:
+		SceneBase* m_scene;
+		bool m_previous;
+	};
+	bool m_unpublishedCandidate = false;
+	std::vector<Actor*> m_unpublishedCommitActors;
+	// SceneActorBatch alone may install a read-only destination fallback while
+	// this Scene is an unpublished candidate. It never outlives that batch.
+	const SceneBase* m_actorLookupFallback = nullptr;
 
 	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;		// Render system
 	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;		// Camera system
@@ -208,11 +235,21 @@ private:
 	EngineContext* m_pEngineContext = nullptr;	// Pointer to the engine context (used for accessing engine systems)
 
 	bool m_isFinalized = false;
+	SceneStructurePolicy m_structurePolicy = SceneStructurePolicy::Unrestricted;
 
 private:
 	friend class SceneLoader;
 	friend class Actor;
 	friend class ActorSubtreeRestorer;
+	friend class ActorImprintSystem;
+	friend class ActorImprintInstanceSerializer;
+	friend class SceneActorBatch;
+	StructuralMutationResult ValidateMutationActor(const Actor* actor) const;
+	StructuralMutationResult ValidateInstanceDestruction(ActorHandle root) const;
+	void CommitInstanceDestruction(ActorHandle root);
+	StructuralMutationResult CanApplyUIHierarchy(const Actor* root, const Canvas* governingCanvas,
+		const Actor* canvasOverrideOwner = nullptr, std::optional<CanvasRenderMode> canvasOverride = std::nullopt) const;
+	static TransformKind RequiredUITransformKind(bool underCanvas, std::optional<CanvasRenderMode> canvasMode);
 
 	// Helper function for Actor registration
 	Actor* RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle, bool applyUIConstraints);
@@ -254,10 +291,21 @@ private:
 	Canvas* FindClosestCanvas(Actor* actor) const;
 
 	// Apply UI hierarchy constraints to the given actor based on the governing canvas
-	bool ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas);
+	bool ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas,
+		bool allowTransformConversion = true, Actor** outInvalidActor = nullptr);
 
 	// Apply UI hierarchy constraints to all actors in the scene
-	bool ApplyAllUIHierarchyConstraints();
+	bool ApplyAllUIHierarchyConstraints(Actor** outInvalidActor = nullptr);
+
+	// Discard a SceneLoader candidate before publication. Candidate Actors have
+	// never received OnAttach, so they are released without lifecycle callbacks.
+	void DiscardUnpublishedCandidate() noexcept;
+	// Finish every allocation that Actor::AttachComponents would otherwise perform
+	// before the first lifecycle callback is allowed to run.
+	const std::vector<Actor*>& PrepareUnpublishedCandidateForCommit();
+	// Publish a fully prepared candidate. All recoverable work and allocation must
+	// finish before this non-failing lifecycle commit begins.
+	void PublishUnpublishedCandidate() noexcept;
 
 	// Helper to mark every RectTransform in the hierarchy of the given actor as dirty
 	// This is used to update the layout of UI elements when the viewport size changes

@@ -18,6 +18,7 @@ bool DeleteActorCommand::Execute()
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
 
 	if (!actor || actor->IsDestroyed()) return false;
+	if (!m_scene->CanCaptureOrdinarySubtree(actor).Report(&m_structuralResult)) return false;
 
 	if (!m_hasSnapshot)
 	{
@@ -28,7 +29,7 @@ bool DeleteActorCommand::Execute()
 	}
 
 	// Remove the actor subtree from the scene
-	m_scene->RemoveActor(actor, /*cascadeToChildren=*/true);
+	if (!m_scene->RemoveActor(actor, /*cascadeToChildren=*/true, &m_structuralResult)) return false;
 
 	// Verify that the actor is marked as destroyed
 	return actor->IsDestroyed();

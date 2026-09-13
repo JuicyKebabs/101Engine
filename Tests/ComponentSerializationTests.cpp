@@ -1344,6 +1344,35 @@ namespace
 			"Recoverable missing mesh reference survives serialization");
 	}
 
+	void TestMeshRendererLiveAssetFailurePreservesRuntimeState()
+	{
+		AssetManager assetManager;
+		MeshManager meshManager;
+		EngineContext context{
+			.pMeshManager = &meshManager,
+			.pAssetManager = &assetManager
+		};
+		SceneBase scene;
+		scene.Initialize(context);
+
+		auto actorOwned = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "ConfiguredMeshOwner"));
+		MeshRenderer* renderer = actorOwned->AddComponent<MeshRenderer>();
+		SubmeshRenderTemplate originalTemplate;
+		originalTemplate.meshDesc.meshHandle = 17;
+		renderer->SetParams({.templates = {originalTemplate}});
+		scene.AddRootActor(std::move(actorOwned));
+
+		AssetReference<MeshAsset> missingReference;
+		missingReference.SetValue({ GuidGenerator::Generate(), AssetType::Mesh, true });
+		Check(!renderer->TrySetMeshAssetReference(missingReference),
+			"Live MeshRenderer rejects an asset that cannot be prepared");
+		Check(renderer->IsConfigured() &&
+			renderer->GetRenderTemplates().front().meshDesc.meshHandle == 17 &&
+			!renderer->GetAssetId().IsValid(),
+			"Failed live MeshRenderer edit preserves its runtime template and asset identity");
+	}
+
 	void TestMeshRendererSetParamsClearsAssetAssociation()
 	{
 		const Guid assetId = GuidGenerator::Generate();
@@ -1583,6 +1612,35 @@ namespace
 		Check(renderer->GetTextureAssetId() == missingTextureId &&
 			!renderer->IsConfigured(),
 			"Missing sprite texture remains visible without runtime resources");
+	}
+
+	void TestSpriteRendererLiveAssetFailurePreservesRuntimeState()
+	{
+		AssetManager assetManager;
+		TextureManager textureManager;
+		EngineContext context{
+			.pTextureManager = &textureManager,
+			.pAssetManager = &assetManager
+		};
+		SceneBase scene;
+		scene.Initialize(context);
+
+		auto actorOwned = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "ConfiguredSpriteOwner"));
+		SpriteRenderer* renderer = actorOwned->AddComponent<SpriteRenderer>();
+		SpriteRenderTemplate originalTemplate;
+		originalTemplate.materialDesc.textureHandle = 23;
+		renderer->SetParams({.renderTemplate = originalTemplate});
+		scene.AddRootActor(std::move(actorOwned));
+
+		AssetReference<TextureAsset> missingReference;
+		missingReference.SetValue({ GuidGenerator::Generate(), AssetType::Texture, true });
+		Check(!renderer->TrySetTextureAssetReference(missingReference),
+			"Live SpriteRenderer rejects a texture that cannot be prepared");
+		Check(renderer->IsConfigured() &&
+			renderer->GetRenderTemplate().materialDesc.textureHandle == 23 &&
+			!renderer->GetTextureAssetId().IsValid(),
+			"Failed live SpriteRenderer edit preserves its runtime template and asset identity");
 	}
 
 	void TestSpriteRendererSetParamsClearsAssetAssociation()
@@ -2063,6 +2121,35 @@ namespace
 			"Missing UIImage texture remains visible without runtime resources");
 	}
 
+	void TestUIImageLiveAssetFailurePreservesRuntimeState()
+	{
+		AssetManager assetManager;
+		TextureManager textureManager;
+		EngineContext context{
+			.pTextureManager = &textureManager,
+			.pAssetManager = &assetManager
+		};
+		SceneBase scene;
+		scene.Initialize(context);
+
+		auto actorOwned = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "ConfiguredImageOwner"));
+		UIImage* image = actorOwned->AddComponent<UIImage>();
+		UIRenderElement originalElement;
+		originalElement.materialDesc.textureHandle = 31;
+		image->SetParams({.renderTemplate = {originalElement}});
+		scene.AddRootActor(std::move(actorOwned));
+
+		AssetReference<TextureAsset> missingReference;
+		missingReference.SetValue({ GuidGenerator::Generate(), AssetType::Texture, true });
+		Check(!image->TrySetTextureAssetReference(missingReference),
+			"Live UIImage rejects a texture that cannot be prepared");
+		Check(image->IsConfigured() &&
+			image->GetRenderTemplate().front().materialDesc.textureHandle == 31 &&
+			!image->GetTextureAssetId().IsValid(),
+			"Failed live UIImage edit preserves its runtime template and asset identity");
+	}
+
 	void TestUIImageSetParamsClearsTextureAssociation()
 	{
 		const Guid textureAssetId = GuidGenerator::Generate();
@@ -2140,6 +2227,7 @@ int main()
 	TestInvalidMeshRendererGuidDoesNotPartiallyMutate();
 	TestMeshRendererResolveWithoutContextFailsSafely();
 	TestMeshRendererMissingAssetIsRecoverable();
+	TestMeshRendererLiveAssetFailurePreservesRuntimeState();
 	TestMeshRendererSetParamsClearsAssetAssociation();
 	TestDefaultMeshRendererRoundTrip();
 	TestRendererCanvasSortOrderRoundTrip();
@@ -2149,6 +2237,7 @@ int main()
 	TestSpriteRendererValidationBoundaries();
 	TestSpriteRendererResolveWithoutContextFailsSafely();
 	TestSpriteRendererMissingTextureIsRecoverable();
+	TestSpriteRendererLiveAssetFailurePreservesRuntimeState();
 	TestSpriteRendererSetParamsClearsAssetAssociation();
 	TestDefaultSpriteRendererRoundTrip();
 	TestCanvasRoundTrip();
@@ -2168,6 +2257,7 @@ int main()
 	TestUIImageTextureFailureDoesNotApplyCanvas();
 	TestUIImageCanvasOnlyResolution();
 	TestUIImageMissingTextureIsRecoverable();
+	TestUIImageLiveAssetFailurePreservesRuntimeState();
 	TestUIImageSetParamsClearsTextureAssociation();
 	TestDefaultUIImageRoundTrip();
 

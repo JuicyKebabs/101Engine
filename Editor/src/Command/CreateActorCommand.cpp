@@ -41,7 +41,8 @@ bool CreateActorCommand::Execute()
 			return false;
 		}
 
-		if (!m_pScene->AddChildActor(std::move(actor), parentActor->GetHandle())) return false;
+		if (!m_pScene->CanAddChildActor(parentActor).Report(&m_structuralResult)) return false;
+		if (!m_pScene->AddChildActor(std::move(actor), parentActor->GetHandle(), &m_structuralResult)) return false;
 
 		m_hasExecuted = true;
 		return true;
@@ -64,7 +65,5 @@ bool CreateActorCommand::Undo()
 	if (!actor || actor->IsDestroyed()) return false;
 
 	// Remove the actor from the scene
-	m_pScene->RemoveActor(actor);
-
-	return true;
+	return m_pScene->RemoveActor(actor, true, &m_structuralResult);
 }

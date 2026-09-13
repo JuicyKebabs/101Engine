@@ -12,10 +12,12 @@
 
 namespace MetaFile
 {
+	enum class WriteMode { Replace, CreateNew };
 	// Trying to load .meta file
 	// Returns the Guid if successful, otherwise returns std::nullopt
 	std::optional<Guid> TryLoad(const std::string& path);
 
 	// Save .meta file with the given GUID
-	void Save(const std::string& path, const Guid& guid);
+	// CreateNew never overwrites an existing sidecar, even during concurrent creation.
+	bool Save(const std::string& path, const Guid& guid, WriteMode mode = WriteMode::Replace);
 }

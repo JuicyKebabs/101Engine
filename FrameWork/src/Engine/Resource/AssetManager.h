@@ -1,11 +1,13 @@
 #pragma once
 #include "Engine/Core/GUID/Guid.h"
 #include "Engine/Resource/AssetType.h"
+#include "Engine/Resource/AssetChange.h"
 #include "Engine/Resource/MeshHandle.h"
 #include "Engine/Resource/Texture.h"
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 //------------------------------------------------------------------------------------
 // AssetManager class
@@ -26,6 +28,15 @@ struct AssetEntry
 	AssetType type = AssetType::Unknown;	// Type of the asset
 };
 
+enum class AssetCatalogErrorCode { None, IoError, InvalidMetadata, DuplicateGuid, InvalidPath };
+
+struct AssetCatalogError
+{
+	AssetCatalogErrorCode code = AssetCatalogErrorCode::None;
+	std::string path;
+	std::string message;
+};
+
 class AssetManager
 {
 public:
@@ -33,16 +44,28 @@ public:
 	~AssetManager() = default;
 
 	// Initialize the AssetManager with the project directory
-	void Initialize(
+	bool Initialize(
 		const std::string& projectDir,
 		TextureManager* pTextureManager,
-		MeshManager* pMeshManager
+		MeshManager* pMeshManager,
+		AssetCatalogError* outError = nullptr
 	);
+
+	// Transactional catalog refresh. Failure preserves catalog and pending events.
+	bool Refresh(AssetCatalogError* outError = nullptr);
+	bool NotifyAssetChanged(const std::string& relativePath, AssetCatalogError* outError = nullptr);
+	// Queues a content-only change for an identity already validated by this
+	// catalog. Editor atomic saves use this after the filesystem commit; no
+	// whole-catalog rescan can make that commit appear to fail afterward.
+	bool NotifyAssetContentReplaced(const Guid& guid);
+	std::vector<AssetChange> TakePendingChanges();
 
 	// Lookup functions to retrieve asset entries by path or GUID
 	const AssetEntry* GetAssetEntryByPath(const std::string& relativePath) const;
 	const AssetEntry* GetAssetEntry(const Guid& guid) const;
 	std::vector<AssetEntry> GetAssetEntries(AssetType type) const;
+	std::string GetAssetPath(const Guid& guid) const;
+	const std::string& GetAssetRoot() const { return m_assetRoot; }
 
 	// Get the handle for each asset type by GUID
 	MeshHandle GetMeshHandle(const Guid& guid);
@@ -51,6 +74,16 @@ public:
 private:
 	std::unordered_map<Guid, AssetEntry> m_catalog;		// GUID -> Entry (Subscribe without loading)
 	std::unordered_map<std::string, Guid> m_pathToId;	// Path -> GUID (Reverse lookup)
+	struct FileState
+	{
+		std::filesystem::file_time_type writeTime;
+		std::uintmax_t size;
+		std::filesystem::file_time_type metaWriteTime;
+		std::uintmax_t metaSize;
+		friend bool operator==(const FileState&, const FileState&) = default;
+	};
+	std::unordered_map<Guid, FileState> m_fileStates;
+	std::vector<AssetChange> m_pendingChanges;
 
 	// Lazy-load cache for each asset type
 	std::unordered_map<Guid, MeshHandle>    m_loadedMeshes;	// Lazy-load cache
@@ -66,11 +99,7 @@ private:
 	// Scans root directory recursively and creates or resolves a GUID
 	// for each asset file via .meta sidecar file.
 	// No asset is loaded at this time, only the catalog is built.
-	void ScanAssetDirectory(const std::string& rootDir);
-
-	// Resolve the GUID for a given path.
-	// Prepare new .meta file if it doesn't exist, otherwise load the existing .meta file.
-	Guid ResolveGuidForPath(const std::string& filePath);
+	bool ScanAssetDirectory(const std::string& rootDir, const std::string& notifiedPath, AssetCatalogError* outError);
 
 	// Deteremine asset type based on the file extension.
 	AssetType DetermineAssetType(const std::string& extension);

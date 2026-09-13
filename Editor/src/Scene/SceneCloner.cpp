@@ -4,6 +4,7 @@
 #include "Engine/Scene/SceneWriter.h"
 #include "Engine/Scene/SceneLoader.h"
 #include "nlohmann/json.hpp"
+#include <utility>
 
 using json = nlohmann::json;
 
@@ -15,14 +16,6 @@ std::unique_ptr<SceneBase> SceneCloner::Clone(const SceneBase* sourceScene, Engi
 
 	if (!SceneWriter::SerializeScene(sourceScene, j)) return nullptr;
 
-	auto clonedScene = std::make_unique<SceneBase>();
-	clonedScene->Initialize(context);
-
-	if (!SceneLoader::DeserializeScene(clonedScene.get(), j))
-	{
-		clonedScene->Finalize();
-		return nullptr;
-	}
-
-	return clonedScene;
+	SceneLoadResult result = SceneLoader::LoadCandidate(j, context, "<scene-clone>");
+	return std::move(result.scene);
 }

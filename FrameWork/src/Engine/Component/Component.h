@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include "nlohmann/json.hpp"
+#include "Engine/Scene/StructuralMutationResult.h"
 
 // Forward declaration
 class Actor;
@@ -16,22 +17,19 @@ public:
 	Component() = default;
 	virtual ~Component() = default;
 
-	void OnAttach() { if (!m_attached) { OnAttachOverride(); m_attached = true; } }							// Call OnAttachOverride if not already attached
 	void OnStart() { OnStartOverride(); MarkAsStarted(); }													// Call OnStartOverride if not already started
 	void PreUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) PreUpdateOverride(deltaTime); }	// Call PreUpdateOverride if started and not destroyed
 	void Update(float deltaTime) { if (IsStarted() && !IsDestroyed()) UpdateOverride(deltaTime); }			// Call UpdateOverride if started and not destroyed
 	void LateUpdate(float deltaTime) { if (IsStarted() && !IsDestroyed()) LateUpdateOverride(deltaTime); }	// Call LateUpdateOverride if started and not destroyed
-	void OnDetach() { if (m_attached) { OnDetachOverride(); m_attached = false; } }							// Call OnDetachOverride if attached
-	void OnDestroy() { if (!IsDestroyed()) OnDestroyOverride(); MarkForDestruction(); }						// Call OnDestroyOverride if not already destroyed
 
-	void SetOwner(Actor* owner) { m_pOwner = owner; }			// Set the owning actor
 	Actor* GetOwner() const { return m_pOwner; }						// Get the owning actor
 	void SetName(const std::string& name) { m_name = name; }	// Set the component name
 	const std::string& GetName() const { return m_name; }		// Get the component name
 
 	void MarkAsStarted() { m_started = true; }					// Mark the component as started
 	bool IsStarted() const { return m_started; }				// Check if the component has been started
-	void MarkForDestruction() { m_destroyed = true; }			// Mark the component for destruction
+	bool IsAttached() const { return m_attached; }
+	void MarkForDestruction(StructuralMutationResult* result = nullptr);
 	bool IsDestroyed() const { return m_destroyed; }			// Check if the component is marked for destruction
 
 	// Serialization and deserialization methods for saving and loading component state
@@ -43,6 +41,14 @@ protected:
 	EngineContext* GetEngineContext() const;	// Get the engine context from the owning actor's scene
 
 private:
+	friend class Actor;
+	friend class SceneBase;
+	// Non-failing commit callback; validation precedes attach. Do not mutate Scene structure here.
+	void OnAttach() noexcept { if (!m_attached) { m_attached = true; OnAttachOverride(); } }
+	void OnDetach() { if (m_attached) { m_attached = false; OnDetachOverride(); } }
+	void SetOwner(Actor* owner) { m_pOwner = owner; }
+	void OnDestroy() { m_destroyed = true; if (!m_destroyNotified) { m_destroyNotified = true; OnDestroyOverride(); } }
+	bool m_destroyNotified = false;
 	Actor* m_pOwner = nullptr;		// Pointer to the owning actor
 	std::string m_name;				// Component name (optional, can be used for debugging or identification)
 

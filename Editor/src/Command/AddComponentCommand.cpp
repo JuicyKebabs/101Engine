@@ -21,7 +21,7 @@ bool AddComponentCommand::Execute()
 
 	if (m_hasExecuted)
 	{// In case of Redo
-		Component* restored = m_componentSnapshot.Restore(m_scene);
+		Component* restored = m_componentSnapshot.Restore(m_scene, &m_structuralResult);
 
 		if (!restored) return false;
 
@@ -37,6 +37,7 @@ bool AddComponentCommand::Execute()
 	const auto typeId = registry.GetTypeId(m_componentName);
 
 	if (!typeId) return false;
+	if (!m_scene->CanAddComponent(actor, *typeId).Report(&m_structuralResult)) return false;
 
 	std::unique_ptr<Component> component = nullptr;
 
@@ -52,7 +53,7 @@ bool AddComponentCommand::Execute()
 
 	if (!component) return false;
 
-	Component* added = m_scene->AddActorComponentImmediate(actor, std::move(component), m_occurrenceIndex);
+	Component* added = m_scene->AddActorComponentImmediate(actor, std::move(component), m_occurrenceIndex, &m_structuralResult);
 
 	if (!added) return false;
 
@@ -79,7 +80,7 @@ bool AddComponentCommand::Undo()
 	if (!m_componentSnapshot.Capture(actor, component)) return false;
 
 	// Remove the component from the actor immediately
-	if (!m_scene->RemoveActorComponentImmediate(actor, component)) return false;
+	if (!m_scene->RemoveActorComponentImmediate(actor, component, &m_structuralResult)) return false;
 
 	m_isApplied = false;
 	return true;

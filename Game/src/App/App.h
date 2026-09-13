@@ -6,12 +6,17 @@
 #include "Engine/Scene/SceneManager.h"
 #include "Engine/Input/InputManager.h"
 #include "Engine/Resource/AssetManager.h"
+#include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Audio/Audio.h"
 #include "Engine/Core/Time/Time.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Window/Window.h"
+#include "Engine/Project/ProjectSettings.h"
+#include "Engine/Core/Path/PathManager.h"
+#include "Engine/Actor/ActorTag.h"
+#include "Engine/Core/Debug/Debug.h"
 
 // Application class
 class App
@@ -33,6 +38,7 @@ private:
 	std::unique_ptr<Renderer> m_pRenderer = nullptr;				// Renderer pointer
 	std::unique_ptr<SceneManager> m_pSceneManager = nullptr;		// Scene manager pointer
 	std::unique_ptr<AssetManager> m_pAssetManager = nullptr;		// Asset Manager pointer
+	std::unique_ptr<ActorImprintSystem> m_pActorImprintSystem;
 	std::unique_ptr<TextureManager> m_pTextureManager = nullptr;	// Texture manager pointer
 	std::unique_ptr<MeshManager> m_pMeshManager = nullptr;			// Mesh manager pointer
 
@@ -53,6 +59,23 @@ public:
 
 	void InitSceneManager()
 	{
+		ProjectSettings settings;
+		std::string settingsError;
+		if (!ProjectSettings::Load(PathManager::Resolve("project.101"), settings, &settingsError))
+		{
+			DBG("App: Project settings could not be loaded: %s", settingsError.c_str());
+			return;
+		}
+		for (const std::string& tag : settings.GetUserTags())
+		{
+			if (TagRegistry::Get().RegisterUserTag(tag, nullptr, &settingsError)) continue;
+			DBG("App: Project Tag could not be registered: %s", settingsError.c_str());
+			return;
+		}
+		if (settings.GetGameStartupSceneGuid().IsValid())
+		{
+			m_pSceneManager->SetInitialScene(settings.GetGameStartupSceneGuid());
+		}
 		m_pSceneManager->SetViewportSize(
 			m_pEngine->GetFrameBufferWidth(),
 			m_pEngine->GetFrameBufferHeight()
@@ -72,7 +95,7 @@ private:
 
 	void PrepareInstance();								// Prepare instance
 
-	void InitInstance();	// Initialize instance
+	bool InitInstance();	// Initialize instance
 	void Update();			// Update
 	void Render();			// Draw
 };

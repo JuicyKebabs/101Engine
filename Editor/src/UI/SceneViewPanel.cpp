@@ -6,7 +6,10 @@
 void SceneViewPanel::Render(
 	D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
 	UINT textureWidth, UINT textureHeight,
-	const ViewportOverlayData& overlayData
+	EditorViewportContext* viewportContext,
+	const ViewportOverlayData& overlayData,
+	std::span<const EditorDocumentInfo> documents,
+	const DocumentTabBar::Callbacks& documentCallbacks
 )
 {
 	if (!ImGui::Begin("Scene"))
@@ -20,6 +23,14 @@ void SceneViewPanel::Render(
 
 	m_isHovered = ImGui::IsWindowHovered();
 	m_isFocused = ImGui::IsWindowFocused();
+	m_documentTabBar.Render(documents, documentCallbacks);
+	if (!viewportContext)
+	{
+		ImGui::TextDisabled("No document is open.");
+		ImGui::End();
+		return;
+	}
+	const auto getViewMode = [viewportContext]() { return viewportContext->GetViewMode(); };
 
 	// Display the resolution of the render target
 	ImGui::Text(
@@ -29,7 +40,7 @@ void SceneViewPanel::Render(
 	);
 
 	// Display the reference size and canvas order if in Canvas view mode and a canvas is present
-	if (m_viewMode == EditorViewportMode::Canvas && !overlayData.canvasRects.empty())
+	if (getViewMode() == EditorViewportMode::Canvas && !overlayData.canvasRects.empty())
 	{
 		ImGui::SameLine();
 
@@ -42,7 +53,7 @@ void SceneViewPanel::Render(
 	}
 
 	// Render the breadcrumb navigation for the canvas view mode
-	if (m_viewMode == EditorViewportMode::Canvas && !overlayData.canvasBreadcrumbs.empty())
+	if (getViewMode() == EditorViewportMode::Canvas && !overlayData.canvasBreadcrumbs.empty())
 	{
 		ImGui::TextDisabled("Canvas Hierarchy:");
 		ImGui::SameLine();
@@ -80,7 +91,7 @@ void SceneViewPanel::Render(
 	}
 
 	// Button to fit the view to rectangle of the Editing-Root Canvas in Canvas View
-	if (m_viewMode == EditorViewportMode::Canvas)
+	if (getViewMode() == EditorViewportMode::Canvas)
 	{
 		ImGui::SameLine();
 
@@ -96,13 +107,13 @@ void SceneViewPanel::Render(
 	{
 		if (ImGui::BeginTabItem("Scene"))
 		{
-			m_viewMode = EditorViewportMode::Scene;
+			viewportContext->SetViewMode(EditorViewportMode::Scene);
 			ImGui::EndTabItem();
 		}
 
 		if (ImGui::BeginTabItem("Canvas"))
 		{
-			m_viewMode = EditorViewportMode::Canvas;
+			viewportContext->SetViewMode(EditorViewportMode::Canvas);
 			ImGui::EndTabItem();
 		}
 
@@ -176,7 +187,7 @@ void SceneViewPanel::Render(
 	m_imageMax = ImGui::GetItemRectMax();
 
 	// Mouse input detection in Canvas View
-	if (m_viewMode == EditorViewportMode::Canvas && ImGui::IsItemHovered())
+	if (getViewMode() == EditorViewportMode::Canvas && ImGui::IsItemHovered())
 	{
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -206,7 +217,7 @@ void SceneViewPanel::Render(
 			m_hasCanvasNavigationInput = true;
 		}
 	}
-	else if (m_viewMode == EditorViewportMode::Scene && ImGui::IsItemHovered())
+	else if (getViewMode() == EditorViewportMode::Scene && ImGui::IsItemHovered())
 	{
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -315,7 +326,7 @@ void SceneViewPanel::Render(
 			drawList->PopClipRect();
 		};
 
-	if (m_viewMode == EditorViewportMode::Canvas)
+	if (getViewMode() == EditorViewportMode::Canvas)
 	{// Canvas View Mode
 		const ImU32 viewportColor = IM_COL32(110, 150, 170, 255);
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <string>
 #include "nlohmann/json.hpp"
 
 //--------------------------------------------------------------------------------
@@ -10,8 +11,16 @@
 
 class Component;
 
+struct ComponentDeserializationError
+{
+	std::string path;
+	std::string message;
+};
+
 class ComponentDeserializer
 {
 public:
-	static std::unique_ptr<Component> DeserializeRecord(const nlohmann::json& componentJson);
+	static std::unique_ptr<Component> DeserializeRecord(
+		const nlohmann::json& componentJson,
+		ComponentDeserializationError* outError = nullptr);
 };

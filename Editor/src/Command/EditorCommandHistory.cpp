@@ -2,10 +2,13 @@
 
 bool EditorCommandHistory::Execute(std::unique_ptr<IEditorCommand> command)
 {
+	m_lastStructuralResult = {};
 	if (!command) return false;
 
 	// Execute the command and check if it was successful
-	if (!command->Execute()) return false;
+	const bool succeeded = command->Execute();
+	m_lastStructuralResult = command->GetStructuralResult();
+	if (!succeeded) return false;
 
 	// Move the command to the undo stack
 	m_undoStack.push_back(std::move(command));
@@ -18,7 +21,9 @@ bool EditorCommandHistory::Execute(std::unique_ptr<IEditorCommand> command)
 
 bool EditorCommandHistory::RecordExecuted(std::unique_ptr<IEditorCommand> command)
 {
+	m_lastStructuralResult = {};
 	if (!command) return false;
+	m_lastStructuralResult = command->GetStructuralResult();
 
 	m_undoStack.push_back(std::move(command));
 	m_redoStack.clear();
@@ -34,7 +39,9 @@ bool EditorCommandHistory::Undo()
 	IEditorCommand* command = m_undoStack.back().get();
 
 	// Call Undo() on the command before moving it to the redo stack
-	if (!command->Undo()) return false;
+	const bool succeeded = command->Undo();
+	m_lastStructuralResult = command->GetStructuralResult();
+	if (!succeeded) return false;
 
 	// Move the command to the redo stack
 	m_redoStack.push_back(std::move(m_undoStack.back()));
@@ -54,7 +61,9 @@ bool EditorCommandHistory::Redo()
 	IEditorCommand* command = m_redoStack.back().get();
 
 	// Call Execute() on the command before moving it to the undo stack
-	if (!command->Execute()) return false;
+	const bool succeeded = command->Execute();
+	m_lastStructuralResult = command->GetStructuralResult();
+	if (!succeeded) return false;
 
 	// Move the command back to the undo stack
 	m_undoStack.push_back(std::move(m_redoStack.back()));
@@ -69,4 +78,5 @@ void EditorCommandHistory::Clear()
 {
 	m_undoStack.clear();
 	m_redoStack.clear();
+	m_lastStructuralResult = {};
 }

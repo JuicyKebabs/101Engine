@@ -1,649 +1,781 @@
 #include "SceneLoader.h"
 #include "SceneVersion.h"
-#include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
-#include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
-#include "Engine/Scene/ComponentRegistry.h"
-#include "Engine/Component/Transform.h"
-#include "Engine/Scene/ActorDeserializer.h"
+#include "Engine/ActorImprint/ActorImprint.h"
+#include "Engine/ActorImprint/ActorImprintInstanceDeserializer.h"
+#include "Engine/ActorImprint/ActorImprintInstanceRecordCodec.h"
+#include "Engine/ActorImprint/ActorImprintInstanceRegistry.h"
+#include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Component/Camera.h"
-#include "Engine/Core/Debug/Debug.h"
+#include "Engine/Component/Component.h"
+#include "Engine/Component/ComponentReflection.h"
 #include "Engine/Core/Context/Context.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/Graphics/LightTypes.h"
+#include "Engine/Scene/ActorDeserializer.h"
+#include "Engine/Scene/ComponentRegistry.h"
+#include "Engine/Scene/SceneBase.h"
 #include "nlohmann/json.hpp"
+#include <algorithm>
+#include <cmath>
 #include <fstream>
-#include <unordered_set>
+#include <initializer_list>
+#include <limits>
+#include <string_view>
+#include <utility>
 
 using json = nlohmann::json;
 
-// Load a scene from a file
-bool SceneLoader::LoadScene(const std::string& filePath, SceneBase* scene)
+namespace
 {
-	if (!scene)
+	bool Fail(SceneLoadError& error, SceneLoadErrorCode code,
+		std::string path, std::string message)
 	{
-		DBG("SceneLoader: Scene is null.");
+		error.code = code;
+		error.path = std::move(path);
+		error.message = std::move(message);
 		return false;
 	}
 
-	// Open the scene file
-	std::string fullPath = PathManager::Resolve(filePath);
+	std::string AppendPath(const std::string& base, const std::string& member)
+	{
+		return (json::json_pointer(base) / member).to_string();
+	}
+
+	std::string ActorPath(std::size_t index)
+	{
+		return "/actors/" + std::to_string(index);
+	}
+
+	std::string InstancePath(std::size_t index)
+	{
+		return "/actorImprintInstances/" + std::to_string(index);
+	}
+
+	bool Contains(std::initializer_list<std::string_view> fields, std::string_view field)
+	{
+		return std::find(fields.begin(), fields.end(), field) != fields.end();
+	}
+
+	bool ValidateFields(const json& object,
+		std::initializer_list<std::string_view> required,
+		std::initializer_list<std::string_view> optional,
+		const std::string& path,
+		SceneLoadError& error)
+	{
+		if (!object.is_object())
+			return Fail(error, SceneLoadErrorCode::InvalidSchema, path, "Expected an object.");
+
+		for (auto member = object.begin(); member != object.end(); ++member)
+		{
+			if (!Contains(required, member.key()) && !Contains(optional, member.key()))
+				return Fail(error, SceneLoadErrorCode::InvalidSchema,
+					AppendPath(path, member.key()), "Unknown field: " + member.key());
+		}
+		for (std::string_view field : required)
+		{
+			if (!object.contains(field))
+				return Fail(error, SceneLoadErrorCode::InvalidSchema,
+					AppendPath(path, std::string(field)), "Required field is missing.");
+		}
+		return true;
+	}
+
+	bool ReadGuid(const json& value, Guid& outGuid)
+	{
+		if (!value.is_string()) return false;
+		const std::string text = value.get<std::string>();
+		return text.find('\0') == std::string::npos &&
+			Guid::TryParse(text, outGuid) && outGuid.IsValid();
+	}
+
+	std::string GuidSortKey(const Guid& guid)
+	{
+		return guid.ToString();
+	}
+
+	bool FitsFiniteFloat(double value)
+	{
+		return std::isfinite(value) &&
+			value >= static_cast<double>(std::numeric_limits<float>::lowest()) &&
+			value <= static_cast<double>(std::numeric_limits<float>::max());
+	}
+
+	bool ValidateVector3(const json& value, const std::string& path, SceneLoadError& error)
+	{
+		if (!value.is_array() || value.size() != 3)
+			return Fail(error, SceneLoadErrorCode::InvalidSceneSettings, path,
+				"Expected an array containing exactly three finite numbers.");
+		for (std::size_t index = 0; index < value.size(); ++index)
+		{
+			if (!value[index].is_number())
+				return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+					path + "/" + std::to_string(index), "Expected a finite number.");
+			const double source = value[index].get<double>();
+			if (!FitsFiniteFloat(source))
+				return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+					path + "/" + std::to_string(index), "Number is outside the finite float range.");
+		}
+		return true;
+	}
+}
+
+SceneLoadResult SceneLoader::LoadCandidate(const std::string& filePath, EngineContext& context)
+{
+	SceneLoadError error;
+	error.assetPath = filePath;
+	if (filePath.empty())
+	{
+		Fail(error, SceneLoadErrorCode::InvalidArgument, {}, "Scene asset path must not be empty.");
+		return { nullptr, std::move(error) };
+	}
+
+	std::string fullPath;
+	try
+	{
+		fullPath = PathManager::Resolve(filePath);
+	}
+	catch (const std::exception& exception)
+	{
+		Fail(error, SceneLoadErrorCode::FileOpenFailed, {}, exception.what());
+		return { nullptr, std::move(error) };
+	}
+
 	std::ifstream file(fullPath);
 	if (!file.is_open())
 	{
-		DBG("SceneLoader: Failed to open scene file: %s", fullPath.c_str());
-		return false;
+		Fail(error, SceneLoadErrorCode::FileOpenFailed, {},
+			"Failed to open Scene asset: " + fullPath);
+		return { nullptr, std::move(error) };
 	}
 
-	// Parse JSON data from the file
-	json j;
-	try 
-	{ 
-		j = json::parse(file); 
-	}
-	catch (const json::exception& e)
-	{
-		DBG("SceneLoader: Failed to parse JSON: %s", e.what());
-		return false;
-	}
-
-	return DeserializeScene(scene, j);
-}
-
-bool SceneLoader::DeserializeScene(SceneBase* scene, const json& sceneRecord)
-{
-	if (!sceneRecord.is_object())
-	{
-		DBG("SceneLoader: Scene record is not a valid JSON object.");
-		return false;
-	}
-
-	if (!scene)
-	{
-		DBG("SceneLoader: Scene is missing.");
-		return false;
-	}
-
-	// Check scene version
-	if (!sceneRecord.contains("version") || !sceneRecord["version"].is_number_integer())
-	{
-		DBG("SceneLoader: Scene record is missing a valid 'version' field.");
-		return false;
-	}
-
-	bool loaded = false;
-
+	json sceneRecord;
 	try
-	{// Load the scene based on its version
-		// Get the version number from the scene record
-		const int version = sceneRecord["version"].get<int>();
-
-		switch (version)
+	{
+		// A DOM cannot represent duplicate object fields. Reject them while parsing
+		// so a later duplicate version or Instance array cannot silently discard data.
+		bool duplicateField = false;
+		std::string duplicateFieldName;
+		std::vector<std::unordered_set<std::string>> objectFields;
+		auto callback = [&](int, json::parse_event_t event, json& value)
 		{
-		case LEGACY_SCENE_VERSION:
-			loaded = LoadSceneVersion2(sceneRecord, scene);
-			break;
-
-		case CURRENT_SCENE_VERSION:
-			loaded = LoadSceneVersion3(sceneRecord, scene);
-			break;
-
-		default:
-			DBG(
-				"SceneLoader: Unsupported scene version: %d",
-				version);
-			return false;
+			if (event == json::parse_event_t::object_start) objectFields.emplace_back();
+			else if (event == json::parse_event_t::object_end) objectFields.pop_back();
+			else if (event == json::parse_event_t::key &&
+				!objectFields.back().insert(value.get<std::string>()).second)
+			{
+				duplicateField = true;
+				duplicateFieldName = value.get<std::string>();
+			}
+			return true;
+		};
+		sceneRecord = json::parse(file, callback);
+		if (file.bad() || duplicateField)
+		{
+			Fail(error, SceneLoadErrorCode::JsonParseFailed, {}, duplicateField
+				? "Scene contains a duplicate JSON field: " + duplicateFieldName
+				: "Scene file read failed while parsing JSON.");
+			return { nullptr, std::move(error) };
 		}
 	}
 	catch (const json::exception& exception)
-	{// Catch any JSON parsing exceptions and log the error
-		DBG("SceneLoader: Invalid scene data: %s", exception.what());
-		return false;
+	{
+		Fail(error, SceneLoadErrorCode::JsonParseFailed, {}, exception.what());
+		return { nullptr, std::move(error) };
 	}
 
-	if (!loaded) return false;
-
-	// Configure the main camera after loading the scene
-	ConfigureMainCamera(scene);
-
-	return true;
+	return LoadCandidate(sceneRecord, context, filePath);
 }
 
-//----------------------------------------------------------------
-// Version 2 scene loading
-//----------------------------------------------------------------
+SceneLoadResult SceneLoader::LoadCandidate(const json& sceneRecord,
+	EngineContext& context, std::string assetPath)
 
-bool SceneLoader::LoadSceneVersion2(const json& sceneJson, SceneBase* scene)
 {
-	std::vector<ActorLoadRecord> records;
-
-	if (!BuildActorLoadRecords(sceneJson, records))
-	{
-		return false;
-	}
-
-	if (!ValidateParentReferences(records))
-	{
-		return false;
-	}
-
-	if (!ValidateHierarchyCycles(records))
-	{
-		return false;
-	}
-
-	// First pass: create every actor as a root.
-	for (const auto& record : records)
-	{
-		if (!RestoreActorDataVersion2(record, scene))
-		{
-			DBG("SceneLoader: Failed to restore actor.");
-			return false;
-		}
-	}
-
-	// Second pass: resolve Guid references and attach children.
-	for (const auto& record : records)
-	{
-		if (!record.hasParent)
-		{
-			continue;
-		}
-
-		Actor* child = scene->ResolveActor(record.actorGuid);
-		Actor* parent = scene->ResolveActor(record.parentGuid);
-
-		if (!child || !parent)
-		{
-			DBG("SceneLoader: Failed to resolve hierarchy reference.");
-			return false;
-		}
-
-		// Restore the parent-child relationship in the scene
-		if (!scene->RestoreParentRelationship(child, parent))
-		{
-			DBG("SceneLoader: Failed to restore parent relationship for Actor '%s'.", child->GetName().c_str());
-			return false;
-		}
-	}
-
-	// Apply UI hierarchy constraints after all parent-child relationships have been restored
-	if (!scene->ApplyAllUIHierarchyConstraints())
-	{
-		DBG("SceneLoader: Failed to apply UI hierarchy constraints.");
-		return false;
-	}
-
-	// Components can safely register with scene systems after the complete
-	// hierarchy and its UI constraints have been restored.
-	for (Actor* actor : scene->GetAllActors())
-	{
-		if (actor) actor->AttachComponents();
-	}
-
-	// Apply scene settings
-	if (!ApplySceneSettings(sceneJson, scene))
-	{
-		DBG("SceneLoader: Failed to apply scene settings.");
-		return false;
-	}
-
-	return true;
+	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), true);
 }
 
-Actor* SceneLoader::RestoreActorDataVersion2(
-	const ActorLoadRecord& record,
-	SceneBase* scene
-)
+SceneLoadResult SceneLoader::LoadPreparedCandidate(const json& sceneRecord,
+	EngineContext& context, std::string assetPath)
 {
-	// Construct an InitDesc for the actor using the JSON data
-	Actor::InitDesc desc;
-	desc.name = record.actorJson->value("name", "Actor");
-	desc.isActive = record.actorJson->value("is_active", true);
-
-	const std::string tagName =
-		record.actorJson->value("tag", "None");
-
-	desc.tag = tagName.empty()
-		? TAG_NONE
-		: TagRegistry::Get().GetId(tagName);
-
-	auto actorOwned = ActorFactory::RestoreEmptyActor(
-		desc,
-		record.actorGuid
-	);
-
-	if (!actorOwned)
-	{
-		DBG("SceneLoader: Failed to restore actor with Guid: %s", record.actorGuid.ToString().c_str());
-		return nullptr;
-	}
-
-	Actor* actor = actorOwned.get();
-
-	// Add Transform component
-	if (record.actorJson->contains("transform"))
-	{
-		auto& t = (*record.actorJson)["transform"];
-
-		Transform::ParamDesc tdesc;	// Prepare a ParamDesc for the Transform component
-
-		// Set transform parameters from JSON
-		tdesc.localPosition =
-		{// Local position
-			t["position"][0], t["position"][1], t["position"][2],
-		};
-		const Vector3 localEulerDeg =
-		{// Local rotation (Euler angles in degrees)
-			t["rotation"][0], t["rotation"][1], t["rotation"][2],
-		};
-		tdesc.localRotation = Quaternion::CreateFromEulerDeg(localEulerDeg);
-		tdesc.localScale =
-		{// Local scale
-			t["scale"][0], t["scale"][1], t["scale"][2],
-		};
-
-		// Get the Transform component and set its parameters
-		actor->GetComponentByClass<Transform>()->SetParams(tdesc);
-	}
-
-	// Add components to the actor
-	if (record.actorJson->contains("components"))
-	{
-		for (auto& comp : (*record.actorJson)["components"])
-		{
-			std::string name = comp.get<std::string>();	// Get component name from JSON
-
-			// Use the ComponentRegistry to create and add the component to the actor
-			if (!ComponentRegistry::Get().AddToActor(name, actor))
-			{
-				DBG("SceneLoader: Unknown component '%s' for actor '%s'", name.c_str(), desc.name.c_str());
-				return nullptr;
-			}
-
-			DBG("SceneLoader: Added component '%s'", name.c_str());
-		}
-	}
-
-	return scene->RegisterRestoredActor(std::move(actorOwned));	// Add the actor to the scene and return the pointer
+	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), false);
 }
 
-//----------------------------------------------------------------
-// Version 3 scene loading
-//----------------------------------------------------------------
-
-bool SceneLoader::LoadSceneVersion3(const json& sceneJson, SceneBase* scene)
+SceneLoadResult SceneLoader::LoadCandidateImpl(const json& sceneRecord,
+	EngineContext& context, std::string assetPath, bool publish)
 {
-	std::vector<ActorLoadRecord> records;
-
-	if (!BuildActorLoadRecords(sceneJson, records)) return false;
-
-	if (!ValidateParentReferences(records)) return false;
-
-	if (!ValidateHierarchyCycles(records)) return false;
-
-	// First pass: create every actor amd deserialize every component.
-	for (const auto& record : records)
+	SceneLoadError error;
+	error.assetPath = std::move(assetPath);
+	if (!sceneRecord.is_object())
 	{
-		if (!RestoreActorDataVersion3(record, scene))
-		{
-			DBG("SceneLoader: Failed to restore Version 3 actor.");
-			return false;
-		}
+		Fail(error, SceneLoadErrorCode::InvalidSchema, {}, "Scene record must be an object.");
+		return { nullptr, std::move(error) };
+	}
+	if (!sceneRecord.contains("version"))
+	{
+		Fail(error, SceneLoadErrorCode::InvalidSchema, "/version", "Required field is missing.");
+		return { nullptr, std::move(error) };
+	}
+	if (!sceneRecord["version"].is_number_integer())
+	{
+		Fail(error, SceneLoadErrorCode::InvalidSchema, "/version", "Scene version must be an integer.");
+		return { nullptr, std::move(error) };
 	}
 
-	// Second pass: resolve actor hierarchy references
-	for (const auto& record : records)
+	const json& versionValue = sceneRecord["version"];
+	bool strictV4 = false;
+	bool compatibleV3 = false;
+	bool legacyV2 = false;
+	if (versionValue.is_number_unsigned())
 	{
-		if (!record.hasParent) continue;
-
-		Actor* child = scene->ResolveActor(record.actorGuid);
-		Actor* parent = scene->ResolveActor(record.parentGuid);
-
-		if (!child || !parent)
-		{
-			DBG("SceneLoader: Failed to resolve hierarchy reference.");
-			return false;
-		}
-
-		// Reparent the child actor to the parent actor in the scene
-		if (!scene->RestoreParentRelationship(child, parent))
-		{
-			DBG("SceneLoader: Failed to restore parent relationship for Actor '%s'.", child->GetName().c_str());
-			return false;
-		}
-	}
-
-	// Thirs pass: resolve component references (Actor or assets)
-	if (!RestoreComponentReferences(records, scene))
-	{
-		DBG("SceneLoader: Failed to restore component references.");
-		return false;
-	}
-
-	// Apply UI hierarchy constraints after all parent-child relationships have been restored
-	if (!scene->ApplyAllUIHierarchyConstraints())
-	{
-		DBG("SceneLoader: Failed to apply UI hierarchy constraints.");
-		return false;
-	}
-
-	// Components can safely register with scene systems after the complete
-	// hierarchy and its UI constraints have been restored.
-	for (Actor* actor : scene->GetAllActors())
-	{
-		if (actor) actor->AttachComponents();
-	}
-
-	// Apply scene settings (e.g., directional light)
-	if (!ApplySceneSettings(sceneJson, scene))
-	{
-		DBG("SceneLoader: Failed to apply Version 3 scene settings.");
-		return false;
-	}
-
-	return true;
-}
-
-Actor* SceneLoader::RestoreActorDataVersion3(const ActorLoadRecord& record, SceneBase* scene)
-{
-	if (!scene)
-	{
-		DBG("SceneLoader: Cannot restore an Actor to a null Scene.");
-		return nullptr;
-	}
-
-	if (!record.actorJson || !record.actorJson->is_object())
-	{
-		DBG("SceneLoader: Invalid Version 3 actor record.");
-		return nullptr;
-	}
-
-	// Deserialize the actor from the JSON data
-	std::unique_ptr<Actor> actor =
-		ActorDeserializer::DeserializeActorRecord(
-			*record.actorJson,
-			record.actorGuid);
-
-	if (!actor)
-	{
-		DBG("SceneLoader: Failed to deserialize Actor with Guid: %s", record.actorGuid.ToString().c_str());
-		return nullptr;
-	}
-
-	// Add the actor to the scene and return the pointer
-	return scene->RegisterRestoredActor(std::move(actor));
-}
-
-bool SceneLoader::RestoreComponentReferences(const std::vector<ActorLoadRecord>& records, SceneBase* scene)
-{
-	if (!scene) return false;
-
-	for (auto& record : records)
-	{
-		// Resolve the actor for the current record
-		Actor* actor = scene->ResolveActor(record.actorGuid);
-
-		if (!actor)
-		{
-			DBG("SceneLoader: Failed to resolve actor for component reference restoration.");
-			return false;
-		}
-
-		// Resolve references for each component of the actor
-		for (Component* component : actor->GetAllComponents())
-		{
-			if (!component || component->IsDestroyed()) continue;
-
-			if (!component->ResolveReferences(*scene))
-			{
-				const std::type_index typeId(typeid(*component));
-				const std::string typeName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
-
-				DBG(
-					"SceneLoader: Failed to resolve component '%s' references on actor '%s'.",
-					typeName.empty()
-					? typeId.name()
-					: typeName.c_str(),
-					actor->GetName().c_str());
-
-				return false;
-			}
-		}
-	}
-
-	return true;
-}
-
-
-bool SceneLoader::ApplySceneSettings(const json& sceneJson, SceneBase* scene)
-{
-	// DirectionalLight
-	if (sceneJson.contains("directional_light"))
-	{
-		auto& light = sceneJson["directional_light"];
-		DirectionalLight dl;
-		dl.direction = {
-			light["direction"][0], light["direction"][1], light["direction"][2]
-		};
-		dl.color = {
-			light["color"][0], light["color"][1], light["color"][2]
-		};
-		dl.intensity = light["intensity"];
-		scene->SetDirectionalLight(dl);
+		const std::uint64_t version = versionValue.get<std::uint64_t>();
+		strictV4 = version == static_cast<std::uint64_t>(CURRENT_SCENE_VERSION);
+		compatibleV3 = version == static_cast<std::uint64_t>(COMPATIBLE_SCENE_VERSION);
+		legacyV2 = version == 2;
 	}
 	else
 	{
-		DBG("SceneLoader: Warning - No directional light found in scene settings.");
+		const std::int64_t version = versionValue.get<std::int64_t>();
+		strictV4 = version == CURRENT_SCENE_VERSION;
+		compatibleV3 = version == COMPATIBLE_SCENE_VERSION;
+		legacyV2 = version == 2;
+	}
+	if (!strictV4 && !compatibleV3)
+	{
+		const std::string message = legacyV2
+			? "Scene version 2 is no longer supported; migrate it to version 3 before loading."
+			: "Unsupported Scene version: " + versionValue.dump();
+		Fail(error, SceneLoadErrorCode::UnsupportedVersion, "/version", message);
+		return { nullptr, std::move(error) };
+	}
+	if (compatibleV3)
+	{
+		const auto instances = sceneRecord.find("actorImprintInstances");
+		if (instances != sceneRecord.end() && (!instances->is_array() || !instances->empty()))
+		{
+			Fail(error, SceneLoadErrorCode::InvalidSchema, "/actorImprintInstances",
+				"Scene version 3 cannot contain ActorImprint Instance records; save it as version 4.");
+			return { nullptr, std::move(error) };
+		}
 	}
 
-	return true;
+	if (strictV4 && !ValidateFields(sceneRecord,
+		{ "version", "directional_light", "actors", "actorImprintInstances" }, {}, {}, error))
+		return { nullptr, std::move(error) };
+
+	std::unordered_map<Guid, ActorOrigin> origins;
+	std::vector<ActorLoadRecord> actorRecords;
+	std::vector<InstanceLoadRecord> instanceRecords;
+	if (!BuildActorLoadRecords(sceneRecord, strictV4, actorRecords, origins, error) ||
+		!ValidateParentReferences(actorRecords, error) ||
+		!ValidateHierarchyCycles(actorRecords, error) ||
+		(strictV4 && !BuildInstanceLoadRecords(sceneRecord, instanceRecords, origins, error)) ||
+		!ValidateSceneSettings(sceneRecord, strictV4, error))
+	{
+		return { nullptr, std::move(error) };
+	}
+
+	std::unordered_set<Guid> reservedSceneGuids;
+	reservedSceneGuids.reserve(origins.size());
+	for (const auto& [guid, origin] : origins)
+	{
+		(void)origin;
+		reservedSceneGuids.insert(guid);
+	}
+
+	auto candidate = std::make_unique<SceneBase>();
+	candidate->Initialize(context);
+	candidate->m_unpublishedCandidate = true;
+
+	auto Abort = [&]() -> SceneLoadResult
+	{
+		DBG("SceneLoader: Candidate load failed at '%s': %s",
+			error.path.c_str(), error.message.c_str());
+		candidate->DiscardUnpublishedCandidate();
+		return { nullptr, std::move(error) };
+	};
+
+	try
+	{
+		if (!RestoreOrdinaryActors(actorRecords, *candidate, error) ||
+			!RestoreInstances(instanceRecords, reservedSceneGuids, origins, *candidate, error) ||
+			!RestoreOrdinaryHierarchy(actorRecords, *candidate, error) ||
+			!RestoreComponentReferences(instanceRecords, origins, *candidate, error))
+		{
+			return Abort();
+		}
+
+		Actor* invalidUIActor = nullptr;
+		if (!candidate->ApplyAllUIHierarchyConstraints(&invalidUIActor))
+		{
+			const auto origin = invalidUIActor ? origins.find(invalidUIActor->GetGuid()) : origins.end();
+			const std::string path = origin == origins.end() ? "/actors" : origin->second.path;
+			Fail(error, SceneLoadErrorCode::UIHierarchyFailed, path,
+				"Scene UI hierarchy is incompatible with the Transform-family component on Actor '" +
+				(invalidUIActor ? invalidUIActor->GetName() : std::string("<unknown>")) + "'.");
+			return Abort();
+		}
+		if (!ApplySceneSettings(sceneRecord, *candidate, error) ||
+			!ValidateInstanceRegistry(*candidate, error))
+		{
+			return Abort();
+		}
+
+		// Preallocate final component storage and the traversal used by commit while
+		// the candidate can still be discarded without lifecycle callbacks.
+		const auto& commitActors = candidate->PrepareUnpublishedCandidateForCommit();
+		ConfigureMainCamera(*candidate, commitActors);
+	}
+	catch (const std::exception& exception)
+	{
+		Fail(error, SceneLoadErrorCode::InvalidSchema, error.path, exception.what());
+		return Abort();
+	}
+	catch (...)
+	{
+		Fail(error, SceneLoadErrorCode::InvalidSchema, error.path,
+			"Scene candidate construction threw an unknown exception.");
+		return Abort();
+	}
+
+	// No recoverable persisted-graph work remains. Normal callers publish now;
+	// ET-14 retains the prepared candidate until every live Scene validates.
+	if (publish) candidate->PublishUnpublishedCandidate();
+	return { std::move(candidate), {} };
 }
 
-void SceneLoader::ConfigureMainCamera(SceneBase* scene)
+bool SceneLoader::BuildActorLoadRecords(const json& sceneJson, bool strictV4,
+	std::vector<ActorLoadRecord>& outRecords,
+	std::unordered_map<Guid, ActorOrigin>& origins, SceneLoadError& error)
 {
-	for (Actor* actor : scene->GetAllActors())
+	if (!sceneJson.contains("actors"))
+		return Fail(error, SceneLoadErrorCode::InvalidSchema, "/actors", "Required field is missing.");
+	if (!sceneJson["actors"].is_array())
+		return Fail(error, SceneLoadErrorCode::InvalidSchema, "/actors", "Scene actors must be an array.");
+
+	const json& actors = sceneJson["actors"];
+	outRecords.reserve(actors.size());
+	for (std::size_t actorIndex = 0; actorIndex < actors.size(); ++actorIndex)
 	{
-		if (!actor || actor->IsDestroyed()) continue;
-		if (actor->GetTag() != ActorTags::MainCamera) continue;
-
-		Camera* camera = actor->GetComponentByClass<Camera>();
-
-		if (!camera) continue;
-
-		scene->GetCameraSystem()->SetMainCamera(camera);
-
-		DBG(
-			"SceneLoader: Main camera set to '%s'",
-			actor->GetName().c_str());
-
-		return;
-	}
-
-	DBG("SceneLoader: Warning - No main camera found.");
-}
-
-
-bool SceneLoader::BuildActorLoadRecords(
-	const json& sceneJson,
-	std::vector<ActorLoadRecord>& outRecords
-)
-{
-	// Check if the scene JSON contains an "actors" array
-	if (!sceneJson.contains("actors") || !sceneJson["actors"].is_array())
-	{
-		DBG("SceneLoader: 'actors' must be an array.");
-		return false;
-	}
-
-	std::unordered_set<Guid> actorGuids;	// To check for duplicate GUIDs
-
-	for (const auto& actorJson : sceneJson["actors"])
-	{
-		// Check if the actor entry is a valid JSON object
+		const json& actorJson = actors[actorIndex];
+		const std::string path = ActorPath(actorIndex);
 		if (!actorJson.is_object())
+			return Fail(error, SceneLoadErrorCode::InvalidSchema, path, "Actor record must be an object.");
+		if (strictV4)
 		{
-			DBG("SceneLoader: Actor entry must be an object.");
-			return false;
+			if (!ValidateFields(actorJson,
+				{ "actorId", "parentId", "name", "is_active", "tag", "components" }, {}, path, error))
+				return false;
+			if (!actorJson["name"].is_string())
+				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/name", "Actor name must be a string.");
+			if (!actorJson["is_active"].is_boolean())
+				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/is_active", "Actor active state must be a boolean.");
+			if (!actorJson["tag"].is_string())
+				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/tag", "Actor tag must be a string.");
+			if (!actorJson["components"].is_array())
+				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/components", "Actor components must be an array.");
+			for (std::size_t componentIndex = 0; componentIndex < actorJson["components"].size(); ++componentIndex)
+			{
+				const json& component = actorJson["components"][componentIndex];
+				const std::string componentPath = path + "/components/" + std::to_string(componentIndex);
+				if (!ValidateFields(component, { "type", "data" }, {}, componentPath, error)) return false;
+				if (!component["type"].is_string() || component["type"].get<std::string>().empty())
+					return Fail(error, SceneLoadErrorCode::InvalidSchema, componentPath + "/type",
+						"Component type must be a nonempty string.");
+				if (!component["data"].is_object())
+					return Fail(error, SceneLoadErrorCode::InvalidSchema, componentPath + "/data",
+						"Component data must be an object.");
+			}
 		}
 
-		// Check if the actor has a valid "actorId" field
-		if (!actorJson.contains("actorId") || !actorJson["actorId"].is_string())
-		{
-			DBG("SceneLoader: Actor is missing a valid actorId.");
-			return false;
-		}
-
-		// Parse the actor's GUID from the "actorId" field
+		if (!actorJson.contains("actorId"))
+			return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/actorId", "Required field is missing.");
 		Guid actorGuid;
-		if (!Guid::TryParse(
-			actorJson["actorId"].get<std::string>(),
-			actorGuid))
-		{
-			DBG("SceneLoader: Actor contains an invalid actorId.");
-			return false;
-		}
-
-		// Check for duplicate actor GUIDs
-		if (!actorGuids.emplace(actorGuid).second)
-		{
-			DBG(
-				"SceneLoader: Duplicate actorId: %s",
-				actorGuid.ToString().c_str());
-			return false;
-		}
-
-		// Create an ActorLoadRecord after cheching GUID is valid and unique
+		if (!ReadGuid(actorJson["actorId"], actorGuid))
+			return Fail(error, SceneLoadErrorCode::InvalidActorGuid, path + "/actorId",
+				"Actor ID must be a nonzero GUID string.");
+		if (!origins.emplace(actorGuid, ActorOrigin{ ActorProvenance::Ordinary, path }).second)
+			return Fail(error, SceneLoadErrorCode::DuplicateActorGuid, path + "/actorId",
+				"Actor GUID is duplicated across the Scene.");
 
 		ActorLoadRecord record;
 		record.actorJson = &actorJson;
 		record.actorGuid = actorGuid;
-
-		// Check if the actor has a parent GUID field
-		// Not if the actor has a parent, but if the actor has a parentId field in the JSON data
+		record.sourceIndex = actorIndex;
 		if (!actorJson.contains("parentId"))
-		{
-			DBG("SceneLoader: Actor is missing parentId.");
-			return false;
-		}
-
-		// Check if the actor has parent
+			return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/parentId", "Required field is missing.");
 		if (actorJson["parentId"].is_null())
-		{// No parent
+		{
 			record.hasParent = false;
 		}
-		else if (actorJson["parentId"].is_string())
-		{// Has parent
+		else
+		{
 			Guid parentGuid;
-
-			// Parse the parent GUID from the "parentId" field
-			if (!Guid::TryParse(
-				actorJson["parentId"].get<std::string>(),
-				parentGuid))
-			{
-				DBG("SceneLoader: Actor contains an invalid parentId.");
-				return false;
-			}
-
-			// Check if the actor is its own parent
+			if (!ReadGuid(actorJson["parentId"], parentGuid))
+				return Fail(error, SceneLoadErrorCode::InvalidHierarchy, path + "/parentId",
+					"Parent ID must be null or a nonzero GUID string.");
 			if (parentGuid == actorGuid)
-			{
-				DBG("SceneLoader: Actor cannot be its own parent.");
-				return false;
-			}
-
-			// Set the parent information in the record
+				return Fail(error, SceneLoadErrorCode::InvalidHierarchy, path + "/parentId",
+					"Actor cannot be its own parent.");
 			record.hasParent = true;
 			record.parentGuid = parentGuid;
 		}
-		else
-		{// in case of invalid parentId type (not string or null)
-			DBG("SceneLoader: parentId must be a Guid string or null.");
-			return false;
-		}
-
-		outRecords.push_back(record);	// Add the record to the output vector
+		outRecords.push_back(record);
 	}
 
+	std::sort(outRecords.begin(), outRecords.end(), [](const auto& left, const auto& right)
+	{
+		return GuidSortKey(left.actorGuid) < GuidSortKey(right.actorGuid);
+	});
 	return true;
 }
 
-bool SceneLoader::HasHierarchyCycle(
-	const Guid& actorGuid,
-	const std::unordered_map<Guid, Guid>& parentMap,
-	std::unordered_map<Guid, VisitState>& states)
+bool SceneLoader::BuildInstanceLoadRecords(const json& sceneJson,
+	std::vector<InstanceLoadRecord>& outRecords,
+	std::unordered_map<Guid, ActorOrigin>& origins, SceneLoadError& error)
 {
-	VisitState& state = states[actorGuid];
+	const json& instances = sceneJson["actorImprintInstances"];
+	if (!instances.is_array())
+		return Fail(error, SceneLoadErrorCode::InvalidSchema, "/actorImprintInstances",
+			"ActorImprint Instances must be an array.");
 
-	// This parent actor is currently being visited, which indicates a cycle in the hierarchy
-	if (state == VisitState::Visiting) return true;
+	outRecords.reserve(instances.size());
+	for (std::size_t instanceIndex = 0; instanceIndex < instances.size(); ++instanceIndex)
+	{
+		const std::string path = InstancePath(instanceIndex);
+		ActorImprintSerializedInstanceRecord record;
+		ActorImprintInstanceRecordError recordError;
+		if (!ActorImprintInstanceRecordReader::Read(instances[instanceIndex], record, &recordError))
+			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
+				path + recordError.path, recordError.message);
 
-	// This actor has already been fully visited and no cycle was detected in its path, so no cycle is detected in this path
-	if (state == VisitState::Visited) return false;
-
-	// This actor has not been visited yet, so mark it as currently being visited
-	state = VisitState::Visiting;
-
-	// Serch for the parent of this actor in the parent map
-	auto parentIt = parentMap.find(actorGuid);
-	if (parentIt != parentMap.end())
-	{// If exists, recursively check the parent actor for cycles
-		if (HasHierarchyCycle(parentIt->second, parentMap, states))
+		const json& actorGuids = instances[instanceIndex]["actorGuids"];
+		for (std::size_t mappingIndex = 0; mappingIndex < actorGuids.size(); ++mappingIndex)
 		{
-			return true;
+			Guid actorGuid;
+			ReadGuid(actorGuids[mappingIndex]["actorGuid"], actorGuid);
+			const ActorProvenance provenance = actorGuid == record.rootActorGuid
+				? ActorProvenance::ImprintRoot : ActorProvenance::ImprintMember;
+			const std::string mappingPath = path + "/actorGuids/" + std::to_string(mappingIndex) + "/actorGuid";
+			if (!origins.emplace(actorGuid, ActorOrigin{ provenance, path }).second)
+				return Fail(error, SceneLoadErrorCode::DuplicateActorGuid, mappingPath,
+					"Actor GUID is duplicated across the Scene.");
 		}
+		outRecords.push_back({ std::move(record), &instances[instanceIndex], instanceIndex });
 	}
 
-	// If no cycle was detected in the parent path, mark this actor as fully visited
-	state = VisitState::Visited;
+	for (const InstanceLoadRecord& instance : outRecords)
+	{
+		if (!instance.record.externalParentActorGuid) continue;
+		const auto parent = origins.find(*instance.record.externalParentActorGuid);
+		if (parent == origins.end() || parent->second.provenance != ActorProvenance::Ordinary)
+			return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+				InstancePath(instance.sourceIndex) + "/externalParentActorGuid",
+				"External parent must identify an ordinary Actor in this Scene.");
+	}
 
-	return false;
+	std::sort(outRecords.begin(), outRecords.end(), [](const auto& left, const auto& right)
+	{
+		return GuidSortKey(left.record.rootActorGuid) < GuidSortKey(right.record.rootActorGuid);
+	});
+	return true;
 }
 
-bool SceneLoader::ValidateParentReferences(const std::vector<ActorLoadRecord>& records)
+bool SceneLoader::ValidateParentReferences(const std::vector<ActorLoadRecord>& records,
+	SceneLoadError& error)
 {
-	std::unordered_set<Guid> actorGuids;	// To check for missing parents
-	for (const auto& record : records)
+	std::unordered_set<Guid> actorGuids;
+	actorGuids.reserve(records.size());
+	for (const ActorLoadRecord& record : records) actorGuids.insert(record.actorGuid);
+	for (const ActorLoadRecord& record : records)
 	{
-		actorGuids.insert(record.actorGuid);	// Collect all actor GUIDs
+		if (record.hasParent && !actorGuids.contains(record.parentGuid))
+			return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+				ActorPath(record.sourceIndex) + "/parentId",
+				"Ordinary Actor parent does not exist in the ordinary Actor array.");
 	}
-
-	for (const auto& record : records)
-	{
-		if (record.hasParent && actorGuids.find(record.parentGuid) == actorGuids.end())
-		{
-			DBG(
-				"SceneLoader: Parent Guid does not exist: %s",
-				record.parentGuid.ToString().c_str());
-			return false;
-		}
-	}
-
-	return true;	// All parent references are valid
+	return true;
 }
 
-bool SceneLoader::ValidateHierarchyCycles(const std::vector<ActorLoadRecord>& records)
+bool SceneLoader::ValidateHierarchyCycles(const std::vector<ActorLoadRecord>& records,
+	SceneLoadError& error)
 {
 	std::unordered_map<Guid, Guid> parentMap;
-
-	// Pick up all parent-child relationships from the records and store them in a map for cycle detection
-	for (const auto& record : records)
-	{
+	for (const ActorLoadRecord& record : records)
 		if (record.hasParent) parentMap.emplace(record.actorGuid, record.parentGuid);
-	}
-
-	std::unordered_map<Guid, VisitState> states;	// Place to save the visit state of each actor during the cycle detection process
-
-	// Check each actor for cycles in the hierarchy
-	for (const auto& record : records)
+	std::unordered_map<Guid, VisitState> states;
+	for (const ActorLoadRecord& record : records)
 	{
-		if (HasHierarchyCycle(record.actorGuid, parentMap, states))
+		if (states[record.actorGuid] == VisitState::Visited) continue;
+		std::vector<Guid> path;
+		Guid current = record.actorGuid;
+		for (;;)
 		{
-			DBG("SceneLoader: Actor hierarchy contains a cycle.");
-			return false;
+			VisitState& state = states[current];
+			if (state == VisitState::Visiting)
+				return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+					ActorPath(record.sourceIndex) + "/parentId", "Actor hierarchy contains a cycle.");
+			if (state == VisitState::Visited) break;
+			state = VisitState::Visiting;
+			path.push_back(current);
+			const auto parent = parentMap.find(current);
+			if (parent == parentMap.end()) break;
+			current = parent->second;
+		}
+		for (const Guid& visited : path) states[visited] = VisitState::Visited;
+	}
+	return true;
+}
+
+bool SceneLoader::RestoreOrdinaryActors(const std::vector<ActorLoadRecord>& records,
+	SceneBase& scene, SceneLoadError& error)
+{
+	for (const ActorLoadRecord& record : records)
+	{
+		ActorDeserializationError actorError;
+		auto actor = ActorDeserializer::DeserializeActorRecord(
+			*record.actorJson, record.actorGuid, &actorError);
+		if (!actor)
+			return Fail(error, SceneLoadErrorCode::ActorDeserializationFailed,
+				ActorPath(record.sourceIndex) + actorError.path,
+				actorError.message.empty() ? "Actor deserialization failed." : actorError.message);
+		if (!scene.RegisterRestoredActor(std::move(actor)))
+			return Fail(error, SceneLoadErrorCode::ActorDeserializationFailed,
+				ActorPath(record.sourceIndex), "Candidate Scene rejected the restored Actor.");
+	}
+	return true;
+}
+
+bool SceneLoader::RestoreOrdinaryHierarchy(const std::vector<ActorLoadRecord>& records,
+	SceneBase& scene, SceneLoadError& error)
+{
+	for (const ActorLoadRecord& record : records)
+	{
+		if (!record.hasParent) continue;
+		Actor* child = scene.ResolveActor(record.actorGuid);
+		Actor* parent = scene.ResolveActor(record.parentGuid);
+		if (!child || !parent || !scene.RestoreParentRelationship(child, parent))
+			return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+				ActorPath(record.sourceIndex) + "/parentId",
+				"Failed to restore the ordinary Actor parent relationship.");
+	}
+	return true;
+}
+
+bool SceneLoader::RestoreInstances(const std::vector<InstanceLoadRecord>& records,
+	const std::unordered_set<Guid>& reservedSceneGuids,
+	std::unordered_map<Guid, ActorOrigin>& origins,
+	SceneBase& scene, SceneLoadError& error)
+{
+	if (records.empty()) return true;
+	EngineContext* context = scene.GetEngineContext();
+	if (!context || !context->pActorImprintSystem || !context->pAssetManager)
+		return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
+			"/actorImprintInstances", "Scene context has no ActorImprintSystem or AssetManager.");
+
+	ActorImprintSystem& system = *context->pActorImprintSystem;
+	for (const InstanceLoadRecord& instance : records)
+	{
+		const std::string path = InstancePath(instance.sourceIndex);
+		ActorImprintPreparedRestore prepared;
+		ActorImprintInstanceDeserializationError prepareError;
+		if (!ActorImprintInstanceDeserializer::Prepare(
+			instance.record, scene, system, prepared, &prepareError))
+			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
+				path + prepareError.path, prepareError.message);
+
+		const ActorImprint* definition = system.ResolveForSceneCandidate(prepared.imprint);
+		if (!definition)
+			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
+				path + "/assetGuid", "ActorImprint definition was not retained after loading.");
+		const auto rootMapping = prepared.input.actorGuids.find(definition->GetRootActorId());
+		if (rootMapping == prepared.input.actorGuids.end() ||
+			rootMapping->second != instance.record.rootActorGuid)
+			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
+				path + "/rootActorGuid",
+				"Root Actor GUID does not match the definition root LocalObjectID mapping.");
+
+		ActorImprintMaterializationError materializationError;
+		Actor* root = system.RestoreInstanceForSceneCandidate(
+			scene, prepared.imprint, prepared.input, reservedSceneGuids, &materializationError);
+		if (!root)
+			return Fail(error, SceneLoadErrorCode::InstanceMaterializationFailed,
+				path + materializationError.path, materializationError.message);
+
+		const ActorImprintInstanceRecord* runtime = scene.GetImprintInstances().FindInstance(root->GetHandle());
+		if (!runtime)
+			return Fail(error, SceneLoadErrorCode::InvalidInstanceRegistry, path,
+				"Materialized Instance has no Scene registry record.");
+		for (const auto& [localId, identity] : runtime->actors)
+		{
+			const ActorProvenance provenance = localId == runtime->rootId
+				? ActorProvenance::ImprintRoot : ActorProvenance::ImprintMember;
+			origins.emplace(identity.guid, ActorOrigin{ provenance, path });
 		}
 	}
+	return true;
+}
 
-	return true;	// No cycles detected in the hierarchy
+bool SceneLoader::RestoreComponentReferences(const std::vector<InstanceLoadRecord>& instanceRecords,
+	const std::unordered_map<Guid, ActorOrigin>& origins, SceneBase& scene, SceneLoadError& error)
+{
+	SceneBase::StructuralMutationScope mutationScope(&scene);
+	const auto& registry = scene.GetImprintInstances();
+	const auto FindInstancePropertyPath = [&](Actor& actor, Component& component,
+		const PropertyPath& propertyPath, const std::string& fallback)
+	{
+		const ActorImprintMembership* membership = registry.FindMember(actor.GetHandle());
+		if (!membership) return fallback;
+		Actor* root = scene.ResolveActor(membership->root);
+		if (!root) return fallback;
+		const LocalObjectId componentId = registry.FindComponentId(membership->root, &component);
+		if (componentId == InvalidLocalObjectId) return fallback;
+		const std::string propertyKey = propertyPath.ToString();
+		for (const InstanceLoadRecord& instance : instanceRecords)
+		{
+			if (instance.record.rootActorGuid != root->GetGuid() || !instance.sourceJson) continue;
+			const auto overrides = instance.sourceJson->find("propertyOverrides");
+			if (overrides == instance.sourceJson->end() || !overrides->is_array()) return fallback;
+			for (std::size_t targetIndex = 0; targetIndex < overrides->size(); ++targetIndex)
+			{
+				const json& target = (*overrides)[targetIndex];
+				if (!target.is_object() || !target.contains("targetLocalObjectId") ||
+					target["targetLocalObjectId"] != componentId || !target.contains("properties") ||
+					!target["properties"].is_object() || !target["properties"].contains(propertyKey)) continue;
+				return AppendPath(InstancePath(instance.sourceIndex) + "/propertyOverrides/" +
+					std::to_string(targetIndex) + "/properties", propertyKey);
+			}
+			return fallback;
+		}
+		return fallback;
+	};
+	for (Actor* actor : scene.GetAllActors())
+	{
+		if (!actor)
+			return Fail(error, SceneLoadErrorCode::ReferenceResolutionFailed, "/actors",
+				"Candidate Scene contains a null Actor.");
+		const auto origin = origins.find(actor->GetGuid());
+		const std::string actorPath = origin == origins.end() ? std::string("/actors") : origin->second.path;
+		const bool ordinary = origin != origins.end() && origin->second.provenance == ActorProvenance::Ordinary;
+		const auto components = actor->GetAllComponents();
+		for (std::size_t componentIndex = 0; componentIndex < components.size(); ++componentIndex)
+		{
+			Component* component = components[componentIndex];
+			if (!component || component->IsDestroyed()) continue;
+			const std::string componentPath = ordinary
+				? actorPath + "/components/" + std::to_string(componentIndex) + "/data"
+				: actorPath;
+			json properties;
+			ReflectionError reflectionError;
+			if (!SerializeReflectedComponent(*component, properties, &scene, &reflectionError))
+			{
+				const std::string diagnosticPath = ordinary
+					? componentPath + (reflectionError.path ? reflectionError.path->ToString() : std::string{})
+					: (reflectionError.path
+						? FindInstancePropertyPath(*actor, *component, *reflectionError.path, componentPath)
+						: componentPath);
+				return Fail(error, SceneLoadErrorCode::ReferenceResolutionFailed,
+					diagnosticPath,
+					reflectionError.message.empty() ? "Component persistence validation failed." : reflectionError.message);
+			}
+			if (!component->ResolveReferences(scene))
+				return Fail(error, SceneLoadErrorCode::ReferenceResolutionFailed, componentPath,
+					"Component reference resolution failed on Actor '" + actor->GetName() + "'.");
+		}
+	}
+	return true;
+}
+
+bool SceneLoader::ValidateSceneSettings(const json& sceneJson, bool strictV4,
+	SceneLoadError& error)
+{
+	const auto lightEntry = sceneJson.find("directional_light");
+	if (lightEntry == sceneJson.end())
+	{
+		if (strictV4)
+			return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+				"/directional_light", "Required field is missing.");
+		return true;
+	}
+	if (!lightEntry->is_object())
+		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light", "Directional light must be an object.");
+	if (strictV4)
+	{
+		if (!ValidateFields(*lightEntry,
+			{ "direction", "color", "intensity" }, {}, "/directional_light", error)) return false;
+	}
+	else
+	{
+		for (std::string_view field : { "direction", "color", "intensity" })
+			if (!lightEntry->contains(field))
+				return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+					AppendPath("/directional_light", std::string(field)), "Required field is missing.");
+	}
+	if (!ValidateVector3((*lightEntry)["direction"], "/directional_light/direction", error) ||
+		!ValidateVector3((*lightEntry)["color"], "/directional_light/color", error)) return false;
+	const json& intensity = (*lightEntry)["intensity"];
+	if (!intensity.is_number())
+		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light/intensity", "Directional light intensity must be a finite number.");
+	const double sourceIntensity = intensity.get<double>();
+	if (!FitsFiniteFloat(sourceIntensity))
+		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light/intensity", "Directional light intensity is outside the finite float range.");
+	return true;
+}
+
+bool SceneLoader::ApplySceneSettings(const json& sceneJson, SceneBase& scene,
+	SceneLoadError& error)
+{
+	const auto entry = sceneJson.find("directional_light");
+	if (entry == sceneJson.end()) return true;
+	try
+	{
+		DirectionalLight light;
+		light.direction = { (*entry)["direction"][0].get<float>(),
+			(*entry)["direction"][1].get<float>(), (*entry)["direction"][2].get<float>() };
+		light.color = { (*entry)["color"][0].get<float>(),
+			(*entry)["color"][1].get<float>(), (*entry)["color"][2].get<float>() };
+		light.intensity = (*entry)["intensity"].get<float>();
+		scene.SetDirectionalLight(light);
+		return true;
+	}
+	catch (const json::exception& exception)
+	{
+		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light", exception.what());
+	}
+}
+
+bool SceneLoader::ValidateInstanceRegistry(SceneBase& scene, SceneLoadError& error)
+{
+	for (const auto& [root, record] : scene.GetImprintInstances().GetInstances())
+	{
+		if (!scene.ValidateInstanceDestruction(root))
+		{
+			Actor* rootActor = scene.ResolveActor(root);
+			const std::string path = rootActor && rootActor->GetGuid().IsValid()
+				? "/actorImprintInstances" : "/actorImprintInstances";
+			(void)record;
+			return Fail(error, SceneLoadErrorCode::InvalidInstanceRegistry, path,
+				"ActorImprint Instance registry is inconsistent with the candidate Scene.");
+		}
+	}
+	return true;
+}
+
+void SceneLoader::ConfigureMainCamera(SceneBase& scene, const std::vector<Actor*>& actors)
+{
+	for (Actor* actor : actors)
+	{
+		if (!actor || actor->IsDestroyed() || actor->GetTag() != ActorTags::MainCamera) continue;
+		Camera* camera = actor->GetComponentByClass<Camera>();
+		if (!camera) continue;
+		scene.GetCameraSystem()->SetMainCamera(camera);
+		return;
+	}
+	DBG("SceneLoader: Warning - No main camera found.");
 }

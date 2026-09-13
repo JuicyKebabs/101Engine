@@ -9,69 +9,165 @@
 
 namespace fs = std::filesystem;
 
-void AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager, MeshManager* pMeshManager)
+namespace
 {
-	m_assetRoot = projectDir;
+	bool FailCatalog(AssetCatalogError* error, AssetCatalogErrorCode code, std::string path, std::string message)
+	{
+		DBG("AssetManager: %s: %s", path.c_str(), message.c_str());
+		if (error) *error = { code, std::move(path), std::move(message) };
+		return false;
+	}
+}
+
+bool AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager,
+	MeshManager* pMeshManager, AssetCatalogError* outError)
+{
+	if (!ScanAssetDirectory(projectDir, "", outError)) return false;
 	m_pTextureManager = pTextureManager;
 	m_pMeshManager = pMeshManager;
-	ScanAssetDirectory(projectDir);
+	m_loadedMeshes.clear();
+	m_loadedTextures.clear();
+	return true;
 }
 
-void AssetManager::ScanAssetDirectory(const std::string& rootDir)
+bool AssetManager::Refresh(AssetCatalogError* outError)
 {
-	m_catalog.clear();
-	m_pathToId.clear();
-
-	// Check if the root directory exists
-	if (!fs::exists(rootDir))
-	{
-		DBG("AssetManager: Asset root '%s' does not exist.", rootDir.c_str());
-		return;
-	}
-
-	for (const auto& entry : fs::recursive_directory_iterator(rootDir))
-	{
-		if (!entry.is_regular_file()) continue; // Skip non-regular files
-
-		const auto& path = entry.path();
-		if (path.extension() == ".meta") continue; // Skip .meta files
-
-		// Determine the asset type based on the file extension
-		AssetType type = DetermineAssetType(path.extension().string());
-		if (type == AssetType::Unknown) continue;	// Skip unknown asset types
-
-		// Resolve or create a GUID for the asset file
-		Guid id = ResolveGuidForPath(path.string());
-
-		// Get the relative path of the asset file with respect to the root directory
-		std::string relativePath = fs::relative(path, rootDir).generic_string();
-
-		// Build the asset entry
-		AssetEntry entry;
-		entry.guid = id;
-		entry.relativePath = relativePath;
-		entry.type = type;
-
-		// Store the asset entry in the catalog and path-to-GUID mapping
-		m_catalog[id] = entry;
-		m_pathToId[relativePath] = id;
-	}
-
-	DBG("AssetManager: Scanned '%s', found %zu assets.", rootDir.c_str(), m_catalog.size());
+	return ScanAssetDirectory(m_assetRoot, "", outError);
 }
 
-Guid AssetManager::ResolveGuidForPath(const std::string& filePath)
+bool AssetManager::NotifyAssetChanged(const std::string& relativePath, AssetCatalogError* outError)
 {
-	// Return the existing GUID if the .meta file exists
-	if (auto existing = MetaFile::TryLoad(filePath))
+	const fs::path path(relativePath);
+	if (path.empty() || path.is_absolute() || path.has_root_name() ||
+		std::find(path.begin(), path.end(), fs::path("..")) != path.end() || path.lexically_normal() == ".")
 	{
-		return *existing; 
+		return FailCatalog(outError, AssetCatalogErrorCode::InvalidPath, relativePath, "Expected an asset-root relative path.");
 	}
+	// Force Modified even when an explicit save preserves file size/timestamp.
+	return ScanAssetDirectory(m_assetRoot, path.lexically_normal().generic_string(), outError);
+}
 
-	// Generate a new GUID and save it to the .meta file
-	Guid newId = GuidGenerator::Generate();
-	MetaFile::Save(filePath, newId);
-	return newId;
+bool AssetManager::NotifyAssetContentReplaced(const Guid& guid)
+{
+	const auto entry = m_catalog.find(guid);
+	if (entry == m_catalog.end()) return false;
+	const AssetChange change{ AssetChangeKind::Modified, entry->second.type, guid, entry->second.relativePath };
+	const auto latest = std::find_if(m_pendingChanges.rbegin(), m_pendingChanges.rend(),
+		[&](const AssetChange& existing)
+		{
+			return existing.guid == change.guid && existing.relativePath == change.relativePath;
+		});
+	if (latest == m_pendingChanges.rend() || *latest != change) m_pendingChanges.push_back(change);
+	return true;
+}
+
+std::vector<AssetChange> AssetManager::TakePendingChanges()
+{
+	std::vector<AssetChange> changes;
+	changes.swap(m_pendingChanges);
+	return changes;
+}
+
+bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::string& notifiedPath, AssetCatalogError* outError)
+{
+	if (outError) *outError = {};
+	try
+	{
+		if (rootDir.empty() || !fs::is_directory(rootDir))
+			return FailCatalog(outError, AssetCatalogErrorCode::IoError, rootDir, "Asset root is not an existing directory.");
+		std::string newRoot = fs::absolute(rootDir).lexically_normal().string();
+		decltype(m_catalog) catalog;
+		decltype(m_pathToId) pathToId;
+		decltype(m_fileStates) fileStates;
+		std::vector<std::pair<std::string, Guid>> missingMetadata;
+		std::vector<fs::path> files;
+		for (const auto& file : fs::recursive_directory_iterator(newRoot))
+		{
+			if (file.is_regular_file() && DetermineAssetType(file.path().extension().string()) != AssetType::Unknown)
+				files.push_back(file.path());
+		}
+		std::sort(files.begin(), files.end());
+		for (const auto& path : files)
+		{
+			const auto relativePath = path.lexically_relative(newRoot).generic_string();
+			Guid id;
+			if (fs::exists(path.string() + ".meta"))
+			{
+				const auto existing = MetaFile::TryLoad(path.string());
+				if (!existing)
+					return FailCatalog(outError, AssetCatalogErrorCode::InvalidMetadata, relativePath + ".meta",
+						"Existing metadata is invalid; its identity was not replaced.");
+				id = *existing;
+			}
+			else
+			{
+				id = GuidGenerator::Generate();
+				if (!id.IsValid()) return FailCatalog(outError, AssetCatalogErrorCode::InvalidMetadata, relativePath, "GUID generation failed.");
+				missingMetadata.emplace_back(path.string(), id);
+			}
+			const auto duplicate = catalog.find(id);
+			if (duplicate != catalog.end())
+				return FailCatalog(outError, AssetCatalogErrorCode::DuplicateGuid, relativePath + ".meta",
+					"GUID also belongs to " + duplicate->second.relativePath + "; catalog was not updated.");
+			catalog.emplace(id, AssetEntry{ id, relativePath, DetermineAssetType(path.extension().string()) });
+			pathToId.emplace(relativePath, id);
+		}
+
+		// Validate all existing identities before creating metadata for new assets.
+		// Never overwrite an existing sidecar, including one created during the scan.
+		for (const auto& [path, id] : missingMetadata)
+		{
+			if (!MetaFile::Save(path, id, MetaFile::WriteMode::CreateNew))
+				return FailCatalog(outError, AssetCatalogErrorCode::IoError, path + ".meta", "Could not create new asset metadata.");
+		}
+		for (const auto& [id, entry] : catalog)
+		{
+			const fs::path path = fs::path(newRoot) / entry.relativePath;
+			const fs::path meta = path.string() + ".meta";
+			fileStates.emplace(id, FileState{ fs::last_write_time(path), fs::file_size(path),
+				fs::last_write_time(meta), fs::file_size(meta) });
+		}
+
+		std::vector<AssetChange> changes;
+		for (const auto& [id, old] : m_catalog)
+		{
+			if (!catalog.contains(id)) changes.push_back({ AssetChangeKind::Removed, old.type, id, old.relativePath });
+		}
+		for (const auto& [id, entry] : catalog)
+		{
+			const auto old = m_catalog.find(id);
+			if (old == m_catalog.end()) changes.push_back({ AssetChangeKind::Added, entry.type, id, entry.relativePath });
+			else if (old->second.relativePath != entry.relativePath || old->second.type != entry.type ||
+				m_fileStates.at(id) != fileStates.at(id) || entry.relativePath == notifiedPath)
+				changes.push_back({ AssetChangeKind::Modified, entry.type, id, entry.relativePath });
+		}
+		std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b)
+		{
+			if (a.relativePath != b.relativePath) return a.relativePath < b.relativePath;
+			return a.kind < b.kind;
+		});
+		auto pending = m_pendingChanges;
+		for (const auto& change : changes)
+		{
+			const auto latest = std::find_if(pending.rbegin(), pending.rend(), [&](const AssetChange& existing)
+			{
+				return existing.guid == change.guid && existing.relativePath == change.relativePath;
+			});
+			if (latest == pending.rend() || *latest != change) pending.push_back(change);
+		}
+
+		// Publish all catalog indices, scan observations and notifications together.
+		m_assetRoot.swap(newRoot);
+		m_catalog.swap(catalog);
+		m_pathToId.swap(pathToId);
+		m_fileStates.swap(fileStates);
+		m_pendingChanges.swap(pending);
+		return true;
+	}
+	catch (const std::exception& exception)
+	{
+		return FailCatalog(outError, AssetCatalogErrorCode::IoError, rootDir, exception.what());
+	}
 }
 
 AssetType AssetManager::DetermineAssetType(const std::string& extension)
@@ -86,6 +182,8 @@ AssetType AssetManager::DetermineAssetType(const std::string& extension)
 	// Texture extensions
 	if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".dds" || ext == ".tga")
 		return AssetType::Texture;
+	if (ext == ".imprint") return AssetType::ActorImprint;
+	if (ext == ".scene") return AssetType::Scene;
 
 	return AssetType::Unknown;
 }
@@ -102,6 +200,12 @@ const AssetEntry* AssetManager::GetAssetEntry(const Guid& guid) const
 	auto it = m_catalog.find(guid);
 	if (it == m_catalog.end()) return nullptr;
 	return &it->second;
+}
+
+std::string AssetManager::GetAssetPath(const Guid& guid) const
+{
+	const AssetEntry* entry = GetAssetEntry(guid);
+	return entry ? (fs::path(m_assetRoot) / entry->relativePath).string() : std::string{};
 }
 
 std::vector<AssetEntry> AssetManager::GetAssetEntries(AssetType type) const

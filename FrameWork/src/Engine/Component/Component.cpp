@@ -4,6 +4,17 @@
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Component/ComponentReflection.h"
 
+void Component::MarkForDestruction(StructuralMutationResult* result)
+{
+	if (m_pOwner && m_pOwner->GetOwner())
+	{
+		m_pOwner->GetOwner()->RemoveActorComponent(m_pOwner, this, result);
+		return;
+	}
+	m_destroyed = true;
+	StructuralMutationResult{}.Report(result);
+}
+
 EngineContext* Component::GetEngineContext() const
 {
 	if (m_pOwner)

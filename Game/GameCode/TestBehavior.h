@@ -2,6 +2,7 @@
 #include "Engine/Component/Behavior.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Input/InputManager.h"
+#include "Engine/Resource/AssetReference.h"
 
 class TestBehavior : public Behavior
 {
@@ -14,4 +15,5 @@ public:
 
 private:
 	float m_rotationSpeed = 1.0f;
+	AssetReference<ActorImprint> m_actorImprint;
 };

@@ -1,221 +1,234 @@
 #include "SceneManager.h"
+
 #include "SceneLoader.h"
-#include "Engine/Core/Path/PathManager.h"
-#include "Engine/Graphics/Renderer.h"
-#include "Engine/Input/InputManager.h"
-#include "Engine/Resource/TextureManager.h"
-#include "Engine/Resource/MeshManager.h"
 #include "Engine/Core/Debug/Debug.h"
+#include "Engine/Graphics/Renderer.h"
+#include "Engine/Resource/AssetManager.h"
+#include "Engine/Resource/MetaFile.h"
+#include "Engine/Core/Path/PathManager.h"
 
-// Constructor
-SceneManager::SceneManager()
-{
-	m_pCurrentScene = nullptr;
-}
+#include <filesystem>
 
-// Destructor
-SceneManager::~SceneManager()
-{
-}
-
-// Register a scene created in code
 void SceneManager::RegisterScene(const std::string& name, std::unique_ptr<SceneBase> scene)
 {
-	m_sceneElements.push_back({ name, std::move(scene) });
+	if (name.empty() || !scene || GetSceneElement(name)) return;
+	SceneElement element;
+	element.name = name;
+	element.pSceneBase = std::move(scene);
+	m_sceneElements.push_back(std::move(element));
 }
 
-// Register a scene from a JSON file
-void SceneManager::RegisterSceneFile(const std::string& name, const std::string& jsonPath)
+bool SceneManager::RegisterSceneAsset(const std::string& name, const Guid& sceneAssetGuid)
 {
-	// Scene pointer is not created in this function
-	// Scene will be created when the scene is changed, using the JSON file
+	if (name.empty() || !sceneAssetGuid.IsValid() || GetSceneElement(name) || GetSceneElement(sceneAssetGuid)) return false;
+	if (m_context.pAssetManager && !ValidateSceneAsset(sceneAssetGuid)) return false;
+	SceneElement element;
+	element.name = name;
+	element.source = SceneElement::Source::Asset;
+	element.sceneAssetGuid = sceneAssetGuid;
+	m_sceneElements.push_back(std::move(element));
+	return true;
+}
 
-	SceneElement elem;
-	elem.name = name;
-	elem.jsonPath = jsonPath;
-	m_sceneElements.push_back(std::move(elem));
-	DBG("SceneManager: Registered scene file '%s' -> '%s'", name.c_str(), jsonPath.c_str());
+bool SceneManager::RegisterSceneFile(const std::string& name, const std::string& scenePath)
+{
+	const std::string resolved = std::filesystem::path(scenePath).is_absolute()
+		? scenePath : PathManager::Resolve(scenePath);
+	const auto guid = MetaFile::TryLoad(resolved);
+	return guid && RegisterSceneAsset(name, *guid);
 }
 
 void SceneManager::SetInitialScene(const std::string& name)
 {
 	m_currentSceneName = name;
+	m_currentSceneAssetGuid = {};
 }
 
-// Initialize
+bool SceneManager::SetInitialScene(const Guid& sceneAssetGuid)
+{
+	if (!sceneAssetGuid.IsValid()) return false;
+	m_currentSceneName.clear();
+	m_currentSceneAssetGuid = sceneAssetGuid;
+	return true;
+}
+
 void SceneManager::Initialize(EngineContext& context)
 {
 	m_context = context;
-
-	// Note : 
-	// The name of the initial scene must be set by the parameter of json file which define whole game data.
-	// But such kind of json file is not implemented yet, 
-	// so the initial scene name is set by SetInitialScene() function for now.
-
-	ChangeScene(m_currentSceneName);	// Change to the initial scene
+	if (m_currentSceneAssetGuid.IsValid()) ChangeScene(m_currentSceneAssetGuid);
+	else if (!m_currentSceneName.empty()) ChangeScene(m_currentSceneName);
 }
 
-// Pre-update
-void SceneManager::PreUpdate(float deltaTime)
-{
-	m_pCurrentScene->PreUpdate(deltaTime);
-}
+void SceneManager::PreUpdate(float deltaTime) { if (m_pCurrentScene) m_pCurrentScene->PreUpdate(deltaTime); }
 
-// Update
 void SceneManager::Update(float deltaTime)
 {
-	m_pCurrentScene->Update(deltaTime);	// Update current scene
-
-	// If there is a scene change reservation, change the scene
-	if (m_sceneChangeReserved)
-	{
-		ChangeScene(m_reservedSceneName);
-	}
+	if (m_pCurrentScene) m_pCurrentScene->Update(deltaTime);
+	if (!m_sceneChangeReserved) return;
+	if (m_reservedSceneAssetGuid.IsValid()) ChangeScene(m_reservedSceneAssetGuid);
+	else ChangeScene(m_reservedSceneName);
 }
 
-// Late update
-void SceneManager::LateUpdate(float deltaTime)
-{
-	m_pCurrentScene->LateUpdate(deltaTime);
-}
+void SceneManager::LateUpdate(float deltaTime) { if (m_pCurrentScene) m_pCurrentScene->LateUpdate(deltaTime); }
 
-// Finalization
 void SceneManager::Finalize()
 {
-	// Finalize the current scene
-	if (m_pCurrentScene)
-	{
-		m_pCurrentScene->Finalize();
-	}
-
-	// Release all scene elements
-	for (auto& element : m_sceneElements)
-	{
-		element.pSceneBase.reset();
-	}
+	if (m_pCurrentScene) m_pCurrentScene->Finalize();
+	for (auto& element : m_sceneElements) element.pSceneBase.reset();
 	m_pCurrentScene = nullptr;
+	m_currentSceneName.clear();
+	m_currentSceneAssetGuid = {};
+	ClearReservation();
 }
 
-// Scene change reservation
-void SceneManager::ReserveChangeScene(const std::string& newScene)
+bool SceneManager::ReserveChangeScene(const std::string& name)
 {
-	m_sceneChangeReserved = true;	// Set scene change reservation flag
-	m_reservedSceneName = newScene;	// Save reserved scene
+	if (!GetSceneElement(name)) return false;
+	m_sceneChangeReserved = true;
+	m_reservedSceneName = name;
+	m_reservedSceneAssetGuid = {};
+	return true;
 }
 
-// Submit draw requests
-void SceneManager::OnRender()
+bool SceneManager::ReserveChangeScene(const Guid& sceneAssetGuid)
 {
-	m_pCurrentScene->OnRender(m_context);
+	if (!ValidateSceneAsset(sceneAssetGuid)) return false;
+	m_sceneChangeReserved = true;
+	m_reservedSceneName.clear();
+	m_reservedSceneAssetGuid = sceneAssetGuid;
+	return true;
 }
 
-// Change scene
-void SceneManager::ChangeScene(const std::string& next)
+bool SceneManager::ReserveChangeScene(const AssetReference<SceneAsset>& sceneAsset)
 {
-	// Get the next scene element
-	SceneElement* pNextElem = GetSceneElement(next);
-	if (!pNextElem)
+	return sceneAsset.HasValue() && ReserveChangeScene(sceneAsset.GetGuid());
+}
+
+void SceneManager::OnRender() { if (m_pCurrentScene) m_pCurrentScene->OnRender(m_context); }
+
+void SceneManager::ChangeScene(const std::string& name)
+{
+	SceneElement* element = GetSceneElement(name);
+	if (!element)
 	{
-		DBG("SceneManager: Scene '%s' not found", next.c_str());
+		DBG("SceneManager: Scene '%s' not found", name.c_str());
+		ClearReservation();
+		return;
+	}
+	ChangeScene(*element);
+}
+
+void SceneManager::ChangeScene(const Guid& sceneAssetGuid)
+{
+	if (!ValidateSceneAsset(sceneAssetGuid))
+	{
+		DBG("SceneManager: Scene asset '%s' is unavailable or has the wrong type.", sceneAssetGuid.ToString().c_str());
+		ClearReservation();
+		return;
+	}
+	SceneElement* element = GetSceneElement(sceneAssetGuid);
+	if (!element)
+	{
+		const AssetEntry* entry = m_context.pAssetManager->GetAssetEntry(sceneAssetGuid);
+		SceneElement candidate;
+		candidate.name = entry->relativePath;
+		candidate.source = SceneElement::Source::Asset;
+		candidate.sceneAssetGuid = sceneAssetGuid;
+		m_sceneElements.push_back(std::move(candidate));
+		element = &m_sceneElements.back();
+	}
+	ChangeScene(*element);
+}
+
+void SceneManager::ChangeScene(SceneElement& element)
+{
+	std::unique_ptr<SceneBase> loadedScene;
+	if (element.source == SceneElement::Source::Asset)
+	{
+		if (!ValidateSceneAsset(element.sceneAssetGuid)) { ClearReservation(); return; }
+		const std::string path = m_context.pAssetManager->GetAssetPath(element.sceneAssetGuid);
+		SceneLoadResult load = SceneLoader::LoadCandidate(path, m_context);
+		if (!load)
+		{
+			DBG("SceneManager: Failed to load scene from '%s' at '%s': %s", path.c_str(), load.error.path.c_str(), load.error.message.c_str());
+			ClearReservation();
+			return;
+		}
+		loadedScene = std::move(load.scene);
+	}
+	else if (!element.pSceneBase)
+	{
+		DBG("SceneManager: Runtime scene '%s' is not initialized.", element.name.c_str());
+		ClearReservation();
 		return;
 	}
 
-	// Finalize current scene
-	if (m_pCurrentScene)
+	SceneBase* nextScene = loadedScene ? loadedScene.get() : element.pSceneBase.get();
+	nextScene->SetSceneManager(this);
+	nextScene->SetViewportSize(m_viewportWidth, m_viewportHeight);
+	SceneBase* previousCurrent = m_pCurrentScene;
+	std::unique_ptr<SceneBase> replacedTarget;
+	if (loadedScene)
 	{
-		m_pCurrentScene->Finalize();	// Finalize current scene
-		m_pCurrentScene = nullptr;		// Reset current scene pointer
+		replacedTarget = std::move(element.pSceneBase);
+		element.pSceneBase = std::move(loadedScene);
+		nextScene = element.pSceneBase.get();
 	}
+	m_pCurrentScene = nullptr;
+	ClearReservation();
+	if (previousCurrent && previousCurrent != nextScene) previousCurrent->Finalize();
+	if (replacedTarget && replacedTarget.get() != previousCurrent) replacedTarget->Finalize();
+	// Finalize hooks must not be able to enqueue an unintended follow-up transition.
+	ClearReservation();
+	m_pCurrentScene = nextScene;
+	m_currentSceneName = element.name;
+	m_currentSceneAssetGuid = element.source == SceneElement::Source::Asset ? element.sceneAssetGuid : Guid{};
+	DBG("SceneManager: Changed to scene '%s'", element.name.c_str());
+}
 
-	// Switch to the next scene
-	m_sceneChangeReserved = false;	// Reset scene change reservation flag
-	m_reservedSceneName.clear();	// Reset reserved scene
-	m_currentSceneName = next;		// Update current scene
+void SceneManager::ClearReservation()
+{
+	m_sceneChangeReserved = false;
+	m_reservedSceneName.clear();
+	m_reservedSceneAssetGuid = {};
+}
 
-	// Switch to the next scene
-	if(!pNextElem->jsonPath.empty())
-	{// If the next scene is registerd with json file, load the scene from the json file
-
-		// Initialize new scene
-		pNextElem->pSceneBase = std::make_unique<SceneBase>();
-		pNextElem->pSceneBase->Initialize(m_context);
-
-		// Load scene from JSON file
-		std::string fullPath = PathManager::Resolve(pNextElem->jsonPath);
-		if (!SceneLoader::LoadScene(fullPath, pNextElem->pSceneBase.get()))
-		{
-			DBG("SceneManager: Failed to load scene from '%s'", fullPath.c_str());
-		}
-	}
-	else
-	{// If the next scene is registerd with code, use the scene pointer directly
-		m_pCurrentScene = pNextElem->pSceneBase.get();
-		if (!m_pCurrentScene)
-		{
-			DBG("SceneManager: Scene '%s' is not initialized.", next.c_str());
-			return;
-		}
-	}
-
-	// Set the current scene pointer
-	m_pCurrentScene = pNextElem->pSceneBase.get();
-
-	// Set the scene manager for the current scene
-	if (m_pCurrentScene)
-	{
-		m_pCurrentScene->SetSceneManager(this);
-
-		m_pCurrentScene->SetViewportSize(
-			m_viewportWidth,
-			m_viewportHeight
-		);
-	}
-
-	m_currentSceneName = next;
-	DBG("SceneManager: Changed to scene '%s'", next.c_str());
+bool SceneManager::ValidateSceneAsset(const Guid& sceneAssetGuid) const
+{
+	if (!sceneAssetGuid.IsValid() || !m_context.pAssetManager) return false;
+	const AssetEntry* entry = m_context.pAssetManager->GetAssetEntry(sceneAssetGuid);
+	return entry && entry->type == AssetType::Scene;
 }
 
 SceneElement* SceneManager::GetSceneElement(const std::string& name)
 {
-	for(auto& element : m_sceneElements)
-	{
-		if (element.name == name)
-		{
-			return &element;
-		}
-	}
-
-	DBG("Error: Scene element '%s' not found.", name.c_str());
-
+	for (auto& element : m_sceneElements) if (element.name == name) return &element;
 	return nullptr;
 }
 
-// Get camera information
+SceneElement* SceneManager::GetSceneElement(const Guid& sceneAssetGuid)
+{
+	for (auto& element : m_sceneElements)
+		if (element.source == SceneElement::Source::Asset && element.sceneAssetGuid == sceneAssetGuid) return &element;
+	return nullptr;
+}
+
 const CameraInfo* SceneManager::GetCameraInfo()
 {
+	if (!m_pCurrentScene) return nullptr;
 	auto cameraSystem = m_pCurrentScene->GetCameraSystem();
-	if (!cameraSystem) {
+	if (!cameraSystem)
+	{
 		DBG("Error: Current scene does not have a camera system. Unable to retrieve camera information.");
 		return nullptr;
 	}
-
 	return cameraSystem->GetCameraInfo();
 }
 
-void SceneManager::SetViewportSize(
-	UINT width,
-	UINT height)
+void SceneManager::SetViewportSize(UINT width, UINT height)
 {
 	if (width == 0 || height == 0) return;
-
 	m_viewportWidth = width;
 	m_viewportHeight = height;
-
-	if (m_pCurrentScene)
-	{
-		m_pCurrentScene->SetViewportSize(
-			m_viewportWidth,
-			m_viewportHeight
-		);
-	}
+	if (m_pCurrentScene) m_pCurrentScene->SetViewportSize(width, height);
 }

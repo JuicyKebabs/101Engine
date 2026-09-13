@@ -3,6 +3,7 @@
 #include "nlohmann/json_fwd.hpp"
 
 class SceneBase;
+class ActorImprintSystem;
 
 //-------------------------------------------------------------------------------------------------
 // SceneWriter class
@@ -17,4 +18,12 @@ public:
 
 	// Create JSON data for the given scene without saving to a file.
 	static bool SerializeScene(const SceneBase* scene, nlohmann::json& outJson);
+
+private:
+	friend class ActorImprintSystem;
+	// Captures a live Edit Scene for an in-memory reload transaction. Missing
+	// definitions already retained by the System and a camera-less Scene are valid
+	// here even though an explicit Scene save must reject them.
+	static bool SerializeReloadSnapshot(const SceneBase* scene, nlohmann::json& outJson);
+	static bool SerializeSceneImpl(const SceneBase* scene, nlohmann::json& outJson, bool forReload);
 };

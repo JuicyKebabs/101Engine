@@ -135,11 +135,11 @@ void UIRenderer::SetGoverningCanvas(Canvas* canvas)
 		return;
 	}
 
-	if (previousCanvas) previousCanvas->UnregisterUIRenderer(this);
+	if (previousCanvas && IsAttached()) previousCanvas->UnregisterUIRenderer(this);
 
 	RendererComponent::SetGoverningCanvas(canvas);
 
-	if (!IsStarted()) return;
+	if (!IsAttached()) return;
 
 	if (canvas)
 	{

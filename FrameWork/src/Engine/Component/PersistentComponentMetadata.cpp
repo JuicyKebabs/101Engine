@@ -37,7 +37,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::MeshRenderer(std::str
 {
 	TypeMetadataBuilder<::MeshRenderer> builder(std::move(stableTypeName));
 	AddRendererProperties(builder);
-	builder.Property("meshAssetId", &::MeshRenderer::GetMeshAssetReference, &::MeshRenderer::SetMeshAssetReference);
+	builder.Property("meshAssetId", &::MeshRenderer::GetMeshAssetReference, &::MeshRenderer::TrySetMeshAssetReference);
 	return PersistentMetadata::Finish(builder);
 }
 
@@ -52,7 +52,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	builder.Property("billboardType", &T::GetBillboardType, &T::SetBillboardType).SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("flipX", &T::IsFlipX, &T::SetFlipX);
 	builder.Property("flipY", &T::IsFlipY, &T::SetFlipY);
-	builder.Property("textureAssetId", &T::GetTextureAssetReference, &T::SetTextureAssetReference);
+	builder.Property("textureAssetId", &T::GetTextureAssetReference, &T::TrySetTextureAssetReference);
 	return PersistentMetadata::Finish(builder);
 }
 
@@ -67,7 +67,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::UIImage(std::string s
 {
 	TypeMetadataBuilder<::UIImage> builder(std::move(stableTypeName));
 	AddUIRendererProperties(builder);
-	builder.Property("textureAssetId", &::UIImage::GetTextureAssetReference, &::UIImage::SetTextureAssetReference);
+	builder.Property("textureAssetId", &::UIImage::GetTextureAssetReference, &::UIImage::TrySetTextureAssetReference);
 	return PersistentMetadata::Finish(builder);
 }
 

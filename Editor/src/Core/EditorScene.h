@@ -5,7 +5,7 @@
 // Minimal SceneBase subclass used by EditorApp. The editor doesn't define
 // any game-specific initial setup; scenes are populated either by
 // EditorApp::NewScene() (creates a MainCamera-tagged DefaultCamera) or by
-// SceneLoader::LoadScene() (reads actors from a .scene JSON file).
+// SceneLoader::LoadCandidate() (reads actors from a .scene JSON file).
 class EditorScene : public SceneBase
 {
 };

@@ -1,61 +1,59 @@
 #pragma once
+
 #include "SceneBase.h"
 #include "Engine/Core/Context/Context.h"
+#include "Engine/Resource/AssetReference.h"
 
-// Forward declaration
-class Renderer;			// Renderer
-class InputManager;		// Input manager
-class TextureManager;	// Texture manager
-class MeshManager;		// Mesh manager
-
-// Scene element structure
 struct SceneElement
 {
-	std::string name;						// Scene name (for debugging)
-	std::unique_ptr<SceneBase> pSceneBase;	// Scene class pointer
-	std::string jsonPath;					// JSON file path for scene loading
+	enum class Source { Runtime, Asset };
+	std::string name;
+	Source source = Source::Runtime;
+	std::unique_ptr<SceneBase> pSceneBase;
+	Guid sceneAssetGuid;
 };
 
-// Scene management class
 class SceneManager
 {
 public:
-	SceneManager();		// Constructor
-	~SceneManager();	// Destructor
-
-	// Main processing function
+	SceneManager() = default;
+	~SceneManager() = default;
 	void Initialize(EngineContext& context);
 	void PreUpdate(float deltaTime);
 	void Update(float deltaTime);
 	void LateUpdate(float deltaTime);
-	void OnRender();	// Draw request submission
+	void OnRender();
 	void Finalize();
-
-	void RegisterScene(const std::string& name, std::unique_ptr<SceneBase> scene);	// Scene registration
-	void RegisterSceneFile(const std::string& name, const std::string& jsonPath);	// Scene registration (from JSON file)
-	
-	void SetInitialScene(const std::string& name);									// Set initial scene (for testing)
-	void ReserveChangeScene(const std::string& name);								// Scene change reservation
-
-	const CameraInfo* GetCameraInfo();	// Camera information retrieval
-
+	void RegisterScene(const std::string& name, std::unique_ptr<SceneBase> scene);
+	bool RegisterSceneAsset(const std::string& name, const Guid& sceneAssetGuid);
+	// Compatibility entry point. Resolves the file's sidecar once and stores only its GUID.
+	bool RegisterSceneFile(const std::string& name, const std::string& scenePath);
+	void SetInitialScene(const std::string& name);
+	bool SetInitialScene(const Guid& sceneAssetGuid);
+	bool ReserveChangeScene(const std::string& name);
+	bool ReserveChangeScene(const Guid& sceneAssetGuid);
+	bool ReserveChangeScene(const AssetReference<SceneAsset>& sceneAsset);
+	const CameraInfo* GetCameraInfo();
+	const std::string& GetCurrentSceneName() const { return m_currentSceneName; }
+	const Guid& GetCurrentSceneAssetGuid() const { return m_currentSceneAssetGuid; }
 	void SetViewportSize(UINT width, UINT height);
 
 private:
-	EngineContext m_context;					// Engine context
-	std::vector<SceneElement> m_sceneElements;	// Scene element list
-
-	SceneBase* m_pCurrentScene = nullptr;	// Current scene class pointer
-	std::string m_currentSceneName;			// Current scene name (for debugging)
-
-	bool m_sceneChangeReserved = false;	// Scene change reservation flag
-	std::string m_reservedSceneName;	// Reserved scene name for scene change
-	
-	// Latest viewport size applied to the current and subsequent scenes
+	EngineContext m_context;
+	std::vector<SceneElement> m_sceneElements;
+	SceneBase* m_pCurrentScene = nullptr;
+	std::string m_currentSceneName;
+	Guid m_currentSceneAssetGuid;
+	bool m_sceneChangeReserved = false;
+	std::string m_reservedSceneName;
+	Guid m_reservedSceneAssetGuid;
 	UINT m_viewportWidth = 1;
 	UINT m_viewportHeight = 1;
-
-private:
-	void ChangeScene(const std::string& name);				// Scene change
-	SceneElement* GetSceneElement(const std::string& name);	// Get scene element by name
+	void ChangeScene(const std::string& name);
+	void ChangeScene(const Guid& sceneAssetGuid);
+	void ChangeScene(SceneElement& element);
+	void ClearReservation();
+	bool ValidateSceneAsset(const Guid& sceneAssetGuid) const;
+	SceneElement* GetSceneElement(const std::string& name);
+	SceneElement* GetSceneElement(const Guid& sceneAssetGuid);
 };

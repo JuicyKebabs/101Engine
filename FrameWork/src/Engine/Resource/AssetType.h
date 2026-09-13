@@ -4,6 +4,8 @@ enum class AssetType
 {
 	Mesh,
 	Texture,
+	ActorImprint,
+	Scene,
 	//Material,
 	//Shader,
 	//Audio,
@@ -18,3 +20,4 @@ enum class AssetType
 // They represent catalog asset types, not loaded GPU resources.
 struct MeshAsset {};
 struct TextureAsset {};
+struct SceneAsset {};

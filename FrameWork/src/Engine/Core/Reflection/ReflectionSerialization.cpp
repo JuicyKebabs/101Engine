@@ -42,17 +42,30 @@ namespace
 		return true;
 	}
 
-	bool ValidateSchema(const json& source, const PropertySchemaNode& schema)
+	bool ValidateSchema(const json& source, const PropertySchemaNode& schema,
+		const std::vector<std::string>& members, ReflectionError& error)
 	{
-		if (!source.is_object()) return false;
+		auto FailSchema = [&](const std::vector<std::string>& location, std::string message)
+		{
+			error = { ReflectionErrorCode::SchemaMismatch, PropertyPath::FromMembers(location), std::move(message) };
+			return false;
+		};
+		if (!source.is_object()) return FailSchema(members, "Expected a reflected property object.");
 
 		for (auto member = source.begin(); member != source.end(); ++member)
 		{
-			if (!schema.children.contains(member.key())) return false;
+			if (!schema.children.contains(member.key()))
+			{
+				auto location = members;
+				location.push_back(member.key());
+				return FailSchema(location, "Unknown reflected property: " + member.key());
+			}
 		}
 
 		for (const auto& [name, childSchema] : schema.children)
 		{
+			auto location = members;
+			location.push_back(name);
 			const auto child = source.find(name);
 			if (child == source.end())
 			{
@@ -61,13 +74,13 @@ namespace
 				{
 					continue;
 				}
-				return false;
+				return FailSchema(location, "Required reflected property is missing.");
 			}
 			if (childSchema.property)
 			{
 				if (!childSchema.children.empty()) return false;
 			}
-			else if (!ValidateSchema(*child, childSchema))
+			else if (!ValidateSchema(*child, childSchema, location, error))
 			{
 				return false;
 			}
@@ -142,6 +155,45 @@ namespace
 		return true;
 	}
 
+	const char* AssetTypeName(AssetType type)
+	{
+		switch (type)
+		{
+		case AssetType::Mesh: return "Mesh";
+		case AssetType::Texture: return "Texture";
+		case AssetType::ActorImprint: return "ActorImprint";
+		case AssetType::Scene: return "Scene";
+		default: return "Unknown";
+		}
+	}
+
+	std::string AssetReferenceFailureMessage(
+		AssetReferenceCodecResult result,
+		AssetType expectedType,
+		const AssetReferenceValue* reference = nullptr)
+	{
+		std::string message = "Asset reference";
+		if (reference && reference->HasValue())
+		{
+			message += " '" + reference->guid.ToString() + "'";
+		}
+		message += " (expected " + std::string(AssetTypeName(expectedType)) + ")";
+
+		switch (result)
+		{
+		case AssetReferenceCodecResult::InvalidJsonType:
+			return message + " must be null or a GUID string.";
+		case AssetReferenceCodecResult::InvalidGuid:
+			return message + " contains an invalid GUID.";
+		case AssetReferenceCodecResult::AssetNotFound:
+			return message + " was not found in the Asset Catalog.";
+		case AssetReferenceCodecResult::AssetTypeMismatch:
+			return message + " has a different Asset type in the Asset Catalog.";
+		default:
+			return message + " could not be encoded.";
+		}
+	}
+
 	template<std::size_t Size>
 	bool DeserializeFloatArray(const json& source, std::array<float, Size>& outValues)
 	{
@@ -158,7 +210,8 @@ namespace
 		const PropertyMetadata& property,
 		const PropertyValue& value,
 		json& outJson,
-		ReflectionSaveContext context)
+		ReflectionSaveContext context,
+		std::string& failureMessage)
 	{
 		switch (property.GetLogicalType())
 		{
@@ -281,6 +334,7 @@ namespace
 
 			if (!typed || !context.assetReferenceCodec || !context.assetReferenceContext)
 			{
+				failureMessage = "Asset reference serialization context is unavailable.";
 				return false;
 			}
 
@@ -290,6 +344,8 @@ namespace
 
 			if (result != AssetReferenceCodecResult::Success)
 			{
+				failureMessage = AssetReferenceFailureMessage(
+					result, property.GetAssetType(), typed);
 				return false;
 			}
 
@@ -305,7 +361,8 @@ namespace
 		const PropertyMetadata& property,
 		const json& source,
 		PropertyValue& outValue,
-		ReflectionRestoreContext context)
+		ReflectionRestoreContext context,
+		std::string& failureMessage)
 	{
 		switch (property.GetLogicalType())
 		{
@@ -452,7 +509,11 @@ namespace
 
 		case PropertyLogicalType::AssetReference:
 		{
-			if (!context.assetReferenceCodec) return false;
+			if (!context.assetReferenceCodec)
+			{
+				failureMessage = "Asset reference deserialization context is unavailable.";
+				return false;
+			}
 
 			AssetReferenceValue reference;
 			AssetReferenceCodecResult result;
@@ -462,6 +523,7 @@ namespace
 
 			if (result != AssetReferenceCodecResult::Success)
 			{
+				failureMessage = AssetReferenceFailureMessage(result, property.GetAssetType());
 				return false;
 			}
 
@@ -529,6 +591,7 @@ bool ReflectionSerializer::Serialize(
 	{
 		PropertyValue value;
 		json serializedValue;
+		std::string failureMessage;
 
 		// Read the property value from the object and serialize it into JSON.
 		if (!property->Read(objectType, object, value))
@@ -538,10 +601,12 @@ bool ReflectionSerializer::Serialize(
 			return false;
 		}
 
-		if (!SerializePropertyValue(*property, value, serializedValue, context))
+		if (!SerializePropertyValue(*property, value, serializedValue, context, failureMessage))
 		{
 			SetError(outError, ReflectionErrorCode::InvalidPropertyValue,
-				property->GetPath(), "Failed to encode a serializable property.");
+				property->GetPath(), failureMessage.empty()
+					? "Failed to encode a serializable property."
+					: std::move(failureMessage));
 			return false;
 		}
 
@@ -583,11 +648,19 @@ bool ReflectionDeserializer::Deserialize(
 	const auto properties = GetSerializableProperties(metadata);
 	PropertySchemaNode schema;
 	const bool schemaBuilt = BuildSchema(properties, schema);
-	const bool schemaValid = schemaBuilt && ValidateSchema(json, schema);
+	ReflectionError schemaError;
+	const bool schemaValid = schemaBuilt && ValidateSchema(json, schema, {}, schemaError);
 	if (!schemaValid)
 	{
-		SetError(outError, ReflectionErrorCode::SchemaMismatch, std::nullopt,
-			"JSON members do not match the registered reflection schema.");
+		if (schemaBuilt)
+		{
+			if (outError) *outError = std::move(schemaError);
+		}
+		else
+		{
+			SetError(outError, ReflectionErrorCode::InvalidMetadata, std::nullopt,
+				"Registered reflection property paths conflict.");
+		}
 		return false;
 	}
 
@@ -609,12 +682,15 @@ bool ReflectionDeserializer::Deserialize(
 		}
 
 		PropertyValue value;
+		std::string failureMessage;
 
 		// Deserialize the JSON entry into a PropertyValue and validate it against the property's constraints.
-		if (!DeserializePropertyValue(*property, *entry, value, context))
+		if (!DeserializePropertyValue(*property, *entry, value, context, failureMessage))
 		{
 			SetError(outError, ReflectionErrorCode::InvalidPropertyValue,
-				property->GetPath(), "Serialized property has an invalid representation.");
+				property->GetPath(), failureMessage.empty()
+					? "Serialized property has an invalid representation."
+					: std::move(failureMessage));
 			return false;
 		}
 

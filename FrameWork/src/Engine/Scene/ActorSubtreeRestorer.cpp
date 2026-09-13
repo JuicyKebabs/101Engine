@@ -151,6 +151,7 @@ namespace
 
 			// Get parent of root existing in the scene, out side of this snapshot restoration
 			Actor* externalParent = scene->ResolveActor(rootRecord.parentId);
+			if (!scene->CanAddChildActor(externalParent)) return false;
 
 			// Check if the external parent is valid
 			if (!externalParent || externalParent->IsDestroyed())

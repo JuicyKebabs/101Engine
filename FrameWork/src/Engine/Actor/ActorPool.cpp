@@ -1,5 +1,24 @@
 #include "ActorPool.h"
 #include "Actor.h"
+#include <stdexcept>
+
+std::vector<ActorHandle> ActorPool::PlanRegistration(std::size_t count) const
+{
+	const auto newSlots = count > m_freeIndices.size() ? count - m_freeIndices.size() : 0;
+	if (newSlots > UINT32_MAX - m_slots.size()) throw std::length_error("ActorPool capacity exhausted.");
+	std::vector<ActorHandle> handles;
+	handles.reserve(count);
+	for (std::size_t i = 0; i < count; ++i)
+	{
+		if (i < m_freeIndices.size())
+		{
+			const auto index = m_freeIndices[m_freeIndices.size() - 1 - i];
+			handles.push_back({ index, m_slots[index].generation });
+		}
+		else handles.push_back({ static_cast<uint32_t>(m_slots.size() + i - m_freeIndices.size()), 0 });
+	}
+	return handles;
+}
 
 ActorHandle ActorPool::Register(std::unique_ptr<Actor> actor)
 {

@@ -31,6 +31,11 @@ bool ApplyComponentPropertyValue(
 	const PropertyValue& value)
 {
 	if (!scene || !identity.actorGuid.IsValid()) return false;
+	if (const auto* reference = std::get_if<ActorReference>(&value))
+	{
+		const Guid target = reference->HasValue() ? reference->GetGuid() : Guid{};
+		if (!scene->CanReferenceActor(target)) return false;
+	}
 
 	Actor* actor = scene->ResolveActor(identity.actorGuid);
 	if (!actor) return false;

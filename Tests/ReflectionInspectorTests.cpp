@@ -49,16 +49,20 @@ namespace
 		int commits = 0;
 		ReflectionInspectorCallbacks callbacks;
 		callbacks.onEditCommit = [&commits](const auto&, const auto&, const auto&) { ++commits; return true; };
-		Check(inspector.BeginEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 1 }),
+		Check(!inspector.HasActiveEdit(), "Inspector starts without an active transaction");
+		Check(inspector.BeginEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 1 }) &&
+			inspector.HasActiveEdit(),
 			"Transaction begins with the original value");
 		Check(inspector.PreviewEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 5 }) && object.value == 5,
 			"Preview writes through PropertyMetadata");
-		Check(inspector.CommitEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 5 }, callbacks) && commits == 1,
+		Check(inspector.CommitEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 5 }, callbacks) &&
+			commits == 1 && !inspector.HasActiveEdit(),
 			"Commit notifies exactly once");
 
 		Check(inspector.BeginEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 5 }) &&
+			inspector.HasActiveEdit() &&
 			inspector.PreviewEdit(*metadata, typeid(Object), &object, property, std::int64_t{ 9 }) &&
-			inspector.CancelActiveEdit() && object.value == 5,
+			inspector.CancelActiveEdit() && !inspector.HasActiveEdit() && object.value == 5,
 			"Cancel restores through PropertyMetadata");
 	}
 
@@ -113,6 +117,34 @@ namespace
 		const bool canceled = inspector.CancelActiveEdit();
 		Check(began && previewed && canceled && stableTarget.value == 1,
 			"Cancel resolves a stable target after the preview object is destroyed");
+
+		editedObject = std::make_unique<Object>();
+		stableTarget.value = 7;
+		callbacks.onEditCommit = [](const auto&, const auto&, const auto&) { return false; };
+		const bool commitBegan = inspector.BeginEdit(
+			*metadata,
+			typeid(Object),
+			editedObject.get(),
+			property,
+			std::int64_t{ 1 },
+			callbacks);
+		const bool commitPreviewed = inspector.PreviewEdit(
+			*metadata,
+			typeid(Object),
+			editedObject.get(),
+			property,
+			std::int64_t{ 9 });
+		void* destroyedIdentity = editedObject.get();
+		editedObject.reset();
+		const bool commitRestored = inspector.CommitEdit(
+			*metadata,
+			typeid(Object),
+			destroyedIdentity,
+			property,
+			std::int64_t{ 9 },
+			callbacks);
+		Check(commitBegan && commitPreviewed && commitRestored && stableTarget.value == 1,
+			"Commit failure restores through the stable callback after the preview object is destroyed");
 	}
 }
 

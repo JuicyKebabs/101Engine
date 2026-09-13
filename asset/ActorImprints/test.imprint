@@ -1,0 +1,107 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "Root",
+        "tag": "None"
+      }
+    },
+    {
+      "components": [
+        {
+          "localObjectId": 4,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 6,
+          "properties": {
+            "billboardType": 0,
+            "color": [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            "flipX": false,
+            "flipY": false,
+            "name": "",
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "sortOrderInCanvas": 0,
+            "textureAssetId": "{9D0DAF6D-4385-4D91-8350-7D0B5511B8EF}",
+            "uvOffset": [
+              0.0,
+              0.0
+            ],
+            "uvScale": [
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          "type": "SpriteRenderer"
+        }
+      ],
+      "localObjectId": 3,
+      "parentLocalObjectId": 1,
+      "properties": {
+        "is_active": true,
+        "name": "test",
+        "tag": "None"
+      }
+    }
+  ],
+  "definitionRevision": "{7AEA2801-0FE5-4A63-B083-DC42C167E962}",
+  "nextLocalObjectId": 7,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

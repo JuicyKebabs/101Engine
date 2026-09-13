@@ -22,6 +22,20 @@ struct AssetTypeOf<TextureAsset>
 	static constexpr AssetType value = AssetType::Texture;
 };
 
+class ActorImprint;
+
+template<>
+struct AssetTypeOf<ActorImprint>
+{
+	static constexpr AssetType value = AssetType::ActorImprint;
+};
+
+template<>
+struct AssetTypeOf<SceneAsset>
+{
+	static constexpr AssetType value = AssetType::Scene;
+};
+
 // Type-erased value used while an AssetReference passes through Reflection.
 // Recognize thr type by the expectedType field.
 // guid is the unique ID of the asset with no type information

@@ -6,6 +6,7 @@
 class Component;
 class Actor;
 class SceneBase;
+struct StructuralMutationResult;
 
 //-----------------------------------------------------------------------------
 // ComponentSnapshot class
@@ -17,7 +18,7 @@ class ComponentSnapshot
 {
 public:
 	bool Capture(Actor* actor, Component* component);
-	Component* Restore(SceneBase* scene) const;
+	Component* Restore(SceneBase* scene, StructuralMutationResult* result = nullptr) const;
 
 	bool IsValid() const { return m_isValid; }
 

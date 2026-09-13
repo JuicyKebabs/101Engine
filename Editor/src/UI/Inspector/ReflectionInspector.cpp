@@ -395,7 +395,8 @@ bool ReflectionInspector::CommitEdit(
 	const ReflectionInspectorCallbacks& callbacks)
 {
 	if (!Matches(metadata, objectType, object, property)) return false;
-	const PropertyValue before = m_transaction->before;
+	const Transaction transaction = *m_transaction;
+	const PropertyValue before = transaction.before;
 	m_transaction.reset();
 	const bool commandRecorded = !callbacks.onEditCommit
 		|| callbacks.onEditCommit(property, before, after);
@@ -403,7 +404,7 @@ bool ReflectionInspector::CommitEdit(
 	{
 		return true;
 	}
-	return metadata.TryWriteProperty(objectType, object, property, before);
+	return RestoreTransaction(transaction);
 }
 
 bool ReflectionInspector::CancelEdit(

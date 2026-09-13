@@ -49,7 +49,8 @@ AssetReferenceCodecResult AssetReferenceCodec::Deserialize(
 	if (!json.is_string()) return AssetReferenceCodecResult::InvalidJsonType;
 
 	Guid guid;
-	if (!Guid::TryParse(json.get<std::string>(), guid) || !guid.IsValid())
+	const std::string text = json.get<std::string>();
+	if (text.find('\0') != std::string::npos || !Guid::TryParse(text, guid) || !guid.IsValid())
 	{
 		return AssetReferenceCodecResult::InvalidGuid;
 	}

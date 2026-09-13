@@ -1,5 +1,6 @@
 #include "SceneBase.h"
 #include "SceneLoader.h"
+#include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Graphics/Renderer.h"
 #include "Engine/Input/InputManager.h"
 #include "Engine/Resource/TextureManager.h"
@@ -23,6 +24,10 @@ SceneBase::SceneBase()
 // Destructor
 SceneBase::~SceneBase()
 {
+	// Imprint records pin App-owned definitions until their Actors are gone.
+	// Preserve the existing explicit-Finalize contract for ordinary Scenes.
+	if (m_unpublishedCandidate) DiscardUnpublishedCandidate();
+	else if (!m_imprintInstances.GetInstances().empty()) Finalize();
 }
 
 // Initialization
@@ -34,6 +39,7 @@ void SceneBase::Initialize(EngineContext& context)
 // Post-update (for late update)
 void SceneBase::PreUpdate(float deltaTime)
 {
+	if (m_actorBatchActive || m_unpublishedCandidate) return;
 	m_actorPool.ForEach([deltaTime](Actor* actor) {
 		if (!actor->IsActive() || actor->IsDestroyed()) return;
 		actor->PreUpdate(deltaTime);
@@ -43,6 +49,7 @@ void SceneBase::PreUpdate(float deltaTime)
 // Update
 void SceneBase::Update(float deltaTime)
 {
+	if (m_actorBatchActive || m_unpublishedCandidate) return;
 	m_actorPool.ForEach([deltaTime](Actor* actor) {
 		if (!actor->IsActive() || actor->IsDestroyed()) return;
 		actor->Update(deltaTime);
@@ -59,6 +66,7 @@ void SceneBase::Update(float deltaTime)
 // Late update
 void SceneBase::LateUpdate(float deltaTime)
 {
+	if (m_actorBatchActive || m_unpublishedCandidate) return;
 	m_actorPool.ForEach([deltaTime](Actor* actor) {
 		if (!actor->IsActive() || actor->IsDestroyed()) return;
 		actor->LateUpdate(deltaTime);
@@ -115,23 +123,80 @@ void SceneBase::OnRender(
 // Finalization
 void SceneBase::Finalize()
 {
+	if (m_actorBatchActive) return;
 	if (m_isFinalized) return;
 	m_isFinalized = true;
 
-	std::vector<Actor*> rootActors = GetRootActors();
-
-	for (Actor* root : rootActors)
-	{
-		RemoveActor(root, /*cascadeToChildren=*/true);
-	}
+	// Internal teardown bypasses normal mutation policy and recursive traversal.
+	m_actorPool.ForEach([this](Actor* actor) {
+		actor->MarkForDestruction();
+		m_actorPool.Destroy(actor->GetHandle());
+	});
 
 	CollectDestroyedActors();
 
 	m_pCollisionSystem->ClearColliders();
 }
 
+void SceneBase::DiscardUnpublishedCandidate() noexcept
+{
+	if (!m_unpublishedCandidate) return;
+
+	// The unpublished objects never entered the lifecycle. Releasing their
+	// ownership directly mirrors SceneActorBatch's failed-candidate teardown.
+	// Keep definition pins alive until every C++ object has been destroyed.
+	m_unpublishedCommitActors.clear();
+	m_actorPool.m_slots.clear();
+	m_actorPool.m_freeIndices.clear();
+	m_actorGuidMap.clear();
+	m_actorHandleGuidMap.clear();
+
+	if (m_imprintInstances.m_system)
+	{
+		for (const auto& [root, record] : m_imprintInstances.m_instances)
+		{
+			(void)root;
+			m_imprintInstances.m_system->ReleaseInstance(record.imprint);
+		}
+	}
+	m_imprintInstances.m_instances.clear();
+	m_imprintInstances.m_members.clear();
+	m_imprintInstances.m_system = nullptr;
+	m_unpublishedCandidate = false;
+}
+
+const std::vector<Actor*>& SceneBase::PrepareUnpublishedCandidateForCommit()
+{
+	if (!m_unpublishedCandidate)
+	{
+		m_unpublishedCommitActors.clear();
+		return m_unpublishedCommitActors;
+	}
+	m_unpublishedCommitActors = GetAllActors();
+	for (Actor* actor : m_unpublishedCommitActors)
+	{
+		if (actor) actor->PrepareComponentsForAttach();
+	}
+	return m_unpublishedCommitActors;
+}
+
+void SceneBase::PublishUnpublishedCandidate() noexcept
+{
+	if (!m_unpublishedCandidate) return;
+	m_unpublishedCandidate = false;
+	{
+		StructuralMutationScope mutationScope(this);
+		for (Actor* actor : m_unpublishedCommitActors)
+		{
+			if (actor) actor->AttachComponents();
+		}
+	}
+	m_unpublishedCommitActors.clear();
+}
+
 void SceneBase::EditorUpdate(float deltaTime)
 {
+	if (m_actorBatchActive || m_unpublishedCandidate) return;
 	// Reflect changes of the transform
 	m_actorPool.ForEach([](Actor* actor)
 		{
@@ -157,21 +222,34 @@ void SceneBase::EditorUpdate(float deltaTime)
 	CollectDestroyedActors();
 }
 
-Actor* SceneBase::AddRootActor(std::unique_ptr<Actor> actor)
+Actor* SceneBase::AddRootActor(std::unique_ptr<Actor> actor,
+	StructuralMutationResult* result)
 {
+	if (!CanAddRootActor().Report(result)) return nullptr;
 	return RegisterActor(std::move(actor), ActorHandle::Null(), /*applyUIConstraints=*/true);
 }
 
-Actor* SceneBase::AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle)
+bool SceneBase::EnableSingleRootClosedSubtreePolicy()
 {
-	// Parent handle must be valid for a child actor
-	if (parentHandle.IsNull()) return nullptr;
+	if (m_structurePolicy == SceneStructurePolicy::SingleRootClosedSubtree) return true;
+	if (m_actorBatchActive || m_isFinalized || !m_imprintInstances.GetInstances().empty()) return false;
+	const auto roots = GetRootActors();
+	if (roots.size() != 1 || !roots.front() || roots.front()->IsDestroyed()) return false;
+	m_structurePolicy = SceneStructurePolicy::SingleRootClosedSubtree;
+	return true;
+}
+
+Actor* SceneBase::AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle,
+	StructuralMutationResult* result)
+{
+	if (!CanAddChildActor(ResolveActor(parentHandle)).Report(result)) return nullptr;
 
 	return RegisterActor(std::move(actor), parentHandle, /*applyUIConstraints=*/true);
 }
 
 Actor* SceneBase::RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle, bool applyUIConstraints)
 {
+	if (m_actorBatchActive) return nullptr;
 	if (!actor) return nullptr;
 
 	// Ensure the actor has exactly one Transform-family component
@@ -267,9 +345,11 @@ Actor* SceneBase::RegisterRestoredActor(std::unique_ptr<Actor> actor)
 
 void SceneBase::CollectDestroyedActors()
 {
+	StructuralMutationScope mutationScope(this);
 	// ActorPool owns the final OnDestroy + release step. All hierarchy-aware
 	// destruction requests have already been marked through RemoveActor().
 	const auto collectedHandles = m_actorPool.CollectGarbage();
+	m_imprintInstances.OnActorsCollected(collectedHandles);
 
 	for (const ActorHandle& handle : collectedHandles)
 	{
@@ -308,14 +388,18 @@ void SceneBase::OnActorComponentAdded(Actor* actor, Component* component)
 Component* SceneBase::AddActorComponentImmediate(
 	Actor* actor,
 	std::unique_ptr<Component> component,
-	std::size_t occurrenceIndex
+	std::size_t occurrenceIndex,
+	StructuralMutationResult* result
 )
 {
-	if (!actor || !component || actor->GetOwner() != this || actor->IsDestroyed())
+	if (!component) { StructuralMutationResult{ StructuralMutationReason::InvalidComponent }.Report(result); return nullptr; }
+	if (!CanAddComponent(actor, typeid(*component)).Report(result)) return nullptr;
+	if (occurrenceIndex > actor->GetComponentsByExactType(typeid(*component)).size())
 	{
+		StructuralMutationResult{ StructuralMutationReason::InvalidComponent }.Report(result);
 		return nullptr;
 	}
-
+	StructuralMutationScope mutationScope(this);
 	Component* added = actor->AddComponentImmediate(
 		std::move(component),
 		occurrenceIndex
@@ -329,16 +413,10 @@ Component* SceneBase::AddActorComponentImmediate(
 	return added;
 }
 
-bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component)
+bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component, StructuralMutationResult* result)
 {
-	if (!actor ||
-		!component ||
-		actor->GetOwner() != this ||
-		actor->IsDestroyed() ||
-		component->GetOwner() != actor)
-	{
-		return false;
-	}
+	if (!CanRemoveComponent(actor, component).Report(result)) return false;
+	StructuralMutationScope mutationScope(this);
 
 	// Check if given component affects the UI hierarchy (Canvas or RendererComponent)
 	const bool affectsUIHierarchy =
@@ -365,9 +443,13 @@ bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component
 	return true;
 }
 
-bool SceneBase::ReparentActor(Actor* actor, Actor* newParent)
+bool SceneBase::ReparentActor(Actor* actor, Actor* newParent, StructuralMutationResult* result)
 {
-	return ReparentActorInternal(actor, newParent, /*applyUIConstraints=*/true);
+	if (!CanReparent(actor, newParent).Report(result)) return false;
+	StructuralMutationScope mutationScope(this);
+	if (!ReparentActorInternal(actor, newParent, /*applyUIConstraints=*/true))
+		return StructuralMutationResult{ StructuralMutationReason::UIConstraintViolation }.Report(result);
+	return true;
 }
 
 bool SceneBase::RestoreParentRelationship(Actor* actor, Actor* newParent)
@@ -451,6 +533,7 @@ bool SceneBase::ReparentActorInternal(Actor* actor, Actor* newParent, bool apply
 
 bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 {
+	if (m_actorBatchActive) return false;
 	if (!canvas)
 	{
 		DBG("SceneBase::SetCanvasRenderMode: Canvas is null.");
@@ -488,6 +571,8 @@ bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 	}
 
 	// Set the render mode of the topmost canvas
+	if (!CanApplyUIHierarchy(owner, nullptr, owner, renderMode)) return false;
+	StructuralMutationScope mutationScope(this);
 	canvas->SetAuthoredRenderMode(renderMode);
 
 	// Apply UI hierarchy constraints
@@ -668,6 +753,7 @@ bool SceneBase::EnsureActorTransformKind(Actor* actor, TransformKind requiredKin
 	{
 		return true;
 	}
+	if (m_imprintInstances.FindMember(actor->GetHandle())) return false;
 
 	// Build a chain of transforms from the root to the target actor
 	std::vector<Transform*> transformChain;
@@ -747,76 +833,58 @@ Canvas* SceneBase::FindClosestCanvas(Actor* actor) const
 	return closestCanvas;
 }
 
-bool SceneBase::ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas)
+bool SceneBase::ApplyUIHierarchyConstraints(Actor* root, Canvas* governingCanvas,
+	bool allowTransformConversion, Actor** outInvalidActor)
 {
-	if (!actor) return false;
-
-	Canvas* actorCanvas = actor->GetComponentByClass<Canvas>();
-
-	// Whether the Actor is a descendant of a governing Canvas
-	const bool isUnderCanvas = (governingCanvas != nullptr);
-
-	// Check if tht given actor is a root canvas
-	if (actorCanvas)
-	{// In case of the given actor has a canvas
-		// Inherit render mode from the governing canvas if it exists
-		if (governingCanvas)
+	if (outInvalidActor) *outInvalidActor = nullptr;
+	if (!root) return false;
+	// Iterative traversal also serves deep Imprint candidates without stack growth.
+	std::vector<std::pair<Actor*, Canvas*>> pending{ { root, governingCanvas } };
+	while (!pending.empty())
+	{
+		auto [actor, governing] = pending.back();
+		pending.pop_back();
+		Canvas* actorCanvas = actor->GetComponentByClass<Canvas>();
+		if (actorCanvas)
 		{
-			actorCanvas->SetInheritedRenderMode(governingCanvas->GetRenderMode());
+			if (governing) actorCanvas->SetInheritedRenderMode(governing->GetRenderMode());
+			else actorCanvas->RestoreAuthoredRenderMode();
+		}
+		const auto requiredKind = RequiredUITransformKind(governing != nullptr,
+			actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
+		const bool definitionOwned = m_imprintInstances.FindMember(actor->GetHandle()) != nullptr;
+		if (allowTransformConversion && !definitionOwned)
+		{
+			if (!EnsureActorTransformKind(actor, requiredKind))
+			{
+				if (outInvalidActor) *outInvalidActor = actor;
+				return false;
+			}
 		}
 		else
 		{
-			actorCanvas->RestoreAuthoredRenderMode();
+			const Transform* transform = actor->GetComponentByClass<Transform>();
+			if (!transform || TransformConversion::GetKind(*transform) != requiredKind)
+			{
+				if (outInvalidActor) *outInvalidActor = actor;
+				return false;
+			}
 		}
+		if (auto* renderer = actor->GetComponentByClass<RendererComponent>())
+			renderer->SetGoverningCanvas(governing);
+		const auto children = actor->GetDirectChildren();
+		for (auto it = children.rbegin(); it != children.rend(); ++it)
+			pending.emplace_back(*it, actorCanvas ? actorCanvas : governing);
 	}
-
-	// Apply appropriate transform kind based on the hierarchy and canvas render mode
-	TransformKind requiredKind = TransformKind::Transform;
-
-	if (isUnderCanvas)
-	{// All actors under a canvas must have RectTransform
-		requiredKind = TransformKind::RectTransform;
-	}
-	else if (actorCanvas)
-	{// In case of the given actor has a root canvas
-		requiredKind = actorCanvas->GetRenderMode()
-			== CanvasRenderMode::WorldSpace
-			? TransformKind::Transform			// WorldSpace canvas uses normal Transform
-			: TransformKind::RectTransform;		// ScreenSpace canvas uses RectTransform
-	}
-
-	// Ensure the actor has the required transform kind
-	if (!EnsureActorTransformKind(actor, requiredKind))
-	{
-		DBG("SceneBase::ApplyUIHierarchyConstraints: Failed to ensure transform kind for Actor '%s'.", actor->GetName().c_str());
-		return false;
-	}
-
-	// Apply the hierarchy-derived Canvas only after transform conversion succeeds.
-	if (RendererComponent* renderer = actor->GetComponentByClass<RendererComponent>())
-	{
-		renderer->SetGoverningCanvas(governingCanvas);
-	}
-
-	Canvas* childGoverningCanvas = actorCanvas ? actorCanvas : governingCanvas;
-
-	// Recursively apply UI hierarchy constraints to all child actors
-	for (Actor* child : actor->GetDirectChildren())
-	{
-		if (!ApplyUIHierarchyConstraints(child, childGoverningCanvas))
-		{
-			return false;
-		}
-	}
-
 	return true;
 }
 
-bool SceneBase::ApplyAllUIHierarchyConstraints()
+bool SceneBase::ApplyAllUIHierarchyConstraints(Actor** outInvalidActor)
 {
+	if (outInvalidActor) *outInvalidActor = nullptr;
 	for (Actor* root : GetRootActors())
 	{
-		if (!ApplyUIHierarchyConstraints(root, nullptr))
+		if (!ApplyUIHierarchyConstraints(root, nullptr, true, outInvalidActor))
 		{
 			return false;
 		}

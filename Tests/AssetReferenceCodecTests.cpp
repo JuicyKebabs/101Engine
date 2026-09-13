@@ -190,6 +190,8 @@ namespace
 		AssetManagerAssetReferenceContext context(manager);
 		const AssetEntry* texture = manager.GetAssetEntryByPath("texture.png");
 		const AssetEntry* mesh = manager.GetAssetEntryByPath("mesh.obj");
+		const Guid textureGuid = texture ? texture->guid : Guid{};
+		const Guid meshGuid = mesh ? mesh->guid : Guid{};
 
 		Check(texture && context.Resolve(texture->guid, AssetType::Texture) ==
 			AssetReferenceCodecResult::Success,
@@ -201,6 +203,25 @@ namespace
 			AssetReferenceCodecResult::AssetNotFound,
 			"AssetManager context distinguishes an unregistered Asset");
 
+		AssetManager repeatedManager;
+		const bool repeatedScan = repeatedManager.Initialize(directory.string(), nullptr, nullptr);
+		const AssetEntry* repeatedTexture = repeatedManager.GetAssetEntryByPath("texture.png");
+		const AssetEntry* repeatedMesh = repeatedManager.GetAssetEntryByPath("mesh.obj");
+		Check(repeatedScan && repeatedTexture && repeatedMesh &&
+			repeatedTexture->guid == textureGuid && repeatedMesh->guid == meshGuid,
+			"Persisted Asset metadata keeps Guid identity across AssetManager instances");
+
+		const fs::path copiedDirectory = directory.string() + "-copy";
+		fs::copy(directory, copiedDirectory, fs::copy_options::recursive);
+		AssetManager copiedManager;
+		const bool copiedScan = copiedManager.Initialize(copiedDirectory.string(), nullptr, nullptr);
+		const AssetEntry* copiedTexture = copiedManager.GetAssetEntryByPath("texture.png");
+		const AssetEntry* copiedMesh = copiedManager.GetAssetEntryByPath("mesh.obj");
+		Check(copiedScan && copiedTexture && copiedMesh &&
+			copiedTexture->guid == textureGuid && copiedMesh->guid == meshGuid,
+			"Copied Asset tree retains Guid identity through its metadata sidecars");
+
+		fs::remove_all(copiedDirectory);
 		fs::remove_all(directory);
 	}
 }

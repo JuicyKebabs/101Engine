@@ -3,10 +3,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "Engine/Engine.h"
 #include "Engine/Graphics/Renderer.h"
 #include "Engine/Resource/AssetManager.h"
+#include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Input/InputManager.h"
@@ -15,17 +17,19 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Window/Window.h"
-#include "Command/EditorCommandHistory.h"
 #include "Command/RectTransformEditCommand.h"
-#include "Core/CanvasEditContext.h"
-
-#include "Core/EditorViewCamera.h"
+#include "Document/EditorDocumentManager.h"
+#include "Document/EditorDocumentWorkflow.h"
 #include "UI/HierarchyPanel.h"
 #include "UI/Inspector/InspectorPanel.h"
 #include "UI/SceneViewPanel.h"
 #include "UI/MenuBar.h"
 #include "UI/Toolbar.h"
 #include "UI/ScriptsPanel.h"
+#include "UI/ActorImprintsPanel.h"
+#include "UI/SceneAssetPanel.h"
+#include "UI/TagManagerPanel.h"
+#include "Engine/Project/ProjectSettings.h"
 
 //--------------------------------------------
 // EditorApp class
@@ -37,16 +41,6 @@ enum class EditorMode
 {
 	Edit,   // Edit mode for editing the scene
 	Play    // Play mode for testing the game
-};
-
-// Struct to hold the navigation state of the Canvas view in the editor
-// Used to reflect the user manipulation to the Canvas view (panning, zooming, etc.)
-// User manipulation -> Store the result as CanvasViewNavigation -> Change the Canvas view to reflect the navigation state
-struct CanvasViewNavigation
-{
-	Vector2 center = Vector2::Zero();	// Camara center position in the Canvas view (in Editing-Root Canvas local space)
-	float zoom = 1.0f;					// Zoom level of the Canvas view (Fitting the Canvas rectangle to the viewport is 1.0f)
-	Guid canvasActorGuid;				// Guid of the editing root Canvas Actor 
 };
 
 class EditorApp
@@ -87,6 +81,7 @@ private:
     std::unique_ptr<TextureManager> m_pTextureManager;
     std::unique_ptr<MeshManager> m_pMeshManager;
     std::unique_ptr<AssetManager> m_pAssetManager;
+    std::unique_ptr<ActorImprintSystem> m_pActorImprintSystem;
 
     InputManager& m_inputManager = InputManager::GetInstance();
     TimeManager& m_timeManager = TimeManager::GetInstance();
@@ -95,18 +90,17 @@ private:
 
     EditorMode m_editorMode = EditorMode::Edit; // The current mode of the editor (Edit or Play)
     EditorModeTransition m_pendingModeTransition = EditorModeTransition::None;
-    std::unique_ptr<SceneBase> m_pEditScene;    // The scene currently being edited
+	float m_assetRefreshElapsedSeconds = 0.0f;
     std::unique_ptr<SceneBase> m_pPlayScene;    // The scene currently being played (runtime)
-
-    EditorCommandHistory m_commandHistory;  // Command history for undo/redo
-
-    // Camera facade owned by the Scene View and kept outside SceneBase so it
-    // is never written to / read from .scene files.
-    EditorViewCamera m_editorViewCamera;
-
-    // Canvas View controls
-    CanvasEditContext m_canvasEditContext;          // Stores the information for editing a Canvas in the Canvas view mode.
-    CanvasViewNavigation m_canvasViewNavigation;    // Stores the information of manipulation on the Canvas View
+	EditorDocumentManager m_documentManager;
+	EditorDocumentWorkflow m_documentWorkflow{m_documentManager};
+	bool m_openDocumentDecisionPopup = false;
+	bool m_allowWindowClose = false;
+    std::string m_documentDecisionDiagnostic;
+	enum class PendingSceneAction { None, Create, Open };
+	PendingSceneAction m_pendingSceneAction = PendingSceneAction::None;
+	std::string m_pendingSceneName;
+	Guid m_pendingSceneGuid;
 
     // Panels
     HierarchyPanel m_hierarchyPanel;
@@ -115,6 +109,10 @@ private:
     MenuBar m_menuBar;
     Toolbar m_toolbar;
     ScriptsPanel m_scriptsPanel;
+    ActorImprintsPanel m_actorImprintsPanel;
+	SceneAssetPanel m_sceneAssetPanel;
+	TagManagerPanel m_tagManagerPanel;
+	ProjectSettings m_projectSettings;
 
     // ImGui keeps IniFilename as a raw pointer, so the backing string must
     // remain alive for the entire ImGui context lifetime.
@@ -164,11 +162,20 @@ private:
 
     void NewScene();                                // Create a new scene with default settings
     void LoadScene(const std::string& filePath);    // Load a scene from a file
+	bool LoadScene(const Guid& sceneAssetGuid);
+	std::unique_ptr<SceneBase> CreateDefaultScene();
+	bool RequestCreateScene(std::string_view name);
+	bool RequestOpenScene(const Guid& sceneAssetGuid);
+	bool ExecutePendingSceneAction();
     void ReloadGameCode(bool reconfigure);          // For hot-reloading game code DLL
     void DeleteScript(const std::string& name);     // Delete a script file from the project
     void EnterPlayMode();                           // Switch to Play mode
     void ExitPlayMode();                            // Switch back to Edit mode
     void ApplyPendingModeTransition();              // Apply a deferred Play/Edit mode transition
+	void RefreshAssetCatalog(float deltaTime);
+	bool ProcessActorImprintAssetChanges(const Guid* requiredAsset = nullptr, std::string* outError = nullptr);
+	bool SaveEditorDocument(EditorDocumentId id);
+	bool HasActiveEditTransaction() const;
 
     bool SaveHotReloadSnapshot();
     bool BuildStagedGameCode(bool reconfigure);
@@ -180,7 +187,7 @@ private:
     void RemovePreviousGameCodeBackup();
 
     void PrepareInstance();
-    void InitInstance();
+    bool InitInstance();
     void InitImGui();
 
     void Update(float deltaTime);
@@ -202,9 +209,20 @@ private:
     void RenderMenuBar();
 	void RenderToolbar();
     void RenderScriptsPanel();
+    void RenderActorImprintsPanel();
+	void RenderSceneAssetPanel();
+	void RenderTagManagerPanel();
+	void RenderDocumentDecisionModal();
+	void RenderOperationDiagnosticModal();
     void ShutdownImGui();
 
     SceneBase* GetActiveScene() const;
+	IEditorDocument* GetActiveEditDocument();
+	const IEditorDocument* GetActiveEditDocument() const;
+	SceneBase* GetEditScene() const;
+	EditorSelection* GetActiveSelection();
+	EditorViewportContext* GetActiveViewportContext();
+	const EditorViewportContext* GetActiveViewportContext() const;
 
     void ApplySceneViewResizeRequest();
     void ApplySceneRenderTargetSizeToScene(SceneBase& scene);
@@ -240,4 +258,9 @@ private:
 
     // Stop all ongoing edit transactions (transform, RectTransform, etc.)
     void StopAllEditTransactions();
+
+	bool HandleWindowCloseRequest();
+	void CompleteExitRequest();
+	bool m_openOperationDiagnosticPopup = false;
+	std::string m_operationDiagnostic;
 };

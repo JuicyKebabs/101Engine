@@ -63,7 +63,7 @@ public:
 
 	bool SetTextureAsset(const Guid& assetId);							// Set the texture asset for this sprite through AssetManager
 	AssetReference<TextureAsset> GetTextureAssetReference() const;
-	void SetTextureAssetReference(const AssetReference<TextureAsset>& value);
+	bool TrySetTextureAssetReference(const AssetReference<TextureAsset>& value);
 	Guid GetTextureAssetId() const {
 		if (m_textureAssetId.IsValid()) return m_textureAssetId;
 		return m_pendingTextureAssetId.value_or(Guid{});
@@ -97,6 +97,19 @@ public:
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
+	enum class AssetPrepareResult
+	{
+		Ready,
+		MissingAsset,
+		Failed,
+	};
+
+	struct PreparedTextureAssetState
+	{
+		Guid assetId;
+		SpriteRenderTemplate renderTemplate;
+	};
+
 	Vector2 m_uvScale{ 1,1 };								// UV scale for texture mapping
 	Vector2 m_uvOffset{ 0,0 };								// UV offset for texture mapping
 	Vector2 m_pivot{ 0.5f, 0.5f };							// Pivot point for the sprite
@@ -111,6 +124,12 @@ private:
 	std::optional<Guid> m_pendingTextureAssetId;	// Optional pending asset ID for the texture (used during deserialization to resolve references)
 
 private:
+	AssetPrepareResult PrepareTextureAssetState(
+		const Guid& assetId,
+		PreparedTextureAssetState& outState) const;
+	void CommitTextureAssetState(PreparedTextureAssetState&& state);
+	bool SetPendingTextureAssetReference(const AssetReference<TextureAsset>& value);
+
 	// Override functions for component lifecycle
 	void OnAttachOverride() override;
 	void OnStartOverride() override;

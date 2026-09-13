@@ -63,7 +63,7 @@ bool ComponentSnapshot::Capture(Actor* actor, Component* component)
 	return true;
 }
 
-Component* ComponentSnapshot::Restore(SceneBase* scene) const
+Component* ComponentSnapshot::Restore(SceneBase* scene, StructuralMutationResult* result) const
 {
 	if (!scene ||
 		!m_isValid ||
@@ -91,7 +91,8 @@ Component* ComponentSnapshot::Restore(SceneBase* scene) const
 	Component* restored = scene->AddActorComponentImmediate(
 		actor,
 		std::move(component),
-		m_occurrenceIndex
+		m_occurrenceIndex,
+		result
 	);
 
 	if (!restored) return nullptr;
@@ -99,7 +100,7 @@ Component* ComponentSnapshot::Restore(SceneBase* scene) const
 	// Reference resolution requires the restored Component to already belong to an Actor and Scene.
 	if (!restored->ResolveReferences(*scene))
 	{
-		if (!scene->RemoveActorComponentImmediate(actor, restored))
+		if (!scene->RemoveActorComponentImmediate(actor, restored, result))
 		{
 			DBG("ComponentSnapshot::Restore: Failed to roll back a Component after reference resolution failed.");
 		}

@@ -46,7 +46,7 @@ public:
 	// Setters and getters for texture asset
 	bool SetTextureAsset(const Guid& assetId);
 	AssetReference<TextureAsset> GetTextureAssetReference() const;
-	void SetTextureAssetReference(const AssetReference<TextureAsset>& value);
+	bool TrySetTextureAssetReference(const AssetReference<TextureAsset>& value);
 	Guid GetTextureAssetId() const {
 		if (m_textureAssetId.IsValid()) return m_textureAssetId;
 		return m_pendingTextureAssetId.value_or(Guid{});
@@ -56,6 +56,25 @@ public:
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
+	enum class AssetPrepareResult
+	{
+		Ready,
+		MissingAsset,
+		Failed,
+	};
+
+	struct PreparedTextureAssetState
+	{
+		Guid assetId;
+		UIRenderTemplate renderTemplate;
+	};
+
+	AssetPrepareResult PrepareTextureAssetState(
+		const Guid& assetId,
+		PreparedTextureAssetState& outState) const;
+	void CommitTextureAssetState(PreparedTextureAssetState&& state);
+	bool SetPendingTextureAssetReference(const AssetReference<TextureAsset>& value);
+
 	Guid m_textureAssetId;							// Guid of the texture asset
 	std::optional<Guid> m_pendingTextureAssetId;	// Optional Guid of the texture asset to be loaded
 };

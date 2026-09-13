@@ -9,67 +9,80 @@
 #include "Engine/Component/RectTransform.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 {
-	// Check if the provided assetId is valid
+	PreparedMeshAssetState prepared;
+	if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitMeshAssetState(std::move(prepared));
+	return true;
+}
+
+MeshRenderer::AssetPrepareResult MeshRenderer::PrepareMeshAssetState(
+	const Guid& assetId,
+	PreparedMeshAssetState& outState) const
+{
 	if (!assetId.IsValid())
 	{
-		m_meshAssetId = {};
-		m_pendingMeshAssetId.reset();
-		m_templates.clear();
-		m_isProxyDirty = true;
-
-		return true;
+		outState = {};
+		return AssetPrepareResult::Ready;
 	}
 
-	// Check if the engine context and necessary managers are available
-	EngineContext* context = GetEngineContext();
-
-	if (!context				||
-		!context->pAssetManager ||
-		!context->pMeshManager)
+	const EngineContext* context = GetEngineContext();
+	if (!context || !context->pAssetManager || !context->pMeshManager)
 	{
-		return false;
+		return AssetPrepareResult::Failed;
 	}
 
-	// Get asset and validate its type
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-
-	if (!assetEntry || assetEntry->type != AssetType::Mesh)
+	if (!assetEntry)
 	{
-		return false;
+		return AssetPrepareResult::MissingAsset;
+	}
+	if (assetEntry->type != AssetType::Mesh)
+	{
+		return AssetPrepareResult::Failed;
 	}
 
-	// Get the mesh handle from the asset manager
 	const MeshHandle meshHandle = context->pAssetManager->GetMeshHandle(assetId);
+	if (meshHandle == InvalidMeshHandle)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
-	if (meshHandle == InvalidMeshHandle) return false;
+	const MeshGPU* meshGPU = context->pMeshManager->GetMeshGPU(meshHandle);
+	if (!meshGPU)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
-	MeshGPU* meshGPU = context->pMeshManager->GetMeshGPU(meshHandle);
-	if (!meshGPU) return false;
-
-	// Get the mesh material info from the mesh manager
 	const MeshMaterialInfo materialInfo = context->pMeshManager->GetMeshMaterialInfo(meshHandle);
-
-	// Create a render template for the mesh
 	SubmeshRenderTemplate renderTemplate;
 	renderTemplate.meshDesc.meshHandle = meshHandle;
-	// MeshGPU stores a sphere centered at the Actor origin that contains
-	// every vertex. Pass it to the render template for RectTransform fitting.
 	renderTemplate.meshDesc.boundsCenter = meshGPU->GetBoundsCenter();
 	renderTemplate.meshDesc.boundsRadius = meshGPU->GetBoundsRadius();
 	renderTemplate.materialDesc.textureHandle = materialInfo.textureHandle;
 	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;
 	renderTemplate.materialDesc.baseColor = materialInfo.materialColor;
 
-	// Update the component's state
-	m_templates = { renderTemplate };
-	m_meshAssetId = assetId;
+	PreparedMeshAssetState prepared;
+	prepared.assetId = assetId;
+	prepared.templates = { std::move(renderTemplate) };
+	outState = std::move(prepared);
+	return AssetPrepareResult::Ready;
+}
+
+void MeshRenderer::CommitMeshAssetState(PreparedMeshAssetState&& state)
+{
+	m_meshAssetId = state.assetId;
+	m_templates.swap(state.templates);
 	m_pendingMeshAssetId.reset();
 	m_isProxyDirty = true;
-
-	return true;
 }
 
 Guid MeshRenderer::GetAssetId() const
@@ -174,28 +187,20 @@ bool MeshRenderer::ResolveReferences(SceneBase& scene)
 	Actor* owner = GetOwner();
 	if (!owner || owner->GetOwner() != &scene) return false;
 
-	// Check if the engine context and necessary managers are available
-	EngineContext* context = scene.GetEngineContext();
-	if (!context || !context->pAssetManager || !context->pMeshManager)
+	const Guid assetId = *m_pendingMeshAssetId;
+	PreparedMeshAssetState prepared;
+	const AssetPrepareResult result = PrepareMeshAssetState(assetId, prepared);
+	if (result == AssetPrepareResult::MissingAsset)
+	{
+		return true;
+	}
+	if (result != AssetPrepareResult::Ready)
 	{
 		return false;
 	}
 
-	// Get the asset entry for the pending asset ID and validate its type
-	const Guid assetId = *m_pendingMeshAssetId;
-	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-	if (!assetEntry || assetEntry->type != AssetType::Mesh)
-	{
-		// Clear the asset ID and templates if the asset is invalid or not a mesh
-		m_templates.clear();
-		m_meshAssetId = {};
-		m_isProxyDirty = true;
-
-		return true;
-	}
-
-	// Attempt to set the mesh asset using the resolved asset ID
-	return SetMeshAsset(assetId);
+	CommitMeshAssetState(std::move(prepared));
+	return true;
 }
 
 Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
@@ -245,15 +250,37 @@ Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 AssetReference<MeshAsset> MeshRenderer::GetMeshAssetReference() const
 {
 	AssetReference<MeshAsset> value;
-	value.SetGuid(GetAssetId());
+	value.SetValue({ GetAssetId(), AssetType::Mesh, m_meshAssetId.IsValid() });
 	return value;
 }
 
-void MeshRenderer::SetMeshAssetReference(const AssetReference<MeshAsset>& value)
+bool MeshRenderer::SetPendingMeshAssetReference(const AssetReference<MeshAsset>& value)
 {
 	m_templates.clear();
 	m_meshAssetId = {};
 	m_pendingMeshAssetId.reset();
 	if (value.HasValue()) m_pendingMeshAssetId = value.GetGuid();
 	m_isProxyDirty = true;
+	return true;
+}
+
+bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& value)
+{
+	Actor* owner = GetOwner();
+	// Deserialization produces unresolved references. Keep those pending even if
+	// an existing Component is currently attached to a Scene.
+	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
+	{
+		return SetPendingMeshAssetReference(value);
+	}
+
+	PreparedMeshAssetState prepared;
+	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+	if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitMeshAssetState(std::move(prepared));
+	return true;
 }

@@ -6,13 +6,22 @@
 
 using json = nlohmann::json;
 
-std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& componentJson)
+std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
+	const json& componentJson,
+	ComponentDeserializationError* outError)
 {
+	if (outError) *outError = {};
+	const auto Fail = [&](std::string path, std::string message) -> std::unique_ptr<Component>
+	{
+		if (outError) *outError = { std::move(path), std::move(message) };
+		return nullptr;
+	};
+
 	// Validate the component record structure
 	if (!componentJson.is_object())
 	{
 		DBG("ComponentDeserializer::DeserializeRecord: Component record must be an object.");
-		return nullptr;
+		return Fail({}, "Component record must be an object.");
 	}
 
 	const bool hasType = componentJson.contains("type");
@@ -22,7 +31,8 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 	if (!hasValidType || !hasValidData)
 	{
 		DBG("ComponentDeserializer::DeserializeRecord: Component record must contain a string 'type' and an object 'data'.");
-		return nullptr;
+		if (!hasValidType) return Fail("/type", "Component type must be a string.");
+		return Fail("/data", "Component data must be an object.");
 	}
 
 	// Get the component type name and data from the JSON record
@@ -32,7 +42,7 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 	if (componentTypeName.empty())
 	{
 		DBG("ComponentDeserializer::DeserializeRecord: Component type name is empty.");
-		return nullptr;
+		return Fail("/type", "Component type name must not be empty.");
 	}
 
 	// Create the component instance with the registered factory function for the given type name
@@ -41,7 +51,7 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 	if (!component)
 	{
 		DBG("ComponentDeserializer::DeserializeRecord: Component '%s' is not registered.", componentTypeName.c_str());
-		return nullptr;
+		return Fail("/type", "Component type is not registered: " + componentTypeName);
 	}
 
 	// Deserialize the component data
@@ -56,7 +66,7 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(const json& 
 		DBG(
 			"ComponentDeserializer::DeserializeRecord: Failed to deserialize component '%s' at '%s': %s",
 			componentTypeName.c_str(), path.c_str(), error.message.c_str());
-		return nullptr;
+		return Fail("/data" + (error.path ? error.path->ToString() : std::string{}), error.message);
 	}
 
 	return component;

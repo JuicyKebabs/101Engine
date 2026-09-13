@@ -1,4 +1,5 @@
 #include <cmath>
+#include <utility>
 #include "SpriteRenderer.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
@@ -58,42 +59,49 @@ void SpriteRenderer::OnDestroyOverride()
 
 bool SpriteRenderer::SetTextureAsset(const Guid& assetId)
 {
-	// If the asset ID is invalid, clear the texture and mark the proxy as dirty
+	PreparedTextureAssetState prepared;
+	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitTextureAssetState(std::move(prepared));
+	return true;
+}
+
+SpriteRenderer::AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
+	const Guid& assetId,
+	PreparedTextureAssetState& outState) const
+{
 	if (!assetId.IsValid())
 	{
-		m_textureAssetId = {};
-		m_pendingTextureAssetId.reset();
-		m_template = {};
-		m_isProxyDirty = true;
-
-		return true;
+		outState = {};
+		outState.renderTemplate.billboardType = m_billboardType;
+		return AssetPrepareResult::Ready;
 	}
 
-	// Get the engine context
-	EngineContext* context = GetEngineContext();
-
+	const EngineContext* context = GetEngineContext();
 	if (!context || !context->pAssetManager || !context->pTextureManager)
 	{
-		return false;
+		return AssetPrepareResult::Failed;
 	}
 
-	// Get the asset entry from the asset manager
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-
-	if (!assetEntry || assetEntry->type != AssetType::Texture)
+	if (!assetEntry)
 	{
-		return false;
+		return AssetPrepareResult::MissingAsset;
+	}
+	if (assetEntry->type != AssetType::Texture)
+	{
+		return AssetPrepareResult::Failed;
 	}
 
-	// Get the texture handle from the asset manager
 	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
-
 	if (textureHandle == InvalidTextureHandle)
 	{
-		return false;
+		return AssetPrepareResult::Failed;
 	}
 
-	// Build the render template for this sprite renderer
 	SpriteRenderTemplate renderTemplate;
 	renderTemplate.materialDesc.textureHandle = textureHandle;
 	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::SPRITE_TRANSPARENT;
@@ -101,12 +109,19 @@ bool SpriteRenderer::SetTextureAsset(const Guid& assetId)
 	renderTemplate.materialDesc.lightingEnabled = false;
 	renderTemplate.billboardType = m_billboardType;
 
-	m_template = renderTemplate;
-	m_textureAssetId = assetId;
+	PreparedTextureAssetState prepared;
+	prepared.assetId = assetId;
+	prepared.renderTemplate = std::move(renderTemplate);
+	outState = std::move(prepared);
+	return AssetPrepareResult::Ready;
+}
+
+void SpriteRenderer::CommitTextureAssetState(PreparedTextureAssetState&& state)
+{
+	m_textureAssetId = state.assetId;
+	std::swap(m_template, state.renderTemplate);
 	m_pendingTextureAssetId.reset();
 	m_isProxyDirty = true;
-
-	return true;
 }
 
 const SpriteRendererProxy& SpriteRenderer::GetRenderProxy(const CameraInfo& cameraInfo)
@@ -182,33 +197,30 @@ bool SpriteRenderer::ResolveReferences(SceneBase& scene)
 	Actor* owner = GetOwner();
 	if (!owner || owner->GetOwner()!= &scene) return false;
 
-	// Get the engine context from the scene and check if the asset manager and texture manager are available
-	EngineContext* context = scene.GetEngineContext();
-	if (!context || !context->pAssetManager || !context->pTextureManager) return false;
-
-	// Get the asset entry for the pending texture asset ID and check if it is a valid texture asset
-	const Guid& assetId = *m_pendingTextureAssetId;
-	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-	if (!assetEntry || assetEntry->type != AssetType::Texture)
+	const Guid assetId = *m_pendingTextureAssetId;
+	PreparedTextureAssetState prepared;
+	const AssetPrepareResult result = PrepareTextureAssetState(assetId, prepared);
+	if (result == AssetPrepareResult::MissingAsset)
 	{
-		m_template = {};
-		m_textureAssetId = {};
-		m_isProxyDirty = true;
 		return true;
 	}
+	if (result != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
 
-	// Attempt to set the texture asset using the resolved asset ID
-	return SetTextureAsset(assetId);
+	CommitTextureAssetState(std::move(prepared));
+	return true;
 }
 
 AssetReference<TextureAsset> SpriteRenderer::GetTextureAssetReference() const
 {
 	AssetReference<TextureAsset> value;
-	value.SetGuid(GetTextureAssetId());
+	value.SetValue({ GetTextureAssetId(), AssetType::Texture, m_textureAssetId.IsValid() });
 	return value;
 }
 
-void SpriteRenderer::SetTextureAssetReference(const AssetReference<TextureAsset>& value)
+bool SpriteRenderer::SetPendingTextureAssetReference(const AssetReference<TextureAsset>& value)
 {
 	m_template = {};
 	m_template.billboardType = m_billboardType;
@@ -216,4 +228,26 @@ void SpriteRenderer::SetTextureAssetReference(const AssetReference<TextureAsset>
 	m_pendingTextureAssetId.reset();
 	if (value.HasValue()) m_pendingTextureAssetId = value.GetGuid();
 	m_isProxyDirty = true;
+	return true;
+}
+
+bool SpriteRenderer::TrySetTextureAssetReference(const AssetReference<TextureAsset>& value)
+{
+	Actor* owner = GetOwner();
+	// Deserialization produces unresolved references; the AssetPicker marks its
+	// catalog-validated live selections as resolved.
+	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
+	{
+		return SetPendingTextureAssetReference(value);
+	}
+
+	PreparedTextureAssetState prepared;
+	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitTextureAssetState(std::move(prepared));
+	return true;
 }

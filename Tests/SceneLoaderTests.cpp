@@ -1,11 +1,15 @@
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
+#include "Engine/Component/Behavior.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
+#include "Engine/Core/Reflection/PropertyMetadata.h"
+#include "Engine/Resource/AssetManager.h"
+#include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Scene/SceneLoader.h"
 #include "Engine/Scene/SceneWriter.h"
@@ -14,10 +18,12 @@
 #include "nlohmann/json.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -27,6 +33,23 @@ namespace
 
 	int g_failures = 0;
 	int g_fileIndex = 0;
+
+	class Version3TestBehavior final : public Behavior
+	{
+	public:
+		float rotationSpeed = 1.0f;
+		AssetReference<ActorImprint> actorImprint;
+	};
+
+	void RegisterVersion3TestBehavior()
+	{
+		TypeMetadataBuilder<Version3TestBehavior> builder("TestBehavior");
+		builder.Property("rotationSpeed", &Version3TestBehavior::rotationSpeed);
+		builder.Property("actorImprint", &Version3TestBehavior::actorImprint).Optional();
+		ComponentRegistry::Get().RegisterGameComponent(
+			"TestBehavior", []() -> Component* { return new Version3TestBehavior(); },
+			typeid(Version3TestBehavior), std::make_unique<TypeMetadata>(*builder.Build()));
+	}
 
 	void Check(bool condition, const std::string& name)
 	{
@@ -133,39 +156,108 @@ namespace
 		};
 	}
 
-	void TestVersion2ChildBeforeParent()
+	json MakeVersion4Scene(json actors = json::array(), json instances = json::array())
+	{
+		return {
+			{ "version", 4 },
+			{ "directional_light", {
+				{ "direction", { 0.0, -1.0, 0.0 } },
+				{ "color", { 1.0, 1.0, 1.0 } },
+				{ "intensity", 1.0 }
+			} },
+			{ "actors", std::move(actors) },
+			{ "actorImprintInstances", std::move(instances) },
+		};
+	}
+
+	EngineContext& TestEngineContext()
+	{
+		static EngineContext context;
+		return context;
+	}
+
+	void TestVersion3ChildBeforeParent()
 	{
 		const Guid parentGuid = GuidGenerator::Generate();
 		const Guid childGuid = GuidGenerator::Generate();
-		TemporarySceneFile file(MakeVersion2Scene({
-			MakeActor(childGuid, "Child", parentGuid.ToString()),
-			MakeActor(parentGuid, "Parent", nullptr)
+		Transform transform;
+		json transformData;
+		transform.Serialize(transformData);
+		TemporarySceneFile file(MakeVersion3Scene({
+			MakeVersion3Actor(childGuid, "Child",
+				json::array({ MakeComponentRecord("Transform", transformData) }), parentGuid.ToString()),
+			MakeVersion3Actor(parentGuid, "Parent",
+				json::array({ MakeComponentRecord("Transform", transformData) }))
 		}));
 
-		SceneBase scene;
-		Check(SceneLoader::LoadScene(file.String(), &scene),
-			"Version 2 loads when a child appears before its parent");
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(static_cast<bool>(load), "Version 3 loads when a child appears before its parent");
+		SceneBase* scene = load.scene.get();
 
-		Actor* parent = scene.ResolveActor(parentGuid);
-		Actor* child = scene.ResolveActor(childGuid);
+		Actor* parent = scene ? scene->ResolveActor(parentGuid) : nullptr;
+		Actor* child = scene ? scene->ResolveActor(childGuid) : nullptr;
 		if (!parent || !child)
 		{
 			std::cerr << "[DIAG] expected parent=" << parentGuid.ToString()
 				<< " child=" << childGuid.ToString()
-				<< " actorCount=" << scene.GetAllActors().size() << '\n';
-			for (Actor* loaded : scene.GetAllActors())
+				<< " actorCount=" << (scene ? scene->GetAllActors().size() : 0) << '\n';
+			for (Actor* loaded : scene ? scene->GetAllActors() : std::vector<Actor*>{})
 			{
 				std::cerr << "[DIAG] loaded name=" << loaded->GetName()
 					<< " guid=" << loaded->GetGuid().ToString() << '\n';
 			}
 		}
 		Check(parent != nullptr && child != nullptr,
-			"Version 2 preserves both persisted Guids");
+			"Version 3 preserves both persisted Guids");
 		Check(child && child->GetParent() == parent,
-			"Version 2 restores the child's parent reference");
+			"Version 3 restores the child's parent reference");
 		Check(parent && parent->GetDirectChildren().size() == 1 &&
 			parent->GetDirectChildren().front() == child,
-			"Version 2 restores the parent's child reference");
+			"Version 3 restores the parent's child reference");
+	}
+
+	void TestRepositorySceneCompatibility()
+	{
+		std::ifstream stream("asset/scenes/test.scene");
+		json repositoryScene = json::parse(stream);
+		// Runtime asset loading is outside this loader compatibility test. Nulling
+		// only asset values retains the real schema, hierarchy and component set.
+		for (json& actor : repositoryScene["actors"])
+		{
+			for (json& component : actor["components"])
+			{
+				json& data = component["data"];
+				if (data.contains("meshAssetId")) data["meshAssetId"] = nullptr;
+				if (data.contains("textureAssetId")) data["textureAssetId"] = nullptr;
+				if (data.contains("actorImprint")) data["actorImprint"] = nullptr;
+			}
+		}
+
+		SceneLoadResult load = SceneLoader::LoadCandidate(
+			repositoryScene, TestEngineContext(), "asset/scenes/test.scene");
+		bool noneTagsPreserved = static_cast<bool>(load);
+		if (load)
+		{
+			for (Actor* actor : load.scene->GetAllActors())
+			{
+				if (actor->GetName() != "DefaultCamera")
+					noneTagsPreserved = noneTagsPreserved && actor->GetTag() == TAG_NONE;
+			}
+		}
+		Check(load && load.scene->GetAllActors().size() == repositoryScene["actors"].size() &&
+			noneTagsPreserved,
+			"The repository Scene schema and Actor set remain loadable");
+		if (!load) std::cerr << "[DIAG] " << load.error.path << ": " << load.error.message << '\n';
+		if (load.scene) load.scene->Finalize();
+	}
+
+	void TestVersion2Rejection()
+	{
+		TemporarySceneFile file(MakeVersion2Scene({}));
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(!load && load.error.code == SceneLoadErrorCode::UnsupportedVersion &&
+			load.error.path == "/version" && !load.error.message.empty(),
+			"Version 2 is rejected with an explicit located diagnostic");
 	}
 
 	void TestVersion1Rejection()
@@ -182,61 +274,156 @@ namespace
 			{"actors", json::array({ legacyActor })}
 			});
 
-		SceneBase scene;
-
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
 		Check(
-			!SceneLoader::LoadScene(file.String(), &scene),
+			!load,
 			"SceneLoader rejects unsupported Version 1 scenes");
 
 		Check(
-			scene.GetAllActors().empty(),
-			"Version 1 rejection does not create Actors");
+			!load.scene && load.error.code == SceneLoadErrorCode::UnsupportedVersion,
+			"Version 1 rejection publishes no candidate Scene");
+	}
+
+	void TestVersion4StrictSchemaAndCandidateIsolation()
+	{
+		const std::string source = "memory://strict-v4.scene";
+		json valid = MakeVersion4Scene();
+		SceneLoadResult accepted = SceneLoader::LoadCandidate(valid, TestEngineContext(), source);
+		Check(accepted && accepted.scene->GetAllActors().empty(),
+			"Version 4 accepts required empty Actor arrays");
+
+		auto ExpectFailure = [&](json invalid, SceneLoadErrorCode code,
+			const char* path, const char* label)
+		{
+			SceneLoadResult load = SceneLoader::LoadCandidate(invalid, TestEngineContext(), source);
+			Check(!load && !load.scene && load.error.code == code &&
+				load.error.path == path && load.error.assetPath == source &&
+				!load.error.message.empty(), label);
+		};
+
+		json unknown = valid;
+		unknown["unexpected"] = true;
+		ExpectFailure(unknown, SceneLoadErrorCode::InvalidSchema, "/unexpected",
+			"Version 4 rejects an unknown top-level field with a complete diagnostic");
+		json missingInstances = valid;
+		missingInstances.erase("actorImprintInstances");
+		ExpectFailure(missingInstances, SceneLoadErrorCode::InvalidSchema,
+			"/actorImprintInstances", "Version 4 requires the Instance array even when empty");
+		json wrongActors = valid;
+		wrongActors["actors"] = nullptr;
+		ExpectFailure(wrongActors, SceneLoadErrorCode::InvalidSchema, "/actors",
+			"Version 4 rejects a null Actor array");
+		json nullLight = valid;
+		nullLight["directional_light"] = nullptr;
+		ExpectFailure(nullLight, SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light", "Version 4 rejects null Scene settings");
+		json outOfFloatRange = valid;
+		outOfFloatRange["directional_light"]["intensity"] = 1.0e100;
+		ExpectFailure(outOfFloatRange, SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light/intensity", "Version 4 rejects settings outside finite float range");
+		json oversizedVersion = valid;
+		oversizedVersion["version"] = std::uint64_t{ 4294967300ULL };
+		ExpectFailure(oversizedVersion, SceneLoadErrorCode::UnsupportedVersion,
+			"/version", "A large integer whose low bits equal 4 is not accepted as Version 4");
+		json mislabeledVersion3 = valid;
+		mislabeledVersion3["version"] = 3;
+		mislabeledVersion3["actorImprintInstances"].push_back(json::object());
+		ExpectFailure(mislabeledVersion3, SceneLoadErrorCode::InvalidSchema,
+			"/actorImprintInstances", "Version 3 cannot silently discard Version 4 Instance records");
+
+		TemporarySceneFile duplicateVersion(std::string(".duplicate-version.scene"));
+		std::ofstream(duplicateVersion.String()) <<
+			R"({"version":4,"directional_light":{"direction":[0.0,-1.0,0.0],"color":[1.0,1.0,1.0],"intensity":1.0},"actors":[],"actorImprintInstances":[],"version":3})";
+		SceneLoadResult duplicateLoad = SceneLoader::LoadCandidate(
+			duplicateVersion.String(), TestEngineContext());
+		Check(!duplicateLoad && duplicateLoad.error.code == SceneLoadErrorCode::JsonParseFailed &&
+			duplicateLoad.error.assetPath == duplicateVersion.String() &&
+			duplicateLoad.error.message.find("version") != std::string::npos,
+			"File loading rejects duplicate JSON fields before DOM normalization");
+
+		Transform transform;
+		json transformData;
+		transform.Serialize(transformData);
+		json actor = MakeVersion3Actor(GuidGenerator::Generate(), "StrictActor",
+			json::array({ MakeComponentRecord("Transform", transformData) }));
+		actor["unexpected"] = true;
+		json nested = valid;
+		nested["actors"].push_back(std::move(actor));
+		ExpectFailure(nested, SceneLoadErrorCode::InvalidSchema,
+			"/actors/0/unexpected", "Version 4 rejects an unknown nested Actor field");
+
+		SceneBase current;
+		current.Initialize(TestEngineContext());
+		current.SetViewportSize(640, 360);
+		Actor* sentinel = current.AddRootActor(ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "Sentinel")));
+		const Guid sentinelGuid = sentinel->GetGuid();
+		SceneLoadResult rejected = SceneLoader::LoadCandidate(unknown, TestEngineContext(), source);
+		Check(!rejected && current.ResolveActor(sentinelGuid) == sentinel &&
+			current.GetViewportSize().x == 640.0f && current.GetViewportSize().y == 360.0f,
+			"Candidate failure cannot mutate the caller's current Scene or viewport");
+
+		TemporarySceneFile malformed(std::string(".malformed.scene"));
+		std::ofstream(malformed.String()) << "{ invalid";
+		SceneLoadResult parseFailure = SceneLoader::LoadCandidate(malformed.String(), TestEngineContext());
+		Check(!parseFailure && parseFailure.error.code == SceneLoadErrorCode::JsonParseFailed &&
+			parseFailure.error.assetPath == malformed.String() && !parseFailure.error.message.empty(),
+			"Malformed Scene JSON returns a stable file diagnostic");
 	}
 
 	void TestDuplicateGuidRejection()
 	{
 		const Guid guid = GuidGenerator::Generate();
-		TemporarySceneFile file(MakeVersion2Scene({
-			MakeActor(guid, "First", nullptr),
-			MakeActor(guid, "Duplicate", nullptr)
+		Transform transform;
+		json transformData;
+		transform.Serialize(transformData);
+		TemporarySceneFile file(MakeVersion3Scene({
+			MakeVersion3Actor(guid, "First", json::array({ MakeComponentRecord("Transform", transformData) })),
+			MakeVersion3Actor(guid, "Duplicate", json::array({ MakeComponentRecord("Transform", transformData) }))
 		}));
 
-		SceneBase scene;
-		Check(!SceneLoader::LoadScene(file.String(), &scene),
-			"Version 2 rejects duplicate actor Guids");
-		Check(scene.GetAllActors().empty(),
-			"Duplicate Guid validation fails before actor creation");
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(!load && load.error.code == SceneLoadErrorCode::DuplicateActorGuid,
+			"Version 3 rejects duplicate actor Guids");
+		Check(!load.scene, "Duplicate Guid validation publishes no candidate");
 	}
 
 	void TestMissingParentRejection()
 	{
 		const Guid actorGuid = GuidGenerator::Generate();
 		const Guid missingParentGuid = GuidGenerator::Generate();
-		TemporarySceneFile file(MakeVersion2Scene({
-			MakeActor(actorGuid, "Orphan", missingParentGuid.ToString())
+		Transform transform;
+		json transformData;
+		transform.Serialize(transformData);
+		TemporarySceneFile file(MakeVersion3Scene({
+			MakeVersion3Actor(actorGuid, "Orphan",
+				json::array({ MakeComponentRecord("Transform", transformData) }), missingParentGuid.ToString())
 		}));
 
-		SceneBase scene;
-		Check(!SceneLoader::LoadScene(file.String(), &scene),
-			"Version 2 rejects a missing parent Guid");
-		Check(scene.GetAllActors().empty(),
-			"Missing parent validation fails before actor creation");
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(!load && load.error.code == SceneLoadErrorCode::InvalidHierarchy,
+			"Version 3 rejects a missing parent Guid");
+		Check(!load.scene, "Missing parent validation publishes no candidate");
 	}
 
 	void TestHierarchyCycleRejection()
 	{
 		const Guid firstGuid = GuidGenerator::Generate();
 		const Guid secondGuid = GuidGenerator::Generate();
-		TemporarySceneFile file(MakeVersion2Scene({
-			MakeActor(firstGuid, "First", secondGuid.ToString()),
-			MakeActor(secondGuid, "Second", firstGuid.ToString())
+		Transform transform;
+		json transformData;
+		transform.Serialize(transformData);
+		TemporarySceneFile file(MakeVersion3Scene({
+			MakeVersion3Actor(firstGuid, "First",
+				json::array({ MakeComponentRecord("Transform", transformData) }), secondGuid.ToString()),
+			MakeVersion3Actor(secondGuid, "Second",
+				json::array({ MakeComponentRecord("Transform", transformData) }), firstGuid.ToString())
 		}));
 
-		SceneBase scene;
-		Check(!SceneLoader::LoadScene(file.String(), &scene),
-			"Version 2 rejects a hierarchy cycle");
-		Check(scene.GetAllActors().empty(),
-			"Cycle validation fails before actor creation");
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(!load && load.error.code == SceneLoadErrorCode::InvalidHierarchy,
+			"Version 3 rejects a hierarchy cycle");
+		Check(!load.scene, "Cycle validation publishes no candidate");
 	}
 
 	void TestWriterLoaderRoundTrip()
@@ -254,19 +441,27 @@ namespace
 
 		TemporarySceneFile file(std::string(".roundtrip.scene"));
 		Check(SceneWriter::SaveScene(file.String(), &source),
-			"SceneWriter saves a temporary version 3 scene");
+			"SceneWriter saves a temporary version 4 scene");
 
-		SceneBase restored;
-		Check(SceneLoader::LoadScene(file.String(), &restored),
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(static_cast<bool>(load),
 			"SceneLoader reloads the SceneWriter output");
-		Actor* restoredCamera = restored.ResolveActor(cameraGuid);
-		Actor* restoredChild = restored.ResolveActor(childGuid);
+		SceneBase* restored = load.scene.get();
+		Actor* restoredCamera = restored ? restored->ResolveActor(cameraGuid) : nullptr;
+		Actor* restoredChild = restored ? restored->ResolveActor(childGuid) : nullptr;
 		Check(restoredCamera && restoredChild,
 			"Writer-loader round trip preserves actor Guids");
 		Check(restoredChild && restoredChild->GetParent() == restoredCamera,
 			"Writer-loader round trip preserves hierarchy");
-		Check(restored.GetCameraSystem()->GetMainCamera() != nullptr,
+		Check(restored && restored->GetCameraSystem()->GetMainCamera() != nullptr,
 			"Writer-loader round trip configures the main camera");
+
+		DirectionalLight invalidLight = source.GetDirectionalLight();
+		invalidLight.intensity = std::numeric_limits<float>::infinity();
+		source.SetDirectionalLight(invalidLight);
+		json unchanged = { { "sentinel", true } };
+		Check(!SceneWriter::SerializeScene(&source, unchanged) && unchanged == json{ { "sentinel", true } },
+			"SceneWriter rejects non-finite settings without modifying its output");
 	}
 
 	void TestVersion3TransformDataRoundTrip()
@@ -287,13 +482,12 @@ namespace
 
 		TemporarySceneFile file(std::string(".v3-transform.scene"));
 		Check(camera && SceneWriter::SaveScene(file.String(), &source),
-			"Version 3 writer saves Transform component data");
+			"Version 4 writer saves Transform component data");
 
-		SceneBase restored;
-		Check(SceneLoader::LoadScene(file.String(), &restored),
-			"Version 3 loader restores Transform component data");
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(static_cast<bool>(load), "Version 4 loader restores Transform component data");
 
-		Actor* restoredActor = restored.ResolveActor(actorGuid);
+		Actor* restoredActor = load.scene ? load.scene->ResolveActor(actorGuid) : nullptr;
 		Transform* restoredTransform = restoredActor
 			? restoredActor->GetComponentByClass<Transform>()
 			: nullptr;
@@ -358,13 +552,13 @@ namespace
 		});
 		TemporarySceneFile file(sceneJson);
 
-		SceneBase scene;
-		const bool loaded = SceneLoader::LoadScene(file.String(), &scene);
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		const bool loaded = static_cast<bool>(load);
 		Check(loaded,
 			"Version 3 accepts RectTransform below a ScreenSpace Canvas");
 
-		Actor* actor = scene.ResolveActor(actorGuid);
-		Actor* canvasActor = scene.ResolveActor(canvasGuid);
+		Actor* actor = load.scene ? load.scene->ResolveActor(actorGuid) : nullptr;
+		Actor* canvasActor = load.scene ? load.scene->ResolveActor(canvasGuid) : nullptr;
 		RectTransform* rect = actor
 			? actor->GetComponentByClass<RectTransform>()
 			: nullptr;
@@ -417,11 +611,11 @@ namespace
 			TemporarySceneFile file(MakeVersion3Scene({
 				MakeVersion3Actor(actorGuid, "MissingTransform", json::array())
 			}));
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 rejects an Actor without a Transform component");
-			Check(scene.GetAllActors().empty(),
-				"Missing Transform fails before the Actor enters the Scene");
+			Check(!load.scene && load.error.code == SceneLoadErrorCode::ActorDeserializationFailed,
+				"Missing Transform publishes no candidate Scene");
 		}
 
 		{
@@ -435,11 +629,11 @@ namespace
 						MakeComponentRecord("RectTransform", rectTransformData)
 					}))
 			}));
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 rejects multiple Transform-derived components");
-			Check(scene.GetAllActors().empty(),
-				"Duplicate Transform validation fails before Scene registration");
+			Check(!load.scene && load.error.code == SceneLoadErrorCode::ActorDeserializationFailed,
+				"Duplicate Transform publishes no candidate Scene");
 		}
 	}
 
@@ -460,11 +654,11 @@ namespace
 						MakeComponentRecord("NotRegistered", json::object())
 					}))
 			}));
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 rejects an unregistered Component type");
-			Check(scene.GetAllActors().empty(),
-				"Unknown Component fails before Actor registration");
+			Check(!load.scene && load.error.path.find("/components/1/type") != std::string::npos,
+				"Unknown Component failure is located and publishes no candidate");
 		}
 
 		{
@@ -479,11 +673,11 @@ namespace
 						MakeComponentRecord("Transform", invalidTransformData)
 					}))
 			}));
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 rejects Component data that cannot be deserialized");
-			Check(scene.GetAllActors().empty(),
-				"Deserialize failure does not register the Actor");
+			Check(!load.scene && load.error.path.find("/components/0/data/position") != std::string::npos,
+				"Deserialize failure is located and publishes no candidate");
 		}
 	}
 
@@ -577,18 +771,18 @@ namespace
 
 		TemporarySceneFile file(std::string(".v3-components.scene"));
 		Check(SceneWriter::SaveScene(file.String(), &source),
-			"Version 3 writer saves referenced and Renderer components");
+			"Version 4 writer saves referenced and Renderer components");
 
-		SceneBase restored;
-		Check(SceneLoader::LoadScene(file.String(), &restored),
-			"Version 3 loader restores referenced and Renderer components");
+		SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+		Check(static_cast<bool>(load), "Version 4 loader restores referenced and Renderer components");
+		SceneBase* restored = load.scene.get();
 
-		Actor* restoredCameraActor = restored.ResolveActor(cameraGuid);
-		Actor* restoredTargetActor = restored.ResolveActor(targetGuid);
-		Actor* restoredMeshActor = restored.ResolveActor(meshGuid);
-		Actor* restoredSpriteActor = restored.ResolveActor(spriteGuid);
-		Actor* restoredCanvasActor = restored.ResolveActor(canvasGuid);
-		Actor* restoredImageActor = restored.ResolveActor(imageGuid);
+		Actor* restoredCameraActor = restored ? restored->ResolveActor(cameraGuid) : nullptr;
+		Actor* restoredTargetActor = restored ? restored->ResolveActor(targetGuid) : nullptr;
+		Actor* restoredMeshActor = restored ? restored->ResolveActor(meshGuid) : nullptr;
+		Actor* restoredSpriteActor = restored ? restored->ResolveActor(spriteGuid) : nullptr;
+		Actor* restoredCanvasActor = restored ? restored->ResolveActor(canvasGuid) : nullptr;
+		Actor* restoredImageActor = restored ? restored->ResolveActor(imageGuid) : nullptr;
 
 		Camera* restoredCamera = restoredCameraActor
 			? restoredCameraActor->GetComponentByClass<Camera>()
@@ -613,7 +807,7 @@ namespace
 			restoredSprite &&
 			restoredCanvas &&
 			restoredImage,
-			"Version 3 restores every tested Component type");
+			"Version 4 restores every tested Component type");
 
 		json actualCamera;
 		json actualMesh;
@@ -677,11 +871,11 @@ namespace
 					}))
 			}));
 
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 rejects a missing Camera Actor reference");
-			Check(scene.ResolveActor(cameraGuid) != nullptr,
-				"Camera reference failure occurs after Actor creation");
+			Check(!load.scene && load.error.code == SceneLoadErrorCode::ReferenceResolutionFailed,
+				"Camera reference failure publishes no candidate Scene");
 		}
 
 		{
@@ -712,21 +906,19 @@ namespace
 					}))
 			}));
 
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 rejects a Canvas reference to an Actor without Canvas");
-			Check(
-				scene.ResolveActor(nonCanvasGuid) != nullptr &&
-				scene.ResolveActor(imageGuid) != nullptr,
-				"Canvas reference failure occurs after all Actors are created");
+			Check(!load.scene && load.error.code == SceneLoadErrorCode::ReferenceResolutionFailed,
+				"Canvas reference failure publishes no candidate Scene");
 		}
 
 		{
 			MeshRenderer renderer;
 			json rendererData;
 			renderer.Serialize(rendererData);
-			rendererData["meshAssetId"] =
-				GuidGenerator::Generate().ToString();
+			const Guid missingAssetGuid = GuidGenerator::Generate();
+			rendererData["meshAssetId"] = missingAssetGuid.ToString();
 
 			const Guid actorGuid = GuidGenerator::Generate();
 			TemporarySceneFile file(MakeVersion3Scene({
@@ -739,19 +931,86 @@ namespace
 					}))
 			}));
 
-			SceneBase scene;
-			Check(!SceneLoader::LoadScene(file.String(), &scene),
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load,
 				"Version 3 propagates Asset reference resolution failure");
-			Check(scene.ResolveActor(actorGuid) != nullptr,
-				"Asset resolution failure occurs after Actor creation");
+			Check(!load.scene && load.error.code == SceneLoadErrorCode::ReferenceResolutionFailed &&
+				load.error.path == "/actors/0/components/1/data/meshAssetId" &&
+				load.error.message.find(missingAssetGuid.ToString()) != std::string::npos &&
+				load.error.message.find("expected Mesh") != std::string::npos &&
+				load.error.message.find("not found") != std::string::npos,
+				"Missing Asset failure retains its path, Guid, expected type and reason");
+		}
+
+		{
+			MeshRenderer renderer;
+			json rendererData;
+			renderer.Serialize(rendererData);
+			rendererData["meshAssetId"] = "not-a-guid";
+
+			TemporarySceneFile file(MakeVersion3Scene({
+				MakeVersion3Actor(
+					GuidGenerator::Generate(),
+					"InvalidMeshGuid",
+					json::array({
+						MakeComponentRecord("Transform", transformData),
+						MakeComponentRecord("MeshRenderer", rendererData)
+					}))
+			}));
+
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), TestEngineContext());
+			Check(!load.scene && load.error.path == "/actors/0/components/1/data/meshAssetId" &&
+				load.error.message.find("invalid GUID") != std::string::npos,
+				"Invalid Asset Guid reports its property path and representation failure");
+		}
+
+		{
+			namespace fs = std::filesystem;
+			const fs::path directory = fs::temp_directory_path() /
+				("101Engine_SceneLoaderAssetType_" + GuidGenerator::Generate().ToString());
+			fs::create_directories(directory);
+			std::ofstream(directory / "texture.png").put('\0');
+
+			AssetManager assetManager;
+			const bool catalogReady = assetManager.Initialize(directory.string(), nullptr, nullptr);
+			const AssetEntry* texture = assetManager.GetAssetEntryByPath("texture.png");
+			MeshRenderer renderer;
+			json rendererData;
+			renderer.Serialize(rendererData);
+			if (texture) rendererData["meshAssetId"] = texture->guid.ToString();
+
+			TemporarySceneFile file(MakeVersion3Scene({
+				MakeVersion3Actor(
+					GuidGenerator::Generate(),
+					"WrongMeshType",
+					json::array({
+						MakeComponentRecord("Transform", transformData),
+						MakeComponentRecord("MeshRenderer", rendererData)
+					}))
+			}));
+			EngineContext context{ .pAssetManager = &assetManager };
+			SceneLoadResult load = SceneLoader::LoadCandidate(file.String(), context);
+			Check(catalogReady && texture && !load.scene &&
+				load.error.path == "/actors/0/components/1/data/meshAssetId" &&
+				load.error.message.find(texture->guid.ToString()) != std::string::npos &&
+				load.error.message.find("expected Mesh") != std::string::npos &&
+				load.error.message.find("different Asset type") != std::string::npos,
+				"Asset type mismatch retains its path, Guid, expected type and reason");
+
+			std::error_code cleanupError;
+			fs::remove_all(directory, cleanupError);
 		}
 	}
 }
 
 int main()
 {
-	TestVersion2ChildBeforeParent();
+	RegisterVersion3TestBehavior();
+	TestVersion3ChildBeforeParent();
+	TestRepositorySceneCompatibility();
+	TestVersion2Rejection();
 	TestVersion1Rejection();
+	TestVersion4StrictSchemaAndCandidateIsolation();
 	TestDuplicateGuidRejection();
 	TestMissingParentRejection();
 	TestHierarchyCycleRejection();
@@ -762,6 +1021,7 @@ int main()
 	TestVersion3InvalidComponentRejection();
 	TestVersion3ComponentReferencesAndRendererRoundTrip();
 	TestVersion3ReferenceResolutionFailures();
+	ComponentRegistry::Get().UnregisterAllGameComponents();
 
 	if (g_failures != 0)
 	{

@@ -1,1 +1,12 @@
-{"version": 1} 
+{
+  "editor": {
+    "startupSceneGuid": "{23C378F6-893E-4AE2-9972-F7B3F1A3B212}"
+  },
+  "game": {
+    "startupSceneGuid": "{23C378F6-893E-4AE2-9972-F7B3F1A3B212}"
+  },
+  "tags": [
+    "Player"
+  ],
+  "version": 1
+}

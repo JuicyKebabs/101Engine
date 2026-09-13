@@ -1,13 +1,21 @@
 #include "Behavior.h"
 #include "Engine/Scene/SceneManager.h"
 
-void Behavior::ChangeScene(const std::string& sceneName)
+bool Behavior::ChangeScene(const std::string& sceneName)
 {
-	// Get the SceneManager instance from the EngineContext
-	SceneManager* sceneManager = GetOwner()->GetOwner()->GetSceneManager();
-	if (sceneManager)
-	{
-		// Reserve a scene change to the specified scene name
-		sceneManager->ReserveChangeScene(sceneName);
-	}
+	SceneManager* sceneManager = GetOwner() && GetOwner()->GetOwner()
+		? GetOwner()->GetOwner()->GetSceneManager() : nullptr;
+	return sceneManager && sceneManager->ReserveChangeScene(sceneName);
+}
+
+bool Behavior::ChangeScene(const Guid& sceneAssetGuid)
+{
+	SceneManager* sceneManager = GetOwner() && GetOwner()->GetOwner()
+		? GetOwner()->GetOwner()->GetSceneManager() : nullptr;
+	return sceneManager && sceneManager->ReserveChangeScene(sceneAssetGuid);
+}
+
+bool Behavior::ChangeScene(const AssetReference<SceneAsset>& sceneAsset)
+{
+	return sceneAsset.HasValue() && ChangeScene(sceneAsset.GetGuid());
 }

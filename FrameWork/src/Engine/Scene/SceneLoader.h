@@ -1,103 +1,138 @@
 #pragma once
-#include <string>
-#include <vector>
-#include <unordered_map>
+
+#include "Engine/ActorImprint/ActorImprintInstanceRecord.h"
 #include "Engine/Core/GUID/Guid.h"
+#include "Engine/Scene/SceneBase.h"
 #include "nlohmann/json_fwd.hpp"
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
-//-----------------------------------------------------------------------------
-// SceneLoader class
-// This class is responsible for loading scene data from a file.
-//------------------------------------------------------------------------------
-
-class SceneBase;
 class Actor;
 class EngineContext;
+class ActorImprintSystem;
 
+enum class SceneLoadErrorCode
+{
+	None,
+	InvalidArgument,
+	FileOpenFailed,
+	JsonParseFailed,
+	UnsupportedVersion,
+	InvalidSchema,
+	InvalidActorGuid,
+	DuplicateActorGuid,
+	InvalidHierarchy,
+	ActorDeserializationFailed,
+	InstanceDeserializationFailed,
+	InstanceMaterializationFailed,
+	ReferenceResolutionFailed,
+	UIHierarchyFailed,
+	InvalidSceneSettings,
+	InvalidInstanceRegistry,
+};
+
+struct SceneLoadError
+{
+	SceneLoadErrorCode code = SceneLoadErrorCode::None;
+	std::string path;      // JSON Pointer into the Scene record.
+	std::string assetPath; // Requested Scene asset path, or a caller-supplied in-memory label.
+	std::string message;
+};
+
+struct SceneLoadResult
+{
+	std::unique_ptr<SceneBase> scene;
+	SceneLoadError error;
+
+	explicit operator bool() const { return scene != nullptr; }
+};
+
+// Builds a complete Scene in private storage. Callers publish the returned Scene
+// only after success, so every recoverable load failure leaves their current Scene
+// and owner-specific state unchanged.
 class SceneLoader
 {
 public:
-	static bool LoadScene(const std::string& filePath, SceneBase* scene);
-
-	// Output the scene data from the JSON record into the provided scene instance.
-	// Provided scene must be initialized before calling this function.
-	static bool DeserializeScene(SceneBase* scene, const nlohmann::json& sceneRecord);
+	static SceneLoadResult LoadCandidate(const std::string& filePath, EngineContext& context);
+	static SceneLoadResult LoadCandidate(const char* filePath, EngineContext& context)
+	{
+		return LoadCandidate(std::string(filePath ? filePath : ""), context);
+	}
+	static SceneLoadResult LoadCandidate(const nlohmann::json& sceneRecord,
+		EngineContext& context, std::string assetPath = "<memory>");
 
 private:
-	// Structure to hold information about an actor being loaded
+	friend class ActorImprintSystem;
+	// ET-14 uses the same complete Scene validation while deferring lifecycle
+	// callbacks until every live Scene candidate has succeeded.
+	static SceneLoadResult LoadPreparedCandidate(const nlohmann::json& sceneRecord,
+		EngineContext& context, std::string assetPath);
+	static SceneLoadResult LoadCandidateImpl(const nlohmann::json& sceneRecord,
+		EngineContext& context, std::string assetPath, bool publish);
+
 	struct ActorLoadRecord
 	{
-		const nlohmann::json* actorJson = nullptr;	// Pointer to the actor's JSON data
-		Guid actorGuid;								// Actor's GUID
-		bool hasParent = false;						// Whether the actor has a parent
-		Guid parentGuid;							// Parent actor's GUID (if any)
+		const nlohmann::json* actorJson = nullptr;
+		Guid actorGuid;
+		bool hasParent = false;
+		Guid parentGuid;
+		std::size_t sourceIndex = 0;
 	};
 
-	// Enum to represent the visit state of an actor reference during the loading process
-	// Used to avoid circular dependencies
+	struct InstanceLoadRecord
+	{
+		ActorImprintSerializedInstanceRecord record;
+		const nlohmann::json* sourceJson = nullptr;
+		std::size_t sourceIndex = 0;
+	};
+
+	enum class ActorProvenance
+	{
+		Ordinary,
+		ImprintRoot,
+		ImprintMember,
+	};
+
+	struct ActorOrigin
+	{
+		ActorProvenance provenance = ActorProvenance::Ordinary;
+		std::string path;
+	};
+
 	enum class VisitState
 	{
-		Unvisited,	// Actor has not been visited yet
-		Visiting,	// Actor is currently being visited (in the process of loading)
-		Visited		// Actor has been fully visited (loading complete)
+		Unvisited,
+		Visiting,
+		Visited,
 	};
 
-private:
-	// Scene loader for  version 2
-	static bool LoadSceneVersion2(
-		const nlohmann::json& sceneJson,
-		SceneBase* scene
-	);
-
-	// Restore actor data for version 2
-	static Actor* RestoreActorDataVersion2(
-		const ActorLoadRecord& record,
-		SceneBase* scene
-	);
-
-	// Scene loader for version 3
-	static bool LoadSceneVersion3(
-		const nlohmann::json& sceneJson,
-		SceneBase* scene
-	);
-
-	// Restore actor data for version 3
-	static Actor* RestoreActorDataVersion3(
-		const ActorLoadRecord& record,
-		SceneBase* scene
-	);
-
-	// Restore component references for all actors after they have been created
-	static bool RestoreComponentReferences(
-		const std::vector<ActorLoadRecord>& records,
-		SceneBase* scene
-	);
-
-	// Apply scene settings from the JSON data to the scene
-	static bool ApplySceneSettings(
-		const nlohmann::json& sceneJson,
-		SceneBase* scene
-	);
-
-	// Check if the scene has a main camera and configure it if necessary
-	static void ConfigureMainCamera(SceneBase* scene);
-
-	// Build a list of actor load records from the scene JSON data before creating the actors
-	static bool BuildActorLoadRecords(
-		const nlohmann::json& sceneJson,
-		std::vector<ActorLoadRecord>& outRecords
-	);
-
-	// Check if the actor hierarchy has cycles (circular dependencies)
-	static bool HasHierarchyCycle(
-		const Guid& actorGuid,
-		const std::unordered_map<Guid, Guid>& parentMap,
-		std::unordered_map<Guid, VisitState>& states
-	);
-
-	// Check if the parent references in the actor load records are valid (no missing parents)
-	static bool ValidateParentReferences(const std::vector<ActorLoadRecord>& records);
-	
-	// Check if the actor hierarchy is valid and does not contain cycles (circular dependencies)
-	static bool ValidateHierarchyCycles(const std::vector<ActorLoadRecord>& records);
+	static bool BuildActorLoadRecords(const nlohmann::json& sceneJson, bool strictV4,
+		std::vector<ActorLoadRecord>& outRecords,
+		std::unordered_map<Guid, ActorOrigin>& origins, SceneLoadError& error);
+	static bool BuildInstanceLoadRecords(const nlohmann::json& sceneJson,
+		std::vector<InstanceLoadRecord>& outRecords,
+		std::unordered_map<Guid, ActorOrigin>& origins, SceneLoadError& error);
+	static bool ValidateParentReferences(const std::vector<ActorLoadRecord>& records,
+		SceneLoadError& error);
+	static bool ValidateHierarchyCycles(const std::vector<ActorLoadRecord>& records,
+		SceneLoadError& error);
+	static bool RestoreOrdinaryActors(const std::vector<ActorLoadRecord>& records,
+		SceneBase& scene, SceneLoadError& error);
+	static bool RestoreOrdinaryHierarchy(const std::vector<ActorLoadRecord>& records,
+		SceneBase& scene, SceneLoadError& error);
+	static bool RestoreInstances(const std::vector<InstanceLoadRecord>& records,
+		const std::unordered_set<Guid>& reservedSceneGuids,
+		std::unordered_map<Guid, ActorOrigin>& origins,
+		SceneBase& scene, SceneLoadError& error);
+	static bool RestoreComponentReferences(const std::vector<InstanceLoadRecord>& instanceRecords,
+		const std::unordered_map<Guid, ActorOrigin>& origins, SceneBase& scene, SceneLoadError& error);
+	static bool ValidateSceneSettings(const nlohmann::json& sceneJson, bool strictV4,
+		SceneLoadError& error);
+	static bool ApplySceneSettings(const nlohmann::json& sceneJson, SceneBase& scene,
+		SceneLoadError& error);
+	static bool ValidateInstanceRegistry(SceneBase& scene, SceneLoadError& error);
+	static void ConfigureMainCamera(SceneBase& scene, const std::vector<Actor*>& actors);
 };

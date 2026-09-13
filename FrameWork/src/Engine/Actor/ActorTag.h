@@ -3,6 +3,9 @@
 #include <string>
 #include <unordered_map>
 #include <string_view>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Tag system
@@ -33,39 +36,27 @@ constexpr TagId CalcTagId(std::string_view str)
 class TagRegistry
 {
 public:
-	static TagRegistry& Get()
-	{
-		static TagRegistry instance;
-		return instance;
-	}
+	static TagRegistry& Get();
 
 	// Register a tag name and get its corresponding TagId.
-	TagId Register(std::string_view tagName)
-	{
-		TagId id = CalcTagId(tagName);
-		m_tags[id] = std::string(tagName);
-		return id;
-	}
+	TagId Register(std::string_view tagName);
+	bool RegisterUserTag(std::string_view tagName, TagId* outId = nullptr, std::string* outError = nullptr);
+	bool UnregisterUserTag(std::string_view tagName);
+	bool ContainsName(std::string_view tagName) const;
+	bool IsReserved(TagId id) const;
+	static bool NormalizeUserTagName(std::string_view input, std::string& output, std::string* outError = nullptr);
+	static bool NamesEqualCaseInsensitive(std::string_view left, std::string_view right);
+	static bool ValidateUserTagSet(const std::vector<std::string>& input,
+		std::vector<std::string>& normalized, std::string* outError = nullptr);
 
 	// Get the TagId for a given tag name. (Auto-registers if not found)
-	TagId GetId(std::string_view tagName)
-	{
-		TagId id = CalcTagId(tagName);
-		if (m_tags.find(id) == m_tags.end())
-		{
-			m_tags[id] = std::string(tagName);
-		}
-		return id;
-	}
+	TagId GetId(std::string_view tagName);
 
 	// Get the tag name for a given TagId.
-	std::string GetName(TagId id) const
-	{
-		if (id == TAG_NONE) return "None";
-		auto it = m_tags.find(id);
-		if (it != m_tags.end()) return it->second;
-		return "UnknownTag";
-	}
+	std::string GetName(TagId id) const;
+
+	// Returns a stable presentation snapshot without exposing the registry storage.
+	std::vector<std::pair<TagId, std::string>> GetRegisteredTags() const;
 
 private:
 	TagRegistry() = default;

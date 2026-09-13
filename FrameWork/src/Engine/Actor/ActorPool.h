@@ -53,6 +53,10 @@ private:
 
 private:
 	friend class SceneBase;
+	friend class SceneActorBatch;
+
+	// Plans ordinary registration order without consuming slots or generations.
+	std::vector<ActorHandle> PlanRegistration(std::size_t count) const;
 
 	// Immediately discard an Actor registered during a failed restoration transaction.
 	// This must only be used before the Actor becomes visible to normal Scene processing.

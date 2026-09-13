@@ -55,19 +55,38 @@ public:
 	const MeshRendererProxy& GetRenderProxy();
 	bool IsConfigured() const override { return !m_templates.empty(); }
 	AssetReference<MeshAsset> GetMeshAssetReference() const;
-	void SetMeshAssetReference(const AssetReference<MeshAsset>& value);
+	bool TrySetMeshAssetReference(const AssetReference<MeshAsset>& value);
 	Guid GetAssetId() const;
 
 	// Serialization and deserialization methods
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
+	enum class AssetPrepareResult
+	{
+		Ready,
+		MissingAsset,
+		Failed,
+	};
+
+	struct PreparedMeshAssetState
+	{
+		Guid assetId;
+		std::vector<SubmeshRenderTemplate> templates;
+	};
+
 	std::vector<SubmeshRenderTemplate> m_templates;			// Render templates for each mesh to be drawn
 	MeshRendererProxy m_proxy;								// Cached render proxy for this component
 	Guid m_meshAssetId;										// Mesh asset ID for this renderer
 	std::optional<Guid> m_pendingMeshAssetId;				// Optional pending asset ID for deferred loading (used during deserialization)
 
 private:
+	AssetPrepareResult PrepareMeshAssetState(
+		const Guid& assetId,
+		PreparedMeshAssetState& outState) const;
+	void CommitMeshAssetState(PreparedMeshAssetState&& state);
+	bool SetPendingMeshAssetReference(const AssetReference<MeshAsset>& value);
+
 	// Override functions for component lifecycle
 	void OnAttachOverride() override;
 	void OnStartOverride() override;

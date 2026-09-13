@@ -8,6 +8,7 @@
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Actor/ActorHandle.h"
 #include "Engine/Core/GUID/Guid.h"
+#include "Engine/Scene/StructuralMutationResult.h"
 
 //-----------------------------------------------------------------------------
 // Actor class
@@ -56,13 +57,10 @@ public:
 	void Update(float deltaTime);		// Update
 	void LateUpdate(float deltaTime);	// Late update
 
-	void Destroy();		// Mark actor as destroyed
-	bool IsDestroyed();	// Check if actor is destroyed
-	void OnDestroy();
+	void Destroy(StructuralMutationResult* result = nullptr);
+	bool IsDestroyed() const;	// Check if actor is destroyed
 
 	// Setters
-	void SetHandle(ActorHandle handle) { m_handle = handle; }
-	void SetOwner(SceneBase* ownerScene) { m_pOwner = ownerScene; }
 	void SetTag(TagId tag) { m_tag = tag; }
 	void SetActive(bool isActive) { m_isActive = isActive; }
 	void SetName(const std::string& name) { m_name = name; }
@@ -97,10 +95,7 @@ public:
 
 		auto component = std::make_unique<T>(std::forward<Args>(args)...);
 
-		Component* added = AddComponentInternal(
-			std::move(component),
-			std::type_index(typeid(T))
-		);
+		Component* added = AddComponent(std::unique_ptr<Component>(std::move(component)));
 
 		return dynamic_cast<T*>(added);
 	}
@@ -108,7 +103,7 @@ public:
 	// Add a pre-created component instance to the container.
 	// Used by ComponentRegistry::AddToActor, where the concrete type is only
 	// known at runtime (created via a Factory function returning Component*).
-	Component* AddComponent(std::unique_ptr<Component> component);
+	Component* AddComponent(std::unique_ptr<Component> component, StructuralMutationResult* result = nullptr);
 
 	// Check if the container has a component of type T
 	template<class T>
@@ -204,7 +199,7 @@ public:
 
 	// Remove a component of type T from the container by class type
 	template<class T>
-	void RemoveComponentByClass()
+	void RemoveComponentByClass(StructuralMutationResult* result = nullptr)
 	{
 		static_assert(std::is_base_of_v<Component, T>, "RemoveComponentByClass<T>: T must derive from Component");
 		using Policy = ComponentPolicy<T>;
@@ -221,9 +216,9 @@ public:
 		{
 			for (const auto& instance : bucket->second.instances)
 			{
-				if (auto casted = static_cast<T*>(instance.get()))
+				if (auto casted = static_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
 				{
-					casted->MarkForDestruction();
+					casted->MarkForDestruction(result);
 				}
 			}
 		}
@@ -231,9 +226,9 @@ public:
 		{
 			if (pending.typeId == typeId)
 			{
-				if (auto casted = static_cast<T*>(pending.instance.get()))
+				if (auto casted = static_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 				{
-					casted->MarkForDestruction();
+					casted->MarkForDestruction(result);
 				}
 			}
 		}
@@ -251,7 +246,7 @@ public:
 		{
 			for (const auto& instance : it->second.instances)
 			{
-				if (auto casted = static_cast<T*>(instance.get()))
+				if (auto casted = static_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
 				{
 					return casted;
 				}
@@ -261,7 +256,7 @@ public:
 		{
 			if (pending.typeId == typeId)
 			{
-				if (auto casted = static_cast<T*>(pending.instance.get()))
+				if (auto casted = static_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 				{
 					return casted;
 				}
@@ -274,7 +269,7 @@ public:
 			if (id == typeId) continue;
 			for(const auto& instance : bucket.instances)
 			{
-				if (auto casted = dynamic_cast<T*>(instance.get()))
+				if (auto casted = dynamic_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
 				{
 					return casted;
 				}
@@ -283,7 +278,7 @@ public:
 		for(auto& pending : m_pendingComponents)
 		{
 			if (pending.typeId == typeId) continue;
-			if (auto casted = dynamic_cast<T*>(pending.instance.get()))
+			if (auto casted = dynamic_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 			{
 				return casted;
 			}
@@ -293,6 +288,12 @@ public:
 	}
 
 	// Get all components of type T from the container by class type
+	template<class T>
+	const T* GetComponentByClass() const
+	{
+		return const_cast<Actor*>(this)->GetComponentByClass<T>();
+	}
+
 	template<class T>
 	std::vector<T*> GetComponentsByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
@@ -304,7 +305,7 @@ public:
 		{
 			for (const auto& instance : it->second.instances)
 			{
-				if (auto casted = static_cast<T*>(instance.get()))
+				if (auto casted = static_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
 				{
 					result.push_back(casted);
 				}
@@ -314,7 +315,7 @@ public:
 		{
 			 if (pending.typeId == GetComponentTypeId<T>())
 			 {
-				 if (auto casted = static_cast<T*>(pending.instance.get())) 
+				 if (auto casted = static_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 				 {
 					 result.push_back(casted);
 				 }
@@ -327,7 +328,7 @@ public:
 			if (id == GetComponentTypeId<T>()) continue;
 			for(const auto& instance : bucket.instances)
 			{
-				if (auto casted = dynamic_cast<T*>(instance.get())) 
+				if (auto casted = dynamic_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
 				{
 					result.push_back(casted);
 				}
@@ -336,7 +337,7 @@ public:
 		for(auto& pending : m_pendingComponents)
 		{
 			if (pending.typeId == GetComponentTypeId<T>()) continue;
-			if (auto casted = dynamic_cast<T*>(pending.instance.get()))
+			if (auto casted = dynamic_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 			{
 				result.push_back(casted);
 			}
@@ -368,15 +369,10 @@ public:
 	std::vector<Component*> GetAllComponents()
 	{
 		std::vector<Component*> result;
-		for (auto& [typeId, bucket] : m_components)
+		result.reserve(m_componentPtrs.size() + m_pendingComponents.size());
+		for (Component* component : m_componentPtrs)
 		{
-			for (auto& instance : bucket.instances)
-			{
-				if (instance && !instance->IsDestroyed())
-				{
-					result.push_back(instance.get());
-				}
-			}
+			if (component && !component->IsDestroyed()) result.push_back(component);
 		}
 		for (auto& pending : m_pendingComponents)
 		{
@@ -397,7 +393,7 @@ public:
 	size_t CountComponentFamily(ComponentFamily family) const;
 
 	// Add a child actor
-	Actor* AddChild(std::unique_ptr<Actor> child);
+	Actor* AddChild(std::unique_ptr<Actor> child, StructuralMutationResult* result = nullptr);
 
 	void AttachComponents();	// Attach all components (call OnAttach)
 
@@ -428,6 +424,14 @@ private:
 
 private:
 	void AttachPendingComponents();
+	// Move detached components into final storage without lifecycle callbacks.
+	void PrepareComponentsForAttach();
+	friend class SceneActorBatch;
+	friend class ActorPool;
+	void OnDestroy();
+	void SetHandle(ActorHandle handle) { m_handle = handle; }
+	void SetOwner(SceneBase* ownerScene) { m_pOwner = ownerScene; }
+	bool CanAddComponentLocal(std::type_index typeId) const;
 	void RemoveDestroyedComponents(Component* component);
 	void MarkForDestruction() { m_destroyed = true; }
 

@@ -12,9 +12,7 @@ class MenuBar
 public:
     struct Callbacks
     {
-        std::function<void()> onNewScene;
-        std::function<void()> onOpenScene;
-        std::function<void()> onSaveScene;
+		std::function<void()> onSaveDocument;
 
         std::function<void()> onUndo;
         std::function<void()> onRedo;
@@ -22,14 +20,31 @@ public:
 
         std::function<void()> onBuildGame;
         std::function<void(bool)> onReloadGameCode;
-        std::function<void(const std::string&, bool isBehavior)> onCreateScript;
+		std::function<void(const std::string&, bool isBehavior)> onCreateScript;
+		std::function<void()> onCreateActorImprint;
 
         bool canUndo = false;
         bool canRedo = false;
-        bool canEditScene = true;
+		bool canSave = false;
         bool canModifyScripts = true;
+		bool canModifyActorImprints = true;
         bool canBuild = true;
     };
+
+	static bool DispatchCreateActorImprint(const Callbacks& callbacks)
+	{
+		if (!callbacks.canModifyActorImprints || !callbacks.onCreateActorImprint) return false;
+		callbacks.onCreateActorImprint();
+		return true;
+	}
+	static bool DispatchSaveShortcut(const Callbacks& callbacks,
+		bool controlDown, bool savePressed, bool textInputActive)
+	{
+		if (!controlDown || !savePressed || textInputActive ||
+			!callbacks.canSave || !callbacks.onSaveDocument) return false;
+		callbacks.onSaveDocument();
+		return true;
+	}
 
     void Render(const Callbacks& callbacks);
 

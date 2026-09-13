@@ -5,20 +5,12 @@ void MenuBar::Render(const Callbacks& callbacks)
 {
     if (ImGui::BeginMainMenuBar())
     {
-		// File menu for scene management (new/open/save)
+		// File menu contains operations shared by every Editor Document.
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("New Scene", nullptr, false, callbacks.canEditScene))
+			if (ImGui::MenuItem("Save", "Ctrl+S", false, callbacks.canSave))
             {
-                if (callbacks.onNewScene) callbacks.onNewScene();
-            }
-            if (ImGui::MenuItem("Open Scene", nullptr, false, callbacks.canEditScene))
-            {
-                if (callbacks.onOpenScene) callbacks.onOpenScene();
-            }
-            if (ImGui::MenuItem("Save Scene", nullptr, false, callbacks.canEditScene))
-            {
-                if (callbacks.onSaveScene) callbacks.onSaveScene();
+				if (callbacks.onSaveDocument) callbacks.onSaveDocument();
             }
             ImGui::EndMenu();
         }
@@ -50,6 +42,12 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// Assets menu for creating new assets like behaviors
         if (ImGui::BeginMenu("Assets"))
         {
+			if (ImGui::MenuItem("Create Actor Imprint...", nullptr, false,
+				callbacks.canModifyActorImprints))
+			{
+				DispatchCreateActorImprint(callbacks);
+			}
+			ImGui::Separator();
             if (ImGui::MenuItem("Create Script...", nullptr, false, callbacks.canModifyScripts))
             {
                 m_showCreateScriptPopup = true;
@@ -79,8 +77,11 @@ void MenuBar::Render(const Callbacks& callbacks)
             ImGui::EndMenu();
         }
 
-        ImGui::EndMainMenuBar();
-    }
+		ImGui::EndMainMenuBar();
+	}
+	const ImGuiIO& io = ImGui::GetIO();
+	DispatchSaveShortcut(callbacks, io.KeyCtrl,
+		ImGui::IsKeyPressed(ImGuiKey_S, false), io.WantTextInput);
 
 	// Handle the Create Script popup
     if (m_showCreateScriptPopup)
