@@ -71,11 +71,14 @@ namespace
 	class TestRendererComponent final : public RendererComponent
 	{
 	private:
+		void OnAttachOverride() override {}
 		void OnStartOverride() override {}
 		void PreUpdateOverride(float) override {}
 		void UpdateOverride(float) override {}
 		void LateUpdateOverride(float) override {}
+		void OnDetachOverride() override {}
 		void OnDestroyOverride() override {}
+		void ApplyBlendModeToRenderTemplates() override {}
 	};
 
 	std::unique_ptr<TypeMetadata> BuildTestRendererMetadata()
@@ -156,7 +159,7 @@ namespace
 	{
 		const std::vector<std::string> typeNames{
 			"Transform", "RectTransform", "Camera", "Collider", "MeshRenderer",
-			"SpriteRenderer", "UIRenderer", "UIImage", "Canvas"
+			"SpriteRenderer", "SkyRenderer", "UIRenderer", "UIImage", "Canvas"
 		};
 		bool allRegistered = true;
 		bool optionalRequirementsAreLimited = true;
@@ -171,7 +174,7 @@ namespace
 				if (property.GetSerializationMetadata()->requirement != PropertyRequirement::Optional) continue;
 				const std::string& path = property.GetPath().ToString();
 				optionalRequirementsAreLimited = optionalRequirementsAreLimited &&
-					(path == "/sortOrderInCanvas" ||
+					(path == "/sortOrderInCanvas" || path == "/blendMode" ||
 					(typeName == "Canvas" &&
 						(path == "/scaleMode" || path == "/matchWidthOrHeight")));
 			}
@@ -185,15 +188,107 @@ namespace
 			? camera->FindPropertyByPath(*PropertyPath::FromString("/lens/projectionType")) : nullptr;
 		const PropertyMetadata* meshAsset = mesh
 			? mesh->FindPropertyByPath(*PropertyPath::FromString("/meshAssetId")) : nullptr;
+		const PropertyMetadata* blendMode = mesh
+			? mesh->FindPropertyByPath(*PropertyPath::FromString("/blendMode")) : nullptr;
 
 		Check(allRegistered,
 			"Every built-in persistent Component has TypeMetadata");
 		Check(optionalRequirementsAreLimited,
-			"Only the three approved Scene v3 compatibility fields are Optional");
+			"Only approved compatibility fields are Optional");
 		Check(target && target->GetLogicalType() == PropertyLogicalType::ActorReference &&
 			lens && lens->GetLogicalType() == PropertyLogicalType::Enum &&
-			meshAsset && meshAsset->GetLogicalType() == PropertyLogicalType::AssetReference,
+			meshAsset && meshAsset->GetLogicalType() == PropertyLogicalType::AssetReference &&
+			blendMode && blendMode->GetLogicalType() == PropertyLogicalType::Enum,
 			"Nested, Actor, Enum, and Asset properties keep their logical metadata types");
+	}
+
+	void TestRendererBlendModePersistenceAndTemplateApplication()
+	{
+		MeshRenderer mesh;
+		SubmeshRenderTemplate first;
+		SubmeshRenderTemplate second;
+		first.materialDesc.psoKey.blend = BlendMode::Add;
+		second.materialDesc.psoKey.blend = BlendMode::Opaque;
+		mesh.SetParams({.templates = {first, second}});
+		Check(mesh.GetBlendMode() == BlendMode::Add &&
+			mesh.GetRenderTemplates()[0].materialDesc.psoKey.blend == BlendMode::Add &&
+			mesh.GetRenderTemplates()[1].materialDesc.psoKey.blend == BlendMode::Add,
+			"MeshRenderer adopts the first template BlendMode and applies it to every submesh");
+
+		mesh.SetBlendMode(BlendMode::Multiply);
+		nlohmann::json serialized;
+		Check(mesh.Serialize(serialized) &&
+			serialized["blendMode"] == static_cast<int>(BlendMode::Multiply),
+			"Renderer BlendMode serializes as an integer enum");
+
+		MeshRenderer restored;
+		Check(restored.Deserialize(serialized) && restored.GetBlendMode() == BlendMode::Multiply,
+			"Renderer BlendMode survives a round trip");
+
+		serialized.erase("blendMode");
+		MeshRenderer legacy;
+		Check(legacy.Deserialize(serialized) && legacy.GetBlendMode() == BlendMode::Opaque,
+			"Renderer data without BlendMode retains the renderer default");
+
+		nlohmann::json invalid;
+		mesh.Serialize(invalid);
+		invalid["name"] = "MustNotApply";
+		invalid["blendMode"] = 999;
+		const std::string previousName = mesh.GetName();
+		Check(!mesh.Deserialize(invalid) && mesh.GetName() == previousName &&
+			mesh.GetBlendMode() == BlendMode::Multiply,
+			"Invalid BlendMode is rejected without partially mutating the renderer");
+
+		SpriteRenderer sprite;
+		Check(sprite.GetBlendMode() == BlendMode::Alpha,
+			"SpriteRenderer retains its transparent default BlendMode");
+		sprite.SetBlendMode(BlendMode::AddAlpha);
+		Check(sprite.GetRenderTemplate().materialDesc.psoKey.blend == BlendMode::AddAlpha,
+			"SpriteRenderer applies BlendMode to its render template");
+
+		UIImage image;
+		UIRenderElement uiElement;
+		uiElement.materialDesc.psoKey.blend = BlendMode::Add;
+		image.SetParams({.renderTemplate = {uiElement}});
+		image.SetBlendMode(BlendMode::Multiply);
+		Check(image.GetRenderTemplate().front().materialDesc.psoKey.blend == BlendMode::Multiply,
+			"UIRenderer applies BlendMode to every UI render element");
+	}
+
+	void TestRenderSystemNormalizesMultiplyShaderDefine()
+	{
+		SceneBase scene;
+		auto actor = ActorFactory::CreateEmptyActor(
+			Actor::InitDesc(true, TAG_NONE, "BlendNormalization"));
+		SpriteRenderer* sprite = actor ? actor->AddComponent<SpriteRenderer>() : nullptr;
+		SpriteRenderTemplate renderTemplate;
+		renderTemplate.materialDesc.textureHandle = 1;
+		renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::SPRITE_TRANSPARENT;
+		renderTemplate.materialDesc.psoKey.psKey.defines |=
+			static_cast<uint64_t>(PS_DEFINE::UseMask);
+		if (sprite)
+		{
+			sprite->SetParams({.renderTemplate = renderTemplate});
+			sprite->SetBlendMode(BlendMode::Multiply);
+		}
+		scene.AddRootActor(std::move(actor));
+		scene.GetRenderSystem()->BuildFrameRenderData(CameraInfo{}, {});
+
+		FrameRenderData& multiplyFrame = scene.GetRenderSystem()->GetFrameRenderData();
+		const uint64_t multiplyBit = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll);
+		const uint64_t maskBit = static_cast<uint64_t>(PS_DEFINE::UseMask);
+		Check(multiplyFrame.GetSpriteCount() == 1 &&
+			(multiplyFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & multiplyBit) != 0 &&
+			(multiplyFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & maskBit) != 0,
+			"RenderSystem adds Multiply alpha control without removing unrelated defines");
+
+		if (sprite) sprite->SetBlendMode(BlendMode::Alpha);
+		scene.GetRenderSystem()->BuildFrameRenderData(CameraInfo{}, {});
+		FrameRenderData& alphaFrame = scene.GetRenderSystem()->GetFrameRenderData();
+		Check(alphaFrame.GetSpriteCount() == 1 &&
+			(alphaFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & multiplyBit) == 0 &&
+			(alphaFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & maskBit) != 0,
+			"RenderSystem removes stale Multiply alpha control without removing unrelated defines");
 	}
 
 	void TestTransformRoundTrip()
@@ -2189,6 +2284,8 @@ int main()
 	RegisterTestRendererMetadata();
 	TestComponentContract();
 	TestPersistentComponentMetadataRegistration();
+	TestRendererBlendModePersistenceAndTemplateApplication();
+	TestRenderSystemNormalizesMultiplyShaderDefine();
 	TestTransformRoundTrip();
 	TestInvalidJsonDoesNotPartiallyMutate();
 	TestSetParamsPropagatesDirtyToChildren();

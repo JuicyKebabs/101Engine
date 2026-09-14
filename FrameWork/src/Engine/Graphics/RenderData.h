@@ -227,6 +227,7 @@ namespace PSO_KEY_DEFAULT
 	inline constexpr PSOKey MESH_MASKED{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
 	inline constexpr PSOKey MESH_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
 	inline constexpr PSOKey MESH_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+	inline constexpr PSOKey MESH_SKY{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::Opaque, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
 
 	inline constexpr PSOKey SPRITE_OPAQUE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true };
 	inline constexpr PSOKey SPRITE_TRANSPARENT{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
@@ -234,7 +235,7 @@ namespace PSO_KEY_DEFAULT
 	inline constexpr PSOKey SPRITE_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
 	inline constexpr PSOKey SPRITE_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
 
-	inline constexpr PSOKey UI{ VS_KEY{.fileID = VS_FILE_ID::UI}, PS_KEY{.fileID = PS_FILE_ID::UI}, 0, BlendMode::Alpha, DepthMode::Disable, CullMode::None, RenderTargetFormat::LDR, true };
+	inline constexpr PSOKey UI{ VS_KEY{.fileID = VS_FILE_ID::UI}, PS_KEY{.fileID = PS_FILE_ID::UI}, 0, BlendMode::Alpha, DepthMode::Disable, CullMode::Front, RenderTargetFormat::LDR, true };
 }
 
 // Hash function for PSOKey to be used in unordered_map
@@ -328,14 +329,14 @@ struct AnimationClip
 using Model = std::vector<Mesh>;	// Model is a collection of meshes
 
 //mesh type enumeration
-enum class DEFAULT_MESH
+enum class DefaultMesh
 {
-	QUAD,		//quad plane
-	CUBE,		//cube
-	CIRCLE,		//circle plane
-	SPHERE,		//sphere
-	CAPSULE,	//capsule
-	CYLINDER,	//cylinder
+	Quad,		//quad plane
+	Cube,		//cube
+	Circle,		//circle plane
+	Sphere,		//sphere
+	Capsule,	//capsule
+	Cylinder,	//cylinder
 };
 
 //=======================
@@ -466,17 +467,17 @@ struct CapsuleVisualDesc
 Model MakeCylinderModel(int slice = 32, int stacks = 16);
 
 //メッシュデータ取得関数
-inline Model GetDefaultModel(DEFAULT_MESH type)
+inline Model GetDefaultModel(DefaultMesh type)
 {
 	//メッシュタイプに応じたメッシュデータを返す
 	switch (type)
 	{
-	case DEFAULT_MESH::QUAD: return MakeQuadModel();			//四角平面
-	case DEFAULT_MESH::CUBE: return MakeCubeModel();			//立方体
-	case DEFAULT_MESH::SPHERE: return MakeSphereModel();		//球体
-	case DEFAULT_MESH::CIRCLE: return MakeCircleModel();		//円形平面
-	case DEFAULT_MESH::CAPSULE: return MakeCapsuleModel();	//カプセル
-	case DEFAULT_MESH::CYLINDER: return MakeCylinderModel();	//円柱
+	case DefaultMesh::Quad: return MakeQuadModel();			//四角平面
+	case DefaultMesh::Cube: return MakeCubeModel();			//立方体
+	case DefaultMesh::Sphere: return MakeSphereModel();		//球体
+	case DefaultMesh::Circle: return MakeCircleModel();		//円形平面
+	case DefaultMesh::Capsule: return MakeCapsuleModel();	//カプセル
+	case DefaultMesh::Cylinder: return MakeCylinderModel();	//円柱
 	default:   return {};						//その他
 	}
 }

@@ -30,6 +30,7 @@ public:
 	void SetParams(const ParamDesc& desc) {
 		SetCanvas(desc.pCanvas);
 		m_renderTemplate = desc.renderTemplate;
+		if (!m_renderTemplate.empty()) SetBlendMode(m_renderTemplate.front().materialDesc.psoKey.blend);
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
 		SetOrder(desc.order);

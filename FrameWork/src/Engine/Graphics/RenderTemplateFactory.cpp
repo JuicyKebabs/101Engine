@@ -13,7 +13,7 @@ MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplate(MeshManager& 
 	return BuildRenderTemplate(meshManager, model, materialDesc);
 }
 
-MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(MeshManager& meshManager, TextureManager& textureManager, DEFAULT_MESH mesh, const MaterialInput& materialInput)
+MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(MeshManager& meshManager, TextureManager& textureManager, DefaultMesh mesh, const MaterialInput& materialInput)
 {
 	Model model = LoadDefaultModel(mesh);
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
@@ -67,7 +67,7 @@ Model RenderTemplateFactory::LoadModelFromFile(const std::wstring& path, bool in
 	return model;
 }
 
-Model RenderTemplateFactory::LoadDefaultModel(DEFAULT_MESH type)
+Model RenderTemplateFactory::LoadDefaultModel(DefaultMesh type)
 {
 	Model model = GetDefaultModel(type);
 	return model;

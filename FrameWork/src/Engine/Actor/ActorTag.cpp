@@ -45,7 +45,8 @@ bool TagRegistry::NormalizeUserTagName(std::string_view input, std::string& outp
 		return fail("Tag name must be valid UTF-8.");
 	std::string folded = output;
 	std::transform(folded.begin(), folded.end(), folded.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-	if (folded == "none" || folded == "maincamera") return fail("Tag name is reserved by the Engine.");
+	if (folded == "none" || folded == "maincamera" || folded == "initialsky")
+		return fail("Tag name is reserved by the Engine.");
 	return true;
 }
 
@@ -126,7 +127,8 @@ bool TagRegistry::ContainsName(std::string_view tagName) const
 
 bool TagRegistry::IsReserved(TagId id) const
 {
-	return id == TAG_NONE || id == CalcTagId("MainCamera");
+	return id == TAG_NONE || id == CalcTagId("MainCamera") ||
+		id == CalcTagId("InitialSky");
 }
 
 TagId TagRegistry::GetId(std::string_view tagName)

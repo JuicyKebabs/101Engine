@@ -2,6 +2,7 @@
 #include <cstdint>
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
+#include "Engine/Graphics/RenderData.h"
 
 class Canvas;
 
@@ -33,7 +34,8 @@ struct CommonRendererProxy
 class RendererComponent : public Component
 {
 public:
-	RendererComponent() = default;
+	explicit RendererComponent(BlendMode blendMode = BlendMode::Opaque)
+		: m_blendMode(blendMode) {}
 	~RendererComponent() = default;
 
 	// Flush function to be called before rendering
@@ -52,6 +54,11 @@ public:
 		m_isProxyDirty = true;
 	}
 	void SetSortOrderInCanvas(uint32_t order) { m_sortOrderInCanvas = order; m_isProxyDirty = true; }
+	void SetBlendMode(BlendMode blendMode)
+	{
+		m_blendMode = blendMode;
+		ApplyBlendModeToRenderTemplates();
+	}
 	
 	// Getters
 	bool GetVisible() const { return m_isVisible; }
@@ -60,6 +67,7 @@ public:
 	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources
 	Canvas* GetGoverningCanvas() const { return m_pGoverningCanvas; }
 	uint32_t GetSortOrderInCanvas() const { return m_sortOrderInCanvas; }
+	BlendMode GetBlendMode() const { return m_blendMode; }
 
 	RenderSpace GetRenderSpace() const;
 
@@ -80,6 +88,7 @@ protected:
 
 	// Function to check if the transform has changed and mark the proxy as dirty if needed
 	void CheckIfTransformChanged();
+	virtual void ApplyBlendModeToRenderTemplates() = 0;
 
 private:
 	// Pointer to the governing Canvas component (if any) for this renderer
@@ -88,4 +97,11 @@ private:
 
 	// Sort order for this renderer (used for sorting in the render queue)
 	uint32_t m_sortOrderInCanvas = 0;
+
+	// Authoring value applied to renderer-specific PSO keys whenever their
+	// render templates are created or replaced.
+	BlendMode m_blendMode = BlendMode::Opaque;
+
+private:
+	virtual void OnAttachOverride() = 0;
 };

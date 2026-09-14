@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include "Controller.h"
+#include "Mouse.h"
 
 //キー入力状態構造体
 struct InputState
@@ -67,10 +68,23 @@ struct ControllerInputInfo
 	DirectX::XMFLOAT2 rightStickPast;	//Right stick(normalized)
 };
 
+struct MouseInputInfo
+{
+	InputState left;
+	InputState right;
+	InputState middle;
+	InputState anyButton;
+
+	DirectX::XMINT2 clientPositionPixels{};
+	DirectX::XMINT2 deltaPixels{};
+	float wheelDelta = 0.0f;
+};
+
 //入力情報構造体
 struct InputInfo
 {
 	KeyInputInfo key;
+	MouseInputInfo mouse;
 	ControllerInputInfo controller[CONTROLLERS_MAX];
 };
 
@@ -81,6 +95,7 @@ public:
 	void Initialize();	//初期化
 	void Update();		//更新
 	void Copy();		//キー情報コピー
+	void ProcessWindowMessage(UINT message, WPARAM wParam, LPARAM lParam);
 
 	//シングルトンパターン
 	static InputManager& GetInstance();
@@ -97,6 +112,7 @@ private:
 	static std::unique_ptr<InputManager> m_instance;	//シングルトンインスタンス
 	InputInfo m_inputInfo{};	//入力情報構造体
 	Controller m_controller;	//コントローラー管理クラス
+	Mouse m_mouse;
 
 private:
 	InputManager() = default;	//コンストラクタ

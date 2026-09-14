@@ -20,7 +20,7 @@ struct UIRendererProxy
 class UIRenderer : public RendererComponent
 {
 public:
-	UIRenderer() = default;
+	UIRenderer() : RendererComponent(BlendMode::Alpha) {}
 	~UIRenderer() = default;
 
 	void InvalidateRenderProxy() { m_isProxyDirty = true; }	// Mark the render proxy as dirty
@@ -74,6 +74,7 @@ private:
 	void LateUpdateOverride(float deltaTime) override;
 	void OnDetachOverride() override;
 	void OnDestroyOverride() override;
+	void ApplyBlendModeToRenderTemplates() override;
 
 	void RebuildRenderProxy();		// Rebuild the render proxy based on the current state of the component (e.g., transform, color, UV settings)
 	void InitialRegistration();		// Register this UI renderer with the canvas for sorting and rendering

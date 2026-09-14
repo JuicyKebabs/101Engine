@@ -23,7 +23,7 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 	return true;
 }
 
-MeshRenderer::AssetPrepareResult MeshRenderer::PrepareMeshAssetState(
+AssetPrepareResult MeshRenderer::PrepareMeshAssetState(
 	const Guid& assetId,
 	PreparedMeshAssetState& outState) const
 {
@@ -67,7 +67,8 @@ MeshRenderer::AssetPrepareResult MeshRenderer::PrepareMeshAssetState(
 	renderTemplate.meshDesc.boundsCenter = meshGPU->GetBoundsCenter();
 	renderTemplate.meshDesc.boundsRadius = meshGPU->GetBoundsRadius();
 	renderTemplate.materialDesc.textureHandle = materialInfo.textureHandle;
-	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;
+	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting();
+	renderTemplate.materialDesc.psoKey.blend = GetBlendMode();
 	renderTemplate.materialDesc.baseColor = materialInfo.materialColor;
 
 	PreparedMeshAssetState prepared;
@@ -283,4 +284,12 @@ bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& val
 
 	CommitMeshAssetState(std::move(prepared));
 	return true;
+}
+
+void MeshRenderer::ApplyBlendModeToRenderTemplates()
+{
+	for (SubmeshRenderTemplate& renderTemplate : m_templates)
+	{
+		renderTemplate.materialDesc.psoKey.blend = GetBlendMode();
+	}
 }

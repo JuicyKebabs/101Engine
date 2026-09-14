@@ -1,7 +1,23 @@
 #include "Engine/Graphics/RenderSystem.h"
+#include "Engine/Component/SkyRenderer.h"
 #include "Engine/Resource/MeshGPU.h"
 #include "Engine/Actor/Actor.h"
+#include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
+
+bool RenderSystem::SetActiveSkyRenderer(SkyRenderer* renderer)
+{
+	if (!renderer || renderer->IsDestroyed()) return false;
+	Actor* owner = renderer->GetOwner();
+	if (!m_scene || !owner || owner->IsDestroyed() || owner->GetOwner() != m_scene) return false;
+	m_skyRenderer = renderer;
+	return true;
+}
+
+void RenderSystem::ClearActiveSkyRenderer(SkyRenderer* renderer)
+{
+	if (m_skyRenderer == renderer) m_skyRenderer = nullptr;
+}
 
 void RenderSystem::Register(MeshRenderer* renderer)
 {
@@ -81,6 +97,24 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 
 	m_frameRenderData.Clear();	// Clear previous frame's render data
 	m_frameSortData.Clear();	// Clear previous frame's sort data
+
+	if (!isCanvasView)
+	{
+		// If we are not rendering in a canvas view, add the sky renderer to the frame render data if it exists
+		if (m_skyRenderer && !m_skyRenderer->IsDestroyed() && m_skyRenderer->GetOwner() &&
+			!m_skyRenderer->GetOwner()->IsDestroyed() &&
+			m_skyRenderer->IsVisible() && m_skyRenderer->IsConfigured())
+		{
+			const auto& renderTemplate = m_skyRenderer->GetRenderTemplate();
+			const auto& renderProxy = m_skyRenderer->GetRenderProxy();
+			auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
+			auto handle = m_frameRenderData.AddMeshs(item);
+			RenderItemRef ref;
+			ref.renderType = RenderType::Mesh;
+			ref.handle = handle;
+			m_frameRenderData.sky = ref;
+		}
+	}
 
 	// Lamda funtion determine if a render item should be included 
 	// in the current render pass based on the view policy
@@ -409,5 +443,16 @@ void RenderSystem::NormalizePSOKey(PSOKey& psoKey, RenderQueue queue)
 	if (queue == RenderQueue::Transparent && psoKey.depth != DepthMode::Disable)
 	{
 		psoKey.depth = DepthMode::TestNoWrite;
+	}
+
+	const uint64_t multiplyAlphaControl =
+		static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll);
+	if (psoKey.blend == BlendMode::Multiply)
+	{
+		psoKey.psKey.defines |= multiplyAlphaControl;
+	}
+	else
+	{
+		psoKey.psKey.defines &= ~multiplyAlphaControl;
 	}
 }

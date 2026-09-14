@@ -18,6 +18,7 @@ void TagManagerPanel::Render(const std::vector<std::string>& userTags, const Cal
 	ImGui::Separator();
 	ImGui::TextDisabled("None (Reserved)");
 	ImGui::TextDisabled("MainCamera (Reserved)");
+	ImGui::TextDisabled("InitialSky (Reserved)");
 	for (const std::string& name : userTags)
 	{
 		ImGui::PushID(name.c_str());

@@ -9,6 +9,8 @@
 #include "Engine/Component/Camera.h"
 
 class Canvas;
+class SceneBase;
+class SkyRenderer;
 
 //-------------------------------------------------------------------------------
 // Render System class
@@ -96,7 +98,7 @@ public:
 	};
 
 public:
-	RenderSystem() = default;	// Constructor
+	explicit RenderSystem(SceneBase* scene = nullptr) : m_scene(scene) {}	// Constructor
 	~RenderSystem() = default;	// Destructor
 
 	void Register(MeshRenderer* renderer);						// Register a mesh renderer to be rendered
@@ -105,6 +107,10 @@ public:
 	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
 	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
+
+	bool SetActiveSkyRenderer(SkyRenderer* renderer);	// Set the active sky renderer for the scene
+	void ClearActiveSkyRenderer(SkyRenderer* renderer);
+	SkyRenderer* GetActiveSkyRenderer() const { return m_skyRenderer; }
 	
 	// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
 	void FlushRegisters();
@@ -121,6 +127,8 @@ public:
 	static UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
 
 private:
+	SceneBase* m_scene = nullptr;
+	SkyRenderer* m_skyRenderer = nullptr;			// Pointer to the sky renderer in the scene (if any)
 	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
 	std::vector<SpriteRenderer*> m_spriteRenderers;	// List of sprite renderers in the scene
 	std::vector<UIRenderer*> m_uiRenderers;			// List of UI renderers in the scene

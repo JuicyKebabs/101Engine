@@ -3,6 +3,7 @@
 #include "Engine/Resource/MetaFile.h"
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Resource/TextureManager.h"
+#include "Engine/Resource/BuiltinMeshAssets.h"
 #include "Engine/Core/Debug/Debug.h"
 #include <filesystem>
 #include <algorithm>
@@ -79,6 +80,12 @@ bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::str
 		decltype(m_catalog) catalog;
 		decltype(m_pathToId) pathToId;
 		decltype(m_fileStates) fileStates;
+		for (const BuiltinMeshAsset& builtin : GetBuiltinMeshAssets())
+		{
+			const std::string path(builtin.path);
+			catalog.emplace(builtin.guid, AssetEntry{ builtin.guid, path, AssetType::Mesh });
+			pathToId.emplace(path, builtin.guid);
+		}
 		std::vector<std::pair<std::string, Guid>> missingMetadata;
 		std::vector<fs::path> files;
 		for (const auto& file : fs::recursive_directory_iterator(newRoot))
@@ -122,6 +129,7 @@ bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::str
 		}
 		for (const auto& [id, entry] : catalog)
 		{
+			if (FindBuiltinMeshAsset(id)) continue;
 			const fs::path path = fs::path(newRoot) / entry.relativePath;
 			const fs::path meta = path.string() + ".meta";
 			fileStates.emplace(id, FileState{ fs::last_write_time(path), fs::file_size(path),
@@ -131,10 +139,12 @@ bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::str
 		std::vector<AssetChange> changes;
 		for (const auto& [id, old] : m_catalog)
 		{
+			if (FindBuiltinMeshAsset(id)) continue;
 			if (!catalog.contains(id)) changes.push_back({ AssetChangeKind::Removed, old.type, id, old.relativePath });
 		}
 		for (const auto& [id, entry] : catalog)
 		{
+			if (FindBuiltinMeshAsset(id)) continue;
 			const auto old = m_catalog.find(id);
 			if (old == m_catalog.end()) changes.push_back({ AssetChangeKind::Added, entry.type, id, entry.relativePath });
 			else if (old->second.relativePath != entry.relativePath || old->second.type != entry.type ||
@@ -204,6 +214,7 @@ const AssetEntry* AssetManager::GetAssetEntry(const Guid& guid) const
 
 std::string AssetManager::GetAssetPath(const Guid& guid) const
 {
+	if (FindBuiltinMeshAsset(guid)) return {};
 	const AssetEntry* entry = GetAssetEntry(guid);
 	return entry ? (fs::path(m_assetRoot) / entry->relativePath).string() : std::string{};
 }
@@ -247,6 +258,12 @@ MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 	{
 		DBG("AssetManager: GetMeshHandle - unknown or non-mesh asset, using error mesh.");
 		return m_pMeshManager->GetErrorMeshHandle();
+	}
+	if (const BuiltinMeshAsset* builtin = FindBuiltinMeshAsset(guid))
+	{
+		const MeshHandle handle = m_pMeshManager->LoadDefaultMesh(builtin->mesh);
+		m_loadedMeshes[guid] = handle;
+		return handle;
 	}
 
 	// Load mesh

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include <optional>
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 
@@ -56,46 +57,56 @@ struct FrameRenderData {
 	std::vector<SpriteRenderItem> sprites;
 	std::vector<UIRenderItem> uis;
 
+	std::optional<RenderItemRef> sky = std::nullopt;	// sky renderer is optional, if not present, no sky will be rendered
 	std::vector<RenderItemRef> opaque;
 	std::vector<RenderItemRef> transparent;
 	std::vector<RenderItemRef> screenspace;
 
-	ItemHandle AddMeshs(MeshRenderItem item) {
+	ItemHandle AddMeshs(MeshRenderItem item)
+	{
 		meshs.push_back(std::move(item));
 		return static_cast<ItemHandle>(meshs.size() - 1);
 	}
 
-	MeshRenderItem& GetMesh(ItemHandle handle) {
+	MeshRenderItem& GetMesh(ItemHandle handle)
+	{
 		return meshs[handle];
 	}
 
-	ItemHandle AddSprites(SpriteRenderItem item) {
+	ItemHandle AddSprites(SpriteRenderItem item)
+	{
 		sprites.push_back(std::move(item));
 		return static_cast<ItemHandle>(sprites.size() - 1);
 	}
 
-	SpriteRenderItem& GetSprite(ItemHandle handle) {
+	SpriteRenderItem& GetSprite(ItemHandle handle)
+	{
 		return sprites[handle];
 	}
 
-	ItemHandle AddUI(UIRenderItem item) {
+	ItemHandle AddUI(UIRenderItem item)
+	{
 		uis.push_back(std::move(item));
 		return static_cast<ItemHandle>(uis.size() - 1);
 	}
 
-	UIRenderItem& GetUI(ItemHandle handle) {
+	UIRenderItem& GetUI(ItemHandle handle)
+	{
 		return uis[handle];
 	}
 
-	void AddOpaque(RenderItemRef item) {
+	void AddOpaque(RenderItemRef item)
+	{
 		opaque.push_back(std::move(item));
 	}
 
-	void AddTransparent(RenderItemRef item) {
+	void AddTransparent(RenderItemRef item)
+	{
 		transparent.push_back(std::move(item));
 	}
 
-	void AddScreenSpace(RenderItemRef item) {
+	void AddScreenSpace(RenderItemRef item)
+	{
 		screenspace.push_back(std::move(item));
 	}
 
@@ -103,7 +114,9 @@ struct FrameRenderData {
 	size_t GetSpriteCount() const { return sprites.size(); }
 	size_t GetUICount() const { return uis.size(); }
 
-	void Clear() {
+	void Clear()
+	{
+		sky.reset();
 		meshs.clear();
 		sprites.clear();
 		uis.clear();

@@ -257,7 +257,7 @@
                             1.0,
                             1.0
                         ],
-                        "visible": true
+                        "visible": false
                     },
                     "type": "UIImage"
                 }
@@ -319,6 +319,54 @@
             "name": "a",
             "parentId": null,
             "tag": "Player"
+        },
+        {
+            "actorId": "{CCD0E87E-E99B-4EF2-98E0-FFD49395C68B}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "followActorId": null,
+                        "followMode": 0,
+                        "name": "",
+                        "skyTextureAssetId": "{5C383CA1-7D26-4DC4-8225-846075C43E73}",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "SkyRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Sky",
+            "parentId": null,
+            "tag": "InitialSky"
         }
     ],
     "directional_light": {

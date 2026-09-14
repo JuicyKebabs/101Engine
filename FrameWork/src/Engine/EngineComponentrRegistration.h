@@ -3,6 +3,7 @@
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
+#include "Engine/Component/SkyRenderer.h"
 #include "Engine/UI/UIRenderer.h"
 #include "Engine/UI/UIImage.h"
 #include "Engine/UI/Canvas.h"

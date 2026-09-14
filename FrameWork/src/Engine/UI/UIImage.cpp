@@ -54,6 +54,7 @@ UIImage::AssetPrepareResult UIImage::PrepareTextureAssetState(
 	UIRenderElement element;
 	element.materialDesc.textureHandle = textureHandle;
 	element.materialDesc.psoKey = PSO_KEY_DEFAULT::UI;
+	element.materialDesc.psoKey.blend = GetBlendMode();
 	element.materialDesc.baseColor = { 1, 1, 1, 1 };
 	element.materialDesc.lightingEnabled = false;
 

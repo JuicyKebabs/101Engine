@@ -5,6 +5,7 @@
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/Component/SpriteRenderer.h"
+#include "Engine/Component/SkyRenderer.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
@@ -235,19 +236,28 @@ namespace
 
 		SceneLoadResult load = SceneLoader::LoadCandidate(
 			repositoryScene, TestEngineContext(), "asset/scenes/test.scene");
-		bool noneTagsPreserved = static_cast<bool>(load);
+		bool tagsPreserved = static_cast<bool>(load);
 		if (load)
 		{
 			for (Actor* actor : load.scene->GetAllActors())
 			{
-				if (actor->GetName() != "DefaultCamera")
-					noneTagsPreserved = noneTagsPreserved && actor->GetTag() == TAG_NONE;
+				auto expected = std::find_if(repositoryScene["actors"].begin(),
+					repositoryScene["actors"].end(), [actor](const json& record)
+					{
+						return record["actorId"].get<std::string>() == actor->GetGuid().ToString();
+					});
+				tagsPreserved = tagsPreserved && expected != repositoryScene["actors"].end() &&
+					TagRegistry::Get().GetName(actor->GetTag()) == (*expected)["tag"].get<std::string>();
 			}
 		}
 		Check(load && load.scene->GetAllActors().size() == repositoryScene["actors"].size() &&
-			noneTagsPreserved,
+			tagsPreserved,
 			"The repository Scene schema and Actor set remain loadable");
 		if (!load) std::cerr << "[DIAG] " << load.error.path << ": " << load.error.message << '\n';
+		else if (!tagsPreserved || load.scene->GetAllActors().size() != repositoryScene["actors"].size())
+			std::cerr << "[DIAG] actors=" << load.scene->GetAllActors().size()
+				<< " expected=" << repositoryScene["actors"].size()
+				<< " tagsPreserved=" << tagsPreserved << '\n';
 		if (load.scene) load.scene->Finalize();
 	}
 
@@ -1001,6 +1011,62 @@ namespace
 			fs::remove_all(directory, cleanupError);
 		}
 	}
+
+	void TestInitialSkySelection()
+	{
+		Transform transform;
+		SkyRenderer sky;
+		json transformData;
+		json skyData;
+		transform.Serialize(transformData);
+		sky.Serialize(skyData);
+
+		const Guid invalidTaggedId = GuidGenerator::Generate();
+		const Guid firstSkyId = GuidGenerator::Generate();
+		const Guid secondSkyId = GuidGenerator::Generate();
+		json invalidTagged = MakeVersion3Actor(invalidTaggedId, "TaggedWithoutSky",
+			json::array({ MakeComponentRecord("Transform", transformData) }));
+		json firstSky = MakeVersion3Actor(firstSkyId, "FirstInitialSky",
+			json::array({ MakeComponentRecord("Transform", transformData),
+				MakeComponentRecord("SkyRenderer", skyData) }));
+		json secondSky = MakeVersion3Actor(secondSkyId, "SecondInitialSky",
+			json::array({ MakeComponentRecord("Transform", transformData),
+				MakeComponentRecord("SkyRenderer", skyData) }));
+		invalidTagged["tag"] = "InitialSky";
+		firstSky["tag"] = "InitialSky";
+		secondSky["tag"] = "InitialSky";
+
+		TemporarySceneFile taggedFile(MakeVersion4Scene(
+			json::array({ invalidTagged, firstSky, secondSky })));
+		SceneLoadResult taggedLoad = SceneLoader::LoadCandidate(
+			taggedFile.String(), TestEngineContext());
+		SkyRenderer* active = taggedLoad.scene
+			? taggedLoad.scene->GetRenderSystem()->GetActiveSkyRenderer() : nullptr;
+		SkyRenderer* expected = nullptr;
+		if (taggedLoad)
+		{
+			for (Actor* actor : taggedLoad.scene->GetAllActors())
+			{
+				if (actor->GetTag() != ActorTags::InitialSky) continue;
+				expected = actor->GetComponentByClass<SkyRenderer>();
+				if (expected) break;
+			}
+		}
+		Check(taggedLoad && active && active == expected &&
+			active->GetOwner()->GetGuid() != invalidTaggedId,
+			"InitialSky skips invalid candidates and deterministically selects the first valid SkyRenderer");
+		if (!taggedLoad) std::cerr << "[DIAG] " << taggedLoad.error.path << ": " << taggedLoad.error.message << '\n';
+		else if (!active) std::cerr << "[DIAG] InitialSky load has no active SkyRenderer\n";
+
+		json ordinarySky = firstSky;
+		ordinarySky["tag"] = "None";
+		TemporarySceneFile untaggedFile(MakeVersion4Scene(json::array({ ordinarySky })));
+		SceneLoadResult untaggedLoad = SceneLoader::LoadCandidate(
+			untaggedFile.String(), TestEngineContext());
+		Check(untaggedLoad &&
+			untaggedLoad.scene->GetRenderSystem()->GetActiveSkyRenderer() == nullptr,
+			"A Scene without InitialSky loads without selecting an arbitrary SkyRenderer");
+	}
 }
 
 int main()
@@ -1021,6 +1087,7 @@ int main()
 	TestVersion3InvalidComponentRejection();
 	TestVersion3ComponentReferencesAndRendererRoundTrip();
 	TestVersion3ReferenceResolutionFailures();
+	TestInitialSkySelection();
 	ComponentRegistry::Get().UnregisterAllGameComponents();
 
 	if (g_failures != 0)

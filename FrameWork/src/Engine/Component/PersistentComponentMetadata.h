@@ -16,6 +16,7 @@ public:
 	static std::unique_ptr<TypeMetadata> Collider(std::string stableTypeName);
 	static std::unique_ptr<TypeMetadata> MeshRenderer(std::string stableTypeName);
 	static std::unique_ptr<TypeMetadata> SpriteRenderer(std::string stableTypeName);
+	static std::unique_ptr<TypeMetadata> SkyRenderer(std::string stableTypeName);
 	static std::unique_ptr<TypeMetadata> UIRenderer(std::string stableTypeName);
 	static std::unique_ptr<TypeMetadata> UIImage(std::string stableTypeName);
 	static std::unique_ptr<TypeMetadata> Canvas(std::string stableTypeName);

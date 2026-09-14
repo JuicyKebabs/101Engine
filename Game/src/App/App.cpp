@@ -3,7 +3,6 @@
 #include <mmsystem.h>
 #include "App.h"
 #include <tchar.h>
-#include "Engine/Input/keyboard.h"
 #include "Engine/EngineComponentrRegistration.h"
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Scene/ComponentRegistry.h"
@@ -35,21 +34,15 @@ bool App::Initialize()
 		LPARAM lParam,
 		LRESULT& outResult)
 		{
+			InputManager::GetInstance().ProcessWindowMessage(message, wParam, lParam);
+
 			switch (message)
 			{
-			case WM_ACTIVATEAPP:
-			case WM_SYSKEYDOWN:
-			case WM_KEYUP:
-			case WM_SYSKEYUP:
-				Keyboard_ProcessMessage(message, wParam, lParam);
-				break;
-
 			case WM_KEYDOWN:
 				if (wParam == VK_ESCAPE)
 				{
 					SendMessage(hwnd, WM_CLOSE, 0, 0);
 				}
-				Keyboard_ProcessMessage(message, wParam, lParam);
 				break;
 			}
 
