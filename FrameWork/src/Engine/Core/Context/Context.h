@@ -5,6 +5,7 @@ class Renderer;					// Renderer
 class TextureManager;			// Texture manager
 class MeshManager;				// Mesh manager
 class AssetManager;				// Asset manager
+class AudioManager;
 class ActorImprintSystem;
 class CollisionSystem;			// Collision manager
 
@@ -16,6 +17,7 @@ struct EngineContext
 	MeshManager* pMeshManager = nullptr;		// Pointer to the mesh manager
 	AssetManager* pAssetManager = nullptr;		// Pointer to the asset manager
 	ActorImprintSystem* pActorImprintSystem = nullptr; // App-owned, outlives Scenes
+	AudioManager* pAudioManager = nullptr;		// Non-owning runtime audio manager
 };
 
 // Frame context structure

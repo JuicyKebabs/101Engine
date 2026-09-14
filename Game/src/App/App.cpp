@@ -150,6 +150,8 @@ void App::Terminate()
 	m_pSceneManager.reset();
 	m_pActorImprintSystem.reset();
 	m_engineContext.pActorImprintSystem = nullptr;
+	m_pAssetManager.reset();
+	m_engineContext.pAssetManager = nullptr;
 	ComponentRegistry::Get().UnregisterAllGameComponents();
 
 	if (m_hGameCodeDll)
@@ -160,6 +162,7 @@ void App::Terminate()
 
 	m_pEngine->Terminate();		// DirectX12 engine termination
 	m_audioManager.Terminate();	// Audio manager termination
+	m_engineContext.pAudioManager = nullptr;
 
 	m_window.Terminate();
 }
@@ -227,7 +230,8 @@ void App::PrepareInstance()
 		m_pTextureManager.get(),
 		m_pMeshManager.get(),
 		m_pAssetManager.get(),
-		m_pActorImprintSystem.get()
+		m_pActorImprintSystem.get(),
+		&m_audioManager
 	};
 }
 
@@ -256,12 +260,20 @@ bool App::InitInstance()
 		m_pTextureManager.get()	// Texture manager
 	);
 
+	// Initialize audio before AssetManager can lazily load audio assets.
+	if (!m_audioManager.Initialize()) return false;
+
 	// Initialize asset manager
 	if (!m_pAssetManager->Initialize(
 		PathManager::Resolve("asset"),
 		m_pTextureManager.get(),
-		m_pMeshManager.get()
-		)) return false;
+		m_pMeshManager.get(),
+		&m_audioManager
+		))
+	{
+		m_audioManager.Terminate();
+		return false;
+	}
 
 	// Initialize engine bindings
 	m_pEngine->InitBindings(m_pTextureManager.get());
@@ -279,9 +291,6 @@ bool App::InitInstance()
 
 	// Initialize rendering
 	m_pEngine->EndFrame();
-
-	// Initialize audio management class
-	m_audioManager.Initialize();
 
 	// Initialize input management class
 	m_inputManager.Initialize();

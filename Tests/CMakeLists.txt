@@ -779,3 +779,9 @@ target_include_directories(BuiltinMeshAssetTests PRIVATE ${CMAKE_SOURCE_DIR}/Fra
 target_link_libraries(BuiltinMeshAssetTests PRIVATE 101Framework)
 add_test(NAME BuiltinMeshAssetTests COMMAND BuiltinMeshAssetTests)
 set_tests_properties(BuiltinMeshAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(AudioAssetTests AudioAssetTests.cpp)
+target_include_directories(AudioAssetTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(AudioAssetTests PRIVATE 101Framework)
+add_test(NAME AudioAssetTests COMMAND AudioAssetTests)
+set_tests_properties(AudioAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

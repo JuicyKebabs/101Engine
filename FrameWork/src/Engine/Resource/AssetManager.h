@@ -4,6 +4,7 @@
 #include "Engine/Resource/AssetChange.h"
 #include "Engine/Resource/MeshHandle.h"
 #include "Engine/Resource/Texture.h"
+#include "Engine/Audio/AudioHandle.h"
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -20,6 +21,7 @@
 // Forward declarations
 class TextureManager;
 class MeshManager;
+class AudioManager;
 
 struct AssetEntry
 {
@@ -50,6 +52,13 @@ public:
 		MeshManager* pMeshManager,
 		AssetCatalogError* outError = nullptr
 	);
+	bool Initialize(
+		const std::string& projectDir,
+		TextureManager* pTextureManager,
+		MeshManager* pMeshManager,
+		AudioManager* pAudioManager,
+		AssetCatalogError* outError = nullptr
+	);
 
 	// Transactional catalog refresh. Failure preserves catalog and pending events.
 	bool Refresh(AssetCatalogError* outError = nullptr);
@@ -70,6 +79,8 @@ public:
 	// Get the handle for each asset type by GUID
 	MeshHandle GetMeshHandle(const Guid& guid);
 	TextureHandle GetTextureHandle(const Guid& guid);
+	AudioHandle GetAudioHandle(const Guid& guid);
+	AudioHandle GetAudioHandleByPath(const std::string& relativePath);
 
 private:
 	std::unordered_map<Guid, AssetEntry> m_catalog;		// GUID -> Entry (Subscribe without loading)
@@ -88,12 +99,14 @@ private:
 	// Lazy-load cache for each asset type
 	std::unordered_map<Guid, MeshHandle>    m_loadedMeshes;	// Lazy-load cache
 	std::unordered_map<Guid, TextureHandle> m_loadedTextures;	// Lazy-load cache
+	std::unordered_map<Guid, AudioHandle>   m_loadedAudio;		// Lazy-load cache
 
 	std::string m_assetRoot;	// Root directory for assets
 
 	// References to necessary engine systems for asset loading
 	TextureManager* m_pTextureManager = nullptr;
 	MeshManager* m_pMeshManager = nullptr;
+	AudioManager* m_pAudioManager = nullptr;
 
 private:
 	// Scans root directory recursively and creates or resolves a GUID
