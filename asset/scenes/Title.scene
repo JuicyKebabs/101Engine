@@ -116,6 +116,7 @@
                 },
                 {
                     "data": {
+                        "blendMode": 1,
                         "canvasActorId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
                         "color": [
                             1.0,
@@ -246,6 +247,7 @@
                 },
                 {
                     "data": {
+                        "blendMode": 1,
                         "canvasActorId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
                         "color": [
                             1.0,

@@ -349,6 +349,10 @@ MeshRenderItem RenderSystem::CreateMeshRenderItem(const SubmeshRenderTemplate& r
 	MeshRenderItem item;
 	item.meshDesc = renderTemplate.meshDesc;
 	item.common.materialDesc = renderTemplate.materialDesc;
+	if (renderProxy.textureOverrideHandle != InvalidTextureHandle)
+	{
+		item.common.materialDesc.textureHandle = renderProxy.textureOverrideHandle;
+	}
 	item.common.worldMatrix = renderProxy.common.worldMatrix;
 	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
 	return item;

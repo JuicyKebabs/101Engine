@@ -41,6 +41,8 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::MeshRenderer(std::str
 	TypeMetadataBuilder<::MeshRenderer> builder(std::move(stableTypeName));
 	AddRendererProperties(builder);
 	builder.Property("meshAssetId", &::MeshRenderer::GetMeshAssetReference, &::MeshRenderer::TrySetMeshAssetReference);
+	builder.Property("textureOverrideAssetId", &::MeshRenderer::GetTextureOverrideAssetReference,
+		&::MeshRenderer::TrySetTextureOverrideAssetReference).Optional();
 	return PersistentMetadata::Finish(builder);
 }
 

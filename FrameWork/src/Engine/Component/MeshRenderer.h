@@ -17,6 +17,7 @@ class Transform;
 struct MeshRendererProxy
 {
 	CommonRendererProxy common;	// Common render proxy data (position, world matrix, color, visibility)
+	TextureHandle textureOverrideHandle = InvalidTextureHandle;
 };
 
 // MeshRendererComponent Class (for static mesh rendering)
@@ -40,6 +41,9 @@ public:
 		if (!m_templates.empty()) SetBlendMode(m_templates.front().materialDesc.psoKey.blend);
 		m_meshAssetId = {};
 		m_pendingMeshAssetId.reset();
+		m_textureOverrideAssetId = {};
+		m_pendingTextureOverrideAssetId.reset();
+		m_textureOverrideHandle = InvalidTextureHandle;
 		SetColor(desc.color);
 		SetVisible(desc.visible);
 		SetName(desc.name);
@@ -49,6 +53,7 @@ public:
 	// Set mesh asset for this renderer through AssetManager
 	// For de-serialization and inspector manipulation, this function
 	bool SetMeshAsset(const Guid& assetId);
+	bool SetTextureOverrideAsset(const Guid& assetId);
 
 	// Getters
 	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
@@ -57,6 +62,9 @@ public:
 	AssetReference<MeshAsset> GetMeshAssetReference() const;
 	bool TrySetMeshAssetReference(const AssetReference<MeshAsset>& value);
 	Guid GetAssetId() const;
+	AssetReference<TextureAsset> GetTextureOverrideAssetReference() const;
+	bool TrySetTextureOverrideAssetReference(const AssetReference<TextureAsset>& value);
+	Guid GetTextureOverrideAssetId() const;
 
 	// Serialization and deserialization methods
 	bool ResolveReferences(SceneBase& scene) override;
@@ -67,11 +75,19 @@ private:
 		Guid assetId;
 		std::vector<SubmeshRenderTemplate> templates;
 	};
+	struct PreparedTextureOverrideState
+	{
+		Guid assetId;
+		TextureHandle textureHandle = InvalidTextureHandle;
+	};
 
 	std::vector<SubmeshRenderTemplate> m_templates;			// Render templates for each mesh to be drawn
 	MeshRendererProxy m_proxy;								// Cached render proxy for this component
 	Guid m_meshAssetId;										// Mesh asset ID for this renderer
 	std::optional<Guid> m_pendingMeshAssetId;				// Optional pending asset ID for deferred loading (used during deserialization)
+	Guid m_textureOverrideAssetId;
+	std::optional<Guid> m_pendingTextureOverrideAssetId;
+	TextureHandle m_textureOverrideHandle = InvalidTextureHandle;
 
 private:
 	AssetPrepareResult PrepareMeshAssetState(
@@ -79,6 +95,11 @@ private:
 		PreparedMeshAssetState& outState) const;
 	void CommitMeshAssetState(PreparedMeshAssetState&& state);
 	bool SetPendingMeshAssetReference(const AssetReference<MeshAsset>& value);
+	AssetPrepareResult PrepareTextureOverrideState(
+		const Guid& assetId,
+		PreparedTextureOverrideState& outState) const;
+	void CommitTextureOverrideState(PreparedTextureOverrideState&& state);
+	bool SetPendingTextureOverrideAssetReference(const AssetReference<TextureAsset>& value);
 
 	// Override functions for component lifecycle
 	void OnAttachOverride() override;

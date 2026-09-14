@@ -175,6 +175,7 @@ namespace
 				const std::string& path = property.GetPath().ToString();
 				optionalRequirementsAreLimited = optionalRequirementsAreLimited &&
 					(path == "/sortOrderInCanvas" || path == "/blendMode" ||
+					path == "/textureOverrideAssetId" ||
 					(typeName == "Canvas" &&
 						(path == "/scaleMode" || path == "/matchWidthOrHeight")));
 			}
@@ -190,6 +191,8 @@ namespace
 			? mesh->FindPropertyByPath(*PropertyPath::FromString("/meshAssetId")) : nullptr;
 		const PropertyMetadata* blendMode = mesh
 			? mesh->FindPropertyByPath(*PropertyPath::FromString("/blendMode")) : nullptr;
+		const PropertyMetadata* textureOverride = mesh
+			? mesh->FindPropertyByPath(*PropertyPath::FromString("/textureOverrideAssetId")) : nullptr;
 
 		Check(allRegistered,
 			"Every built-in persistent Component has TypeMetadata");
@@ -198,7 +201,8 @@ namespace
 		Check(target && target->GetLogicalType() == PropertyLogicalType::ActorReference &&
 			lens && lens->GetLogicalType() == PropertyLogicalType::Enum &&
 			meshAsset && meshAsset->GetLogicalType() == PropertyLogicalType::AssetReference &&
-			blendMode && blendMode->GetLogicalType() == PropertyLogicalType::Enum,
+			blendMode && blendMode->GetLogicalType() == PropertyLogicalType::Enum &&
+			textureOverride && textureOverride->GetLogicalType() == PropertyLogicalType::AssetReference,
 			"Nested, Actor, Enum, and Asset properties keep their logical metadata types");
 	}
 
@@ -289,6 +293,25 @@ namespace
 			(alphaFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & multiplyBit) == 0 &&
 			(alphaFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & maskBit) != 0,
 			"RenderSystem removes stale Multiply alpha control without removing unrelated defines");
+	}
+
+	void TestMeshTextureOverrideIsAppliedAtRenderItemCreation()
+	{
+		SubmeshRenderTemplate renderTemplate;
+		renderTemplate.materialDesc.textureHandle = 11;
+		MeshRendererProxy proxy;
+
+		const MeshRenderItem inherited =
+			RenderSystem::CreateMeshRenderItem(renderTemplate, proxy);
+		proxy.textureOverrideHandle = 22;
+		const MeshRenderItem overridden =
+			RenderSystem::CreateMeshRenderItem(renderTemplate, proxy);
+
+		Check(inherited.common.materialDesc.textureHandle == 11 &&
+			overridden.common.materialDesc.textureHandle == 22,
+			"Mesh render items use the source texture unless an override is present");
+		Check(renderTemplate.materialDesc.textureHandle == 11,
+			"Texture override does not mutate the source mesh material");
 	}
 
 	void TestTransformRoundTrip()
@@ -1330,6 +1353,7 @@ namespace
 	void TestMeshRendererPendingAssetRoundTrip()
 	{
 		const Guid assetId = GuidGenerator::Generate();
+		const Guid textureOverrideId = GuidGenerator::Generate();
 		MeshRenderer source;
 		nlohmann::json serialized;
 		source.Serialize(serialized);
@@ -1337,20 +1361,23 @@ namespace
 		serialized["color"] = {1.5f, 0.25f, 0.5f, 0.75f};
 		serialized["visible"] = false;
 		serialized["meshAssetId"] = assetId.ToString();
+		serialized["textureOverrideAssetId"] = textureOverrideId.ToString();
 
 		MeshRenderer restored;
 		Check(restored.Deserialize(serialized),
 			"MeshRenderer accepts a valid deferred asset Guid");
-		Check(restored.GetAssetId() == assetId && !restored.IsConfigured(),
-			"MeshRenderer exposes its pending asset without creating runtime resources");
+		Check(restored.GetAssetId() == assetId &&
+			restored.GetTextureOverrideAssetId() == textureOverrideId && !restored.IsConfigured(),
+			"MeshRenderer exposes pending mesh and texture override assets without creating runtime resources");
 
 		nlohmann::json restoredJson;
 		restored.Serialize(restoredJson);
 		Check(restoredJson["meshAssetId"] == assetId.ToString() &&
+			restoredJson["textureOverrideAssetId"] == textureOverrideId.ToString() &&
 			restoredJson["name"] == "SavedMeshRenderer" &&
 			!restoredJson["visible"].get<bool>() &&
 			Near(restored.GetColor(), {1.5f, 0.25f, 0.5f, 0.75f}),
-			"MeshRenderer preserves pending asset and common renderer settings");
+			"MeshRenderer preserves pending assets and common renderer settings");
 	}
 
 	void TestInvalidMeshRendererGuidDoesNotPartiallyMutate()
@@ -1382,6 +1409,7 @@ namespace
 	void TestMeshRendererResolveWithoutContextFailsSafely()
 	{
 		const Guid assetId = GuidGenerator::Generate();
+		const Guid textureOverrideId = GuidGenerator::Generate();
 		SceneBase scene;
 		auto actorOwned = ActorFactory::CreateEmptyActor(
 			Actor::InitDesc(true, TAG_NONE, "MeshOwner"));
@@ -1391,6 +1419,7 @@ namespace
 		nlohmann::json serialized;
 		renderer->Serialize(serialized);
 		serialized["meshAssetId"] = assetId.ToString();
+		serialized["textureOverrideAssetId"] = textureOverrideId.ToString();
 		Check(renderer->Deserialize(serialized),
 			"Owned MeshRenderer stores a pending asset Guid");
 		Check(!renderer->ResolveReferences(scene),
@@ -1400,15 +1429,20 @@ namespace
 		renderer->Serialize(unresolvedJson);
 		Check(unresolvedJson["meshAssetId"] == assetId.ToString(),
 			"Failed MeshRenderer resolution retains the pending asset Guid");
+		Check(unresolvedJson["textureOverrideAssetId"] == textureOverrideId.ToString(),
+			"Failed MeshRenderer resolution retains the pending texture override Guid");
 	}
 
 	void TestMeshRendererMissingAssetIsRecoverable()
 	{
 		const Guid missingAssetId = GuidGenerator::Generate();
+		const Guid missingTextureOverrideId = GuidGenerator::Generate();
 
 		AssetManager assetManager;
 		MeshManager meshManager;
+		TextureManager textureManager;
 		EngineContext context{
+			.pTextureManager = &textureManager,
 			.pMeshManager = &meshManager,
 			.pAssetManager = &assetManager
 		};
@@ -1424,26 +1458,32 @@ namespace
 		nlohmann::json serialized;
 		renderer->Serialize(serialized);
 		serialized["meshAssetId"] = missingAssetId.ToString();
+		serialized["textureOverrideAssetId"] = missingTextureOverrideId.ToString();
 
 		Check(renderer->Deserialize(serialized),
 			"MeshRenderer accepts a missing asset Guid as a deferred reference");
 		Check(renderer->ResolveReferences(scene),
 			"Missing mesh asset does not fail scene reference restoration");
 		Check(renderer->GetAssetId() == missingAssetId &&
+			renderer->GetTextureOverrideAssetId() == missingTextureOverrideId &&
 			!renderer->IsConfigured(),
-			"Missing mesh asset remains visible to the inspector without runtime templates");
+			"Missing mesh and texture override assets remain visible without runtime templates");
 
 		nlohmann::json unresolvedJson;
 		renderer->Serialize(unresolvedJson);
 		Check(unresolvedJson["meshAssetId"] == missingAssetId.ToString(),
 			"Recoverable missing mesh reference survives serialization");
+		Check(unresolvedJson["textureOverrideAssetId"] == missingTextureOverrideId.ToString(),
+			"Recoverable missing texture override reference survives serialization");
 	}
 
 	void TestMeshRendererLiveAssetFailurePreservesRuntimeState()
 	{
 		AssetManager assetManager;
 		MeshManager meshManager;
+		TextureManager textureManager;
 		EngineContext context{
+			.pTextureManager = &textureManager,
 			.pMeshManager = &meshManager,
 			.pAssetManager = &assetManager
 		};
@@ -1466,6 +1506,14 @@ namespace
 			renderer->GetRenderTemplates().front().meshDesc.meshHandle == 17 &&
 			!renderer->GetAssetId().IsValid(),
 			"Failed live MeshRenderer edit preserves its runtime template and asset identity");
+
+		AssetReference<TextureAsset> missingTextureOverride;
+		missingTextureOverride.SetValue({ GuidGenerator::Generate(), AssetType::Texture, true });
+		Check(!renderer->TrySetTextureOverrideAssetReference(missingTextureOverride),
+			"Live MeshRenderer rejects a texture override that cannot be prepared");
+		Check(renderer->GetRenderTemplates().front().meshDesc.meshHandle == 17 &&
+			!renderer->GetTextureOverrideAssetId().IsValid(),
+			"Failed texture override edit preserves the source mesh material state");
 	}
 
 	void TestMeshRendererSetParamsClearsAssetAssociation()
@@ -1475,6 +1523,7 @@ namespace
 		nlohmann::json serialized;
 		renderer.Serialize(serialized);
 		serialized["meshAssetId"] = assetId.ToString();
+		serialized["textureOverrideAssetId"] = GuidGenerator::Generate().ToString();
 		renderer.Deserialize(serialized);
 
 		SubmeshRenderTemplate runtimeTemplate;
@@ -1483,8 +1532,9 @@ namespace
 		nlohmann::json afterSetParams;
 		renderer.Serialize(afterSetParams);
 		Check(afterSetParams["meshAssetId"].is_null() &&
+			afterSetParams["textureOverrideAssetId"].is_null() &&
 			renderer.IsConfigured(),
-			"Direct MeshRenderer templates clear the old asset association");
+			"Direct MeshRenderer templates clear old mesh and texture override associations");
 	}
 
 	void TestDefaultMeshRendererRoundTrip()
@@ -1492,8 +1542,9 @@ namespace
 		MeshRenderer source;
 		nlohmann::json serialized;
 		source.Serialize(serialized);
-		Check(serialized["meshAssetId"].is_null(),
-			"Default MeshRenderer serializes a null meshAssetId");
+		Check(serialized["meshAssetId"].is_null() &&
+			serialized["textureOverrideAssetId"].is_null(),
+			"Default MeshRenderer serializes null mesh and texture override assets");
 
 		MeshRenderer restored;
 		Check(restored.Deserialize(serialized),
@@ -2286,6 +2337,7 @@ int main()
 	TestPersistentComponentMetadataRegistration();
 	TestRendererBlendModePersistenceAndTemplateApplication();
 	TestRenderSystemNormalizesMultiplyShaderDefine();
+	TestMeshTextureOverrideIsAppliedAtRenderItemCreation();
 	TestTransformRoundTrip();
 	TestInvalidJsonDoesNotPartiallyMutate();
 	TestSetParamsPropagatesDirtyToChildren();

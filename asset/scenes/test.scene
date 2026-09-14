@@ -29,6 +29,7 @@
                 {
                     "data": {
                         "billboardType": 0,
+                        "blendMode": 1,
                         "color": [
                             1.0,
                             1.0,
@@ -236,6 +237,7 @@
                 },
                 {
                     "data": {
+                        "blendMode": 1,
                         "canvasActorId": "{6A91F5F6-3CE7-4055-B952-F8FD0FCEDCBA}",
                         "color": [
                             1.0,
@@ -248,7 +250,7 @@
                         "name": "",
                         "order": 0,
                         "sortOrderInCanvas": 0,
-                        "textureAssetId": "{5C383CA1-7D26-4DC4-8225-846075C43E73}",
+                        "textureAssetId": "{8A5A6333-6CEA-4394-AD9C-13E13FB44526}",
                         "uvOffset": [
                             0.0,
                             0.0
@@ -294,6 +296,7 @@
                 },
                 {
                     "data": {
+                        "blendMode": 0,
                         "color": [
                             1.0,
                             1.0,
@@ -303,6 +306,7 @@
                         "meshAssetId": "{B0A4AC1C-322D-4D44-91C4-A6773BFBC157}",
                         "name": "",
                         "sortOrderInCanvas": 0,
+                        "textureOverrideAssetId": null,
                         "visible": true
                     },
                     "type": "MeshRenderer"
@@ -347,6 +351,7 @@
                 },
                 {
                     "data": {
+                        "blendMode": 0,
                         "color": [
                             1.0,
                             1.0,
@@ -367,6 +372,54 @@
             "name": "Sky",
             "parentId": null,
             "tag": "InitialSky"
+        },
+        {
+            "actorId": "{EA50D10A-39ED-4990-8646-7A217F39B05F}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            8.399999618530273,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "blendMode": 0,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{9F63052B-8F13-4A69-9B6D-F886F995984E}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "textureOverrideAssetId": "{8A5A6333-6CEA-4394-AD9C-13E13FB44526}",
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Cube",
+            "parentId": null,
+            "tag": "None"
         }
     ],
     "directional_light": {
