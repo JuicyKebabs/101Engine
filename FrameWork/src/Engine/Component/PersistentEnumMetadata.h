@@ -4,7 +4,19 @@
 #include "Engine/Component/Collider.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/Component/SpriteRenderer.h"
+#include "Engine/Component/SkyRenderer.h"
 #include "Engine/UI/Canvas.h"
+template<> struct EnumReflection<BlendMode>
+{
+	static const std::optional<EnumMetadata>& Get()
+	{
+		static const auto value = EnumMetadataBuilder<BlendMode>()
+			.Add("Opaque", BlendMode::Opaque).Add("Alpha", BlendMode::Alpha)
+			.Add("AddAlpha", BlendMode::AddAlpha).Add("Add", BlendMode::Add)
+			.Add("Multiply", BlendMode::Multiply).Build();
+		return value;
+	}
+};
 template<>
 struct EnumReflection<AnchorMode>
 {
@@ -80,6 +92,17 @@ template<> struct EnumReflection<BillboardType>
 		static const auto value = EnumMetadataBuilder<BillboardType>()
 			.Add("None", BillboardType::None).Add("Spherical", BillboardType::Spherical)
 			.Add("Cylindrical", BillboardType::Cylindrical).Build();
+		return value;
+	}
+};
+template<> struct EnumReflection<SkyRenderer::FollowMode>
+{
+	static const std::optional<EnumMetadata>& Get()
+	{
+		static const auto value = EnumMetadataBuilder<SkyRenderer::FollowMode>()
+			.Add("Owner", SkyRenderer::FollowMode::Owner)
+			.Add("MainCamera", SkyRenderer::FollowMode::MainCamera)
+			.Add("Actor", SkyRenderer::FollowMode::Actor).Build();
 		return value;
 	}
 };

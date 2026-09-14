@@ -81,7 +81,7 @@ std::wstring MeshManager::GetSourcePath(MeshHandle handle)
 void MeshManager::CreateErrorMesh()
 {
 	// Create cube mesh for error mesh
-	Model cubeModel = RenderTemplateFactory::LoadDefaultModel(DEFAULT_MESH::CUBE);
+	Model cubeModel = RenderTemplateFactory::LoadDefaultModel(DefaultMesh::Cube);
 	if (cubeModel.empty())
 	{
 		DBG("MeshManager: Failed to create error mesh (default cube model is empty).");
@@ -100,4 +100,18 @@ void MeshManager::CreateErrorMesh()
 	m_materials[m_errorMeshHandle] = materialInfo;
 
 	DBG("MeshManager: Error mesh created (handle=%u).", m_errorMeshHandle);
+}
+
+MeshHandle MeshManager::LoadDefaultMesh(DefaultMesh type)
+{
+	const auto loaded = m_loadedDefaultMeshes.find(type);
+	if (loaded != m_loadedDefaultMeshes.end()) return loaded->second;
+
+	Model model = GetDefaultModel(type);
+	if (model.empty()) return m_errorMeshHandle;
+
+	MeshHandle handle = CreateMeshHandle(model.front());
+	m_materials[handle] = MeshMaterialInfo{};
+	m_loadedDefaultMeshes.emplace(type, handle);
+	return handle;
 }

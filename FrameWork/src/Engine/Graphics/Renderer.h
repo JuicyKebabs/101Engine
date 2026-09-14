@@ -41,7 +41,7 @@ public:
 	void Update(UINT currentBackBufferIndex, const CameraInfo& info);															// Update
 	
 	void BeginFrame(ID3D12GraphicsCommandList* p_commandList);	// Begin frame (set root signature, descriptor heaps, etc.)
-	
+
 	void RenderShadowMap(ID3D12GraphicsCommandList* p_commandList);							// Render shadow map (if needed)
 	void RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t shadowMapSrvIndex);	// Render the scene using submitted draw packets
 	void RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, GpuTexture* input);	// Render a full-screen pass (for post-processing)
@@ -111,9 +111,9 @@ private:
 	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);		// Render a sprite
 	void RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);				// Render a UI element
 
-
-	PipelineState* GetPipelineStateObject(PSOKey key);				// Get pipeline state object(if not exists, create it)
+	PipelineState* GetPipelineStateObject(PSOKey key);								// Get pipeline state object(if not exists, create it)
 	std::shared_ptr<PipelineState> CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object
+
 	void PreparePostProcessKey();			// Prepare post-processing information
 	void PrepareShadowMapKey();				// Prepare shadow map information
 	void PrepareSelectionMaskKey();			// Prepare selection mesh information

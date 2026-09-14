@@ -3,6 +3,13 @@
 #include "Engine/Resource/AssetType.h"
 #include <type_traits>
 
+enum class AssetPrepareResult
+{
+	Ready,
+	MissingAsset,
+	Failed,
+};
+
 // Primary template for converting an asset type to its corresponding AssetType enum value.
 template<class Asset>
 struct AssetTypeOf

@@ -200,3 +200,11 @@ void UIRenderer::SetCanvasActorReference(const ActorReference& value)
 	m_pendingCanvasActorId.reset();
 	if (value.HasValue()) m_pendingCanvasActorId = value.GetGuid();
 }
+
+void UIRenderer::ApplyBlendModeToRenderTemplates()
+{
+	for (UIRenderElement& element : m_renderTemplate)
+	{
+		element.materialDesc.psoKey.blend = GetBlendMode();
+	}
+}

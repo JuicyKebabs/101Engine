@@ -75,4 +75,5 @@ namespace ActorTags
 {
 	inline const TagId None       = TAG_NONE;
 	inline const TagId MainCamera = TAG("MainCamera");
+	inline const TagId InitialSky = TAG("InitialSky");
 }

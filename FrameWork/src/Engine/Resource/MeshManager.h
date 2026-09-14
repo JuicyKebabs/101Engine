@@ -15,6 +15,7 @@
 //-----------------------------------------------------------------------------
 
 class TextureManager;	// Forward declaration of TextureManager
+enum class DefaultMesh;
 
 // Structure to hold material information linked to a mesh
 struct MeshMaterialInfo
@@ -35,6 +36,7 @@ public:
 	// Load a model from a file and return its mesh handles
 	// If the model is already loaded, it returns the existing handles
 	const std::vector<MeshHandle>& LoadModel(const std::wstring& path);
+	MeshHandle LoadDefaultMesh(DefaultMesh type);
 
 	// Create a mesh from a Mesh structure and return its handle
 	// (Called in LoadModel function or built-in mesh creation)
@@ -46,12 +48,15 @@ public:
 	// Get the source path of a mesh handle(for debbuging or serialization purposes)
 	std::wstring GetSourcePath(MeshHandle handle);
 
+	MeshHandle GetDefaultMeshHandle(DefaultMesh type) const;	// Get the handle for a built-in mesh type
+
 	// Get the handle for the error mesh (used when a mesh fails to load)
 	MeshHandle GetErrorMeshHandle() const { return m_errorMeshHandle; }
 
 private:
 
 	std::unordered_map<std::wstring, std::vector<MeshHandle>> m_loadedModels;	// Path to submesh handles mapping
+	std::unordered_map<DefaultMesh, MeshHandle> m_loadedDefaultMeshes;			// Built-in mesh type to handle mapping
 	std::unordered_map<MeshHandle, std::unique_ptr<MeshGPU>> m_meshes;			// Mesh handle to MeshGPU mapping
 	std::unordered_map<MeshHandle, std::wstring> m_sorurcePathes;				// Mesh handle to source path mapping
 	std::unordered_map<MeshHandle, MeshMaterialInfo> m_materials;				// Mesh handle to material info mapping

@@ -8,6 +8,7 @@
 #include "Engine/ActorImprint/ActorImprintInstanceRegistry.h"
 #include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Component/Camera.h"
+#include "Engine/Component/SkyRenderer.h"
 #include "Engine/Component/Component.h"
 #include "Engine/Component/ComponentReflection.h"
 #include "Engine/Core/Context/Context.h"
@@ -15,6 +16,7 @@
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/Graphics/LightTypes.h"
+#include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Scene/ActorDeserializer.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
@@ -327,6 +329,7 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(const json& sceneRecord,
 		// the candidate can still be discarded without lifecycle callbacks.
 		const auto& commitActors = candidate->PrepareUnpublishedCandidateForCommit();
 		ConfigureMainCamera(*candidate, commitActors);
+		ConfigureInitialSky(*candidate, commitActors);
 	}
 	catch (const std::exception& exception)
 	{
@@ -778,4 +781,21 @@ void SceneLoader::ConfigureMainCamera(SceneBase& scene, const std::vector<Actor*
 		return;
 	}
 	DBG("SceneLoader: Warning - No main camera found.");
+}
+
+void SceneLoader::ConfigureInitialSky(SceneBase& scene, const std::vector<Actor*>& actors)
+{
+	SkyRenderer* initialSky = nullptr;
+	bool duplicate = false;
+	for (Actor* actor : actors)
+	{
+		if (!actor || actor->IsDestroyed() || actor->GetTag() != ActorTags::InitialSky) continue;
+		SkyRenderer* sky = actor->GetComponentByClass<SkyRenderer>();
+		if (!sky) continue;
+		if (!initialSky) initialSky = sky;
+		else duplicate = true;
+	}
+
+	if (initialSky) scene.GetRenderSystem()->SetActiveSkyRenderer(initialSky);
+	if (duplicate) DBG("SceneLoader: Warning - Multiple valid InitialSky Actors found; using the first.");
 }

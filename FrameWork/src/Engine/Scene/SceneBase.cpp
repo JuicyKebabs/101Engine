@@ -17,7 +17,7 @@
 SceneBase::SceneBase()
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>(this);
-	m_pRenderSystem = std::make_unique<RenderSystem>();
+	m_pRenderSystem = std::make_unique<RenderSystem>(this);
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 }
 

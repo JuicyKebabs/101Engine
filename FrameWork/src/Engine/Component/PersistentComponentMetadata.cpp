@@ -3,6 +3,7 @@
 #include "PersistentMetadataHelpers.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
+#include "Engine/Component/SkyRenderer.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIImage.h"
@@ -14,6 +15,8 @@ void PersistentComponentMetadata::AddRendererProperties(TypeMetadataBuilder<T>& 
 	PersistentMetadata::AddComponentName(builder);
 	builder.Property("color", &T::GetColor, &T::SetColor).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
 	builder.Property("visible", &T::GetVisible, &T::SetVisible);
+	builder.Property("blendMode", &T::GetBlendMode, &T::SetBlendMode)
+		.SerializedAs(EnumSerializationFormat::Integer).Optional();
 	// UI order is authoritative; retain the legacy JSON field without applying it twice.
 	builder.Property("sortOrderInCanvas", &T::GetSortOrderInCanvas,
 		[writeLegacySortOrder](T& c, std::uint32_t v) { if (writeLegacySortOrder) c.SetSortOrderInCanvas(v); }).Optional();
@@ -53,6 +56,17 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	builder.Property("flipX", &T::IsFlipX, &T::SetFlipX);
 	builder.Property("flipY", &T::IsFlipY, &T::SetFlipY);
 	builder.Property("textureAssetId", &T::GetTextureAssetReference, &T::TrySetTextureAssetReference);
+	return PersistentMetadata::Finish(builder);
+}
+
+std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SkyRenderer(std::string stableTypeName)
+{
+	using T = ::SkyRenderer;
+	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
+	AddRendererProperties(builder);
+	builder.Property("skyTextureAssetId", &T::GetSkyTextureAssetReference, &T::TrySetSkyTextureAssetReference);
+	builder.Property("followMode", &T::GetFollowMode, &T::SetFollowMode).SerializedAs(EnumSerializationFormat::Integer);
+	builder.Property("followActorId", &T::GetFollowActorReference, &T::SetFollowActorReference);
 	return PersistentMetadata::Finish(builder);
 }
 

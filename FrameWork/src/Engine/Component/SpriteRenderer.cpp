@@ -69,7 +69,7 @@ bool SpriteRenderer::SetTextureAsset(const Guid& assetId)
 	return true;
 }
 
-SpriteRenderer::AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
+AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
 	const Guid& assetId,
 	PreparedTextureAssetState& outState) const
 {
@@ -105,6 +105,7 @@ SpriteRenderer::AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
 	SpriteRenderTemplate renderTemplate;
 	renderTemplate.materialDesc.textureHandle = textureHandle;
 	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::SPRITE_TRANSPARENT;
+	renderTemplate.materialDesc.psoKey.blend = GetBlendMode();
 	renderTemplate.materialDesc.baseColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 	renderTemplate.materialDesc.lightingEnabled = false;
 	renderTemplate.billboardType = m_billboardType;
@@ -250,4 +251,9 @@ bool SpriteRenderer::TrySetTextureAssetReference(const AssetReference<TextureAss
 
 	CommitTextureAssetState(std::move(prepared));
 	return true;
+}
+
+void SpriteRenderer::ApplyBlendModeToRenderTemplates()
+{
+	m_template.materialDesc.psoKey.blend = GetBlendMode();
 }

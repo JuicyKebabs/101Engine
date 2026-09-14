@@ -13,6 +13,36 @@ set_tests_properties(ActorPoolTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_executable(MouseInputTests
+    MouseInputTests.cpp
+)
+
+target_include_directories(MouseInputTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(MouseInputTests PRIVATE 101Framework)
+
+add_test(NAME MouseInputTests COMMAND MouseInputTests)
+set_tests_properties(MouseInputTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_executable(SkyRendererTests
+    SkyRendererTests.cpp
+)
+
+target_include_directories(SkyRendererTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Framework/src
+)
+
+target_link_libraries(SkyRendererTests PRIVATE 101Framework)
+
+add_test(NAME SkyRendererTests COMMAND SkyRendererTests)
+set_tests_properties(SkyRendererTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 add_executable(PropertyMetadataTests
     PropertyMetadataTests.cpp
 )
@@ -743,3 +773,9 @@ target_include_directories(SceneAssetTests PRIVATE
 target_link_libraries(SceneAssetTests PRIVATE 101Framework)
 add_test(NAME SceneAssetTests COMMAND SceneAssetTests)
 set_tests_properties(SceneAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(BuiltinMeshAssetTests BuiltinMeshAssetTests.cpp)
+target_include_directories(BuiltinMeshAssetTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework/src)
+target_link_libraries(BuiltinMeshAssetTests PRIVATE 101Framework)
+add_test(NAME BuiltinMeshAssetTests COMMAND BuiltinMeshAssetTests)
+set_tests_properties(BuiltinMeshAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

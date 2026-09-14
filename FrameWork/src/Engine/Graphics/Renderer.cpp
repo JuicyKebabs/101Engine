@@ -196,6 +196,17 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 
 	PSOKey compare{};
 
+	// Draw through the existing mesh path after frame state and mesh buffers are ready.
+	if (m_frameRenderData.sky.has_value())
+	{
+		const RenderItemRef& sky = *m_frameRenderData.sky;
+		if (sky.renderType == RenderType::Mesh && sky.handle < m_frameRenderData.GetMeshCount())
+		{
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(sky.handle),
+				static_cast<int>(sky.handle), compare, RenderTargetFormat::HDR);
+		}
+	}
+
 	for (auto& item : m_frameRenderData.opaque)
 	{
 		switch (item.renderType)

@@ -86,7 +86,7 @@ public:
 	static MeshRenderTemplate CreateMeshRenderTemplateFromDefaultMesh(
 		MeshManager& meshManager,
 		TextureManager& textureManager,
-		DEFAULT_MESH desc,
+		DefaultMesh desc,
 		const MaterialInput& materialInput
 	);
 
@@ -118,7 +118,7 @@ public:
 		bool inverseV
 	);
 
-	static Model LoadDefaultModel(DEFAULT_MESH type);
+	static Model LoadDefaultModel(DefaultMesh type);
 
 	static MeshRenderTemplate BuildRenderTemplate(
 		MeshManager& meshManager,

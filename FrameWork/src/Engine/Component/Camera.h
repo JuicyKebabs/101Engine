@@ -71,7 +71,7 @@ struct CameraLens
 	float width = 1.0f;																// screen width
 	float height = 1.0f;															// screen height
 	float nearZ = 0.1f;																// Near clipping plane distance
-	float farZ = 150.0f;															// Far clipping plane distance
+	float farZ = 1000.0f;															// Far clipping plane distance
 	PROJECTION_TYPE projectionType = PROJECTION_TYPE::PROJECTION_TYPE_PERSPECTIVE;	// Projection type (perspective or orthographic)
 };
 

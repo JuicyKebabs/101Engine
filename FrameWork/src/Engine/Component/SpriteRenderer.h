@@ -9,8 +9,6 @@
 #include "Engine/Core/GUID/Guid.h"
 
 //---------------------------------------------------
-
-
 // SpriteRenderer class
 // A component for rendering 2D sprites in the scene
 //---------------------------------------------------
@@ -43,10 +41,11 @@ public:
 	};
 
 public:
-	SpriteRenderer() = default;
+	SpriteRenderer() : RendererComponent(BlendMode::Alpha) {}
 	~SpriteRenderer() = default;
 	void SetParams(const ParamDesc& desc) {
 		m_template = desc.renderTemplate;
+		SetBlendMode(m_template.materialDesc.psoKey.blend);
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
 		SetUVScale(desc.uvScale);
@@ -97,12 +96,6 @@ public:
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
-	enum class AssetPrepareResult
-	{
-		Ready,
-		MissingAsset,
-		Failed,
-	};
 
 	struct PreparedTextureAssetState
 	{
@@ -138,6 +131,7 @@ private:
 	void LateUpdateOverride(float deltaTime) override;
 	void OnDetachOverride() override;
 	void OnDestroyOverride() override;
+	void ApplyBlendModeToRenderTemplates() override;
 
 	void RebuildRenderProxy(const CameraInfo& cameraInfo);	// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)
 };

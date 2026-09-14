@@ -135,4 +135,5 @@ private:
 		SceneLoadError& error);
 	static bool ValidateInstanceRegistry(SceneBase& scene, SceneLoadError& error);
 	static void ConfigureMainCamera(SceneBase& scene, const std::vector<Actor*>& actors);
+	static void ConfigureInitialSky(SceneBase& scene, const std::vector<Actor*>& actors);
 };

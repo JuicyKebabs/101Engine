@@ -7,7 +7,6 @@
 #include <tchar.h>
 #include <shellapi.h> 
 #include "Core/EditorApp.h"
-#include "Engine/Input/keyboard.h"
 #include "Engine/Input/InputManager.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -142,6 +141,7 @@ bool EditorApp::Initialize()
 				outResult = 0;
 				return true;
 			}
+
             if (ImGui::GetCurrentContext() &&
                 ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
             {
@@ -149,21 +149,15 @@ bool EditorApp::Initialize()
                 return true;
             }
 
+			InputManager::GetInstance().ProcessWindowMessage(message, wParam, lParam);
+
             switch (message)
             {
-            case WM_ACTIVATEAPP:
-            case WM_SYSKEYDOWN:
-            case WM_KEYUP:
-            case WM_SYSKEYUP:
-                Keyboard_ProcessMessage(message, wParam, lParam);
-                break;
-
             case WM_KEYDOWN:
                 if (wParam == VK_ESCAPE)
                 {
                     SendMessage(hwnd, WM_CLOSE, 0, 0);
                 }
-                Keyboard_ProcessMessage(message, wParam, lParam);
                 break;
             }
 
@@ -3095,7 +3089,7 @@ CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportH
             visibleExtent.x,
             visibleExtent.y,
             -1.0f,
-            100.0f
+            500.0f
         );
 
     return cameraInfo;

@@ -47,6 +47,9 @@ namespace
 			"Project Tag validation rejects FNV-1a collisions");
 		Check(!registry.UnregisterUserTag("MainCamera"),
 			"Reserved Tags cannot be unregistered");
+		Check(!registry.UnregisterUserTag("InitialSky") &&
+			!TagRegistry::ValidateUserTagSet({"initialsky"}, normalized, &error),
+			"InitialSky is reserved case-insensitively");
 	}
 
 	void TestChangeUndoRedoAndNone()

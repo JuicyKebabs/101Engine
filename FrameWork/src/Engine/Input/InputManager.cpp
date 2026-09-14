@@ -16,6 +16,7 @@ InputManager& InputManager::GetInstance()
 void InputManager::Initialize()
 {
 	Keyboard_Initialize(); //キーボード初期化
+	m_mouse.Initialize();
 	m_controller.Initialize();	//追加コントローラー初期化
 }
 
@@ -25,6 +26,7 @@ void InputManager::Update()
 	UpdateTriggerKeyInfo();	// Update Trigger Key Info
 	UpdateDownKeyInfo();	// Update Down Key Info
 	UpdateUpKeyInfo();		// Update Up Key Info
+	m_mouse.Update(m_inputInfo.mouse);
 
 	m_controller.Update(m_inputInfo.controller);	// Update Controller Info
 
@@ -34,7 +36,14 @@ void InputManager::Update()
 void InputManager::Copy()
 {
 	keycopy(); //キーボードキー情報コピー
+	m_mouse.CopyState();
 	m_controller.CopyState();	//コントローラー状態子コピー
+}
+
+void InputManager::ProcessWindowMessage(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	Keyboard_ProcessMessage(message, wParam, lParam);
+	m_mouse.ProcessMessage(message, wParam, lParam);
 }
 
 //入力情報構造体取得
