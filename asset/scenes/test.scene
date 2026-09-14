@@ -152,7 +152,7 @@
                         "followActorId": null,
                         "followMode": 1,
                         "lens": {
-                            "farZ": 150.0,
+                            "farZ": 1000.0,
                             "fov": 1.72787606716156,
                             "height": 720.0,
                             "nearZ": 0.10000000149011612,

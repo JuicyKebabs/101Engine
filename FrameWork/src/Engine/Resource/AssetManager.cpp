@@ -4,6 +4,7 @@
 #include "Engine/Resource/MeshManager.h"
 #include "Engine/Resource/TextureManager.h"
 #include "Engine/Resource/BuiltinMeshAssets.h"
+#include "Engine/Audio/AudioManager.h"
 #include "Engine/Core/Debug/Debug.h"
 #include <filesystem>
 #include <algorithm>
@@ -23,11 +24,19 @@ namespace
 bool AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager,
 	MeshManager* pMeshManager, AssetCatalogError* outError)
 {
+	return Initialize(projectDir, pTextureManager, pMeshManager, nullptr, outError);
+}
+
+bool AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager,
+	MeshManager* pMeshManager, AudioManager* pAudioManager, AssetCatalogError* outError)
+{
 	if (!ScanAssetDirectory(projectDir, "", outError)) return false;
 	m_pTextureManager = pTextureManager;
 	m_pMeshManager = pMeshManager;
+	m_pAudioManager = pAudioManager;
 	m_loadedMeshes.clear();
 	m_loadedTextures.clear();
+	m_loadedAudio.clear();
 	return true;
 }
 
@@ -192,6 +201,7 @@ AssetType AssetManager::DetermineAssetType(const std::string& extension)
 	// Texture extensions
 	if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".dds" || ext == ".tga")
 		return AssetType::Texture;
+	if (ext == ".wav") return AssetType::Audio;
 	if (ext == ".imprint") return AssetType::ActorImprint;
 	if (ext == ".scene") return AssetType::Scene;
 
@@ -301,4 +311,32 @@ TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
 	TextureHandle handle = m_pTextureManager->LoadTexture(fullPath);
 	m_loadedTextures[guid] = handle;
 	return handle;
+}
+
+AudioHandle AssetManager::GetAudioHandle(const Guid& guid)
+{
+	const AssetEntry* entry = GetAssetEntry(guid);
+	if (!entry || entry->type != AssetType::Audio || !m_pAudioManager)
+	{
+		DBG("AssetManager: GetAudioHandle - unknown, non-audio, or unavailable runtime audio asset.");
+		return InvalidAudioHandle;
+	}
+
+	auto cached = m_loadedAudio.find(guid);
+	if (cached != m_loadedAudio.end())
+	{
+		if (m_pAudioManager && m_pAudioManager->IsLoaded(cached->second)) return cached->second;
+		m_loadedAudio.erase(cached);
+	}
+
+	const AudioHandle handle = m_pAudioManager->Load(GetAssetPath(guid));
+	if (handle != InvalidAudioHandle) m_loadedAudio.emplace(guid, handle);
+	return handle;
+}
+
+AudioHandle AssetManager::GetAudioHandleByPath(const std::string& relativePath)
+{
+	const AssetEntry* entry = GetAssetEntryByPath(
+		fs::path(relativePath).lexically_normal().generic_string());
+	return entry ? GetAudioHandle(entry->guid) : InvalidAudioHandle;
 }

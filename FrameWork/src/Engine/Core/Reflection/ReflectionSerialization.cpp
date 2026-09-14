@@ -161,6 +161,7 @@ namespace
 		{
 		case AssetType::Mesh: return "Mesh";
 		case AssetType::Texture: return "Texture";
+		case AssetType::Audio: return "Audio";
 		case AssetType::ActorImprint: return "ActorImprint";
 		case AssetType::Scene: return "Scene";
 		default: return "Unknown";

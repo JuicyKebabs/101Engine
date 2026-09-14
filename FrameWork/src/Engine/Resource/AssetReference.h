@@ -29,6 +29,12 @@ struct AssetTypeOf<TextureAsset>
 	static constexpr AssetType value = AssetType::Texture;
 };
 
+template<>
+struct AssetTypeOf<AudioAsset>
+{
+	static constexpr AssetType value = AssetType::Audio;
+};
+
 class ActorImprint;
 
 template<>
