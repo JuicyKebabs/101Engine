@@ -108,13 +108,13 @@ bool SerializeReflectedComponent(
 		}
 	}
 
-	return ReflectionSerializer::Serialize(
-		*metadata, typeid(component), &component, outJson, context, outError);
+	return ReflectionSerializer::Serialize(*metadata, typeid(component), &component, outJson, context, outError);
 }
 
 bool DeserializeReflectedComponent(
 	Component& component,
 	const nlohmann::json& json,
+	ComponentRestoreOptions options,
 	ReflectionError* outError)
 {
 	ComponentRegistry& registry = ComponentRegistry::Get();
@@ -145,6 +145,7 @@ bool DeserializeReflectedComponent(
 	ReflectionRestoreContext context{
 		.actorReferenceCodec = &actorCodec,
 		.assetReferenceCodec = &assetCodec,
+		.unknownPropertyPolicy = options.unknownPropertyPolicy,
 	};
 
 	if (!ReflectionDeserializer::Deserialize(

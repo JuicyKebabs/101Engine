@@ -16,11 +16,16 @@ public:
 		std::function<bool(std::string_view)> onCreate;
 		std::function<bool(const Guid&)> onOpen;
 		std::function<bool(const Guid&, std::string_view)> onRename;
-		std::function<bool(const Guid&)> onSetStartup;
+		std::function<bool(const Guid&)> onSetEditorStartup;
+		std::function<bool(const Guid&)> onSetGameStartup;
 		bool canModify = true;
 	};
 
-	void Render(const AssetManager& assets, const Guid& startupSceneGuid, const Callbacks& callbacks);
+	void Render(
+		const AssetManager& assets, 
+		const Guid& editorStartupSceneGuid, 
+		const Guid& gameStartupSceneGuid, 
+		const Callbacks& callbacks);
 	static std::vector<AssetEntry> GetVisibleEntries(const AssetManager& assets);
 	void RequestCreateDialog() { m_openCreatePopup = true; }
 	void Select(const Guid& guid) { m_selectedGuid = guid; }

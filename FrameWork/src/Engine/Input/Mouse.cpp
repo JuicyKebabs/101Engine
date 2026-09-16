@@ -9,6 +9,13 @@ void Mouse::Initialize()
 	m_current = {};
 	m_previous = {};
 	m_wheelAccumulator = 0.0f;
+	m_rawLookDelta = {};
+}
+
+void Mouse::SetRawLookEnabled(bool enabled)
+{
+	m_rawLookEnabled = enabled;
+	m_rawLookDelta = {};
 }
 
 void Mouse::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
@@ -17,6 +24,21 @@ void Mouse::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_MOUSEMOVE:
 		UpdateClientPosition(lParam);
+		break;
+	case WM_INPUT:
+		if (m_rawLookEnabled)
+		{
+			RAWINPUT raw{};
+			UINT size = sizeof(raw);
+			if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT,
+				&raw, &size, sizeof(RAWINPUTHEADER)) == sizeof(raw) &&
+				raw.header.dwType == RIM_TYPEMOUSE &&
+				!(raw.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE))
+			{
+				m_rawLookDelta.x += raw.data.mouse.lLastX;
+				m_rawLookDelta.y += raw.data.mouse.lLastY;
+			}
+		}
 		break;
 	case WM_LBUTTONDOWN:
 		UpdateClientPosition(lParam);
@@ -84,6 +106,7 @@ void Mouse::Update(MouseInputInfo& inputInfo) const
 		inputInfo.deltaPixels.y =
 			m_current.clientPositionPixels.y - m_previous.clientPositionPixels.y;
 	}
+	inputInfo.lookDelta = m_rawLookEnabled ? m_rawLookDelta : inputInfo.deltaPixels;
 
 	inputInfo.wheelDelta = m_wheelAccumulator;
 }
@@ -92,6 +115,7 @@ void Mouse::CopyState()
 {
 	m_previous = m_current;
 	m_wheelAccumulator = 0.0f;
+	m_rawLookDelta = {};
 }
 
 void Mouse::UpdateClientPosition(LPARAM lParam)

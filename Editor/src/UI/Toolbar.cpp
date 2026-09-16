@@ -42,5 +42,12 @@ void Toolbar::Render(const Callbacks& callbacks)
 		ImGui::TextColored(ImVec4(0.35f, 0.45f, 0.80f, 1.0f), "Edit Mode");
 	}
 
+	ImGui::SameLine();
+	bool showColliders = callbacks.showColliders;
+	if (ImGui::Checkbox("Colliders", &showColliders) && callbacks.onShowCollidersChanged)
+	{
+		callbacks.onShowCollidersChanged(showColliders);
+	}
+
 	ImGui::End();
 }

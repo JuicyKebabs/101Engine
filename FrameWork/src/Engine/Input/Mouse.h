@@ -12,6 +12,7 @@ public:
 	void ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam);
 	void Update(MouseInputInfo& inputInfo) const;
 	void CopyState();
+	void SetRawLookEnabled(bool enabled);
 
 private:
 	struct State
@@ -28,4 +29,6 @@ private:
 	State m_current{};
 	State m_previous{};
 	float m_wheelAccumulator = 0.0f;
+	DirectX::XMINT2 m_rawLookDelta{};
+	bool m_rawLookEnabled = false;
 };

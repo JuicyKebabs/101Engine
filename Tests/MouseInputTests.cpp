@@ -52,6 +52,13 @@ int main()
 		"mouse position preserves signed coordinates");
 	Check(input.deltaPixels.x == -125 && input.deltaPixels.y == 30,
 		"mouse delta compares current and previous frame positions");
+	Check(input.lookDelta.x == -125 && input.lookDelta.y == 30,
+		"editor look input keeps using cursor movement");
+	mouse.SetRawLookEnabled(true);
+	mouse.Update(input);
+	Check(input.lookDelta.x == 0 && input.lookDelta.y == 0,
+		"raw look input does not reuse cursor movement");
+	mouse.SetRawLookEnabled(false);
 	mouse.CopyState();
 
 	mouse.ProcessMessage(WM_LBUTTONUP, 0, MousePosition(-5, 110));

@@ -77,6 +77,7 @@ struct MouseInputInfo
 
 	DirectX::XMINT2 clientPositionPixels{};
 	DirectX::XMINT2 deltaPixels{};
+	DirectX::XMINT2 lookDelta{}; // Raw counts in the standalone game; cursor pixels otherwise.
 	float wheelDelta = 0.0f;
 };
 
@@ -96,6 +97,7 @@ public:
 	void Update();		//更新
 	void Copy();		//キー情報コピー
 	void ProcessWindowMessage(UINT message, WPARAM wParam, LPARAM lParam);
+	void SetRawMouseLookEnabled(bool enabled);
 
 	//シングルトンパターン
 	static InputManager& GetInstance();

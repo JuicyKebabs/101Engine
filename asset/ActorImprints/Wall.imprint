@@ -1,0 +1,86 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              10.0,
+              8.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 3,
+          "properties": {
+            "center": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "isTrigger": false,
+            "layer": 3,
+            "name": "",
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.100000023841858,
+              1.100000023841858,
+              1.100000023841858
+            ],
+            "type": 0
+          },
+          "type": "Collider"
+        },
+        {
+          "localObjectId": 4,
+          "properties": {
+            "blendMode": 0,
+            "color": [
+              0.48267900943756104,
+              0.48267900943756104,
+              0.48267900943756104,
+              1.0
+            ],
+            "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
+            "name": "",
+            "sortOrderInCanvas": 0,
+            "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+            "visible": true
+          },
+          "type": "MeshRenderer"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "Wall",
+        "tag": "Wall"
+      }
+    }
+  ],
+  "definitionRevision": "{4DD366F5-293F-42F5-B445-974DCC1C1504}",
+  "nextLocalObjectId": 5,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

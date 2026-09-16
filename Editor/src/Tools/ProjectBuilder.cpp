@@ -1,4 +1,5 @@
 #include "ProjectBuilder.h"
+#include "GameCodeHotReloadConfig.h"
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Core/Debug/Debug.h"
 #include <fstream>
@@ -135,6 +136,13 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 
 	// Construct paths for the project root and Visual Studio installation
     std::string projectRoot = PathManager::GetProjectRoot();
+	const auto hotReloadConfig = ResolveGameCodeHotReloadConfig(projectRoot, config);
+	if (!hotReloadConfig)
+	{
+		DBG("ProjectBuilder: Unsupported hot reload configuration '%s'", config.c_str());
+		return false;
+	}
+
     std::string vsPath = GetVSInstallPath();
     if (vsPath.empty())
     {
@@ -156,10 +164,10 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
     std::string imguiBackendInc = imguiInc + "\\backends";
 
 	// Construct paths for location of outputting build artifacts
-    std::string objDir = projectRoot + "\\build\\GameCode_hotreload\\obj";
-    std::string frameworkLib = projectRoot + "\\build\\lib\\" + config + "\\101Framework.lib";
-    std::string outputDll = projectRoot + "\\build\\bin\\" + config + "\\GameCode.staged.dll";
-    std::string outputLib = projectRoot + "\\build\\lib\\" + config + "\\GameCode.staged.lib";
+    const std::string& objDir = hotReloadConfig->objectDirectory;
+    const std::string& frameworkLib = hotReloadConfig->frameworkLibrary;
+    const std::string& outputDll = hotReloadConfig->stagedDll;
+    const std::string& outputLib = hotReloadConfig->stagedLibrary;
     std::string logPath = projectRoot + "\\hotreload_compile.log";
     std::string batPath = projectRoot + "\\build_hotreload.bat";
 
@@ -199,10 +207,6 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 	// Create the directory for saving .obj files if it doesn't exist
 	fs::create_directories(objDir);
 
-	// Switch runtime library flag based on build configuration
-	// Debug : /MDd, Release : /MD
-    std::string rtFlag = (config == "Debug") ? "/MDd" : "/MD";
-
 	// Generate batch file to compile and link GameCode for hot reload
     {
         std::ofstream bat(batPath);
@@ -219,7 +223,8 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		// Compile all .cpp files into .obj files
         // Genarate obj files by giving all .cpp files to cl.exe.
         bat << "echo [HotReload] Compiling " << (int)sources.size() << " files...\n";
-        bat << "cl.exe /nologo " << rtFlag << " /Z7 /EHsc /std:c++latest /DNOMINMAX /c";
+        bat << "cl.exe /nologo " << hotReloadConfig->compilerFlags
+			<< " /Z7 /EHsc /std:c++latest /DNOMINMAX /c";
         bat << " /I\"" << gameCodeDir << "\"";
         bat << " /I\"" << frameworkInc << "\"";
         bat << " /I\"" << thirdPartyInc << "\"";
@@ -258,7 +263,8 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
     }
 
 	// Run the batch file to compile and link GameCode for hot reload
-    DBG("ProjectBuilder: Hot reload build (%d files) via cl.exe...", (int)sources.size());
+    DBG("ProjectBuilder: Hot reload build (%s, %d files) via cl.exe...",
+		hotReloadConfig->configuration.c_str(), (int)sources.size());
     int result = system(batPath.c_str());
 
 	// Check if hot reload is succeeded or failed

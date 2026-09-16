@@ -138,6 +138,12 @@ enum class CullMode
 	Back,
 };
 
+enum class FillMode
+{
+	Solid,
+	Wireframe,
+};
+
 // Render target formats
 enum class RenderTargetFormat
 {
@@ -157,6 +163,7 @@ struct PSOKey
 	RenderTargetFormat rtvFormat = RenderTargetFormat::LDR;	// Render target format
 	bool indexFree = false;									// Whether to use index-free drawing (e.g., for sprites)
 	bool depthOnly = false;									// Whether this PSO is for depth-only rendering (e.g., shadow maps)
+	FillMode fill = FillMode::Solid;						// Rasterizer fill mode
 
 	// Equality operators for PSOKey
 	bool operator == (const PSOKey& other) const
@@ -170,7 +177,8 @@ struct PSOKey
 			cull == other.cull &&
 			rtvFormat == other.rtvFormat &&
 			indexFree == other.indexFree &&
-			depthOnly == other.depthOnly;
+			depthOnly == other.depthOnly &&
+			fill == other.fill;
 	}
 	bool operator != (const PSOKey& other) const
 	{
@@ -248,7 +256,8 @@ struct PSOKeyHash
 		size_t h3 = std::hash<int>{}(static_cast<int>(k.blend)) ^ std::hash<int>{}(static_cast<int>(k.depth)) ^ std::hash<int>{}(static_cast<int>(k.cull)) ^ std::hash<int>{}(static_cast<int>(k.rtvFormat));
 		size_t h4 = std::hash<bool>{}(k.indexFree) ^ std::hash<bool>{}(k.depthOnly);
 		size_t h5 = std::hash<uint64_t>{}(k.commonDefines) ^ std::hash<uint64_t>{}(k.vsKey.defines) ^ std::hash<uint64_t>{}(k.psKey.defines);
-		return (((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4);
+		size_t h6 = std::hash<int>{}(static_cast<int>(k.fill));
+		return ((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5);
 	}
 };
 

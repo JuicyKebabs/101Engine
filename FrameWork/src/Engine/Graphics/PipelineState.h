@@ -40,6 +40,7 @@ public:
 	void SetBlendMode(BlendMode mode);			//ブレンドモードを設定
 	void SetDepthMode(DepthMode mode);			//深度モードを設定
 	void SetCullMode(CullMode mode);			//カリングモードを設定
+	void SetFillMode(FillMode mode);
 	void SetFormat(RenderTargetFormat format);	//レンダーターゲットのフォーマットを設定
 	
 	void FreeIndex(bool isFree);	//フリーインデックスの使用を設定

@@ -178,6 +178,20 @@ set_tests_properties(EditorCommandHistoryTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_executable(GameCodeHotReloadConfigTests
+    GameCodeHotReloadConfigTests.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Tools/GameCodeHotReloadConfig.cpp
+)
+
+target_include_directories(GameCodeHotReloadConfigTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/Editor/src
+)
+
+add_test(NAME GameCodeHotReloadConfigTests COMMAND GameCodeHotReloadConfigTests)
+set_tests_properties(GameCodeHotReloadConfigTests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 add_executable(EditorDocumentTests
     EditorDocumentTests.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
@@ -634,6 +648,7 @@ add_executable(ActorImprintStructuralMutationTests
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/CreateActorCommand.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/DeleteActorCommand.cpp
+    ${CMAKE_SOURCE_DIR}/Editor/src/Command/DeleteActorImprintInstanceCommand.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/AddComponentCommand.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/RemoveComponentCommand.cpp
     ${CMAKE_SOURCE_DIR}/Editor/src/Command/ReparentActorCommand.cpp
@@ -704,6 +719,7 @@ add_executable(ActorImprintWorkflowTests
 	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingSnapshot.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/Command/EditorCommandHistory.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/Command/InstantiateActorImprintCommand.cpp
+	${CMAKE_SOURCE_DIR}/Editor/src/Command/DeleteActorImprintInstanceCommand.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/Core/AtomicFileReplacement.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/Core/CanvasEditContext.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/Core/EditorCameraController.cpp

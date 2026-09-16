@@ -33,33 +33,55 @@ namespace
 			PropertySchemaNode* node = &root;
 			for (const std::string& member : property->GetPath().GetMembers())
 			{
-				if (node->property) return false;
+				if (node->property)
+				{
+					return false;
+				}
 				node = &node->children[member];
 			}
-			if (node->property || !node->children.empty()) return false;
+
+			if (node->property || !node->children.empty()) 
+			{
+				return false;
+			}
 			node->property = property;
 		}
 		return true;
 	}
 
-	bool ValidateSchema(const json& source, const PropertySchemaNode& schema,
-		const std::vector<std::string>& members, ReflectionError& error)
+	bool ValidateSchema(
+		const json& source,
+		const PropertySchemaNode& schema,
+		const std::vector<std::string>& members,
+		UnknownPropertyPolicy unknownPropertyPolicy,
+		ReflectionError& error)
 	{
 		auto FailSchema = [&](const std::vector<std::string>& location, std::string message)
 		{
 			error = { ReflectionErrorCode::SchemaMismatch, PropertyPath::FromMembers(location), std::move(message) };
 			return false;
 		};
-		if (!source.is_object()) return FailSchema(members, "Expected a reflected property object.");
+
+		if (!source.is_object())
+		{
+			return FailSchema(members, "Expected a reflected property object.");
+		}
 
 		for (auto member = source.begin(); member != source.end(); ++member)
 		{
-			if (!schema.children.contains(member.key()))
+			if (schema.children.contains(member.key()))
 			{
-				auto location = members;
-				location.push_back(member.key());
-				return FailSchema(location, "Unknown reflected property: " + member.key());
+				continue;
 			}
+
+			if (unknownPropertyPolicy == UnknownPropertyPolicy::Ignore)
+			{
+				continue;
+			}
+
+			auto location = members;
+			location.push_back(member.key());
+			return FailSchema(location, "Unknown reflected property: " + member.key());
 		}
 
 		for (const auto& [name, childSchema] : schema.children)
@@ -67,6 +89,7 @@ namespace
 			auto location = members;
 			location.push_back(name);
 			const auto child = source.find(name);
+
 			if (child == source.end())
 			{
 				if (childSchema.property &&
@@ -76,11 +99,12 @@ namespace
 				}
 				return FailSchema(location, "Required reflected property is missing.");
 			}
+
 			if (childSchema.property)
 			{
 				if (!childSchema.children.empty()) return false;
 			}
-			else if (!ValidateSchema(*child, childSchema, location, error))
+			else if (!ValidateSchema(*child, childSchema, location, unknownPropertyPolicy, error))
 			{
 				return false;
 			}
@@ -634,15 +658,13 @@ bool ReflectionDeserializer::Deserialize(
 {
 	if (!object || objectType != metadata.GetType())
 	{
-		SetError(outError, ReflectionErrorCode::InvalidObject, std::nullopt,
-			"Object type does not match its reflection metadata.");
+		SetError(outError, ReflectionErrorCode::InvalidObject, std::nullopt, "Object type does not match its reflection metadata.");
 		return false;
 	}
 
 	if (!json.is_object())
 	{
-		SetError(outError, ReflectionErrorCode::SchemaMismatch, std::nullopt,
-			"Reflection data must be a JSON object.");
+		SetError(outError, ReflectionErrorCode::SchemaMismatch, std::nullopt, "Reflection data must be a JSON object.");
 		return false;
 	}
 
@@ -650,17 +672,22 @@ bool ReflectionDeserializer::Deserialize(
 	PropertySchemaNode schema;
 	const bool schemaBuilt = BuildSchema(properties, schema);
 	ReflectionError schemaError;
-	const bool schemaValid = schemaBuilt && ValidateSchema(json, schema, {}, schemaError);
+	const bool schemaValid = 
+		schemaBuilt && 
+		ValidateSchema(json, schema, {}, context.unknownPropertyPolicy, schemaError);
+	
 	if (!schemaValid)
 	{
 		if (schemaBuilt)
 		{
-			if (outError) *outError = std::move(schemaError);
+			if (outError)
+			{
+				*outError = std::move(schemaError);
+			}
 		}
 		else
 		{
-			SetError(outError, ReflectionErrorCode::InvalidMetadata, std::nullopt,
-				"Registered reflection property paths conflict.");
+			SetError(outError, ReflectionErrorCode::InvalidMetadata, std::nullopt, "Registered reflection property paths conflict.");
 		}
 		return false;
 	}

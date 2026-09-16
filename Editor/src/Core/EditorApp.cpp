@@ -42,6 +42,7 @@
 #include "Tag/TagManagementWorkflow.h"
 #include "Command/CreateActorCommand.h"
 #include "Command/DeleteActorCommand.h"
+#include "Command/DeleteActorImprintInstanceCommand.h"
 #include "Command/ReparentActorCommand.h"
 #include "Command/AddComponentCommand.h"
 #include "Command/RemoveComponentCommand.h"
@@ -65,10 +66,17 @@ static const int WINDOW_HEIGHT = 720;
 
 namespace
 {
+#ifndef ENGINE_BUILD_CONFIGURATION
+#error ENGINE_BUILD_CONFIGURATION must identify the Editor build configuration.
+#endif
+
+	constexpr const char* kBuildConfiguration = ENGINE_BUILD_CONFIGURATION;
     constexpr const char* kHotReloadScenePath = "build/_hotreload_temp.scene";
-    constexpr const char* kActiveGameCodePath = "build/bin/Debug/GameCode.dll";
-    constexpr const char* kStagedGameCodePath = "build/bin/Debug/GameCode.staged.dll";
-    constexpr const char* kPreviousGameCodePath = "build/bin/Debug/GameCode.previous.dll";
+
+	std::string GetGameCodeBuildPath(const char* fileName)
+	{
+		return "build/bin/" + std::string(kBuildConfiguration) + "/" + fileName;
+	}
 
     // Temporary Scene View navigation tuning. These values intentionally live
     // outside EditorViewCamera so they can later move to editor preferences.
@@ -98,6 +106,10 @@ namespace
 			return "The operation violates the UI hierarchy constraints.";
 		case StructuralMutationReason::ImprintMemberImmutable:
 			return "The structure of an ActorImprint Instance cannot be changed.";
+		case StructuralMutationReason::InstanceDestroyRequired:
+			return "Delete the root Actor to remove the entire ActorImprint Instance.";
+		case StructuralMutationReason::InstanceSnapshotRequired:
+			return "The ActorImprint Instance could not be saved for Undo.";
 		case StructuralMutationReason::PendingDestroy:
 			return "The selected Actor is pending destruction.";
 		case StructuralMutationReason::TransactionInProgress:
@@ -274,10 +286,11 @@ void EditorApp::Run()
 void EditorApp::Terminate()
 {
 	// Destroy the scene while the game code DLL is still loaded
-    if (m_pPlayScene)
+    if (m_pPlaySceneManager)
     {
-        m_pPlayScene->Finalize();
-        m_pPlayScene.reset();
+        m_pPlayScene = nullptr;
+        m_pPlaySceneManager->Finalize();
+        m_pPlaySceneManager.reset();
     }
 
 	m_documentManager.Clear();
@@ -489,6 +502,9 @@ bool EditorApp::ExecutePendingSceneAction()
 // the staged DLL fails, restore the previous DLL and reconstruct the scene snapshot.
 void EditorApp::ReloadGameCode(bool reconfigure)
 {
+	DBG("EditorApp: Starting %s GameCode hot reload%s.",
+		kBuildConfiguration, reconfigure ? " with reconfigure" : "");
+
 	// 1. Save a snapshot of the current scene to disk (to preserve all actors and components).
     if (!SaveHotReloadSnapshot())
     {
@@ -601,17 +617,18 @@ bool EditorApp::BuildStagedGameCode(bool reconfigure)
 		}
 	}
 
-	return ProjectBuilder::BuildGameCodeForHotReload("Debug");
+	return ProjectBuilder::BuildGameCodeForHotReload(kBuildConfiguration);
 }
 
 bool EditorApp::DestroyCurrentRuntimeState()
 {
     StopAllEditTransactions();
 
-    if (m_pPlayScene)
+    if (m_pPlaySceneManager)
     {
-        m_pPlayScene->Finalize();
-        m_pPlayScene.reset();
+        m_pPlayScene = nullptr;
+        m_pPlaySceneManager->Finalize();
+        m_pPlaySceneManager.reset();
     }
 
 	m_documentManager.ReleaseWorkingScenesForRuntimeReload();
@@ -641,9 +658,9 @@ bool EditorApp::PromoteStagedGameCode()
     // Replace the active GameCode.dll with the newly built one, while keeping a backup of the previous version.
     namespace fs = std::filesystem;
 
-    const fs::path activeDll = PathManager::Resolve("build/bin/Debug/GameCode.dll");
-    const fs::path stagedDll = PathManager::Resolve("build/bin/Debug/GameCode.staged.dll");
-    const fs::path previousDll = PathManager::Resolve("build/bin/Debug/GameCode.previous.dll");
+    const fs::path activeDll = PathManager::Resolve(GetGameCodeBuildPath("GameCode.dll"));
+    const fs::path stagedDll = PathManager::Resolve(GetGameCodeBuildPath("GameCode.staged.dll"));
+    const fs::path previousDll = PathManager::Resolve(GetGameCodeBuildPath("GameCode.previous.dll"));
 
 	// Check if the newly built staged DLL exists before attempting to promote it
     if (!fs::exists(stagedDll))
@@ -705,8 +722,8 @@ bool EditorApp::RestorePreviousGameCode()
 {
     namespace fs = std::filesystem;
 
-    const fs::path activePath = PathManager::Resolve(kActiveGameCodePath);
-    const fs::path previousPath = PathManager::Resolve(kPreviousGameCodePath);
+    const fs::path activePath = PathManager::Resolve(GetGameCodeBuildPath("GameCode.dll"));
+    const fs::path previousPath = PathManager::Resolve(GetGameCodeBuildPath("GameCode.previous.dll"));
 
 	// Remove registration after failing to load the previous DLL
     m_pActorImprintSystem->Clear();
@@ -786,9 +803,21 @@ bool EditorApp::RollbackGameCode()
 
 bool EditorApp::RestoreHotReloadSnapshot()
 {
-	SceneLoadResult load = SceneLoader::LoadCandidate(kHotReloadScenePath, m_engineContext);
+	SceneLoadOptions options
+	{
+		// Ignore unknown properties of component to accept changes 
+		// in GameCode component definitions after hot reload.
+	   .unknownComponentPropertyPolicy = UnknownPropertyPolicy::Ignore,
+	};
+
+	// Load scene temporary to check if the loading is successful before publishing it to the editor document.
+	SceneLoadResult load = SceneLoader::LoadCandidate(
+		kHotReloadScenePath,
+		m_engineContext,
+		options);
+
 	if (!load)
-    {
+    {// In case of failure
 		DBG("EditorApp::RestoreHotReloadSnapshot: Failed at '%s': %s",
 			load.error.path.c_str(), load.error.message.c_str());
 		return false;
@@ -797,9 +826,12 @@ bool EditorApp::RestoreHotReloadSnapshot()
 	// Complete caller-owned viewport state before publishing the restored candidate.
 	ApplySceneRenderTargetSizeToScene(*load.scene);
 
-	auto* document = static_cast<SceneEditorDocument*>(
-		m_documentManager.FindFirst(EditorDocumentType::Scene));
-	if (!document) return false;
+	auto* document = static_cast<SceneEditorDocument*>(m_documentManager.FindFirst(EditorDocumentType::Scene));
+	if (!document)
+	{
+		return false;
+	}
+	
 	const bool wasDirty = document->IsDirty();
 	document->ReplaceScene(std::move(load.scene), document->GetFilePath(), wasDirty);
 	m_documentManager.ActivateDocument(document);
@@ -812,7 +844,7 @@ void EditorApp::RemovePreviousGameCodeBackup()
 {
     namespace fs = std::filesystem;
 
-    const fs::path previousPath = PathManager::Resolve(kPreviousGameCodePath);
+    const fs::path previousPath = PathManager::Resolve(GetGameCodeBuildPath("GameCode.previous.dll"));
 
     std::error_code error;
     fs::remove(previousPath, error);
@@ -889,21 +921,32 @@ void EditorApp::EnterPlayMode()
 		return;
 	}
 
-	// Move ownership of the cloned scene to m_pPlayScene
-    m_pPlayScene = std::move(playScene);
-
 	// Resize the scene render targets to the fixed resolution for Play Mode
     if (!m_pEngine->ResizeSceneRenderTargets(PLAY_VIEWPORT_WIDTH, PLAY_VIEWPORT_HEIGHT))
     {
 		DBG("EditorApp: Failed to resize scene render targets for Play mode.");
-		m_pPlayScene->Finalize();
-		m_pPlayScene.reset();
+		playScene->Finalize();
 		return;
     }
 
     // Apply the render target size to viewport-dependent elements
     // in the Play scene, such as Screen-Space UI layout.
-    ApplySceneRenderTargetSizeToScene(*m_pPlayScene);
+    ApplySceneRenderTargetSizeToScene(*playScene);
+
+	// Keep the unsaved Edit Scene clone for the first Play Scene. SceneManager
+	// owns it so Behavior::ChangeScene can load subsequent Scene assets.
+	m_pPlaySceneManager = std::make_unique<SceneManager>();
+	m_pPlaySceneManager->SetViewportSize(PLAY_VIEWPORT_WIDTH, PLAY_VIEWPORT_HEIGHT);
+	m_pPlaySceneManager->RegisterScene("EditorPlay", std::move(playScene));
+	m_pPlaySceneManager->SetInitialScene("EditorPlay");
+	m_pPlaySceneManager->Initialize(m_engineContext);
+	m_pPlayScene = m_pPlaySceneManager->GetCurrentScene();
+	if (!m_pPlayScene)
+	{
+		m_pPlaySceneManager->Finalize();
+		m_pPlaySceneManager.reset();
+		return;
+	}
 
 	// Switch to Play Mode
 	m_editorMode = EditorMode::Play;
@@ -933,9 +976,10 @@ void EditorApp::ExitPlayMode()
 	EditorSelection* selection = GetActiveSelection();
 	const Guid selectedActorId = selection ? selection->GetSelectedActorGuid() : Guid{};
 
-    // Destroy the play scene
-	m_pPlayScene->Finalize();
-	m_pPlayScene.reset();
+    // Destroy the Play Scene before returning to the Edit Scene.
+	m_pPlayScene = nullptr;
+	m_pPlaySceneManager->Finalize();
+	m_pPlaySceneManager.reset();
 
 	// Switch back to Edit Mode
 	m_editorMode = EditorMode::Edit;
@@ -1158,9 +1202,10 @@ void EditorApp::Update(float deltaTime)
     {
         if (m_editorMode == EditorMode::Play)
         {
-            activeScene->PreUpdate(deltaTime);
-            activeScene->Update(deltaTime);
-            activeScene->LateUpdate(deltaTime);
+			m_pPlaySceneManager->PreUpdate(deltaTime);
+			m_pPlaySceneManager->Update(deltaTime);
+			m_pPlayScene = m_pPlaySceneManager->GetCurrentScene();
+			m_pPlaySceneManager->LateUpdate(deltaTime);
         }
         else
         {
@@ -1441,6 +1486,8 @@ void EditorApp::RenderEditViewport(SceneBase* activeScene, GpuTexture* sceneColo
     {
 		RenderShadowPass();
 		RenderWorldPass();
+		BuildColliderDebugRenderData(activeScene);
+		RenderColliderDebugPass();
     }
     else
     {
@@ -1582,6 +1629,25 @@ void EditorApp::RenderSelectionPass()
     m_pRenderer->RenderSelectionOutline(m_pEngine->GetCommandList(), selectionMask);
     m_pEngine->EndPass(selectionOutlineTarget);
 
+}
+
+void EditorApp::RenderColliderDebugPass()
+{
+	if (!m_showColliders || m_colliderDebugRenderData.meshs.empty()) return;
+
+	RenderPassTarget sceneTarget
+	{
+		RenderPassTargetType::ColorDepth,
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
+		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
+		false,
+		false
+	};
+
+	m_pEngine->BeginPass(sceneTarget);
+	m_pRenderer->RenderColliderDebug(
+		m_pEngine->GetCommandList(), m_colliderDebugRenderData);
+	m_pEngine->EndPass(sceneTarget);
 }
 
 
@@ -1735,14 +1801,16 @@ void EditorApp::RenderHierarchyPanel()
 			Actor* actor = editScene->ResolveActor(actorGuid);
 			if (!actor || actor->IsDestroyed()) return false;
 
-            const std::string actorName = actor->GetName();
+			const std::string actorName = actor->GetName();
 
-			const bool succeeded = document->ExecuteCommand(
-                std::make_unique<DeleteActorCommand>(
-					editScene,
-					actorGuid
-                )
-            );
+			const auto* member = editScene->GetImprintInstances().FindMember(actor->GetHandle());
+			std::unique_ptr<IEditorCommand> command;
+			if (member && m_pActorImprintSystem)
+				command = std::make_unique<DeleteActorImprintInstanceCommand>(
+					*editScene, *m_pActorImprintSystem, actorGuid);
+			else
+				command = std::make_unique<DeleteActorCommand>(editScene, actorGuid);
+			const bool succeeded = document->ExecuteCommand(std::move(command));
 
             if (succeeded)
             {
@@ -2235,14 +2303,20 @@ void EditorApp::RenderToolbar()
             m_pendingModeTransition = EditorModeTransition::EnterPlay;
         };
 
-    callbacks.onStop = [this]()
+	callbacks.onStop = [this]()
         {
             m_pendingModeTransition = EditorModeTransition::ExitPlay;
         };
+	callbacks.onShowCollidersChanged = [this](bool visible)
+		{
+			m_showColliders = visible;
+			if (!visible) m_colliderDebugRenderData.Clear();
+		};
 
 	callbacks.canPlay = m_editorMode == EditorMode::Edit && document &&
 		document->CanEnterPlay();
     callbacks.canStop = m_editorMode == EditorMode::Play && m_pPlayScene != nullptr;
+	callbacks.showColliders = m_showColliders;
 
     m_toolbar.Render(callbacks);
 }
@@ -2260,17 +2334,39 @@ void EditorApp::RenderScriptsPanel()
 
     callbacks.onOpen = [](const std::string& name)
         {
-            const std::string headerPath =
-                PathManager::Resolve("Game/GameCode/" + name + ".h");
+			namespace fs = std::filesystem;
 
-            ShellExecuteA(
-                nullptr,
-                "open",
-                headerPath.c_str(),
-                nullptr,
-                nullptr,
-                SW_SHOWNORMAL
-            );
+            const std::string basePath = PathManager::Resolve("Game/GameCode/" + name);
+
+			const std::string headerPath = basePath + ".h";
+			const std::string sourcePath = basePath + ".cpp";
+
+			const auto openFile = [&name](const std::string& path)
+				{
+
+					if (!fs::exists(path))
+					{
+						DBG("EditorApp: File '%s' does not exist.", path.c_str());
+						return;
+					}
+
+					ShellExecuteA(
+						nullptr,
+						"open",
+						path.c_str(),
+						nullptr,
+						nullptr,
+						SW_SHOWNORMAL
+					);
+
+					if (GetLastError() != ERROR_SUCCESS)
+					{
+						DBG("EditorApp: Failed to open file '%s' in default editor.", path.c_str());
+					}
+				};
+			
+            openFile(headerPath);
+            openFile(sourcePath);
 
             DBG("EditorApp: Opening %s in default editor", name.c_str());
         };
@@ -2381,24 +2477,62 @@ void EditorApp::RenderSceneAssetPanel()
 		m_sceneAssetPanel.SetDiagnostic("Scene asset renamed.");
 		return true;
 	};
-	callbacks.onSetStartup = [this](const Guid& guid)
+	callbacks.onSetEditorStartup = [this](const Guid& guid)
 	{
 		const AssetEntry* entry = m_pAssetManager->GetAssetEntry(guid);
-		if (!entry || entry->type != AssetType::Scene) return false;
+
+		if (!entry || entry->type != AssetType::Scene)
+		{
+			m_sceneAssetPanel.SetDiagnostic("Editor Startup Scene must reference a Scene asset.");
+			return false;
+		}
+
 		ProjectSettings candidate = m_projectSettings;
 		candidate.SetEditorStartupSceneGuid(guid);
+
 		std::string error;
 		if (!candidate.Save(PathManager::Resolve("project.101"), &error))
 		{
 			m_sceneAssetPanel.SetDiagnostic(error);
 			return false;
 		}
+
 		m_projectSettings = candidate;
 		m_sceneAssetPanel.SetDiagnostic("Editor Startup Scene updated.");
+
 		return true;
 	};
-	m_sceneAssetPanel.Render(*m_pAssetManager,
-		m_projectSettings.GetEditorStartupSceneGuid(), callbacks);
+
+	callbacks.onSetGameStartup = [this](const Guid& guid)
+		{
+			const AssetEntry* entry = m_pAssetManager->GetAssetEntry(guid);
+			if (!entry || entry->type != AssetType::Scene)
+			{
+				m_sceneAssetPanel.SetDiagnostic(
+					"Game Startup Scene must reference a Scene asset.");
+				return false;
+			}
+
+			ProjectSettings candidate = m_projectSettings;
+			candidate.SetGameStartupSceneGuid(guid);
+
+			std::string error;
+			if (!candidate.Save(PathManager::Resolve("project.101"), &error))
+			{
+				m_sceneAssetPanel.SetDiagnostic(error);
+				return false;
+			}
+
+			m_projectSettings = candidate;
+			m_sceneAssetPanel.SetDiagnostic("Game Startup Scene updated.");
+			return true;
+		};
+
+	m_sceneAssetPanel.Render(
+		*m_pAssetManager,
+		m_projectSettings.GetEditorStartupSceneGuid(),
+		m_projectSettings.GetGameStartupSceneGuid(),
+		callbacks);
 }
 
 void EditorApp::RenderTagManagerPanel()
@@ -2601,7 +2735,7 @@ SceneBase* EditorApp::GetActiveScene() const
 
 	if (m_editorMode == EditorMode::Play && m_pPlayScene)
 	{
-		return m_pPlayScene.get();
+		return m_pPlayScene;
 	}
 
 	return nullptr;
@@ -3043,6 +3177,78 @@ void EditorApp::BuildSelectionRenderData(
 
             m_selectionRenderData.AddUI(std::move(item));
         }
+	}
+}
+
+void EditorApp::BuildColliderDebugRenderData(SceneBase* scene)
+{
+	m_colliderDebugRenderData.Clear();
+	if (!m_showColliders || !scene || !m_pMeshManager) return;
+
+	for (Actor* actor : scene->GetAllActors())
+	{
+		if (!actor || !actor->IsActive() || actor->IsDestroyed()) continue;
+
+		for (Collider* collider : actor->GetComponentsByClass<Collider>())
+		{
+			if (!collider || !collider->isActive() ||
+				collider->GetType() == ColliderType::None) continue;
+
+			collider->Flush();
+
+			if (collider->GetType() == ColliderType::CAPSULE)
+			{
+				const CapsuleCollider& capsule = collider->GetCurrentCapsuleCollider();
+				const float diameter = capsule.radius * 2.0f;
+				const Quaternion rotation = collider->GetWorldTransformCurrent().rotation;
+				const MeshHandle sphereMesh = m_pMeshManager->LoadDefaultMesh(DefaultMesh::Sphere);
+
+				auto addMesh = [this](MeshHandle mesh, const Matrix4x4& world)
+					{
+						MeshRenderItem item{};
+						item.meshDesc.meshHandle = mesh;
+						item.common.worldMatrix = world;
+						m_colliderDebugRenderData.AddMeshs(std::move(item));
+					};
+
+				if (capsule.cylHeight <= 0.0f)
+				{
+					addMesh(sphereMesh, Matrix4x4::CreateTRS(
+						collider->GetWorldTransformCurrent().position,
+						Quaternion::Identity(),
+						Vector3(diameter, diameter, diameter)));
+				}
+				else
+				{
+					const MeshHandle cylinderMesh =
+						m_pMeshManager->LoadDefaultMesh(DefaultMesh::Cylinder);
+					addMesh(cylinderMesh, Matrix4x4::CreateTRS(
+						collider->GetWorldTransformCurrent().position,
+						rotation,
+						Vector3(diameter, capsule.cylHeight, diameter)));
+					addMesh(sphereMesh, Matrix4x4::CreateTRS(
+						capsule.pointA, Quaternion::Identity(),
+						Vector3(diameter, diameter, diameter)));
+					addMesh(sphereMesh, Matrix4x4::CreateTRS(
+						capsule.pointB, Quaternion::Identity(),
+						Vector3(diameter, diameter, diameter)));
+				}
+				continue;
+			}
+
+			DefaultMesh meshType;
+			switch (collider->GetType())
+			{
+			case ColliderType::BOX: meshType = DefaultMesh::Cube; break;
+			case ColliderType::SPHERE: meshType = DefaultMesh::Sphere; break;
+			default: continue;
+			}
+
+			MeshRenderItem item{};
+			item.meshDesc.meshHandle = m_pMeshManager->LoadDefaultMesh(meshType);
+			item.common.worldMatrix = collider->GetWorldMatrix();
+			m_colliderDebugRenderData.AddMeshs(std::move(item));
+		}
 	}
 }
 

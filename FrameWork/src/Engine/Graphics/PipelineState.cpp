@@ -184,6 +184,13 @@ void PipelineState::SetCullMode(CullMode mode)
 	}
 }
 
+void PipelineState::SetFillMode(FillMode mode)
+{
+	m_desc.RasterizerState.FillMode = mode == FillMode::Wireframe
+		? D3D12_FILL_MODE_WIREFRAME
+		: D3D12_FILL_MODE_SOLID;
+}
+
 //レンダーターゲットのフォーマットを設定
 void PipelineState::SetFormat(RenderTargetFormat format)
 {

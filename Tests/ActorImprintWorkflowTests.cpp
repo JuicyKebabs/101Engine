@@ -1,5 +1,6 @@
 #include "ActorImprint/ActorImprintAssetWorkflow.h"
 #include "Command/EditorCommandHistory.h"
+#include "Command/DeleteActorImprintInstanceCommand.h"
 #include "Command/InstantiateActorImprintCommand.h"
 #include "Document/EditorDocumentManager.h"
 #include "Engine/Actor/Actor.h"
@@ -219,6 +220,21 @@ namespace
 		Check(instanceRoot && instanceRoot->GetGuid() == rootGuid &&
 			instanceRoot->GetParent() == ordinaryParent,
 			"Instantiation Redo preserves root ActorGUID and external parent identity");
+		Check(history.Execute(std::make_unique<DeleteActorImprintInstanceCommand>(
+			scene, fixture.system, rootGuid)),
+			"Hierarchy deletion removes a complete ActorImprint Instance");
+		Check(instanceRoot->IsDestroyed(), "Deleted Instance is pending collection");
+		scene.EditorUpdate(0.0f);
+		Check(!scene.ResolveActor(rootGuid) && fixture.system.GetLiveInstanceCount(assetGuid) == 0,
+			"Instance deletion retires the root and its registry record");
+		Check(history.Undo(), "Instance deletion Undo restores the Instance snapshot");
+		instanceRoot = scene.ResolveActor(rootGuid);
+		Check(instanceRoot && instanceRoot->GetParent() == ordinaryParent &&
+			fixture.system.GetLiveInstanceCount(assetGuid) == 1,
+			"Deletion Undo preserves the Actor GUID and external parent");
+		Check(history.Redo(), "Instance deletion Redo destroys the restored Instance");
+		scene.EditorUpdate(0.0f);
+		Check(history.Undo(), "Instance deletion supports repeated Undo after Redo");
 		Check(history.Undo(), "The restored Instance can be undone again");
 		scene.EditorUpdate(0.0f);
 

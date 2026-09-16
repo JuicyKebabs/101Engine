@@ -19,6 +19,13 @@ class AssetReferenceCodec;
 class AssetReferenceSaveContext;
 class AssetReferenceRestoreContext;
 
+// Policy for handling unknown properties during deserialization.
+enum class UnknownPropertyPolicy
+{
+	Reject,	// Reject unknown properties and stop deserialization with an error.(e.g., for scene loading).
+	Ignore,	// Ignore unknown properties and continue deserialization (e.g., for hotreload).
+};
+
 // Context for saving and restoreing reflection data, 
 // including codecs and contexts for ActorReference and AssetReference serialization and deserialization.
 struct ReflectionSaveContext
@@ -35,6 +42,7 @@ struct ReflectionRestoreContext
 	const ActorReferenceRestoreContext* actorReferenceContext = nullptr;
 	const AssetReferenceCodec* assetReferenceCodec = nullptr;
 	const AssetReferenceRestoreContext* assetReferenceContext = nullptr;
+	UnknownPropertyPolicy unknownPropertyPolicy = UnknownPropertyPolicy::Reject;
 };
 
 class ReflectionSerializer

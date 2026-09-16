@@ -11,6 +11,7 @@
 #include "Engine/UI/Canvas.h"
 #include "Command/CreateActorCommand.h"
 #include "Command/DeleteActorCommand.h"
+#include "Command/DeleteActorImprintInstanceCommand.h"
 #include "Command/AddComponentCommand.h"
 #include "Command/RemoveComponentCommand.h"
 #include "Command/ReparentActorCommand.h"
@@ -155,6 +156,9 @@ namespace
 		DeleteActorCommand destroy(&f.scene, root->GetGuid());
 		Check(!destroy.Execute() && destroy.GetStructuralResult().reason == Reason::InstanceSnapshotRequired && !root->IsDestroyed(),
 			"Ordinary Delete command requires an Instance snapshot instead of discarding provenance");
+		DeleteActorImprintInstanceCommand destroyMember(f.scene, f.system, child->GetGuid());
+		Check(!destroyMember.Execute() && destroyMember.GetStructuralResult().reason == Reason::InstanceDestroyRequired &&
+			!root->IsDestroyed(), "Instance Delete command requires the root Actor");
 		EditorCommandHistory history;
 		Check(!history.Execute(std::make_unique<AddComponentCommand>(&f.scene, root->GetGuid(), "Camera")) && !history.CanUndo(),
 			"Failed structural commands do not enter history");

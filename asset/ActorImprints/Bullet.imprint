@@ -1,0 +1,94 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              0.20000000298023224,
+              0.20000000298023224,
+              0.20000000298023224
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 3,
+          "properties": {
+            "blendMode": 3,
+            "color": [
+              1.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "meshAssetId": "{9F63052B-8F13-4A69-9B6D-F886F995984E}",
+            "name": "",
+            "sortOrderInCanvas": 0,
+            "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+            "visible": true
+          },
+          "type": "MeshRenderer"
+        },
+        {
+          "localObjectId": 5,
+          "properties": {
+            "center": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "isTrigger": true,
+            "layer": 4,
+            "name": "",
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              4.0,
+              3.0,
+              3.0
+            ],
+            "type": 1
+          },
+          "type": "Collider"
+        },
+        {
+          "localObjectId": 6,
+          "properties": {
+            "damage": 1.0,
+            "lifeTime": 2.0
+          },
+          "type": "Bullet"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "Root",
+        "tag": "Bullet"
+      }
+    }
+  ],
+  "definitionRevision": "{F3D0F1DC-AD77-479D-BC50-62EA7CB2F825}",
+  "nextLocalObjectId": 10,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

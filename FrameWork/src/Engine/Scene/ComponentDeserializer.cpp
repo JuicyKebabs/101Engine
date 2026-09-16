@@ -1,13 +1,24 @@
 #include "ComponentDeserializer.h"
 #include "Engine/Component/Component.h"
-#include "Engine/Component/ComponentReflection.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Core/Debug/Debug.h"
 
 using json = nlohmann::json;
 
 std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
+	const nlohmann::json& componentJson,
+	ComponentDeserializationError* outError)
+{
+	return DeserializeRecord(
+		componentJson,
+		{},
+		outError
+	);
+}
+
+std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
 	const json& componentJson,
+	ComponentRestoreOptions options,
 	ComponentDeserializationError* outError)
 {
 	if (outError) *outError = {};
@@ -56,7 +67,7 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
 
 	// Deserialize the component data
 	ReflectionError error;
-	if (!DeserializeReflectedComponent(*component, componentData, &error))
+	if (!DeserializeReflectedComponent(*component, componentData, options, &error))
 	{
 		std::string path = "<type>";
 		if (error.path)

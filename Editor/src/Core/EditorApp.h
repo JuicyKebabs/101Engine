@@ -15,6 +15,7 @@
 #include "Engine/Core/Time/Time.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Scene/SceneBase.h"
+#include "Engine/Scene/SceneManager.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Window/Window.h"
 #include "Command/RectTransformEditCommand.h"
@@ -91,7 +92,8 @@ private:
     EditorMode m_editorMode = EditorMode::Edit; // The current mode of the editor (Edit or Play)
     EditorModeTransition m_pendingModeTransition = EditorModeTransition::None;
 	float m_assetRefreshElapsedSeconds = 0.0f;
-    std::unique_ptr<SceneBase> m_pPlayScene;    // The scene currently being played (runtime)
+    std::unique_ptr<SceneManager> m_pPlaySceneManager;
+    SceneBase* m_pPlayScene = nullptr; // Non-owning current Scene of m_pPlaySceneManager.
 	EditorDocumentManager m_documentManager;
 	EditorDocumentWorkflow m_documentWorkflow{m_documentManager};
 	bool m_openDocumentDecisionPopup = false;
@@ -122,7 +124,9 @@ private:
     HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
 
     // Render data for rendering the outline of a selected object in the scene view
-    FrameRenderData m_selectionRenderData;
+	FrameRenderData m_selectionRenderData;
+	FrameRenderData m_colliderDebugRenderData;
+	bool m_showColliders = false;
 
 private:
     // Struct to track transform edits for undo/redo
@@ -197,8 +201,9 @@ private:
     void RenderPlayViewport(SceneBase* activeScene, GpuTexture* sceneColor);
 
     void RenderShadowPass();
-    void RenderWorldPass();
-    void RenderSelectionPass();
+	void RenderWorldPass();
+	void RenderSelectionPass();
+	void RenderColliderDebugPass();
 
     void RenderImGui();
     void RenderMainDockSpace();
@@ -229,11 +234,12 @@ private:
 
     // Build render data for the selected object in the scene view
     // (used to render an outline around the selected object)
-    void BuildSelectionRenderData(
+	void BuildSelectionRenderData(
         RenderSpace targetRenderSpace,
         const CameraInfo& viewportCameraInfo,
         const Canvas* canvasViewRoot
-    );
+	);
+	void BuildColliderDebugRenderData(SceneBase* scene);
 
     // Helper function to build CameraInfo for the current viewport size
     // Camera matrix is built based on the current viewport mode (Scene or Canvas)

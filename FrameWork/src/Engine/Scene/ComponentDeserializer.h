@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 #include "nlohmann/json.hpp"
+#include "Engine/Component/ComponentReflection.h"
 
 //--------------------------------------------------------------------------------
 // ComponentDeserializer class
@@ -22,5 +23,10 @@ class ComponentDeserializer
 public:
 	static std::unique_ptr<Component> DeserializeRecord(
 		const nlohmann::json& componentJson,
+		ComponentDeserializationError* outError = nullptr);
+
+	static std::unique_ptr<Component> DeserializeRecord(
+		const nlohmann::json& componentJson,
+		ComponentRestoreOptions options,
 		ComponentDeserializationError* outError = nullptr);
 };

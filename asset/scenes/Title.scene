@@ -77,7 +77,7 @@
             "tag": "MainCamera"
         },
         {
-            "actorId": "{A89AA771-B84F-431B-822F-81752F569265}",
+            "actorId": "{6A714EE2-DAA6-44FA-8DD9-AA6E2C802B9D}",
             "components": [
                 {
                     "data": {
@@ -108,8 +108,80 @@
                             1.0
                         ],
                         "size": [
-                            100.0,
-                            100.0
+                            1920.0,
+                            1080.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
+                        "color": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 100,
+                        "sortOrderInCanvas": 100,
+                        "textureAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "FadeImage",
+            "parentId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{A89AA771-B84F-431B-822F-81752F569265}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            -264.3999938964844
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            0.5,
+                            0.5,
+                            1.0
+                        ],
+                        "size": [
+                            1280.0,
+                            200.0
                         ]
                     },
                     "type": "RectTransform"
@@ -127,9 +199,9 @@
                         "flipX": false,
                         "flipY": false,
                         "name": "",
-                        "order": 0,
-                        "sortOrderInCanvas": 0,
-                        "textureAssetId": "{F6251694-900E-42FF-A5B2-5DC6490E3550}",
+                        "order": 1,
+                        "sortOrderInCanvas": 1,
+                        "textureAssetId": "{8BB79788-849E-4D09-8D09-EE04C71C9795}",
                         "uvOffset": [
                             0.0,
                             0.0
@@ -200,6 +272,13 @@
                         "visible": true
                     },
                     "type": "Canvas"
+                },
+                {
+                    "data": {
+                        "FadeImageActor": "{6A714EE2-DAA6-44FA-8DD9-AA6E2C802B9D}",
+                        "nextScene": "{23C378F6-893E-4AE2-9972-F7B3F1A3B212}"
+                    },
+                    "type": "TitleManager"
                 }
             ],
             "is_active": true,
@@ -215,7 +294,7 @@
                         "anchorMode": 4,
                         "anchoredPosition": [
                             0.0,
-                            0.0
+                            100.0
                         ],
                         "name": "",
                         "pivot": [
@@ -239,8 +318,8 @@
                             1.0
                         ],
                         "size": [
-                            100.0,
-                            100.0
+                            1280.0,
+                            400.0
                         ]
                     },
                     "type": "RectTransform"
@@ -258,9 +337,9 @@
                         "flipX": false,
                         "flipY": false,
                         "name": "",
-                        "order": 0,
-                        "sortOrderInCanvas": 0,
-                        "textureAssetId": "{9D0DAF6D-4385-4D91-8350-7D0B5511B8EF}",
+                        "order": 1,
+                        "sortOrderInCanvas": 1,
+                        "textureAssetId": "{8A3165D2-E123-4E43-9D6A-5FEF7B264CB7}",
                         "uvOffset": [
                             0.0,
                             0.0
@@ -276,6 +355,78 @@
             ],
             "is_active": true,
             "name": "TitleLogo",
+            "parentId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{F475D90F-7141-4F7C-8F35-A679B245B436}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            1920.0,
+                            1080.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
+                        "color": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "BackGround",
             "parentId": "{B086FCF7-4C64-48D2-896D-F3F01C41D113}",
             "tag": "None"
         }

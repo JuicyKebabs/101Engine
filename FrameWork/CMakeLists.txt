@@ -86,4 +86,21 @@ foreach(SHADER_ENTRY ${SHADER_COMPILE_LIST})
     list(APPEND COMPILED_SHADER_OUTPUTS ${SHADER_OUT})
 endforeach()
 
+set(LIT_MESH_PS
+    "${CMAKE_SOURCE_DIR}/shader/compiled/PixelShader/MeshPSLit.cso")
+
+add_custom_command(
+    OUTPUT "${LIT_MESH_PS}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${CMAKE_SOURCE_DIR}/shader/compiled/PixelShader"
+    COMMAND ${FXC_EXECUTABLE} /nologo /T ps_5_0 /E main
+            /D USE_LIGHTING=1
+            /Fo "${LIT_MESH_PS}"
+            "${CMAKE_SOURCE_DIR}/shader/PixelShader/MeshPS.hlsl"
+    DEPENDS "${CMAKE_SOURCE_DIR}/shader/PixelShader/MeshPS.hlsl"
+    VERBATIM
+)
+
+list(APPEND COMPILED_SHADER_OUTPUTS "${LIT_MESH_PS}")
+
 add_custom_target(CompileShaders ALL DEPENDS ${COMPILED_SHADER_OUTPUTS})

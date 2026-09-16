@@ -38,6 +38,13 @@ public:
 	~MeshRenderer() = default;
 	void SetParams(const ParamDesc& desc) {
 		m_templates = desc.templates;
+
+		// Enable lighting for all render templates by default when setting parameters
+		for (auto& renderTemplate : m_templates)
+		{
+			renderTemplate.materialDesc.psoKey = renderTemplate.materialDesc.psoKey.WithLighting();
+		}
+
 		if (!m_templates.empty()) SetBlendMode(m_templates.front().materialDesc.psoKey.blend);
 		m_meshAssetId = {};
 		m_pendingMeshAssetId.reset();

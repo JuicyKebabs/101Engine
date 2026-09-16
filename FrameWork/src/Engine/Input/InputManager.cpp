@@ -46,6 +46,11 @@ void InputManager::ProcessWindowMessage(UINT message, WPARAM wParam, LPARAM lPar
 	m_mouse.ProcessMessage(message, wParam, lParam);
 }
 
+void InputManager::SetRawMouseLookEnabled(bool enabled)
+{
+	m_mouse.SetRawLookEnabled(enabled);
+}
+
 //入力情報構造体取得
 const InputInfo& InputManager::GetInputInfo() const
 {

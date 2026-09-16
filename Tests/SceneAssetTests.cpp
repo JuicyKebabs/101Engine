@@ -93,6 +93,21 @@ namespace
 			"Runtime transition resolves the renamed Scene's latest catalog path");
 		manager.Finalize();
 		scene->Finalize();
+
+		SceneManager playManager;
+		playManager.RegisterScene("EditorPlay", MakeScene(context));
+		playManager.SetInitialScene("EditorPlay");
+		playManager.Initialize(context);
+		Check(playManager.GetCurrentScene() &&
+			playManager.GetCurrentSceneName() == "EditorPlay",
+			"Play manager owns the cloned runtime Scene");
+		Check(playManager.ReserveChangeScene(guid),
+			"Play runtime Scene can reserve an asset transition");
+		playManager.Update(0.0f);
+		Check(playManager.GetCurrentScene() &&
+			playManager.GetCurrentSceneAssetGuid() == guid,
+			"Play manager publishes the transitioned Scene asset");
+		playManager.Finalize();
 	}
 
 	void TestProjectSettingsRoundTrip()

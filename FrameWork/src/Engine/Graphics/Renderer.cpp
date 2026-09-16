@@ -48,6 +48,7 @@ void Renderer::Initialize(
 	m_shadowFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 	m_lightCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(LightConstants));
 	m_selectionFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
+	m_colliderDebugFrameCB = std::make_unique<ConstantBuffer>(m_pDevice, sizeof(FrameConstants));
 
 	// Prepare  specific PSO keys for different rendering passes
 	PreparePostProcessKey();
@@ -56,6 +57,7 @@ void Renderer::Initialize(
 	PrepareSelectionOutlineKey();
 	PrepareSelectionSpriteMaskKey();
 	PrepareSelectionUIMaskKey();
+	PrepareColliderDebugKey();
 }
 
 // Update
@@ -99,7 +101,7 @@ void Renderer::SubmitDirectionalLight(const DirectionalLight& light)
 		: Vector3(0.0f, 1.0f, 0.0f);
 
 	m_directionalLight.view = Matrix4x4::CreateLookAt(eye, sceneCenter, up);
-	m_directionalLight.proj = Matrix4x4::CreateOrthographic(20.0f, 20.0f, 0.1f, 200.0f);
+	m_directionalLight.proj = Matrix4x4::CreateOrthographic(40.0f, 40.0f, 0.1f, 400.0f);
 }
 
 void Renderer::RenderShadowMap(ID3D12GraphicsCommandList* p_commandList)
@@ -513,6 +515,51 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 	}
 }
 
+void Renderer::RenderColliderDebug(
+	ID3D12GraphicsCommandList* p_commandList,
+	const FrameRenderData& colliderRenderData)
+{
+	const size_t meshCount = colliderRenderData.GetMeshCount();
+	while (m_colliderDebugMeshCB.size() < meshCount)
+	{
+		m_colliderDebugMeshCB.push_back(
+			std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
+	}
+
+	auto frame = m_colliderDebugFrameCB->GetPtr<FrameConstants>();
+	frame->view = m_cameraInfoThisFrame.viewMatrix;
+	frame->proj = m_cameraInfoThisFrame.projMatrix;
+	frame->cameraPosition = m_cameraInfoThisFrame.position;
+	p_commandList->SetGraphicsRootConstantBufferView(0, m_colliderDebugFrameCB->GetAddress());
+
+	PipelineState* pso = GetPipelineStateObject(m_colliderDebugKey);
+	if (!pso) return;
+	p_commandList->SetPipelineState(pso->GetPipelineState());
+
+	for (size_t i = 0; i < meshCount; ++i)
+	{
+		const MeshRenderItem& item = colliderRenderData.meshs[i];
+		auto constants = m_colliderDebugMeshCB[i]->GetPtr<MeshRenderConstants>();
+		constants->worldMatrix = item.common.worldMatrix;
+		constants->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+		constants->lightViewProj = Matrix4x4::Identity();
+		constants->objectColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+		p_commandList->SetGraphicsRootConstantBufferView(1, m_colliderDebugMeshCB[i]->GetAddress());
+
+		MeshGPU* meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
+		if (!meshGPU) continue;
+
+		auto vbv = meshGPU->GetVertexBuffer()->GetView();
+		auto ibv = meshGPU->GetIndexBuffer()->GetView();
+		p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
+		p_commandList->IASetVertexBuffers(0, 1, &vbv);
+		p_commandList->IASetIndexBuffer(&ibv);
+		p_commandList->DrawIndexedInstanced(
+			meshGPU->GetIndexCount(), 1,
+			item.meshDesc.startIndex, item.meshDesc.baseVertex, 0);
+	}
+}
+
 void Renderer::RenderSelectionOutline(ID3D12GraphicsCommandList* p_commandList, GpuTexture* selectionMask)
 {
 	if (!p_commandList || !selectionMask) return;
@@ -817,6 +864,7 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 	}
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
+	pso->SetFillMode(key.fill);
 
 	if (key.depthOnly)
 	{
@@ -906,6 +954,21 @@ void Renderer::PrepareSelectionOutlineKey()
 	key.indexFree = true;
 
 	m_selectionOutlineKey = key;
+}
+
+void Renderer::PrepareColliderDebugKey()
+{
+	PSOKey key{};
+	key.vsKey.fileID = VS_FILE_ID::Mesh;
+	key.vsKey.entryID = VS_ENTRY_ID::Main;
+	key.psKey.fileID = PS_FILE_ID::SelectionMask;
+	key.psKey.entryID = PS_ENTRY_ID::Main;
+	key.blend = BlendMode::Opaque;
+	key.depth = DepthMode::TestNoWrite;
+	key.cull = CullMode::None;
+	key.rtvFormat = RenderTargetFormat::HDR;
+	key.fill = FillMode::Wireframe;
+	m_colliderDebugKey = key;
 }
 
 void Renderer::PrepareSelectionSpriteMaskKey()
