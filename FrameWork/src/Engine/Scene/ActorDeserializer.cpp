@@ -13,6 +13,19 @@ std::unique_ptr<Actor> ActorDeserializer::DeserializeActorRecord(
 	const Guid& actorGuid,
 	ActorDeserializationError* outError)
 {
+	return DeserializeActorRecord(
+		actorJson,
+		actorGuid,
+		{},
+		outError);
+}
+
+std::unique_ptr<Actor> ActorDeserializer::DeserializeActorRecord(
+	const json& actorJson,
+	const Guid& actorGuid,
+	ActorDeserializationOptions options,
+	ActorDeserializationError* outError)
+{
 	if (outError) *outError = {};
 	const auto Fail = [&](std::string path, std::string message) -> std::unique_ptr<Actor>
 	{
@@ -72,7 +85,9 @@ std::unique_ptr<Actor> ActorDeserializer::DeserializeActorRecord(
 	{
 		const json& componentRecord = actorJson["components"][componentIndex];
 		ComponentDeserializationError componentError;
-		std::unique_ptr<Component> component = ComponentDeserializer::DeserializeRecord(componentRecord, &componentError);
+		ComponentRestoreOptions restoreOptions;
+		restoreOptions.unknownPropertyPolicy = options.unknownComponentPropertyPolicy;
+		std::unique_ptr<Component> component = ComponentDeserializer::DeserializeRecord(componentRecord, restoreOptions, &componentError);
 
 		if (!component)
 		{

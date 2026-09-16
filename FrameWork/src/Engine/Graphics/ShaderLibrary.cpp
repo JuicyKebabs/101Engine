@@ -71,6 +71,12 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetPS(PS_FILE_ID fieldID, PS_ENT
 		PS_PROFILE
 	};
 
+	// Switch to a mesh pixel shader with lighting if the UseLighting define is set
+	if (fieldID == PS_FILE_ID::Mesh && (stageDefines & static_cast<uint64_t>(PS_DEFINE::UseLighting)) != 0)
+	{
+		desc.filePath = L"shader\\compiled\\PixelShader\\MeshPSLit.cso";
+	}
+
 	// Get or compile shader
 	return GetOrCompileShader(SHADER_STAGE::STAGE_PS, desc, stageDefines, commonDefines);
 }

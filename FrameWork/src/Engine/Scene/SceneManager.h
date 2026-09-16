@@ -36,6 +36,7 @@ public:
 	const CameraInfo* GetCameraInfo();
 	const std::string& GetCurrentSceneName() const { return m_currentSceneName; }
 	const Guid& GetCurrentSceneAssetGuid() const { return m_currentSceneAssetGuid; }
+	SceneBase* GetCurrentScene() const { return m_pCurrentScene; }
 	void SetViewportSize(UINT width, UINT height);
 
 private:

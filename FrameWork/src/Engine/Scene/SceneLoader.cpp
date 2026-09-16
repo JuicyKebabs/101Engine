@@ -127,86 +127,165 @@ namespace
 
 SceneLoadResult SceneLoader::LoadCandidate(const std::string& filePath, EngineContext& context)
 {
+	return LoadCandidate(filePath, context, {});
+}
+
+SceneLoadResult SceneLoader::LoadCandidate(
+	const std::string& filePath,
+	EngineContext& context,
+	SceneLoadOptions options)
+{
 	SceneLoadError error;
 	error.assetPath = filePath;
+
 	if (filePath.empty())
 	{
-		Fail(error, SceneLoadErrorCode::InvalidArgument, {}, "Scene asset path must not be empty.");
+		Fail(
+			error,
+			SceneLoadErrorCode::InvalidArgument,
+			{},
+			"Scene asset path must not be empty.");
+
 		return { nullptr, std::move(error) };
 	}
 
 	std::string fullPath;
+
 	try
 	{
 		fullPath = PathManager::Resolve(filePath);
 	}
 	catch (const std::exception& exception)
 	{
-		Fail(error, SceneLoadErrorCode::FileOpenFailed, {}, exception.what());
+		Fail(
+			error,
+			SceneLoadErrorCode::FileOpenFailed,
+			{},
+			exception.what());
+
 		return { nullptr, std::move(error) };
 	}
 
 	std::ifstream file(fullPath);
+
 	if (!file.is_open())
 	{
-		Fail(error, SceneLoadErrorCode::FileOpenFailed, {},
+		Fail(
+			error,
+			SceneLoadErrorCode::FileOpenFailed,
+			{},
 			"Failed to open Scene asset: " + fullPath);
+
 		return { nullptr, std::move(error) };
 	}
 
 	json sceneRecord;
+
 	try
 	{
-		// A DOM cannot represent duplicate object fields. Reject them while parsing
-		// so a later duplicate version or Instance array cannot silently discard data.
 		bool duplicateField = false;
 		std::string duplicateFieldName;
 		std::vector<std::unordered_set<std::string>> objectFields;
-		auto callback = [&](int, json::parse_event_t event, json& value)
-		{
-			if (event == json::parse_event_t::object_start) objectFields.emplace_back();
-			else if (event == json::parse_event_t::object_end) objectFields.pop_back();
-			else if (event == json::parse_event_t::key &&
-				!objectFields.back().insert(value.get<std::string>()).second)
+
+		auto callback =
+			[&](int, json::parse_event_t event, json& value)
 			{
-				duplicateField = true;
-				duplicateFieldName = value.get<std::string>();
-			}
-			return true;
-		};
+				if (event == json::parse_event_t::object_start)
+				{
+					objectFields.emplace_back();
+				}
+				else if (event == json::parse_event_t::object_end)
+				{
+					objectFields.pop_back();
+				}
+				else if (
+					event == json::parse_event_t::key &&
+					!objectFields.back()
+					.insert(value.get<std::string>())
+					.second)
+				{
+					duplicateField = true;
+					duplicateFieldName = value.get<std::string>();
+				}
+
+				return true;
+			};
+
 		sceneRecord = json::parse(file, callback);
+
 		if (file.bad() || duplicateField)
 		{
-			Fail(error, SceneLoadErrorCode::JsonParseFailed, {}, duplicateField
-				? "Scene contains a duplicate JSON field: " + duplicateFieldName
+			Fail(
+				error,
+				SceneLoadErrorCode::JsonParseFailed,
+				{},
+				duplicateField
+				? "Scene contains a duplicate JSON field: " +
+				duplicateFieldName
 				: "Scene file read failed while parsing JSON.");
+
 			return { nullptr, std::move(error) };
 		}
 	}
 	catch (const json::exception& exception)
 	{
-		Fail(error, SceneLoadErrorCode::JsonParseFailed, {}, exception.what());
+		Fail(
+			error,
+			SceneLoadErrorCode::JsonParseFailed,
+			{},
+			exception.what());
+
 		return { nullptr, std::move(error) };
 	}
 
-	return LoadCandidate(sceneRecord, context, filePath);
+	return LoadCandidate(
+		sceneRecord,
+		context,
+		filePath,
+		options);
 }
 
-SceneLoadResult SceneLoader::LoadCandidate(const json& sceneRecord,
-	EngineContext& context, std::string assetPath)
+SceneLoadResult SceneLoader::LoadCandidate(
+	const json& sceneRecord,
+	EngineContext& context, 
+	std::string assetPath)
 
 {
-	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), true);
+	return LoadCandidate(
+		sceneRecord,
+		context,
+		std::move(assetPath),
+		{});
 }
 
-SceneLoadResult SceneLoader::LoadPreparedCandidate(const json& sceneRecord,
-	EngineContext& context, std::string assetPath)
+SceneLoadResult SceneLoader::LoadCandidate(
+	const json& sceneRecord,
+	EngineContext& context,
+	std::string assetPath,
+	SceneLoadOptions options)
 {
-	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), false);
+	return LoadCandidateImpl(
+		sceneRecord,
+		context,
+		std::move(assetPath),
+		true,
+		options);
 }
 
-SceneLoadResult SceneLoader::LoadCandidateImpl(const json& sceneRecord,
-	EngineContext& context, std::string assetPath, bool publish)
+SceneLoadResult SceneLoader::LoadPreparedCandidate(
+	const json& sceneRecord,
+	EngineContext& context, 
+	std::string assetPath)
+{
+	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), false, {});
+}
+
+SceneLoadResult SceneLoader::LoadCandidateImpl(
+	const json& sceneRecord,
+	EngineContext& context, 
+	std::string assetPath, 
+	bool publish, 
+	SceneLoadOptions options)
 {
 	SceneLoadError error;
 	error.assetPath = std::move(assetPath);
@@ -265,7 +344,9 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(const json& sceneRecord,
 
 	if (strictV4 && !ValidateFields(sceneRecord,
 		{ "version", "directional_light", "actors", "actorImprintInstances" }, {}, {}, error))
+	{
 		return { nullptr, std::move(error) };
+	}
 
 	std::unordered_map<Guid, ActorOrigin> origins;
 	std::vector<ActorLoadRecord> actorRecords;
@@ -301,7 +382,7 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(const json& sceneRecord,
 
 	try
 	{
-		if (!RestoreOrdinaryActors(actorRecords, *candidate, error) ||
+		if (!RestoreOrdinaryActors(actorRecords, *candidate, options, error) ||
 			!RestoreInstances(instanceRecords, reservedSceneGuids, origins, *candidate, error) ||
 			!RestoreOrdinaryHierarchy(actorRecords, *candidate, error) ||
 			!RestoreComponentReferences(instanceRecords, origins, *candidate, error))
@@ -532,21 +613,32 @@ bool SceneLoader::ValidateHierarchyCycles(const std::vector<ActorLoadRecord>& re
 	return true;
 }
 
-bool SceneLoader::RestoreOrdinaryActors(const std::vector<ActorLoadRecord>& records,
-	SceneBase& scene, SceneLoadError& error)
+bool SceneLoader::RestoreOrdinaryActors(
+	const std::vector<ActorLoadRecord>& records,
+	SceneBase& scene,
+	SceneLoadOptions options,
+	SceneLoadError& error)
 {
 	for (const ActorLoadRecord& record : records)
 	{
 		ActorDeserializationError actorError;
+		ActorDeserializationOptions actorOptions;
+		actorOptions.unknownComponentPropertyPolicy = options.unknownComponentPropertyPolicy;
 		auto actor = ActorDeserializer::DeserializeActorRecord(
-			*record.actorJson, record.actorGuid, &actorError);
+			*record.actorJson, record.actorGuid, actorOptions, &actorError);
 		if (!actor)
+		{
 			return Fail(error, SceneLoadErrorCode::ActorDeserializationFailed,
 				ActorPath(record.sourceIndex) + actorError.path,
 				actorError.message.empty() ? "Actor deserialization failed." : actorError.message);
+		}
+
 		if (!scene.RegisterRestoredActor(std::move(actor)))
+		{
 			return Fail(error, SceneLoadErrorCode::ActorDeserializationFailed,
 				ActorPath(record.sourceIndex), "Candidate Scene rejected the restored Actor.");
+
+		}
 	}
 	return true;
 }

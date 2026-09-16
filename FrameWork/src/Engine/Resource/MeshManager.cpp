@@ -5,6 +5,7 @@
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Core/Path/PathManager.h"
 #include "Engine/Core/Debug/Debug.h"
+#include <algorithm>
 
 void MeshManager::Initialize(ID3D12Device* pDevice, TextureManager* pTextureManager)
 {
@@ -52,6 +53,24 @@ const std::vector<MeshHandle>& MeshManager::LoadModel(const std::wstring& path)
 
 MeshHandle MeshManager::CreateMeshHandle(Mesh& src)
 {
+	if (src.boundsRadius <= 0.0f && !src.vertices.empty())
+	{
+		Vector3 minPos = src.vertices.front().position;
+		Vector3 maxPos = minPos;
+		for (const Vertex& vertex : src.vertices)
+		{
+			const Vector3& pos = vertex.position;
+			minPos.x = std::min(minPos.x, pos.x);
+			minPos.y = std::min(minPos.y, pos.y);
+			minPos.z = std::min(minPos.z, pos.z);
+			maxPos.x = std::max(maxPos.x, pos.x);
+			maxPos.y = std::max(maxPos.y, pos.y);
+			maxPos.z = std::max(maxPos.z, pos.z);
+		}
+		src.boundsCenter = (minPos + maxPos) * 0.5f;
+		src.boundsRadius = (maxPos - minPos).Length() * 0.5f;
+	}
+
 	MeshHandle handle = m_nextMeshHandle++;
 	m_meshes[handle] = std::make_unique<MeshGPU>(m_pDevice, src);
 	return handle;

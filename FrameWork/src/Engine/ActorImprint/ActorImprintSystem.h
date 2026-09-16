@@ -137,28 +137,32 @@ public:
 	{
 		return Load(reference.GetGuid(), outError);
 	}
+
 	ActorImprintHandle FindHandle(const Guid& assetGuid) const;
 	const ActorImprint* Resolve(ActorImprintHandle handle) const;
 	Guid GetAssetGuid(ActorImprintHandle handle) const;
+
 	ActorImprintAvailability GetAvailability(ActorImprintHandle handle) const;
 	ActorImprintAvailability GetAvailability(const Guid& assetGuid) const
 	{
 		return GetAvailability(FindHandle(assetGuid));
 	}
+
 	bool IsMissing(ActorImprintHandle handle) const
 	{
 		return GetAvailability(handle) == ActorImprintAvailability::Missing;
 	}
+
 	std::size_t GetLoadedCount() const { return m_handles.size(); }
 	std::size_t GetLiveInstanceCount(const Guid& assetGuid) const;
-	ActorImprintReloadResult Reload(const AssetChange& change,
-		std::span<std::unique_ptr<SceneBase>* const> liveScenes);
-	Actor* Instantiate(SceneBase& scene, ActorImprintHandle imprint,
-		ActorHandle externalParent = {}, ActorImprintMaterializationError* outError = nullptr);
-	Actor* Instantiate(SceneBase& scene, const AssetReference<ActorImprint>& imprint,
-		ActorHandle externalParent = {}, ActorImprintMaterializationError* outError = nullptr);
-	Actor* RestoreInstance(SceneBase& scene, ActorImprintHandle imprint,
-		const ActorImprintRestoreInput& input, ActorImprintMaterializationError* outError = nullptr);
+
+	ActorImprintReloadResult Reload(const AssetChange& change,std::span<std::unique_ptr<SceneBase>* const> liveScenes);
+
+	Actor* Instantiate(SceneBase& scene, ActorImprintHandle imprint, ActorHandle externalParent = {}, ActorImprintMaterializationError* outError = nullptr);
+	Actor* Instantiate(SceneBase& scene, const AssetReference<ActorImprint>& imprint,ActorHandle externalParent = {}, ActorImprintMaterializationError* outError = nullptr);
+	
+	Actor* RestoreInstance(SceneBase& scene, ActorImprintHandle imprint,const ActorImprintRestoreInput& input, ActorImprintMaterializationError* outError = nullptr);
+	
 	bool DestroyInstance(SceneBase& scene, ActorHandle root, StructuralMutationResult* result = nullptr);
 
 	// Borrowed definition pointers expire on successful Reload, Unload/Clear,
@@ -167,18 +171,6 @@ public:
 	bool Clear();
 
 private:
-	friend class ActorImprintInstanceRegistry;
-	friend class SceneBase;
-	friend class SceneLoader;
-	void CommitDestroyInstance(SceneBase& scene, ActorHandle root) noexcept;
-	void ReleaseInstance(ActorImprintHandle handle);
-	Actor* RestoreInstanceForSceneCandidate(SceneBase& scene, ActorImprintHandle imprint,
-		const ActorImprintRestoreInput& input, const std::unordered_set<Guid>& reservedSceneGuids,
-		ActorImprintMaterializationError* outError);
-	Actor* Materialize(SceneBase& scene, ActorImprintHandle imprint, ActorHandle externalParent,
-		const ActorImprintRestoreInput* restoreInput, const std::unordered_set<Guid>* reservedSceneGuids,
-		ActorImprintMaterializationError* outError);
-	const ActorImprint* ResolveForSceneCandidate(ActorImprintHandle handle) const;
 	struct Slot
 	{
 		std::unique_ptr<const ActorImprint> definition;
@@ -187,13 +179,42 @@ private:
 		std::size_t instances = 0;
 		bool missing = false;
 	};
+
 	const AssetManager& m_assets;
 	std::vector<Slot> m_slots;
 	std::vector<std::uint32_t> m_freeIndices;
 	std::unordered_map<Guid, ActorImprintHandle> m_handles;
+
 	bool m_materializing = false;
 	bool m_reloading = false;
 	bool m_buildingReloadCandidate = false;
+
 	ActorImprintHandle m_reloadHandle;
 	const ActorImprint* m_reloadDefinition = nullptr;
+
+private:
+	friend class ActorImprintInstanceRegistry;
+	friend class SceneBase;
+	friend class SceneLoader;
+
+	void CommitDestroyInstance(SceneBase& scene, ActorHandle root) noexcept;
+
+	void ReleaseInstance(ActorImprintHandle handle);
+
+	Actor* RestoreInstanceForSceneCandidate(
+		SceneBase& scene, ActorImprintHandle imprint,
+		const ActorImprintRestoreInput& input, 
+		const std::unordered_set<Guid>& reservedSceneGuids,
+		ActorImprintMaterializationError* outError);
+
+	Actor* Materialize(
+		SceneBase& scene, 
+		ActorImprintHandle imprint, 
+		ActorHandle externalParent,
+		const ActorImprintRestoreInput* restoreInput, 
+		const std::unordered_set<Guid>* reservedSceneGuids,
+		ActorImprintMaterializationError* outError);
+
+	const ActorImprint* ResolveForSceneCandidate(ActorImprintHandle handle) const;
+
 };

@@ -1,0 +1,86 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 3,
+          "properties": {
+            "blendMode": 0,
+            "color": [
+              0.48235294222831726,
+              0.48235294222831726,
+              0.48235294222831726,
+              1.0
+            ],
+            "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
+            "name": "",
+            "sortOrderInCanvas": 0,
+            "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+            "visible": true
+          },
+          "type": "MeshRenderer"
+        },
+        {
+          "localObjectId": 4,
+          "properties": {
+            "center": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "isTrigger": false,
+            "layer": 3,
+            "name": "",
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.100000023841858,
+              1.100000023841858,
+              1.100000023841858
+            ],
+            "type": 0
+          },
+          "type": "Collider"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "CubeFieldMesh",
+        "tag": "None"
+      }
+    }
+  ],
+  "definitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}",
+  "nextLocalObjectId": 5,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

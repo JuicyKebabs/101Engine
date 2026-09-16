@@ -22,8 +22,8 @@ public:
 		bool buildDependencies = true
         );
 
-	// Build the GameCode for hot reload (Debug config).
+	// Build GameCode for hot reload using the Editor's matching configuration.
     // This method does't use MSBuild system.
 	// Call cl.exe and link.exe directly to build the GameCode for hot reload.
-	static bool BuildGameCodeForHotReload(const std::string& config = "Debug");
+	static bool BuildGameCodeForHotReload(const std::string& config);
 };

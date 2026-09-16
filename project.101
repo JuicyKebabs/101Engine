@@ -3,10 +3,15 @@
     "startupSceneGuid": "{23C378F6-893E-4AE2-9972-F7B3F1A3B212}"
   },
   "game": {
-    "startupSceneGuid": "{23C378F6-893E-4AE2-9972-F7B3F1A3B212}"
+    "startupSceneGuid": "{2CCF25C5-41D2-4EC9-9C19-BEE2E8A6EB09}"
   },
   "tags": [
-    "Player"
+    "Bullet",
+    "Enemy",
+    "Player",
+    "ResultUI",
+    "TutorialUI",
+    "Wall"
   ],
   "version": 1
 }

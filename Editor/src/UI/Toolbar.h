@@ -12,9 +12,11 @@ public:
 	{
 		std::function<void()> onPlay;
 		std::function<void()> onStop;
+		std::function<void(bool)> onShowCollidersChanged;
 
 		bool canPlay = false;
 		bool canStop = false;
+		bool showColliders = false;
 	};
 
 	void Render(const Callbacks& callbacks);

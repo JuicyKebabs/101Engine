@@ -258,7 +258,8 @@ Actor* ActorSubtreeRestorer::Restore(
 		{
 			record.detachedActor = ActorDeserializer::DeserializeActorRecord(
 				*record.actorJson,
-				record.actorId
+				record.actorId,
+				{}
 			);
 
 			if (!record.detachedActor)

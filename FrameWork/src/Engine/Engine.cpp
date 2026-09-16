@@ -573,8 +573,8 @@ void Engine::CreateSceneDepthRenderTarget()
 void Engine::CreateShadowMapRenderTarget()
 {
 	GpuTexture::ParamDesc desc{};
-	desc.width = 2048;
-	desc.height = 2048;
+	desc.width = 4096;
+	desc.height = 4096;
 	desc.initialState = GpuTexture::ResourceState::ShaderResource;
 	desc.depthFormat = GpuTexture::DepthFormat::D32F;
 	desc.useDSV = true;

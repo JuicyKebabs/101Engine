@@ -1,0 +1,4325 @@
+{
+    "actorImprintInstances": [
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{09022CF5-C3AF-4818-B8C6-D94A5D149FB5}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            2.4000000953674316,
+                            0.0
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.12186934798955917,
+                            0.0,
+                            0.9925461411476135
+                        ],
+                        "/scale": [
+                            13.899999618530273,
+                            5.550000190734863,
+                            5.5
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{09022CF5-C3AF-4818-B8C6-D94A5D149FB5}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{0B320867-526C-428F-9540-0CC3A8C24588}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{C7FB651A-E60F-4491-A746-EFC3124B90A4}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            17.850000381469727,
+                            4.5,
+                            22.899999618530273
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{0B320867-526C-428F-9540-0CC3A8C24588}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{166CEDBD-2685-4C27-A8ED-E003544860A8}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D238E8F4-635B-4580-B939-5FDC41B8036E}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.44999998807907104,
+                            2.25,
+                            2.549999952316284
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.4067366421222687,
+                            0.0,
+                            0.9135454297065735
+                        ],
+                        "/scale": [
+                            5.550000190734863,
+                            8.600000381469727,
+                            4.550000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{166CEDBD-2685-4C27-A8ED-E003544860A8}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{17294701-0AD9-49C1-8D26-22950BAF4BA3}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            2.9000000953674316,
+                            0.800000011920929,
+                            -1.899999976158142
+                        ],
+                        "/rotation": [
+                            -0.2710302174091339,
+                            0.3255448639392853,
+                            0.09797782450914383,
+                            0.9005351662635803
+                        ],
+                        "/scale": [
+                            3.75,
+                            5.849999904632568,
+                            2.299999952316284
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{17294701-0AD9-49C1-8D26-22950BAF4BA3}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{1B207AC3-BB0A-4B57-9AE7-E3D35D2EF92E}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            9.600000381469727,
+                            0.0,
+                            0.0
+                        ],
+                        "/scale": [
+                            6.849999904632568,
+                            2.9000000953674316,
+                            5.300000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{1B207AC3-BB0A-4B57-9AE7-E3D35D2EF92E}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{2EE01130-564C-4BC0-8F73-A389B95E9F38}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{B9F85EDE-7796-4815-8DFF-65467F5A1A77}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -25.0,
+                            2.5,
+                            0.0
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ],
+                        "/scale": [
+                            50.0,
+                            5.0,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{2EE01130-564C-4BC0-8F73-A389B95E9F38}",
+            "sourceDefinitionRevision": "{4DD366F5-293F-42F5-B445-974DCC1C1504}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{2F5DC224-CECB-4A75-B111-689E5ED961B8}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{E7C0BB11-FE1A-4152-A2E9-B66C95144779}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            4.400000095367432,
+                            0.949999988079071,
+                            3.299999952316284
+                        ],
+                        "/rotation": [
+                            -3.772115259037534e-11,
+                            0.7071068286895752,
+                            3.772115259037534e-11,
+                            0.7071068286895752
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{2F5DC224-CECB-4A75-B111-689E5ED961B8}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{3580655F-7D9B-4E66-9620-B9794DEADE73}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -1.850000023841858,
+                            -0.44999998807907104,
+                            13.600000381469727
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.6086714267730713,
+                            0.0,
+                            0.7934224009513855
+                        ],
+                        "/scale": [
+                            29.200000762939453,
+                            2.9000000953674316,
+                            3.25
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{3580655F-7D9B-4E66-9620-B9794DEADE73}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{36EC06BD-C3AF-4C35-8322-D3CCD7A45E56}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{B9F85EDE-7796-4815-8DFF-65467F5A1A77}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            2.5,
+                            25.0
+                        ],
+                        "/rotation": [
+                            -3.0139148663079054e-18,
+                            1.6560648252034182e-12,
+                            4.9912385392411914e-30,
+                            1.0
+                        ],
+                        "/scale": [
+                            50.0,
+                            5.0,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{36EC06BD-C3AF-4C35-8322-D3CCD7A45E56}",
+            "sourceDefinitionRevision": "{4DD366F5-293F-42F5-B445-974DCC1C1504}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{4017EAD6-44CB-473D-A74A-3159FB44A1CB}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{F0415528-426A-4FAB-9ECD-0FD614E82CF1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -11.850000381469727,
+                            0.0,
+                            -21.549999237060547
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.3173046410083771,
+                            0.0,
+                            0.948323667049408
+                        ],
+                        "/scale": [
+                            2.049999952316284,
+                            11.899999618530273,
+                            2.450000047683716
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{4017EAD6-44CB-473D-A74A-3159FB44A1CB}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{40CB36BA-75D3-4A3B-9458-E60E70131C5F}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/rotation": [
+                            -0.4744775593280792,
+                            0.39259248971939087,
+                            0.24922777712345123,
+                            0.7474140524864197
+                        ],
+                        "/scale": [
+                            7.5,
+                            2.9000000953674316,
+                            6.050000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{40CB36BA-75D3-4A3B-9458-E60E70131C5F}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{414EA727-9F94-42C6-BDCE-0E7049891CE6}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/rotation": [
+                            -0.08555444329977036,
+                            0.1900828331708908,
+                            0.01663009263575077,
+                            0.9778918623924255
+                        ],
+                        "/scale": [
+                            4.050000190734863,
+                            1.0,
+                            11.350000381469727
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{414EA727-9F94-42C6-BDCE-0E7049891CE6}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{43390CD5-801A-4E9E-BC9F-8CE99D9F2E92}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -5.0,
+                            0.6499999761581421,
+                            0.0
+                        ],
+                        "/rotation": [
+                            0.48902180790901184,
+                            0.09631891548633575,
+                            -0.054600007832050323,
+                            0.8652162551879883
+                        ],
+                        "/scale": [
+                            3.25,
+                            2.5999999046325684,
+                            6.050000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{43390CD5-801A-4E9E-BC9F-8CE99D9F2E92}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{4767ED5E-B375-4D86-819C-641F29320DFE}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{C75B632B-3C92-4184-A9D5-9789D7B4C543}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -15.75,
+                            1.899999976158142,
+                            8.199999809265137
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{4767ED5E-B375-4D86-819C-641F29320DFE}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{4F9D7457-76E4-40EC-9643-BC346C5A5A7D}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            5.349999904632568,
+                            0.0,
+                            19.100000381469727
+                        ],
+                        "/rotation": [
+                            0.3146411180496216,
+                            0.1625174582004547,
+                            -0.054772116243839264,
+                            0.9335893988609314
+                        ],
+                        "/scale": [
+                            5.150000095367432,
+                            3.049999952316284,
+                            2.799999952316284
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{4F9D7457-76E4-40EC-9643-BC346C5A5A7D}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{5264698C-108D-49DE-95D6-04584F29BD51}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -2.299999952316284,
+                            0.0,
+                            13.350000381469727
+                        ],
+                        "/rotation": [
+                            -0.03298000246286392,
+                            0.02129916101694107,
+                            -0.14122769236564636,
+                            0.9891983866691589
+                        ],
+                        "/scale": [
+                            5.0,
+                            2.25,
+                            3.049999952316284
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{5264698C-108D-49DE-95D6-04584F29BD51}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{5741A336-F08C-4878-9032-1A3A3A480987}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{9C16EBA8-4320-4B11-89A8-D65F9D883E39}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            9.75,
+                            1.899999976158142,
+                            -13.300000190734863
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.448149174451828,
+                            0.0,
+                            0.8939588069915771
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{5741A336-F08C-4878-9032-1A3A3A480987}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{5C4D52B1-9808-487E-A912-70B7211565DD}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            -1.0499999523162842,
+                            22.549999237060547
+                        ],
+                        "/rotation": [
+                            0.20686855912208557,
+                            -0.06920918822288513,
+                            0.04903221130371094,
+                            0.9746853113174438
+                        ],
+                        "/scale": [
+                            10.5,
+                            7.300000190734863,
+                            5.5
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{5C4D52B1-9808-487E-A912-70B7211565DD}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{5D324FF4-0732-4C3E-8079-B3929BDE9A79}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{DC895B34-00F9-46B7-B61F-20CF1D7B9ED1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -8.25,
+                            0.6499999761581421,
+                            -6.150000095367432
+                        ],
+                        "/rotation": [
+                            0.6722750663757324,
+                            0.19147716462612152,
+                            -0.1864573359489441,
+                            0.6903741955757141
+                        ],
+                        "/scale": [
+                            7.599999904632568,
+                            4.5,
+                            2.75
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{5D324FF4-0732-4C3E-8079-B3929BDE9A79}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{5F6826C2-541A-4603-8B07-8BEDB07CD9E1}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -1.0499999523162842,
+                            2.799999952316284,
+                            -6.800000190734863
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.2185690551996231,
+                            0.0,
+                            0.9758214950561523
+                        ],
+                        "/scale": [
+                            1.649999976158142,
+                            2.25,
+                            1.649999976158142
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{5F6826C2-541A-4603-8B07-8BEDB07CD9E1}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{5FDFFD03-8E5B-4F29-84CD-21BDDBE08E58}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{580EE110-6774-402D-AF52-63DDA29AFFBE}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            2.75,
+                            1.399999976158142,
+                            21.0
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{5FDFFD03-8E5B-4F29-84CD-21BDDBE08E58}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{61071BB7-26D1-4A34-801D-7BEBAA1A8F81}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            6.900000095367432,
+                            0.4000000059604645,
+                            -4.75
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.40274670720100403,
+                            0.0,
+                            0.9153114557266235
+                        ],
+                        "/scale": [
+                            6.849999904632568,
+                            1.0,
+                            6.550000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{61071BB7-26D1-4A34-801D-7BEBAA1A8F81}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{624E4B5C-0B44-4E45-89FA-8777331FF84F}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{5AA9E951-A9BC-45FB-881F-2A00A0AB2330}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -16.600000381469727,
+                            3.5999999046325684,
+                            -6.300000190734863
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{624E4B5C-0B44-4E45-89FA-8777331FF84F}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{66F56695-24C0-4959-A0BB-E19875D3A3FA}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            1.25,
+                            0.800000011920929,
+                            -4.150000095367432
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.3583679795265198,
+                            0.0,
+                            0.9335804581642151
+                        ],
+                        "/scale": [
+                            9.649999618530273,
+                            2.450000047683716,
+                            7.5
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{66F56695-24C0-4959-A0BB-E19875D3A3FA}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{67A1C1AC-52D4-4EF3-86AC-1642722A6312}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{672ADE9F-68A3-483F-94ED-22EBA3998905}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -9.600000381469727,
+                            1.649999976158142,
+                            -23.75
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.23344536125659943,
+                            0.0,
+                            0.972369909286499
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{67A1C1AC-52D4-4EF3-86AC-1642722A6312}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{6CC47649-CC29-4652-ABD4-033CD2811D4E}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{B9F85EDE-7796-4815-8DFF-65467F5A1A77}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            25.0,
+                            2.5,
+                            0.0
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ],
+                        "/scale": [
+                            50.0,
+                            5.0,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{6CC47649-CC29-4652-ABD4-033CD2811D4E}",
+            "sourceDefinitionRevision": "{4DD366F5-293F-42F5-B445-974DCC1C1504}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{6DE2C7B8-57F7-4378-A555-88822835ABF3}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            12.350000381469727,
+                            0.6000000238418579,
+                            13.800000190734863
+                        ],
+                        "/rotation": [
+                            0.21110276877880096,
+                            0.21546602249145508,
+                            -0.04776766151189804,
+                            0.9522228240966797
+                        ],
+                        "/scale": [
+                            11.600000381469727,
+                            2.299999952316284,
+                            8.100000381469727
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{6DE2C7B8-57F7-4378-A555-88822835ABF3}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{6E0FEBAE-934B-40B9-85FC-15A761E1EC14}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{BB867E30-18C7-42B1-A0F9-7CB2E7E55827}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            22.399999618530273,
+                            3.549999952316284,
+                            -22.25
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.4752403497695923,
+                            0.0,
+                            0.8798560500144958
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{6E0FEBAE-934B-40B9-85FC-15A761E1EC14}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{71084C91-5902-42F3-91C9-DD12ACC385AB}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            13.449999809265137,
+                            1.149999976158142,
+                            21.649999618530273
+                        ],
+                        "/rotation": [
+                            0.34816303849220276,
+                            0.0,
+                            0.0,
+                            0.9374340176582336
+                        ],
+                        "/scale": [
+                            3.1500000953674316,
+                            6.900000095367432,
+                            3.950000047683716
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{71084C91-5902-42F3-91C9-DD12ACC385AB}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{72CBD742-BF4C-4CDE-A039-346AD46EBDEA}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            10.800000190734863,
+                            0.550000011920929,
+                            3.8499999046325684
+                        ],
+                        "/rotation": [
+                            0.19722959399223328,
+                            0.0,
+                            0.0,
+                            0.9803573489189148
+                        ],
+                        "/scale": [
+                            9.300000190734863,
+                            3.299999952316284,
+                            7.300000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{72CBD742-BF4C-4CDE-A039-346AD46EBDEA}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{75B16B42-7576-4C1B-95C3-13A3D34A4FA9}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{29B0112B-B2D4-40AE-82C9-F4666B7D692F}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -20.700000762939453,
+                            3.049999952316284,
+                            20.75
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.290284663438797,
+                            0.0,
+                            0.9569403529167175
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{75B16B42-7576-4C1B-95C3-13A3D34A4FA9}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{77A7B858-B9D6-4F6D-B276-08A061999F3C}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{DC895B34-00F9-46B7-B61F-20CF1D7B9ED1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -11.75,
+                            -0.15000000596046448,
+                            -8.75
+                        ],
+                        "/rotation": [
+                            -0.23818787932395935,
+                            -0.03253018856048584,
+                            -0.007982652634382248,
+                            0.9706413745880127
+                        ],
+                        "/scale": [
+                            6.550000190734863,
+                            8.350000381469727,
+                            9.850000381469727
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{77A7B858-B9D6-4F6D-B276-08A061999F3C}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{782B2951-331A-4D8D-A474-A83470C48BCC}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{64ABDE69-E7FB-48A4-A35D-9163399B1E2E}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -0.10000000149011612,
+                            5.199999809265137,
+                            -22.149999618530273
+                        ],
+                        "/rotation": [
+                            1.7030597376788137e-08,
+                            4.678908638311441e-08,
+                            -7.968460863108054e-16,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{782B2951-331A-4D8D-A474-A83470C48BCC}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{7B336458-BF5B-4E8D-8672-3A4B1530936A}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{B9F85EDE-7796-4815-8DFF-65467F5A1A77}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            15.800000190734863,
+                            2.5,
+                            9.25
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ],
+                        "/scale": [
+                            30.0,
+                            5.0,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{7B336458-BF5B-4E8D-8672-3A4B1530936A}",
+            "sourceDefinitionRevision": "{4DD366F5-293F-42F5-B445-974DCC1C1504}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{7B6A883D-38D8-41AD-8C0A-1FE3AB5CA9AC}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{98E51443-13ED-427E-B110-4D26185EA477}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            22.450000762939453,
+                            2.5999999046325684,
+                            15.800000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{7B6A883D-38D8-41AD-8C0A-1FE3AB5CA9AC}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{7F7AB3E0-44E3-4DFD-A439-B6266830C847}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{DC895B34-00F9-46B7-B61F-20CF1D7B9ED1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -16.350000381469727,
+                            0.75,
+                            -7.449999809265137
+                        ],
+                        "/rotation": [
+                            -0.5862182974815369,
+                            0.39540985226631165,
+                            0.39540934562683105,
+                            0.5862172245979309
+                        ],
+                        "/scale": [
+                            8.399999618530273,
+                            5.349999904632568,
+                            2.8499999046325684
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{7F7AB3E0-44E3-4DFD-A439-B6266830C847}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{80AB4B09-5B0E-4712-8961-A52919E14307}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{F0415528-426A-4FAB-9ECD-0FD614E82CF1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -21.149999618530273,
+                            0.0,
+                            -23.149999618530273
+                        ],
+                        "/rotation": [
+                            0.25671109557151794,
+                            0.0,
+                            0.0,
+                            0.9664881825447083
+                        ],
+                        "/scale": [
+                            5.25,
+                            5.300000190734863,
+                            5.300000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{80AB4B09-5B0E-4712-8961-A52919E14307}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{83C65144-204D-4197-866B-18AB912D2E9F}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{835143CD-A579-4A8F-84B4-508BC3CB3901}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            13.75,
+                            4.050000190734863,
+                            19.850000381469727
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{83C65144-204D-4197-866B-18AB912D2E9F}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{84A6ED25-7823-4500-9738-35748939ED38}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            4.449999809265137,
+                            -0.800000011920929,
+                            12.600000381469727
+                        ],
+                        "/rotation": [
+                            0.9911589026451111,
+                            -0.008305469527840614,
+                            0.07583051174879074,
+                            0.10855833441019058
+                        ],
+                        "/scale": [
+                            4.900000095367432,
+                            -3.9000000953674316,
+                            6.300000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{84A6ED25-7823-4500-9738-35748939ED38}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{85BAAA76-A479-4FC6-974D-357DA1546FFA}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{2B7B782E-3F51-4E8A-BC3D-2B2502B69424}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -2.5999999046325684,
+                            1.850000023841858,
+                            -7.550000190734863
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.34816303849220276,
+                            0.0,
+                            0.9374340176582336
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{85BAAA76-A479-4FC6-974D-357DA1546FFA}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{8AE6C58B-5B5F-410E-872E-E0E0E387E8C6}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{38BD5CBD-FC1F-40F5-BEF2-492730DA4E78}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.550000011920929,
+                            3.5,
+                            -22.700000762939453
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.12403444945812225,
+                            0.0,
+                            0.9922779202461243
+                        ],
+                        "/scale": [
+                            4.800000190734863,
+                            1.0,
+                            4.150000095367432
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{8AE6C58B-5B5F-410E-872E-E0E0E387E8C6}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{8D44D362-87AD-4417-8687-17C7A4777812}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -1.100000023841858,
+                            2.0,
+                            -5.25
+                        ],
+                        "/scale": [
+                            1.899999976158142,
+                            5.800000190734863,
+                            1.7000000476837158
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{8D44D362-87AD-4417-8687-17C7A4777812}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{91C304C1-B5F8-49A1-952A-08713F76E5D6}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{7C34DAB2-636A-42D8-AA44-13108E5D7432}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            18.149999618530273,
+                            2.3499999046325684,
+                            5.650000095367432
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{91C304C1-B5F8-49A1-952A-08713F76E5D6}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{91D40C3C-DA9C-4454-8C40-B2CB98E6543E}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{38BD5CBD-FC1F-40F5-BEF2-492730DA4E78}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -0.3499999940395355,
+                            0.0,
+                            -22.450000762939453
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.3110911250114441,
+                            0.0,
+                            0.9503800868988037
+                        ],
+                        "/scale": [
+                            11.449999809265137,
+                            3.5,
+                            7.349999904632568
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{91D40C3C-DA9C-4454-8C40-B2CB98E6543E}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{938B96F5-F6BC-4C5A-9B2E-0A534AF6E34E}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.6499999761581421,
+                            0.0,
+                            20.950000762939453
+                        ],
+                        "/rotation": [
+                            -0.23344536125659943,
+                            0.0,
+                            0.0,
+                            0.972369909286499
+                        ],
+                        "/scale": [
+                            7.400000095367432,
+                            1.0,
+                            7.050000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{938B96F5-F6BC-4C5A-9B2E-0A534AF6E34E}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{9A875A29-6379-4571-9B73-D7C683B33210}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            0.0,
+                            8.350000381469727
+                        ],
+                        "/rotation": [
+                            -0.21271173655986786,
+                            -0.11903782188892365,
+                            -0.026117714121937752,
+                            0.9694852232933044
+                        ],
+                        "/scale": [
+                            3.5999999046325684,
+                            11.300000190734863,
+                            2.700000047683716
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{9A875A29-6379-4571-9B73-D7C683B33210}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{9D112378-0834-480D-8B2B-1CB63288A57F}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            5.400000095367432,
+                            0.0,
+                            -0.699999988079071
+                        ],
+                        "/rotation": [
+                            -0.1942325234413147,
+                            0.09187399595975876,
+                            0.01827487349510193,
+                            0.9764726758003235
+                        ],
+                        "/scale": [
+                            4.050000190734863,
+                            9.350000381469727,
+                            2.25
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{9D112378-0834-480D-8B2B-1CB63288A57F}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{9E1AC990-2BB0-4E85-AA77-C20C57CE132B}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{56197311-965F-4E17-AF3C-63504449AD87}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -21.5,
+                            3.3499999046325684,
+                            -0.949999988079071
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.25671109557151794,
+                            0.0,
+                            0.9664881825447083
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{9E1AC990-2BB0-4E85-AA77-C20C57CE132B}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{AFE70969-7163-4E59-BDFA-CB00A92E1738}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            4.949999809265137,
+                            0.0,
+                            8.199999809265137
+                        ],
+                        "/rotation": [
+                            0.235566183924675,
+                            0.0,
+                            0.0,
+                            0.9718583226203918
+                        ],
+                        "/scale": [
+                            8.0,
+                            3.799999952316284,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{AFE70969-7163-4E59-BDFA-CB00A92E1738}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{B028416B-E28D-487A-A8A3-7E6475447AC0}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -2.799999952316284,
+                            0.0,
+                            0.0
+                        ],
+                        "/rotation": [
+                            -0.08695089817047119,
+                            -0.22828379273414612,
+                            -0.020474186167120934,
+                            0.9694879651069641
+                        ],
+                        "/scale": [
+                            5.349999904632568,
+                            1.850000023841858,
+                            4.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{B028416B-E28D-487A-A8A3-7E6475447AC0}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{B0A2EF52-C325-4CE7-A0BE-3C337597E525}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            3.0,
+                            0.10000000149011612,
+                            2.450000047683716
+                        ],
+                        "/rotation": [
+                            -0.0228322334587574,
+                            0.03797917068004608,
+                            0.25057899951934814,
+                            0.9670814275741577
+                        ],
+                        "/scale": [
+                            3.950000047683716,
+                            3.4000000953674316,
+                            4.75
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{B0A2EF52-C325-4CE7-A0BE-3C337597E525}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{B0FB46D1-EEAC-4BF2-8435-1706A485A565}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            6.900000095367432,
+                            0.0,
+                            22.850000381469727
+                        ],
+                        "/rotation": [
+                            0.1961411088705063,
+                            -0.2244988977909088,
+                            0.04618510231375694,
+                            0.9534127712249756
+                        ],
+                        "/scale": [
+                            8.100000381469727,
+                            4.849999904632568,
+                            5.050000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{B0FB46D1-EEAC-4BF2-8435-1706A485A565}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{B1DECE55-6553-4723-B2E8-9B1875BDF001}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            11.550000190734863,
+                            0.0,
+                            -3.700000047683716
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.20364175736904144,
+                            0.0,
+                            0.9790454506874084
+                        ],
+                        "/scale": [
+                            5.599999904632568,
+                            5.849999904632568,
+                            4.550000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{B1DECE55-6553-4723-B2E8-9B1875BDF001}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{B509DF3D-3680-4439-ABFD-B01AB8A6D621}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{DC895B34-00F9-46B7-B61F-20CF1D7B9ED1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -3.75,
+                            0.25,
+                            -10.550000190734863
+                        ],
+                        "/rotation": [
+                            0.1298682540655136,
+                            0.10311288386583328,
+                            -0.013580376282334328,
+                            0.986061692237854
+                        ],
+                        "/scale": [
+                            -4.400000095367432,
+                            4.400000095367432,
+                            -3.549999952316284
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{B509DF3D-3680-4439-ABFD-B01AB8A6D621}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{BBD173C1-8B5D-456B-889C-72DA8A36C711}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            0.75,
+                            8.25
+                        ],
+                        "/rotation": [
+                            0.20787130296230316,
+                            -0.14029155671596527,
+                            0.030139898881316185,
+                            0.9675740003585815
+                        ],
+                        "/scale": [
+                            8.300000190734863,
+                            0.800000011920929,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{BBD173C1-8B5D-456B-889C-72DA8A36C711}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{BCDD774D-6FF0-4D75-B947-8989AA7C45F0}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "rootActorGuid": "{BCDD774D-6FF0-4D75-B947-8989AA7C45F0}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{BE08DC95-5AD6-4937-9047-2CF5EE502DEF}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            0.15000000596046448,
+                            -4.949999809265137
+                        ],
+                        "/rotation": [
+                            0.16504718363285065,
+                            -0.0021517397835850716,
+                            0.000360077538061887,
+                            0.9862833023071289
+                        ],
+                        "/scale": [
+                            9.75,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{BE08DC95-5AD6-4937-9047-2CF5EE502DEF}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{BE32069E-31AC-426D-AC51-76D941B9A361}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{2E6FD00B-9044-4940-920F-77542ACDCAD7}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            13.100000381469727,
+                            3.049999952316284,
+                            8.949999809265137
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{BE32069E-31AC-426D-AC51-76D941B9A361}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{C81B210F-5877-4E6A-A16F-C3DD6ACC8EE1}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -1.649999976158142,
+                            5.099999904632568,
+                            4.650000095367432
+                        ],
+                        "/rotation": [
+                            -0.12242871522903442,
+                            -0.31872522830963135,
+                            -0.041556406766176224,
+                            0.9389880299568176
+                        ],
+                        "/scale": [
+                            3.799999952316284,
+                            1.100000023841858,
+                            11.149999618530273
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{C81B210F-5877-4E6A-A16F-C3DD6ACC8EE1}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{D00E1147-F6B2-4147-8E39-96656DB25F9F}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{A3C3BEE4-FB07-4FDC-B381-5AB5D1572499}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            23.850000381469727,
+                            2.0999999046325684,
+                            0.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{D00E1147-F6B2-4147-8E39-96656DB25F9F}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{D50F66E2-ED39-43F2-A091-F67B60F39A11}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{B9F85EDE-7796-4815-8DFF-65467F5A1A77}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.10000000149011612,
+                            2.5,
+                            -25.0
+                        ],
+                        "/scale": [
+                            50.0,
+                            5.0,
+                            1.649999976158142
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{D50F66E2-ED39-43F2-A091-F67B60F39A11}",
+            "sourceDefinitionRevision": "{4DD366F5-293F-42F5-B445-974DCC1C1504}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{DD105629-13B1-48EA-B4E0-5FEF52BD38B4}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{B158301B-F3F3-4E13-8D66-BFD97EF112D5}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -18.25,
+                            1.0,
+                            15.649999618530273
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.4107188284397125,
+                            0.0,
+                            0.9117620587348938
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{DD105629-13B1-48EA-B4E0-5FEF52BD38B4}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{DE0A4386-5496-48ED-93E9-B7913B8B6401}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            2.9000000953674316,
+                            0.75,
+                            0.0
+                        ],
+                        "/scale": [
+                            1.7999999523162842,
+                            1.2000000476837158,
+                            6.449999809265137
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{DE0A4386-5496-48ED-93E9-B7913B8B6401}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{DE8D2682-F2ED-415F-B927-135A068709CA}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{86EFDAC5-EFF6-452F-BF09-CA748BCA2F47}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            13.949999809265137,
+                            4.300000190734863,
+                            1.5
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.7071068286895752,
+                            0.0,
+                            0.7071068286895752
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{DE8D2682-F2ED-415F-B927-135A068709CA}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{E0272B6B-175F-4373-A2F0-A5B6762DF06C}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            3.9000000953674316,
+                            2.049999952316284,
+                            -3.9000000953674316
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.2714404761791229,
+                            0.0,
+                            0.9624552726745605
+                        ],
+                        "/scale": [
+                            3.25,
+                            4.099999904632568,
+                            1.0
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{E0272B6B-175F-4373-A2F0-A5B6762DF06C}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{E09A0C3B-6A23-48E1-AE08-2A4ACD49D9C3}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -0.20000000298023224,
+                            2.799999952316284,
+                            -6.449999809265137
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.19722959399223328,
+                            0.0,
+                            0.9803573489189148
+                        ],
+                        "/scale": [
+                            0.8999999761581421,
+                            3.25,
+                            2.5999999046325684
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{E09A0C3B-6A23-48E1-AE08-2A4ACD49D9C3}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{E0E2C9B4-43F5-4142-AA17-7D1D5765E022}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{D238E8F4-635B-4580-B939-5FDC41B8036E}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/rotation": [
+                            0.0,
+                            -0.13917312026023865,
+                            0.0,
+                            0.9902681112289429
+                        ],
+                        "/scale": [
+                            4.25,
+                            5.300000190734863,
+                            4.199999809265137
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{E0E2C9B4-43F5-4142-AA17-7D1D5765E022}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{E45F02BB-36FA-4A6F-8B75-4A7481C19825}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{D47EE415-31CE-4713-959D-41B19B355294}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -11.600000381469727,
+                            1.350000023841858,
+                            13.399999618530273
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.5187732577323914,
+                            0.0,
+                            0.8549118638038635
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{E45F02BB-36FA-4A6F-8B75-4A7481C19825}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{E79A5A7D-327C-4469-85C1-7250A8786E30}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{38BD5CBD-FC1F-40F5-BEF2-492730DA4E78}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.5,
+                            2.5,
+                            -21.700000762939453
+                        ],
+                        "/rotation": [
+                            0.0,
+                            -0.19509033858776093,
+                            0.0,
+                            0.9807853102684021
+                        ],
+                        "/scale": [
+                            4.949999809265137,
+                            1.2000000476837158,
+                            5.050000190734863
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{E79A5A7D-327C-4469-85C1-7250A8786E30}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{EA625BC4-492C-40C9-9AC4-CCAF6FF33FE5}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{FF39BB20-486C-4787-B0DC-5266A4D3310F}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -15.050000190734863,
+                            5.75,
+                            19.799999237060547
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.3173046410083771,
+                            0.0,
+                            0.948323667049408
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{EA625BC4-492C-40C9-9AC4-CCAF6FF33FE5}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{EB5119D4-322C-47DD-85A2-12D422BD619B}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{5FAB129C-5A85-4BE0-9DEC-68B880B6FFF9}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -13.649999618530273,
+                            1.100000023841858,
+                            -3.549999952316284
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{EB5119D4-322C-47DD-85A2-12D422BD619B}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{EDDB0B38-0FB8-47DE-8FAB-730EE66F638B}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{B190AF3E-8A60-42FA-A446-0AEC0A16BFB7}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            6.449999809265137,
+                            -1.7000000476837158
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{EDDB0B38-0FB8-47DE-8FAB-730EE66F638B}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{F1636F24-C139-4143-A125-EC3509DBE7A4}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{F0415528-426A-4FAB-9ECD-0FD614E82CF1}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -17.25,
+                            0.20000000298023224,
+                            -23.600000381469727
+                        ],
+                        "/rotation": [
+                            0.0,
+                            0.21430915594100952,
+                            0.0,
+                            0.9767658710479736
+                        ],
+                        "/scale": [
+                            4.650000095367432,
+                            2.6500000953674316,
+                            2.950000047683716
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{F1636F24-C139-4143-A125-EC3509DBE7A4}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{F91FFAEB-EB18-48C7-90A2-066456E0A61B}",
+                    "localObjectId": 1
+                }
+            ],
+            "assetGuid": "{32401CE8-0E2A-4355-8174-C403A04B5353}",
+            "externalParentActorGuid": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -6.400000095367432,
+                            0.8999999761581421,
+                            8.399999618530273
+                        ],
+                        "/rotation": [
+                            0.06715492904186249,
+                            0.35743963718414307,
+                            -0.025778362527489662,
+                            0.9311619997024536
+                        ],
+                        "/scale": [
+                            2.450000047683716,
+                            9.899999618530273,
+                            4.150000095367432
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{F91FFAEB-EB18-48C7-90A2-066456E0A61B}",
+            "sourceDefinitionRevision": "{4563C8C2-EEAF-4C97-916E-C8BC4469C41E}"
+        },
+        {
+            "actorGuids": [
+                {
+                    "actorGuid": "{F9B24336-1F36-4E33-BEFB-8CB99AF4867E}",
+                    "localObjectId": 1
+                },
+                {
+                    "actorGuid": "{4B3BC07F-0BA3-4EA4-B75E-033B8CA1ACAC}",
+                    "localObjectId": 11
+                }
+            ],
+            "assetGuid": "{2293AC0F-11CF-4DC0-8629-CD470E81129A}",
+            "externalParentActorGuid": null,
+            "propertyOverrides": [
+                {
+                    "properties": {
+                        "/position": [
+                            -7.25,
+                            0.949999988079071,
+                            -11.25
+                        ]
+                    },
+                    "targetLocalObjectId": 2
+                }
+            ],
+            "rootActorGuid": "{F9B24336-1F36-4E33-BEFB-8CB99AF4867E}",
+            "sourceDefinitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}"
+        }
+    ],
+    "actors": [
+        {
+            "actorId": "{0593E51D-2A93-474A-9ED6-60A5CAA0651F}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            -0.5,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            50.0,
+                            1.0,
+                            50.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "blendMode": 0,
+                        "color": [
+                            0.29792147874832153,
+                            0.29792147874832153,
+                            0.29792147874832153,
+                            1.0
+                        ],
+                        "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Floor",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                },
+                {
+                    "data": {
+                        "Digit001sActor": "{FF1505D4-0A5A-4263-B738-5FD3773A9DE9}",
+                        "Digit01sActor": "{3B81BD2A-2318-4DC2-9D2C-137F889E40B3}",
+                        "Digit100sActor": "{DE43D732-51C8-44F4-BF30-CE3AD5C67227}",
+                        "Digit10sActor": "{373B3BC0-6A1B-439A-898B-7B2EB6F6336C}",
+                        "Digit1sActor": "{5F0A9B27-E59D-48E8-90FD-158CDF397CEA}",
+                        "GameManagerActor": "{356BA053-46D3-4DE7-92A0-A13F462F01A8}"
+                    },
+                    "type": "GameUIManager"
+                }
+            ],
+            "is_active": true,
+            "name": "GameUICanvas",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{2EDEC4D2-3197-4614-9E1B-4D870D388A40}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            1920.0,
+                            1080.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+                        "color": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.6666666865348816
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "BackGround",
+            "parentId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{30AFCB82-EA40-4605-A343-D648DFC71A9D}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            0.10000000149011612,
+                            1.0,
+                            0.10000000149011612
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "blendMode": 0,
+                        "color": [
+                            0.23529411852359772,
+                            0.5490196347236633,
+                            0.12941177189350128,
+                            0.772549033164978
+                        ],
+                        "meshAssetId": "{419762E8-378D-483A-A5E9-147063863C2B}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Body",
+            "parentId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{356BA053-46D3-4DE7-92A0-A13F462F01A8}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "clearImageActor": "{84824A55-F27E-4EBC-84E8-3BF17AFF01E8}",
+                        "failedImageActor": "{50219155-D131-46A5-8C53-9B9BF7E0CB4B}",
+                        "nextScene": "{2CCF25C5-41D2-4EC9-9C19-BEE2E8A6EB09}",
+                        "restTarget": 24,
+                        "restTime": 120.0,
+                        "resultUIActor": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+                        "timerUIActor": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+                        "titlePromptImageActor": "{47FFDD24-CC61-464A-8143-462C528DED00}",
+                        "tutorialUIActor": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}"
+                    },
+                    "type": "GameManager"
+                }
+            ],
+            "is_active": true,
+            "name": "GameManager",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                }
+            ],
+            "is_active": false,
+            "name": "TutorialUICanvas",
+            "parentId": null,
+            "tag": "TutorialUI"
+        },
+        {
+            "actorId": "{373B3BC0-6A1B-439A-898B-7B2EB6F6336C}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 0,
+                        "anchoredPosition": [
+                            200.0,
+                            -100.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            150.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{4FC89544-9749-43A4-B217-BFD0EF6D2F8A}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "TimerDigits10",
+            "parentId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{38BD5CBD-FC1F-40F5-BEF2-492730DA4E78}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock2",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{3B81BD2A-2318-4DC2-9D2C-137F889E40B3}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 0,
+                        "anchoredPosition": [
+                            390.0,
+                            -120.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            60.0,
+                            90.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{4FC89544-9749-43A4-B217-BFD0EF6D2F8A}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "TimerDigits0.1",
+            "parentId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{47FFDD24-CC61-464A-8143-462C528DED00}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            -304.1000061035156
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            1100.0,
+                            300.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{4B345320-D824-43D1-AD41-B59049ADEB0D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "ToTitleText",
+            "parentId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{50219155-D131-46A5-8C53-9B9BF7E0CB4B}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            100.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            1000.0,
+                            400.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{A14E54B4-7132-45BA-96FE-836A8A500A29}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": false
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "FailedText",
+            "parentId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                }
+            ],
+            "is_active": false,
+            "name": "ResultUICanvas",
+            "parentId": null,
+            "tag": "ResultUI"
+        },
+        {
+            "actorId": "{5F0A9B27-E59D-48E8-90FD-158CDF397CEA}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 0,
+                        "anchoredPosition": [
+                            300.0,
+                            -100.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            150.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{4FC89544-9749-43A4-B217-BFD0EF6D2F8A}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "TimerDigits1",
+            "parentId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{6A91F5F6-3CE7-4055-B952-F8FD0FCEDCBA}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            100.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "matchWidthOrHeight": 0.5,
+                        "name": "",
+                        "referenceSize": [
+                            1920.0,
+                            1080.0
+                        ],
+                        "renderMode": 0,
+                        "scaleMode": 1,
+                        "sortOrder": 0,
+                        "visible": true
+                    },
+                    "type": "Canvas"
+                }
+            ],
+            "is_active": true,
+            "name": "Canvas",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            -22.299999237060547,
+                            1.0,
+                            -18.350000381469727
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "aimingFOV": 50.0,
+                        "bulletImprint": "{EAB9DE5A-15B3-4A1E-8F65-D5C1029A7A40}",
+                        "bulletSpeed": 100.0,
+                        "defaultFOV": 100.0,
+                        "fireSound": "{965469F8-1CEF-4F49-A7E8-76E9CD101C08}",
+                        "fovSwitchingSpeed": 0.10000000149011612,
+                        "moveSlowSpeed": 2.5,
+                        "moveSpeed": 10.0,
+                        "sensitivity": 0.20000000298023224
+                    },
+                    "type": "Player"
+                },
+                {
+                    "data": {
+                        "center": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "isTrigger": false,
+                        "layer": 1,
+                        "name": "",
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.2000000476837158,
+                            1.5,
+                            1.2000000476837158
+                        ],
+                        "type": 1
+                    },
+                    "type": "Collider"
+                }
+            ],
+            "is_active": true,
+            "name": "Player",
+            "parentId": null,
+            "tag": "Player"
+        },
+        {
+            "actorId": "{84824A55-F27E-4EBC-84E8-3BF17AFF01E8}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            100.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            800.0,
+                            400.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{8308EF51-77DE-46EF-83FE-3DC24B60D6D0}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "CleatText",
+            "parentId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{89957DD7-F1F4-4B5D-9704-8F2D63327116}",
+            "components": [
+                {
+                    "data": {
+                        "name": "Transform",
+                        "position": [
+                            0.0,
+                            0.5,
+                            -0.20000000298023224
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "followActorId": null,
+                        "followMode": 1,
+                        "lens": {
+                            "farZ": 1000.0,
+                            "fov": 1.5707963705062866,
+                            "height": 1080.0,
+                            "nearZ": 0.10000000149011612,
+                            "projectionType": 0,
+                            "width": 1920.0
+                        },
+                        "name": "Camera",
+                        "pose": {
+                            "position": [
+                                -22.299999237060547,
+                                1.7999999523162842,
+                                -18.350000381469727
+                            ],
+                            "rotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rig": {
+                            "offsetPosition": [
+                                0.0,
+                                0.30000001192092896,
+                                0.20000000298023224
+                            ],
+                            "offsetRotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rotationMode": 1,
+                        "targetActorId": null
+                    },
+                    "type": "Camera"
+                }
+            ],
+            "is_active": true,
+            "name": "DefaultCamera",
+            "parentId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
+            "tag": "MainCamera"
+        },
+        {
+            "actorId": "{8AEC8ABF-21B5-4D07-982A-CB6A95642D44}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.3826834559440613,
+                            0.9238795042037964
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            20.0,
+                            20.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{6A91F5F6-3CE7-4055-B952-F8FD0FCEDCBA}",
+                        "color": [
+                            0.3811797499656677,
+                            1.0,
+                            0.15473443269729614,
+                            0.6509804129600525
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 1,
+                        "sortOrderInCanvas": 1,
+                        "textureAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "Reticle",
+            "parentId": "{6A91F5F6-3CE7-4055-B952-F8FD0FCEDCBA}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{8C4FDE23-BC51-48DF-A242-9F48177F2ED2}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            -476.04998779296875,
+                            -77.44999694824219
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            1.1851199843704308e-07,
+                            5.175078143793144e-09,
+                            0.3826834559440613,
+                            0.9238795042037964
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            300.0,
+                            300.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+                        "color": [
+                            0.8588235378265381,
+                            0.19607843458652496,
+                            0.9058823585510254,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 2,
+                        "sortOrderInCanvas": 2,
+                        "textureAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "Mark",
+            "parentId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{8F469620-B493-432F-BB14-D115AD8B364F}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            20.049999237060547,
+                            0.0,
+                            -16.450000762939453
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock5",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{B5878429-4FA4-4DF2-97AB-E7091EA1AC2F}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.5,
+                            0.4000000059604645,
+                            0.30000001192092896
+                        ],
+                        "rotation": [
+                            0.6200204491615295,
+                            -0.10685381293296814,
+                            0.0857592225074768,
+                            0.7725297808647156
+                        ],
+                        "scale": [
+                            0.20000000298023224,
+                            0.4000000059604645,
+                            0.20000000298023224
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "blendMode": 0,
+                        "color": [
+                            0.23529411852359772,
+                            0.5490196347236633,
+                            0.11764705926179886,
+                            0.772549033164978
+                        ],
+                        "meshAssetId": "{419762E8-378D-483A-A5E9-147063863C2B}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Arm",
+            "parentId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{CCD0E87E-E99B-4EF2-98E0-FFD49395C68B}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "blendMode": 0,
+                        "color": [
+                            0.772549033164978,
+                            0.4431372582912445,
+                            0.40784314274787903,
+                            1.0
+                        ],
+                        "followActorId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
+                        "followMode": 2,
+                        "name": "",
+                        "skyTextureAssetId": "{5C383CA1-7D26-4DC4-8225-846075C43E73}",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "SkyRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Sky",
+            "parentId": null,
+            "tag": "InitialSky"
+        },
+        {
+            "actorId": "{D238E8F4-635B-4580-B939-5FDC41B8036E}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            -23.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock8",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{D593135C-86A2-4E4B-B723-E3119C3113DB}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock6",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{DC895B34-00F9-46B7-B61F-20CF1D7B9ED1}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock1",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{DE43D732-51C8-44F4-BF30-CE3AD5C67227}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 0,
+                        "anchoredPosition": [
+                            100.0,
+                            -100.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            100.0,
+                            150.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{4FC89544-9749-43A4-B217-BFD0EF6D2F8A}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            0.20000000298023224,
+                            0.5
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "TimerDigits100",
+            "parentId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{E2B88067-FACF-4A69-AF4F-7280819BE775}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            -13.449999809265137,
+                            0.0,
+                            10.449999809265137
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock7",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{E5459BE4-EFF8-4E29-AB55-4932EE18E639}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            1920.0,
+                            1080.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 1,
+                        "sortOrderInCanvas": 1,
+                        "textureAssetId": "{63E12BA8-46B3-4AE4-A706-F3A012D494C6}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "Explanation",
+            "parentId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{F0415528-426A-4FAB-9ECD-0FD614E82CF1}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock3",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{F066014D-8142-432D-8F7F-CEB567A2639F}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 4,
+                        "anchoredPosition": [
+                            0.0,
+                            0.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            1920.0,
+                            1080.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+                        "color": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.6666666865348816
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "BackGround",
+            "parentId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
+            "tag": "None"
+        },
+        {
+            "actorId": "{FEEDB6E1-3EA9-4266-9669-02280E8B1BD8}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            20.75,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                }
+            ],
+            "is_active": true,
+            "name": "Rock4",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{FF1505D4-0A5A-4263-B738-5FD3773A9DE9}",
+            "components": [
+                {
+                    "data": {
+                        "anchorMode": 0,
+                        "anchoredPosition": [
+                            450.0,
+                            -120.0
+                        ],
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "size": [
+                            60.0,
+                            90.0
+                        ]
+                    },
+                    "type": "RectTransform"
+                },
+                {
+                    "data": {
+                        "blendMode": 1,
+                        "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "order": 0,
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{4FC89544-9749-43A4-B217-BFD0EF6D2F8A}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "UIImage"
+                }
+            ],
+            "is_active": true,
+            "name": "TimerDigits0.01",
+            "parentId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
+            "tag": "None"
+        }
+    ],
+    "directional_light": {
+        "color": [
+            1.0,
+            1.0,
+            1.0
+        ],
+        "direction": [
+            -1.0,
+            -1.0,
+            0.0
+        ],
+        "intensity": 1.0
+    },
+    "version": 4
+}

@@ -59,6 +59,18 @@ bool App::Initialize()
 
 	if (!InitInstance()) return false;
 
+	// Only the standalone game requests relative mouse movement. Editor Play mode
+	// keeps using cursor movement through the same lookDelta input field.
+	RAWINPUTDEVICE mouseDevice{ 0x01, 0x02, 0, m_window.GetHandle() };
+	if (RegisterRawInputDevices(&mouseDevice, 1, sizeof(mouseDevice)))
+	{
+		m_inputManager.SetRawMouseLookEnabled(true);
+	}
+	else
+	{
+		DBG("App: Raw mouse input registration failed (error %lu).", GetLastError());
+	}
+
 	return true;
 }
 

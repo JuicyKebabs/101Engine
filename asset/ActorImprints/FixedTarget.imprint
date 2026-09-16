@@ -1,0 +1,127 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              0.15000000596046448
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 10,
+          "properties": {
+            "center": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "isTrigger": false,
+            "layer": 2,
+            "name": "",
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.5,
+              1.5,
+              3.5
+            ],
+            "type": 0
+          },
+          "type": "Collider"
+        },
+        {
+          "localObjectId": 14,
+          "properties": {
+            "explosionImprintRef": "{2CC5E2CE-6C94-46B6-A89A-36918FDE8540}"
+          },
+          "type": "FixedTarget"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "FIxedTarget",
+        "tag": "Enemy"
+      }
+    },
+    {
+      "components": [
+        {
+          "localObjectId": 12,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.3826834559440613,
+              0.9238795042037964
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 13,
+          "properties": {
+            "blendMode": 0,
+            "color": [
+              0.8578416705131531,
+              0.1965342015028,
+              0.9053117632865906,
+              1.0
+            ],
+            "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
+            "name": "",
+            "sortOrderInCanvas": 0,
+            "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
+            "visible": true
+          },
+          "type": "MeshRenderer"
+        }
+      ],
+      "localObjectId": 11,
+      "parentLocalObjectId": 1,
+      "properties": {
+        "is_active": true,
+        "name": "Mesh",
+        "tag": "None"
+      }
+    }
+  ],
+  "definitionRevision": "{3A68337B-F688-4834-B23C-780AC5DCBBF4}",
+  "nextLocalObjectId": 15,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

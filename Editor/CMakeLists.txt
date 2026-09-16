@@ -21,6 +21,10 @@ add_executable(101Editor WIN32
     ${CMAKE_SOURCE_DIR}/Config/Windows/101Engine.manifest
 )
 
+target_compile_definitions(101Editor PRIVATE
+    ENGINE_BUILD_CONFIGURATION="$<CONFIG>"
+)
+
 target_include_directories(101Editor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )

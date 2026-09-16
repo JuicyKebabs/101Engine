@@ -1,0 +1,84 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              5.0,
+              5.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "localObjectId": 3,
+          "properties": {
+            "billboardType": 2,
+            "blendMode": 1,
+            "color": [
+              1.0,
+              0.2678983807563782,
+              0.998309314250946,
+              1.0
+            ],
+            "flipX": false,
+            "flipY": false,
+            "name": "",
+            "pivot": [
+              0.5,
+              0.5
+            ],
+            "sortOrderInCanvas": 0,
+            "textureAssetId": "{8957CF75-425C-42D2-80E8-F5D269EBD78D}",
+            "uvOffset": [
+              0.0,
+              0.0
+            ],
+            "uvScale": [
+              1.0,
+              1.0
+            ],
+            "visible": true
+          },
+          "type": "SpriteRenderer"
+        },
+        {
+          "localObjectId": 4,
+          "properties": {
+            "duration": 0.5,
+            "elapsedTime": 0.0,
+            "spriteIndex": 0,
+            "totalSprites": 5
+          },
+          "type": "Explosion"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "Root",
+        "tag": "None"
+      }
+    }
+  ],
+  "definitionRevision": "{B8DD125C-D177-4C89-9B2B-97DB3EDACE61}",
+  "nextLocalObjectId": 5,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

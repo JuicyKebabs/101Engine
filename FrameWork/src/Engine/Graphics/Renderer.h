@@ -60,6 +60,10 @@ public:
 		ID3D12GraphicsCommandList* p_commandList,
 		GpuTexture* selectionMask
 	);
+	void RenderColliderDebug(
+		ID3D12GraphicsCommandList* p_commandList,
+		const FrameRenderData& colliderRenderData
+	);
 
 	void SubmitFrameRenderData(const FrameRenderData& frameRenderData);	// Submit draw packets
 	void SubmitCameraInfo(const CameraInfo& cameraInfo);				// Submit camera information for this frame
@@ -86,6 +90,7 @@ private:
 	std::unique_ptr<ConstantBuffer> m_shadowFrameCB;
 	std::unique_ptr<ConstantBuffer> m_lightCB;
 	std::unique_ptr<ConstantBuffer> m_selectionFrameCB;
+	std::unique_ptr<ConstantBuffer> m_colliderDebugFrameCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshForShadowCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCB;
@@ -93,6 +98,7 @@ private:
 	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionMeshCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionSpriteCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionUICB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_colliderDebugMeshCB;
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light
@@ -104,6 +110,7 @@ private:
 	PSOKey m_selectionOutlineKey;		// Selection outline PSO key
 	PSOKey m_selectionSpriteMaskKey;	// Selection sprite mask PSO key
 	PSOKey m_selectionUIMaskKey;		// Selection UI mask PSO key
+	PSOKey m_colliderDebugKey;
 
 private:
 	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);			// Render a mesh
@@ -120,4 +127,5 @@ private:
 	void PrepareSelectionOutlineKey();		// Prepare selection outline information
 	void PrepareSelectionSpriteMaskKey();	// Prepare selection sprite mask information
 	void PrepareSelectionUIMaskKey();		// Prepare selection UI mask information
+	void PrepareColliderDebugKey();
 };

@@ -14,6 +14,6 @@ struct DirectionalLight
 	Matrix4x4 proj;									// Light projection matrix
 	float     intensity = 1.0f;
 	Vector3   color     = { 1.0f, 1.0f, 1.0f };
-	float     ambient   = 0.1f;
+	float     ambient   = 0.2f;
 	bool      enabled   = true;
 };

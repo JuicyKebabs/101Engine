@@ -309,6 +309,7 @@ void SkyRenderer::RebuildRenderProxy()
 	auto owner = GetOwner();
 	if (!owner)
 	{
+		DBG("SkyRenderer::RebuildRenderProxy: Owner actor is null.");
 		return;
 	}
 
