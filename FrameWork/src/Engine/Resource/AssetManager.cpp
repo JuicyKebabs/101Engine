@@ -16,21 +16,37 @@ namespace
 	bool FailCatalog(AssetCatalogError* error, AssetCatalogErrorCode code, std::string path, std::string message)
 	{
 		DBG("AssetManager: %s: %s", path.c_str(), message.c_str());
-		if (error) *error = { code, std::move(path), std::move(message) };
+
+		if (error)
+		{
+			*error = {code, std::move(path), std::move(message)};
+		}
+
 		return false;
 	}
 }
 
-bool AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager,
-	MeshManager* pMeshManager, AssetCatalogError* outError)
+bool AssetManager::Initialize(
+	const std::string& projectDir,
+	TextureManager* pTextureManager,
+	MeshManager* pMeshManager,
+	AssetCatalogError* outError)
 {
 	return Initialize(projectDir, pTextureManager, pMeshManager, nullptr, outError);
 }
 
-bool AssetManager::Initialize(const std::string& projectDir, TextureManager* pTextureManager,
-	MeshManager* pMeshManager, AudioManager* pAudioManager, AssetCatalogError* outError)
+bool AssetManager::Initialize(
+	const std::string& projectDir,
+	TextureManager* pTextureManager,
+	MeshManager* pMeshManager,
+	AudioManager* pAudioManager,
+	AssetCatalogError* outError)
 {
-	if (!ScanAssetDirectory(projectDir, "", outError)) return false;
+	if (!ScanAssetDirectory(projectDir, "", outError))
+	{
+		return false;
+	}
+
 	m_pTextureManager = pTextureManager;
 	m_pMeshManager = pMeshManager;
 	m_pAudioManager = pAudioManager;
@@ -48,11 +64,14 @@ bool AssetManager::Refresh(AssetCatalogError* outError)
 bool AssetManager::NotifyAssetChanged(const std::string& relativePath, AssetCatalogError* outError)
 {
 	const fs::path path(relativePath);
+
 	if (path.empty() || path.is_absolute() || path.has_root_name() ||
 		std::find(path.begin(), path.end(), fs::path("..")) != path.end() || path.lexically_normal() == ".")
 	{
-		return FailCatalog(outError, AssetCatalogErrorCode::InvalidPath, relativePath, "Expected an asset-root relative path.");
+		return FailCatalog(
+			outError, AssetCatalogErrorCode::InvalidPath, relativePath, "Expected an asset-root relative path.");
 	}
+
 	// Force Modified even when an explicit save preserves file size/timestamp.
 	return ScanAssetDirectory(m_assetRoot, path.lexically_normal().generic_string(), outError);
 }
@@ -60,14 +79,24 @@ bool AssetManager::NotifyAssetChanged(const std::string& relativePath, AssetCata
 bool AssetManager::NotifyAssetContentReplaced(const Guid& guid)
 {
 	const auto entry = m_catalog.find(guid);
-	if (entry == m_catalog.end()) return false;
+
+	if (entry == m_catalog.end())
+	{
+		return false;
+	}
+
 	const AssetChange change{ AssetChangeKind::Modified, entry->second.type, guid, entry->second.relativePath };
-	const auto latest = std::find_if(m_pendingChanges.rbegin(), m_pendingChanges.rend(),
-		[&](const AssetChange& existing)
-		{
-			return existing.guid == change.guid && existing.relativePath == change.relativePath;
-		});
-	if (latest == m_pendingChanges.rend() || *latest != change) m_pendingChanges.push_back(change);
+	const auto latest =
+		std::find_if(m_pendingChanges.rbegin(), m_pendingChanges.rend(), [&](const AssetChange& existing)
+	{
+		return existing.guid == change.guid && existing.relativePath == change.relativePath;
+	});
+
+	if (latest == m_pendingChanges.rend() || *latest != change)
+	{
+		m_pendingChanges.push_back(change);
+	}
+
 	return true;
 }
 
@@ -78,53 +107,87 @@ std::vector<AssetChange> AssetManager::TakePendingChanges()
 	return changes;
 }
 
-bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::string& notifiedPath, AssetCatalogError* outError)
+bool AssetManager::ScanAssetDirectory(
+	const std::string& rootDir,
+	const std::string& notifiedPath,
+	AssetCatalogError* outError)
 {
-	if (outError) *outError = {};
+	if (outError)
+	{
+		*outError = {};
+	}
+
 	try
 	{
 		if (rootDir.empty() || !fs::is_directory(rootDir))
-			return FailCatalog(outError, AssetCatalogErrorCode::IoError, rootDir, "Asset root is not an existing directory.");
+		{
+			return FailCatalog(
+				outError, AssetCatalogErrorCode::IoError, rootDir, "Asset root is not an existing directory.");
+		}
+
 		std::string newRoot = fs::absolute(rootDir).lexically_normal().string();
 		decltype(m_catalog) catalog;
 		decltype(m_pathToId) pathToId;
 		decltype(m_fileStates) fileStates;
+
 		for (const BuiltinMeshAsset& builtin : GetBuiltinMeshAssets())
 		{
 			const std::string path(builtin.path);
 			catalog.emplace(builtin.guid, AssetEntry{ builtin.guid, path, AssetType::Mesh });
 			pathToId.emplace(path, builtin.guid);
 		}
+
 		std::vector<std::pair<std::string, Guid>> missingMetadata;
 		std::vector<fs::path> files;
+
 		for (const auto& file : fs::recursive_directory_iterator(newRoot))
 		{
 			if (file.is_regular_file() && DetermineAssetType(file.path().extension().string()) != AssetType::Unknown)
+			{
 				files.push_back(file.path());
+			}
 		}
+
 		std::sort(files.begin(), files.end());
+
 		for (const auto& path : files)
 		{
 			const auto relativePath = path.lexically_relative(newRoot).generic_string();
 			Guid id;
+
 			if (fs::exists(path.string() + ".meta"))
 			{
 				const auto existing = MetaFile::TryLoad(path.string());
+
 				if (!existing)
+				{
 					return FailCatalog(outError, AssetCatalogErrorCode::InvalidMetadata, relativePath + ".meta",
 						"Existing metadata is invalid; its identity was not replaced.");
+				}
+
 				id = *existing;
 			}
 			else
 			{
 				id = GuidGenerator::Generate();
-				if (!id.IsValid()) return FailCatalog(outError, AssetCatalogErrorCode::InvalidMetadata, relativePath, "GUID generation failed.");
+
+				if (!id.IsValid())
+				{
+					return FailCatalog(
+						outError, AssetCatalogErrorCode::InvalidMetadata, relativePath, "GUID generation failed.");
+				}
+
 				missingMetadata.emplace_back(path.string(), id);
 			}
+
 			const auto duplicate = catalog.find(id);
+
 			if (duplicate != catalog.end())
+			{
 				return FailCatalog(outError, AssetCatalogErrorCode::DuplicateGuid, relativePath + ".meta",
 					"GUID also belongs to " + duplicate->second.relativePath + "; catalog was not updated.");
+			}
+
 			catalog.emplace(id, AssetEntry{ id, relativePath, DetermineAssetType(path.extension().string()) });
 			pathToId.emplace(relativePath, id);
 		}
@@ -134,11 +197,19 @@ bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::str
 		for (const auto& [path, id] : missingMetadata)
 		{
 			if (!MetaFile::Save(path, id, MetaFile::WriteMode::CreateNew))
-				return FailCatalog(outError, AssetCatalogErrorCode::IoError, path + ".meta", "Could not create new asset metadata.");
+			{
+				return FailCatalog(
+					outError, AssetCatalogErrorCode::IoError, path + ".meta", "Could not create new asset metadata.");
+			}
 		}
+
 		for (const auto& [id, entry] : catalog)
 		{
-			if (FindBuiltinMeshAsset(id)) continue;
+			if (FindBuiltinMeshAsset(id))
+			{
+				continue;
+			}
+
 			const fs::path path = fs::path(newRoot) / entry.relativePath;
 			const fs::path meta = path.string() + ".meta";
 			fileStates.emplace(id, FileState{ fs::last_write_time(path), fs::file_size(path),
@@ -146,33 +217,62 @@ bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::str
 		}
 
 		std::vector<AssetChange> changes;
+
 		for (const auto& [id, old] : m_catalog)
 		{
-			if (FindBuiltinMeshAsset(id)) continue;
-			if (!catalog.contains(id)) changes.push_back({ AssetChangeKind::Removed, old.type, id, old.relativePath });
+			if (FindBuiltinMeshAsset(id))
+			{
+				continue;
+			}
+
+			if (!catalog.contains(id))
+			{
+				changes.push_back({AssetChangeKind::Removed, old.type, id, old.relativePath});
+			}
 		}
+
 		for (const auto& [id, entry] : catalog)
 		{
-			if (FindBuiltinMeshAsset(id)) continue;
+			if (FindBuiltinMeshAsset(id))
+			{
+				continue;
+			}
+
 			const auto old = m_catalog.find(id);
-			if (old == m_catalog.end()) changes.push_back({ AssetChangeKind::Added, entry.type, id, entry.relativePath });
+
+			if (old == m_catalog.end())
+			{
+				changes.push_back({AssetChangeKind::Added, entry.type, id, entry.relativePath});
+			}
 			else if (old->second.relativePath != entry.relativePath || old->second.type != entry.type ||
-				m_fileStates.at(id) != fileStates.at(id) || entry.relativePath == notifiedPath)
-				changes.push_back({ AssetChangeKind::Modified, entry.type, id, entry.relativePath });
+					 m_fileStates.at(id) != fileStates.at(id) || entry.relativePath == notifiedPath)
+			{
+				changes.push_back({AssetChangeKind::Modified, entry.type, id, entry.relativePath});
+			}
 		}
+
 		std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b)
 		{
-			if (a.relativePath != b.relativePath) return a.relativePath < b.relativePath;
+			if (a.relativePath != b.relativePath)
+			{
+				return a.relativePath < b.relativePath;
+			}
+
 			return a.kind < b.kind;
 		});
 		auto pending = m_pendingChanges;
+
 		for (const auto& change : changes)
 		{
 			const auto latest = std::find_if(pending.rbegin(), pending.rend(), [&](const AssetChange& existing)
 			{
 				return existing.guid == change.guid && existing.relativePath == change.relativePath;
 			});
-			if (latest == pending.rend() || *latest != change) pending.push_back(change);
+
+			if (latest == pending.rend() || *latest != change)
+			{
+				pending.push_back(change);
+			}
 		}
 
 		// Publish all catalog indices, scan observations and notifications together.
@@ -192,18 +292,38 @@ bool AssetManager::ScanAssetDirectory(const std::string& rootDir, const std::str
 AssetType AssetManager::DetermineAssetType(const std::string& extension)
 {
 	std::string ext = extension;
-	for (auto& c : ext) c = (char)tolower((unsigned char)c);
+
+	for (auto& c : ext)
+	{
+		c = (char)tolower((unsigned char)c);
+	}
 
 	// Mesh extensioins
 	if (ext == ".fbx" || ext == ".obj" || ext == ".gltf" || ext == ".glb")
+	{
 		return AssetType::Mesh;
+	}
 
 	// Texture extensions
 	if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".dds" || ext == ".tga")
+	{
 		return AssetType::Texture;
-	if (ext == ".wav") return AssetType::Audio;
-	if (ext == ".imprint") return AssetType::ActorImprint;
-	if (ext == ".scene") return AssetType::Scene;
+	}
+
+	if (ext == ".wav")
+	{
+		return AssetType::Audio;
+	}
+
+	if (ext == ".imprint")
+	{
+		return AssetType::ActorImprint;
+	}
+
+	if (ext == ".scene")
+	{
+		return AssetType::Scene;
+	}
 
 	return AssetType::Unknown;
 }
@@ -211,22 +331,41 @@ AssetType AssetManager::DetermineAssetType(const std::string& extension)
 const AssetEntry* AssetManager::GetAssetEntryByPath(const std::string& relativePath) const
 {
 	auto it = m_pathToId.find(relativePath);
-	if (it == m_pathToId.end()) return nullptr;
+
+	if (it == m_pathToId.end())
+	{
+		return nullptr;
+	}
+
 	return GetAssetEntry(it->second);
 }
 
 const AssetEntry* AssetManager::GetAssetEntry(const Guid& guid) const
 {
 	auto it = m_catalog.find(guid);
-	if (it == m_catalog.end()) return nullptr;
+
+	if (it == m_catalog.end())
+	{
+		return nullptr;
+	}
+
 	return &it->second;
 }
 
 std::string AssetManager::GetAssetPath(const Guid& guid) const
 {
-	if (FindBuiltinMeshAsset(guid)) return {};
+	if (FindBuiltinMeshAsset(guid))
+	{
+		return {};
+	}
+
 	const AssetEntry* entry = GetAssetEntry(guid);
-	return entry ? (fs::path(m_assetRoot) / entry->relativePath).string() : std::string{};
+	if (!entry)
+	{
+		return std::string{};
+	}
+
+	return (fs::path(m_assetRoot) / entry->relativePath).string();
 }
 
 std::vector<AssetEntry> AssetManager::GetAssetEntries(AssetType type) const
@@ -258,7 +397,11 @@ std::vector<AssetEntry> AssetManager::GetAssetEntries(AssetType type) const
 MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 {
 	auto cashed = m_loadedMeshes.find(guid);
-	if (cashed != m_loadedMeshes.end()) return cashed->second; // Return cached handle if already loaded
+
+	if (cashed != m_loadedMeshes.end())
+	{
+		return cashed->second; // Return cached handle if already loaded
+	}
 
 	// Lookup the asset entry for the given GUID
 	const AssetEntry* entryPtr = GetAssetEntry(guid);
@@ -269,6 +412,7 @@ MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
 		DBG("AssetManager: GetMeshHandle - unknown or non-mesh asset, using error mesh.");
 		return m_pMeshManager->GetErrorMeshHandle();
 	}
+
 	if (const BuiltinMeshAsset* builtin = FindBuiltinMeshAsset(guid))
 	{
 		const MeshHandle handle = m_pMeshManager->LoadDefaultMesh(builtin->mesh);
@@ -295,7 +439,11 @@ TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
 {
 	// Return cached handle if the texture has already been loaded
 	auto cashed = m_loadedTextures.find(guid);
-	if (cashed != m_loadedTextures.end()) return cashed->second;
+
+	if (cashed != m_loadedTextures.end())
+	{
+		return cashed->second;
+	}
 
 	const AssetEntry* entryPtr = GetAssetEntry(guid);
 
@@ -316,6 +464,7 @@ TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
 AudioHandle AssetManager::GetAudioHandle(const Guid& guid)
 {
 	const AssetEntry* entry = GetAssetEntry(guid);
+
 	if (!entry || entry->type != AssetType::Audio || !m_pAudioManager)
 	{
 		DBG("AssetManager: GetAudioHandle - unknown, non-audio, or unavailable runtime audio asset.");
@@ -323,14 +472,24 @@ AudioHandle AssetManager::GetAudioHandle(const Guid& guid)
 	}
 
 	auto cached = m_loadedAudio.find(guid);
+
 	if (cached != m_loadedAudio.end())
 	{
-		if (m_pAudioManager && m_pAudioManager->IsLoaded(cached->second)) return cached->second;
+		if (m_pAudioManager && m_pAudioManager->IsLoaded(cached->second))
+		{
+			return cached->second;
+		}
+
 		m_loadedAudio.erase(cached);
 	}
 
 	const AudioHandle handle = m_pAudioManager->Load(GetAssetPath(guid));
-	if (handle != InvalidAudioHandle) m_loadedAudio.emplace(guid, handle);
+
+	if (handle != InvalidAudioHandle)
+	{
+		m_loadedAudio.emplace(guid, handle);
+	}
+
 	return handle;
 }
 

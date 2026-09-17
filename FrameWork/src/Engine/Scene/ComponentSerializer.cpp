@@ -10,7 +10,10 @@ using json = nlohmann::json;
 
 bool ComponentSerializer::SerializeRecord(const Component* component, nlohmann::json& outJson)
 {
-	if (!component || component->IsDestroyed()) return false;
+	if (!component || component->IsDestroyed())
+	{
+		return false;
+	}
 
 	// Get name of the component type from the ComponentRegistry
 	const std::type_index typeId = typeid(*component);
@@ -26,21 +29,14 @@ bool ComponentSerializer::SerializeRecord(const Component* component, nlohmann::
 	json componentData;
 	const Actor* owner = component->GetOwner();
 	const SceneBase* scene = nullptr;
+
 	if (owner)
 	{
 		scene = owner->GetOwner();
 	}
-	ReflectionError error;
-	if (!SerializeReflectedComponent(*component, componentData, scene, &error))
+
+	if (!SerializeReflectedComponent(*component, componentData, scene))
 	{
-		std::string path = "<type>";
-		if (error.path)
-		{
-			path = error.path->ToString();
-		}
-		DBG(
-			"ComponentSerializer::SerializeRecord: Failed to serialize component '%s' at '%s': %s",
-			typeName.c_str(), path.c_str(), error.message.c_str());
 		return false;
 	}
 

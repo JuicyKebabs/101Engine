@@ -1,4 +1,5 @@
 #include "ComponentReflection.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Component.h"
 #include "Engine/Core/Context/Context.h"
@@ -18,63 +19,58 @@ namespace
 	class DirectActorReferenceContext final : public ActorReferenceSaveContext
 	{
 	public:
-		ActorReferenceCodecResult Validate(const Guid& guid) const override
+		bool Validate(const Guid& guid) const override
 		{
 			if (!guid.IsValid())
 			{
-				return ActorReferenceCodecResult::ActorNotFound;
+				DBG("Actor reference: ActorNotFound.");
+				return false;
 			}
-			return ActorReferenceCodecResult::Success;
+
+			return true;
 		}
 	};
 
 	class DirectAssetReferenceContext final : public AssetReferenceSaveContext
 	{
 	public:
-		AssetReferenceCodecResult Validate(const Guid& guid, AssetType type) const override
+		bool Validate(const Guid& guid, AssetType type) const override
 		{
 			const bool validReference = guid.IsValid() && type != AssetType::Unknown;
+
 			if (!validReference)
 			{
-				return AssetReferenceCodecResult::AssetNotFound;
+				DBG("Asset reference: AssetNotFound.");
+				return false;
 			}
-			return AssetReferenceCodecResult::Success;
+
+			return true;
 		}
 	};
 
 	class MissingAssetReferenceContext final : public AssetReferenceSaveContext
 	{
 	public:
-		AssetReferenceCodecResult Validate(const Guid&, AssetType) const override
+		bool Validate(const Guid&, AssetType) const override
 		{
-			return AssetReferenceCodecResult::AssetNotFound;
+			DBG("Asset reference: AssetNotFound.");
+			return false;
 		}
 	};
 
-	void SetMetadataError(ReflectionError* outError, std::string message)
-	{
-		if (!outError)
-		{
-			return;
-		}
-		*outError = {
-			ReflectionErrorCode::InvalidMetadata,
-			std::nullopt,
-			std::move(message) };
-	}
 }
 
 bool SerializeReflectedComponent(
 	const Component& component,
 	nlohmann::json& outJson,
-	const SceneBase* scene,
-	ReflectionError* outError)
+	const SceneBase* scene)
 {
 	// Get the TypeMetadata for the component's type from the ComponentRegistry.
 	const TypeMetadata* metadata = ComponentRegistry::Get().GetMetadata(typeid(component));
+
 	if (!metadata)
 	{
-		SetMetadataError(outError, "Component reflection metadata is not registered.");
+		DBG("Component reflection metadata is not registered.");
 		return false;
 	}
 
@@ -94,6 +90,7 @@ bool SerializeReflectedComponent(
 	// Prepare context for scene and asset manager if a scene is provided.
 	std::optional<SceneActorReferenceContext> sceneActorContext;
 	std::optional<AssetManagerAssetReferenceContext> assetContext;
+
 	if (scene)
 	{
 		sceneActorContext.emplace(*scene);
@@ -101,6 +98,7 @@ bool SerializeReflectedComponent(
 		context.assetReferenceContext = &missingAssetContext;
 
 		EngineContext* engineContext = scene->GetEngineContext();
+
 		if (engineContext && engineContext->pAssetManager)
 		{
 			assetContext.emplace(*engineContext->pAssetManager);
@@ -108,35 +106,37 @@ bool SerializeReflectedComponent(
 		}
 	}
 
-	return ReflectionSerializer::Serialize(*metadata, typeid(component), &component, outJson, context, outError);
+	return ReflectionSerializer::Serialize(*metadata, typeid(component), &component, outJson, context);
 }
 
 bool DeserializeReflectedComponent(
 	Component& component,
 	const nlohmann::json& json,
-	ComponentRestoreOptions options,
-	ReflectionError* outError)
+	ComponentRestoreOptions options)
 {
 	ComponentRegistry& registry = ComponentRegistry::Get();
 	const std::type_index type = typeid(component);
 	const TypeMetadata* metadata = registry.GetMetadata(type);
+
 	if (!metadata)
 	{
-		SetMetadataError(outError, "Component reflection metadata is not registered.");
+		DBG("Component reflection metadata is not registered.");
 		return false;
 	}
 
 	const std::string typeName = registry.GetNameByTypeIndex(type);
+
 	if (typeName.empty())
 	{
-		SetMetadataError(outError, "Component type name is not registered.");
+		DBG("Component type name is not registered.");
 		return false;
 	}
 
 	std::unique_ptr<Component> candidate(registry.Create(typeName));
+
 	if (!candidate)
 	{
-		SetMetadataError(outError, "Component factory did not create a validation candidate.");
+		DBG("Component factory did not create a validation candidate.");
 		return false;
 	}
 
@@ -149,11 +149,11 @@ bool DeserializeReflectedComponent(
 	};
 
 	if (!ReflectionDeserializer::Deserialize(
-		*metadata, type, json, candidate.get(), context, outError))
+		*metadata, type, json, candidate.get(), context))
 	{
 		return false;
 	}
 
 	return metadata->CopySerializableState(
-		type, candidate.get(), &component, outError);
+		type, candidate.get(), &component);
 }

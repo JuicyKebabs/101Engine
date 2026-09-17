@@ -22,7 +22,8 @@ public:
         std::function<bool(const Guid& actorGuid, const std::string& componentName)> onAddComponent;
 
 		// Callback for removing a component from an actor
-        std::function<bool(const Guid& actorGuid, const std::string& componentName, std::size_t occurrenceIndex)> onRemoveComponent;
+		std::function<bool(const Guid& actorGuid, const std::string& componentName, std::size_t occurrenceIndex)>
+			onRemoveComponent;
 
 		std::function<bool(
 			const ComponentPropertyIdentity& identity,

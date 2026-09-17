@@ -22,6 +22,7 @@ public:
 		{
 			return nullptr;
 		}
+
 		return m_frameSlots[frameIndex].commandContext.GetCommandList();
 	}
 

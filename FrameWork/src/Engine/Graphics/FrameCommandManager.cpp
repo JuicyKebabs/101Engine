@@ -94,9 +94,10 @@ bool FrameCommandManager::EndFrame(size_t frameIndex)
 		return false;
 	}
 
-	// Execute the command list and get the fence value 
+	// Execute the command list and get the fence value
 	// which will be signaled when the GPU has finished executing the commands
 	const uint64_t fenceValue = m_commandQueue.Execute(slot.commandContext.GetCommandList());
+
 	if (fenceValue == 0)
 	{
 		DBG("FrameCommandManager::EndFrame: Failed to execute command list.");

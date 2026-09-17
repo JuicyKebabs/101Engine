@@ -5,9 +5,15 @@
 std::vector<ActorHandle> ActorPool::PlanRegistration(std::size_t count) const
 {
 	const auto newSlots = count > m_freeIndices.size() ? count - m_freeIndices.size() : 0;
-	if (newSlots > UINT32_MAX - m_slots.size()) throw std::length_error("ActorPool capacity exhausted.");
+
+	if (newSlots > UINT32_MAX - m_slots.size())
+	{
+		throw std::length_error("ActorPool capacity exhausted.");
+	}
+
 	std::vector<ActorHandle> handles;
 	handles.reserve(count);
+
 	for (std::size_t i = 0; i < count; ++i)
 	{
 		if (i < m_freeIndices.size())
@@ -15,14 +21,21 @@ std::vector<ActorHandle> ActorPool::PlanRegistration(std::size_t count) const
 			const auto index = m_freeIndices[m_freeIndices.size() - 1 - i];
 			handles.push_back({ index, m_slots[index].generation });
 		}
-		else handles.push_back({ static_cast<uint32_t>(m_slots.size() + i - m_freeIndices.size()), 0 });
+		else
+		{
+			handles.push_back({static_cast<uint32_t>(m_slots.size() + i - m_freeIndices.size()), 0});
+		}
 	}
+
 	return handles;
 }
 
 ActorHandle ActorPool::Register(std::unique_ptr<Actor> actor)
 {
-	if (!actor) return ActorHandle::Null();
+	if (!actor)
+	{
+		return ActorHandle::Null();
+	}
 
 	uint32_t index;
 
@@ -49,7 +62,11 @@ ActorHandle ActorPool::Register(std::unique_ptr<Actor> actor)
 
 void ActorPool::Destroy(ActorHandle handle)
 {
-	if (!IsValid(handle)) return;
+	if (!IsValid(handle))
+	{
+		return;
+	}
+
 	m_slots[handle.index].pendingDestroy = true;
 
 	// Destroy child actors recursively
@@ -58,7 +75,11 @@ void ActorPool::Destroy(ActorHandle handle)
 
 Actor* ActorPool::Resolve(ActorHandle handle) const
 {
-	if (!IsValid(handle)) return nullptr;
+	if (!IsValid(handle))
+	{
+		return nullptr;
+	}
+
 	return m_slots[handle.index].actor.get();
 }
 
@@ -76,7 +97,11 @@ std::vector<ActorHandle> ActorPool::CollectGarbage()
 	for (size_t i = 0; i < m_slots.size(); ++i)
 	{
 		Slot& slot = m_slots[i];
-		if (!slot.pendingDestroy || !slot.actor) continue;
+
+		if (!slot.pendingDestroy || !slot.actor)
+		{
+			continue;
+		}
 
 		collectedHandles.push_back({ static_cast<uint32_t>(i), slot.generation });
 
@@ -97,6 +122,7 @@ void ActorPool::ForEach(const std::function<void(Actor*)>& fn) const
 	// Snapshot the slot count. Actors registered by the callback are processed
 	// from the next traversal, and holes do not hide later live slots.
 	size_t count = m_slots.size();
+
 	for (size_t i = 0; i < count; ++i)
 	{
 		if (m_slots[i].actor)
@@ -109,20 +135,31 @@ void ActorPool::ForEach(const std::function<void(Actor*)>& fn) const
 size_t ActorPool::Count() const
 {
 	size_t count = 0;
+
 	for (const auto& slot : m_slots)
 	{
-		if (slot.actor) count++;
+		if (slot.actor)
+		{
+			count++;
+		}
 	}
+
 	return count;
 }
 
 bool ActorPool::DiscardUninitialized(ActorHandle handle)
 {
-	if (!IsValid(handle)) return false;
+	if (!IsValid(handle))
+	{
+		return false;
+	}
 
 	Slot& slot = m_slots[handle.index];
 
-	if (slot.pendingDestroy) return false;
+	if (slot.pendingDestroy)
+	{
+		return false;
+	}
 
 	// Calling OnDestroy is not necessary because the Actor has not entered
 	// normal Scene processing yet.

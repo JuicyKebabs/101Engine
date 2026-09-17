@@ -8,7 +8,6 @@
 
 class Canvas;
 
-
 struct UIRendererProxy
 {
 	CommonRendererProxy common;			// Common render proxy data (position, world matrix, color, visibility)
@@ -26,10 +25,26 @@ public:
 	void InvalidateRenderProxy() { m_isProxyDirty = true; }	// Mark the render proxy as dirty
 
 	// Setters
-	void SetUVScale(const Vector2& uvScale) { m_uvScale = uvScale; m_isProxyDirty = true; }
-	void SetUVOffset(const Vector2& uvOffset) { m_uvOffset = uvOffset; m_isProxyDirty = true; }
-	void SetFlipX(bool flip) { m_flipX = flip; m_isProxyDirty = true; }
-	void SetFlipY(bool flip) { m_flipY = flip; m_isProxyDirty = true; }
+	void SetUVScale(const Vector2& uvScale)
+	{
+		m_uvScale = uvScale;
+		m_isProxyDirty = true;
+	}
+	void SetUVOffset(const Vector2& uvOffset)
+	{
+		m_uvOffset = uvOffset;
+		m_isProxyDirty = true;
+	}
+	void SetFlipX(bool flip)
+	{
+		m_flipX = flip;
+		m_isProxyDirty = true;
+	}
+	void SetFlipY(bool flip)
+	{
+		m_flipY = flip;
+		m_isProxyDirty = true;
+	}
 
 	// Getters
 	const UIRenderTemplate& GetRenderTemplate() const { return m_renderTemplate; }
@@ -43,8 +58,15 @@ public:
 	bool IsConfigured() const override { return !m_renderTemplate.empty(); }	// Check if the renderer has been configured with necessary resources (at least one render template)
 
 	void SetGoverningCanvas(Canvas* canvas) override;
-	void SetCanvas(Canvas* canvas) { SetGoverningCanvas(canvas); }
-	void SetOrder(UINT order) { SetSortOrderInCanvas(order); m_isProxyDirty = true; }
+	void SetCanvas(Canvas* canvas)
+	{
+		SetGoverningCanvas(canvas);
+	}
+	void SetOrder(UINT order)
+	{
+		SetSortOrderInCanvas(order);
+		m_isProxyDirty = true;
+	}
 
 	Canvas* GetCanvas() const { return GetGoverningCanvas(); }
 	bool GetCanvasActorReference(ActorReference& value) const;

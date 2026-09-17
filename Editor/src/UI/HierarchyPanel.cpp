@@ -1,11 +1,14 @@
 #include "HierarchyPanel.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/UI/Canvas.h"
 #include "UI/AssetDragDropPayload.h"
 #include "imgui.h"
 #include <cstdio>
 
-void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
+void HierarchyPanel::Render(
+	SceneBase* scene,
+	EditorSelection& selection,
 	const Callbacks& callbacks)
 {
     const bool isOpen = ImGui::Begin("Hierarchy");
@@ -21,8 +24,9 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
             for (auto* actor : scene->GetRootActors())
             {
 				RenderActorNode(actor, scene, selection, callbacks);
-            }
-        }
+			}
+		}
+
 		if (!m_diagnostic.empty())
 		{
 			ImGui::Separator();
@@ -97,9 +101,13 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
 				renamed = callbacks.onRenameActor(m_renameTargetGuid, name);
             }
 
-			if (renamed) ImGui::CloseCurrentPopup();
-        }
-        ImGui::SetItemDefaultFocus();
+			if (renamed)
+			{
+				ImGui::CloseCurrentPopup();
+			}
+		}
+
+		ImGui::SetItemDefaultFocus();
         ImGui::SameLine();
 
         // Cancel button just closes the popup without doing anything
@@ -110,7 +118,6 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
 
         ImGui::EndPopup();
     }
-
 
     // Handle the Create Actor popup
     if (m_showActorCreationPopup)
@@ -124,23 +131,28 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
     {
 		ImGui::Text("Actor Name:");
 		ImGui::InputText("##NewActorName", m_newActorNameBuffer, sizeof(m_newActorNameBuffer));
-		if (!m_diagnostic.empty())
-			ImGui::TextWrapped("%s", m_diagnostic.c_str());
 
-        ImGui::Separator();
+		if (!m_diagnostic.empty())
+		{
+			ImGui::TextWrapped("%s", m_diagnostic.c_str());
+		}
+
+		ImGui::Separator();
 
         // Create button triggers the callback to create the script
         if (ImGui::Button("Create", ImVec2(120, 0)))
-        {
-            std::string name = m_newActorNameBuffer;
+		{
+			std::string name = m_newActorNameBuffer;
+
 			if (!name.empty() && callbacks.onCreateActor &&
 				callbacks.onCreateActor(name, m_creationParentGuid))
 			{
 				m_diagnostic.clear();
 				ImGui::CloseCurrentPopup();
 			}
-        }
-        ImGui::SetItemDefaultFocus();
+		}
+
+		ImGui::SetItemDefaultFocus();
         ImGui::SameLine();
 
         // Cancel button just closes the popup without doing anything
@@ -157,7 +169,6 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
     {
         ImGui::OpenPopup("Confirm Delete Actor");
     }
-
 
     // This ia also a modal popup
     if (ImGui::BeginPopupModal("Confirm Delete Actor", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
@@ -178,12 +189,14 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
 			if (actorToDelete && callbacks.onDeleteActor)
 			{
 				const bool deletesSelection = selection.GetSelectedActorGuid() == m_actorToDeleteGuid;
+
 				if (deletesSelection && callbacks.onSelectionChanging)
 				{
 					callbacks.onSelectionChanging();
 				}
+
 				deleted = callbacks.onDeleteActor(m_actorToDeleteGuid);
-            }
+			}
 
 			if (deleted && selection.GetSelectedActorGuid() == m_actorToDeleteGuid)
 			{
@@ -208,23 +221,35 @@ void HierarchyPanel::Render(SceneBase* scene, EditorSelection& selection,
     }
 }
 
-void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene,
-	EditorSelection& selection, const Callbacks& callbacks)
+void HierarchyPanel::RenderActorNode(
+	Actor* actor,
+	SceneBase* scene,
+	EditorSelection& selection,
+	const Callbacks& callbacks)
 {
-    if (!actor) return;
+	if (!actor)
+	{
+		return;
+	}
 
-    auto children = actor->GetDirectChildren();
+	auto children = actor->GetDirectChildren();
     bool hasChildren = !children.empty();
 
     ImGuiTreeNodeFlags flags =
         ImGuiTreeNodeFlags_OpenOnArrow |
         ImGuiTreeNodeFlags_SpanAvailWidth;
 
-    if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
+	if (!hasChildren)
+	{
+		flags |= ImGuiTreeNodeFlags_Leaf;
+	}
 
-	if (selection.GetSelectedActorGuid() == actor->GetGuid()) flags |= ImGuiTreeNodeFlags_Selected;
+	if (selection.GetSelectedActorGuid() == actor->GetGuid())
+	{
+		flags |= ImGuiTreeNodeFlags_Selected;
+	}
 
-    bool opened = ImGui::TreeNodeEx((void*)actor, flags, "%s", actor->GetName().c_str());
+	bool opened = ImGui::TreeNodeEx((void*)actor, flags, "%s", actor->GetName().c_str());
 
     // Left-click to select
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
@@ -257,15 +282,18 @@ void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene,
 			std::snprintf(m_renameBuffer, sizeof(m_renameBuffer), "%s", actor->GetName().c_str());
 		}
 
-		const StructuralMutationResult destroyResult = scene
-			? scene->CanDestroy(actor, true) : StructuralMutationResult{ StructuralMutationReason::InvalidActor };
+		const bool canDestroy = scene && scene->CanDestroy(actor, true);
+
 		if (ImGui::MenuItem("Delete Actor", nullptr, false,
-			callbacks.canEdit && static_cast<bool>(destroyResult)))
+			callbacks.canEdit && canDestroy))
         {
 			m_actorToDeleteGuid = actor->GetGuid();
-        }
-		if (callbacks.canEdit && !destroyResult)
+		}
+
+		if (callbacks.canEdit && !canDestroy)
+		{
 			ImGui::TextDisabled("Required root Actor cannot be deleted.");
+		}
 
 		if (ImGui::MenuItem("Create Child Actor", nullptr, false, callbacks.canEdit))
 		{
@@ -287,9 +315,10 @@ void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene,
 		// Additional context menu items can be added here.
         // ==========================================================
 
-        ImGui::EndPopup();
-    }
-    if (opened)
+		ImGui::EndPopup();
+	}
+
+	if (opened)
     {
         for (auto* child : children)
         {
@@ -300,7 +329,9 @@ void HierarchyPanel::RenderActorNode(Actor* actor, SceneBase* scene,
     }
 }
 
-void HierarchyPanel::RenderRootDropTarget(SceneBase* scene, EditorSelection& selection,
+void HierarchyPanel::RenderRootDropTarget(
+	SceneBase* scene,
+	EditorSelection& selection,
 	const Callbacks& callbacks)
 {
     const bool selected = false;
@@ -322,23 +353,42 @@ void HierarchyPanel::ChangeSelection(
 	const Guid& actorGuid,
 	const Callbacks& callbacks)
 {
-	if (selection.GetSelectedActorGuid() == actorGuid) return;
-	if (callbacks.onSelectionChanging) callbacks.onSelectionChanging();
+	if (selection.GetSelectedActorGuid() == actorGuid)
+	{
+		return;
+	}
+
+	if (callbacks.onSelectionChanging)
+	{
+		callbacks.onSelectionChanging();
+	}
+
 	selection.SelectActor(actorGuid);
 }
 
 Guid HierarchyPanel::ResolveEmptySpaceCreationParent(const SceneBase* scene)
 {
 	if (!scene || scene->GetStructurePolicy() != SceneStructurePolicy::SingleRootClosedSubtree)
+	{
 		return {};
+	}
+
 	const auto roots = scene->GetRootActors();
-	if (roots.size() != 1 || !roots.front() || roots.front()->IsDestroyed()) return {};
+
+	if (roots.size() != 1 || !roots.front() || roots.front()->IsDestroyed())
+	{
+		return {};
+	}
+
 	return roots.front()->GetGuid();
 }
 
 void HierarchyPanel::HandleActorDragSource(Actor* actor, const Callbacks& callbacks)
 {
-    if (!actor || !actor->GetGuid().IsValid() || !callbacks.onReparentActor || !callbacks.canEdit) return;
+	if (!actor || !actor->GetGuid().IsValid() || !callbacks.onReparentActor || !callbacks.canEdit)
+	{
+		return;
+	}
 
 	// Begin dragging this Actor.
     // The payload will contain the Actor's Guid,
@@ -354,7 +404,7 @@ void HierarchyPanel::HandleActorDragSource(Actor* actor, const Callbacks& callba
             &actorGuid,
             sizeof(Guid)
         );
-        
+
         // Display the name of the Actor being moved
         ImGui::Text(
             "Move %s",
@@ -366,27 +416,39 @@ void HierarchyPanel::HandleActorDragSource(Actor* actor, const Callbacks& callba
 }
 
 void HierarchyPanel::HandleDropTarget(
-	SceneBase* scene, const Guid& newParentGuid, const Callbacks& callbacks)
+	SceneBase* scene,
+	const Guid& newParentGuid,
+	const Callbacks& callbacks)
 {
-	if ((!callbacks.onReparentActor && !callbacks.onInstantiateActorImprint) || !callbacks.canEdit) return;
+	if ((!callbacks.onReparentActor && !callbacks.onInstantiateActorImprint) || !callbacks.canEdit)
+	{
+		return;
+	}
 
 	// Check if the current item is a valid drop target for drag-and-drop operations.
-    if (!ImGui::BeginDragDropTarget()) return;
+	if (!ImGui::BeginDragDropTarget())
+	{
+		return;
+	}
 
 	// Peek before accepting so invalid hierarchy targets never consume the drop.
 	bool canAcceptActor = callbacks.onReparentActor != nullptr;
+
 	if (const ImGuiPayload* incoming = ImGui::GetDragDropPayload();
 		canAcceptActor && incoming && incoming->IsDataType(kActorPayloadType) &&
 		incoming->DataSize == sizeof(Guid))
 	{
 		const Guid sourceGuid = *static_cast<const Guid*>(incoming->Data);
 		Actor* source = scene ? scene->ResolveActor(sourceGuid) : nullptr;
-		Actor* parent = scene && newParentGuid.IsValid()
-			? scene->ResolveActor(newParentGuid) : nullptr;
+		Actor* parent = scene && newParentGuid.IsValid() ? scene->ResolveActor(newParentGuid) : nullptr;
 		canAcceptActor = scene && static_cast<bool>(scene->CanReparent(source, parent));
+
 		if (!canAcceptActor)
+		{
 			ImGui::SetTooltip("This hierarchy target is not valid for the dragged Actor.");
+		}
 	}
+
 	const ImGuiPayload* payload = canAcceptActor
 		? ImGui::AcceptDragDropPayload(kActorPayloadType) : nullptr;
 
@@ -400,14 +462,18 @@ void HierarchyPanel::HandleDropTarget(
 		callbacks.onReparentActor(sourceGuid, newParentGuid);
     }
 
-	const ImGuiPayload* assetPayload = callbacks.onInstantiateActorImprint
-		? ImGui::AcceptDragDropPayload(EditorAssetDragDropPayloadType) : nullptr;
+	const ImGuiPayload* assetPayload =
+		callbacks.onInstantiateActorImprint ? ImGui::AcceptDragDropPayload(EditorAssetDragDropPayloadType) : nullptr;
+
 	if (assetPayload && assetPayload->DataSize == sizeof(EditorAssetDragDropPayload))
 	{
 		const auto& asset = *static_cast<const EditorAssetDragDropPayload*>(assetPayload->Data);
+
 		if (asset.assetType == AssetType::ActorImprint && asset.assetGuid.IsValid())
+		{
 			callbacks.onInstantiateActorImprint(asset.assetGuid, newParentGuid);
+		}
 	}
 
-    ImGui::EndDragDropTarget();
+	ImGui::EndDragDropTarget();
 }

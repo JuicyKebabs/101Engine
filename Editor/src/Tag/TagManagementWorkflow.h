@@ -24,16 +24,27 @@ struct TagManagementResult
 class TagManagementWorkflow
 {
 public:
-	static TagManagementResult Create(std::string_view name, ProjectSettings& settings,
+	static TagManagementResult Create(
+		std::string_view name,
+		ProjectSettings& settings,
 		const std::string& settingsPath);
-	static TagManagementResult Rename(std::string_view oldName, std::string_view newName,
-		ProjectSettings& settings, const std::string& settingsPath,
-		const AssetManager& assets, const EditorDocumentManager& documents);
-	static TagManagementResult Delete(std::string_view name, ProjectSettings& settings,
-		const std::string& settingsPath, const AssetManager& assets,
+	static TagManagementResult Rename(
+		std::string_view oldName,
+		std::string_view newName,
+		ProjectSettings& settings,
+		const std::string& settingsPath,
+		const AssetManager& assets,
+		const EditorDocumentManager& documents);
+	static TagManagementResult Delete(
+		std::string_view name,
+		ProjectSettings& settings,
+		const std::string& settingsPath,
+		const AssetManager& assets,
 		const EditorDocumentManager& documents);
 
 private:
-	static TagManagementResult FindUsages(std::string_view name,
-		const AssetManager& assets, const EditorDocumentManager& documents);
+	static TagManagementResult FindUsages(
+		std::string_view name,
+		const AssetManager& assets,
+		const EditorDocumentManager& documents);
 };

@@ -11,7 +11,6 @@
 
 class Actor;
 
-
 //camera information structure
 struct CameraInfo
 {
@@ -105,11 +104,31 @@ public:
 
 	const CameraInfo& GetCameraInfo();	// Build camera information (calculate view/projection matrices, etc.)
 
-	void SetFollowMode(CAMERA_FOLLOW_MODE mode) { m_followMode = mode; m_isCameraInfoDirty = true; }		// Set follow mode
-	void SetRotationMode(CAMERA_ROTATION_MODE mode) { m_rotationMode = mode; m_isCameraInfoDirty = true; }	// Set rotation mode
-	void SetCameraRig(const CameraRig& rig) { m_cameraRig = rig; m_isCameraInfoDirty = true; }				// Set camera rig settings
-	void SetCameraLens(const CameraLens& lens) { m_cameraLens = lens; m_isCameraInfoDirty = true; }			// Set camera lens settings
-	void SetCameraPose(const CameraPose& pose) { m_cameraPose = pose; m_isCameraInfoDirty = true; }			// Set camera camera pose (position and rotation)
+	void SetFollowMode(CAMERA_FOLLOW_MODE mode)
+	{
+		m_followMode = mode;
+		m_isCameraInfoDirty = true;
+	} // Set follow mode
+	void SetRotationMode(CAMERA_ROTATION_MODE mode)
+	{
+		m_rotationMode = mode;
+		m_isCameraInfoDirty = true;
+	} // Set rotation mode
+	void SetCameraRig(const CameraRig& rig)
+	{
+		m_cameraRig = rig;
+		m_isCameraInfoDirty = true;
+	} // Set camera rig settings
+	void SetCameraLens(const CameraLens& lens)
+	{
+		m_cameraLens = lens;
+		m_isCameraInfoDirty = true;
+	} // Set camera lens settings
+	void SetCameraPose(const CameraPose& pose)
+	{
+		m_cameraPose = pose;
+		m_isCameraInfoDirty = true;
+	} // Set camera camera pose (position and rotation)
 
 	// Set target and follow Actor references.
 	bool SetTargetActor(Actor* target);

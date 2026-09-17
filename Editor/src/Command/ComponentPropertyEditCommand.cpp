@@ -30,27 +30,58 @@ bool ApplyComponentPropertyValue(
 	const ComponentPropertyIdentity& identity,
 	const PropertyValue& value)
 {
-	if (!scene || !identity.actorGuid.IsValid()) return false;
+	if (!scene || !identity.actorGuid.IsValid())
+	{
+		return false;
+	}
+
 	if (const auto* reference = std::get_if<ActorReference>(&value))
 	{
 		const Guid target = reference->HasValue() ? reference->GetGuid() : Guid{};
-		if (!scene->CanReferenceActor(target)) return false;
+
+		if (!scene->CanReferenceActor(target))
+		{
+			return false;
+		}
 	}
 
 	Actor* actor = scene->ResolveActor(identity.actorGuid);
-	if (!actor) return false;
-	if (actor->IsDestroyed()) return false;
-	if (actor->GetOwner() != scene) return false;
 
-	Component* component = actor->GetComponentByExactType(
-		identity.componentType, identity.occurrenceIndex);
-	if (!component) return false;
+	if (!actor)
+	{
+		return false;
+	}
+
+	if (actor->IsDestroyed())
+	{
+		return false;
+	}
+
+	if (actor->GetOwner() != scene)
+	{
+		return false;
+	}
+
+	Component* component = actor->GetComponentByExactType(identity.componentType, identity.occurrenceIndex);
+
+	if (!component)
+	{
+		return false;
+	}
 
 	const TypeMetadata* metadata = ComponentRegistry::Get().GetMetadata(identity.componentType);
-	if (!metadata) return false;
+
+	if (!metadata)
+	{
+		return false;
+	}
 
 	const PropertyMetadata* property = metadata->FindPropertyByPath(identity.propertyPath);
-	if (!property) return false;
+
+	if (!property)
+	{
+		return false;
+	}
 
 	return metadata->TryWriteProperty(
 		identity.componentType, component, *property, value);

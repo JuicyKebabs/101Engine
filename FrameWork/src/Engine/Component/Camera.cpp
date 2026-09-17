@@ -49,7 +49,10 @@ const CameraInfo& Camera::GetCameraInfo()
 
 bool Camera::SetTargetActor(Actor* target)
 {
-	if (!m_targetActor.Set(target)) return false;
+	if (!m_targetActor.Set(target))
+	{
+		return false;
+	}
 
 	m_isCameraInfoDirty = true;
 	m_rotatingTransformGeneration = static_cast<uint64_t>(-1);
@@ -59,7 +62,10 @@ bool Camera::SetTargetActor(Actor* target)
 
 bool Camera::SetFollowTarget(Actor* target)
 {
-	if (!m_followActor.Set(target)) return false;
+	if (!m_followActor.Set(target))
+	{
+		return false;
+	}
 
 	m_isCameraInfoDirty = true;
 	m_followingTransformGeneration = static_cast<uint64_t>(-1);
@@ -70,10 +76,15 @@ bool Camera::SetFollowTarget(Actor* target)
 void Camera::SetAsMainCamera()
 {
 	auto owner = GetOwner();
-	if (owner) {
+
+	if (owner)
+	{
 		auto scene = owner->GetOwner();
-		if (scene) {
+
+		if (scene)
+		{
 			auto cameraSystem = scene->GetCameraSystem();
+
 			if (cameraSystem) {
 				cameraSystem->SetMainCamera(this);
 			}
@@ -103,7 +114,8 @@ CameraInfo Camera::RebuildCameraInfo()
 	if (m_cameraLens.projectionType == PROJECTION_TYPE::PROJECTION_TYPE_PERSPECTIVE)
 	{
 		const float aspectRatio = m_cameraLens.width / m_cameraLens.height;
-		info.projMatrix = Matrix4x4::CreatePerspectiveFov(m_cameraLens.fov, aspectRatio, m_cameraLens.nearZ, m_cameraLens.farZ);
+		info.projMatrix =
+			Matrix4x4::CreatePerspectiveFov(m_cameraLens.fov, aspectRatio, m_cameraLens.nearZ, m_cameraLens.farZ);
 	}
 	else // Orthographic projection
 	{
@@ -144,8 +156,10 @@ void Camera::UpdateCameraPose(float deltaTime)
 	}
 
 	// Check if the following target's transform has changed since the last update
-	if (followingTarget) {
+	if (followingTarget)
+	{
 		auto followTransform = followingTarget->GetComponentByClass<Transform>();
+
 		if (followTransform) {
 			if (m_followingTransformGeneration != followTransform->GetWorldGeneration()) {
 				m_followingTransformGeneration = followTransform->GetWorldGeneration();
@@ -172,8 +186,10 @@ void Camera::UpdateCameraPose(float deltaTime)
 	}
 
 	// Check if the rotating target's transform has changed since the last update
-	if (rotatingTarget) {
+	if (rotatingTarget)
+	{
 		auto rotatingTransform = rotatingTarget->GetComponentByClass<Transform>();
+
 		if (rotatingTransform) {
 			if (m_rotatingTransformGeneration != rotatingTransform->GetWorldGeneration()) {
 				m_rotatingTransformGeneration = rotatingTransform->GetWorldGeneration();
@@ -181,11 +197,18 @@ void Camera::UpdateCameraPose(float deltaTime)
 				rotatingDirty = true;
 			}
 		}
-	}	
+	}
 
 	// Update position and rotation if needed
-	if (followingDirty) UpdatePosition(deltaTime);
-	if (rotatingDirty)  UpdateRotation(deltaTime);
+	if (followingDirty)
+	{
+		UpdatePosition(deltaTime);
+	}
+
+	if (rotatingDirty)
+	{
+		UpdateRotation(deltaTime);
+	}
 }
 
 void Camera::UpdatePosition(float deltaTime)
@@ -206,10 +229,18 @@ void Camera::UpdatePosition(float deltaTime)
 	default:
 		break;
 	}
-	if (!followTarget) return; // No valid follow target, do not update position
+
+	if (!followTarget)
+	{
+		return; // No valid follow target, do not update position
+	}
 
 	auto targetTransform = followTarget->GetComponentByClass<Transform>();
-	if (!targetTransform) return; // Follow target does not have a Transform component, do not update position
+
+	if (!targetTransform)
+	{
+		return; // Follow target does not have a Transform component, do not update position
+	}
 
 	Vector3 newPosition = targetTransform->TransformPoint(m_cameraRig.offsetPosition); // Apply offset position from the camera rig
 	m_cameraPose.position = newPosition;
@@ -226,22 +257,27 @@ void Camera::UpdateRotation(float deltaTime)
 		break;
 
 	case CAMERA_ROTATION_MODE::ROTATION_MODE_MATCH_OWNER:
-		if (GetOwner()) {
+		if (GetOwner())
+		{
 			auto ownerTransform = GetOwner()->GetComponentByClass<Transform>();
+
 			if (ownerTransform) {
 				targetRotation = ownerTransform->GetWorldRotationQuat();
 				// Apply offset rotation from the camera rig
 				targetRotation *= m_cameraRig.offsetRotation;
 			}
 		}
+
 		break;
 
 	case CAMERA_ROTATION_MODE::ROTATION_MODE_LOOK_AT_TARGET:
 	{
 		Actor* targetActor = ResolveActorReference(m_targetActor);
+
 		if (targetActor)
 		{
 			auto targetTransform = targetActor->GetComponentByClass<Transform>();
+
 			if (targetTransform)
 			{
 				Vector3 targetPosition = targetTransform->GetWorldPosition();
@@ -260,6 +296,7 @@ void Camera::UpdateRotation(float deltaTime)
 				targetRotation *= m_cameraRig.offsetRotation;
 			}
 		}
+
 		break;
 	}
 	default:
@@ -269,20 +306,21 @@ void Camera::UpdateRotation(float deltaTime)
 	m_cameraPose.rotation = targetRotation;
 }
 
-
 bool Camera::ResolveReferences(SceneBase& scene)
 {
 	// Resolve target actor reference using their GUIDs
 	if (m_targetActor.HasValue() && !m_targetActor.Resolve(scene))
 	{
-		DBG("Camera::ResolveReferences() - Failed to resolve target Actor with GUID: %s", m_targetActor.GetGuid().ToString().c_str());
+		DBG("Camera::ResolveReferences() - Failed to resolve target Actor with GUID: %s",
+			m_targetActor.GetGuid().ToString().c_str());
 		return false;
 	}
 
 	// Resolve follow Actor reference using its Guid.
 	if (m_followActor.HasValue() && !m_followActor.Resolve(scene))
 	{
-		DBG("Camera::ResolveReferences() - Failed to resolve follow Actor with GUID: %s", m_followActor.GetGuid().ToString().c_str());
+		DBG("Camera::ResolveReferences() - Failed to resolve follow Actor with GUID: %s",
+			m_followActor.GetGuid().ToString().c_str());
 		return false;
 	}
 
@@ -296,14 +334,21 @@ bool Camera::ResolveReferences(SceneBase& scene)
 Actor* Camera::ResolveActorReference(const ActorReference& reference) const
 {
 	Actor* owner = GetOwner();
-	if (!owner) return nullptr;
+
+	if (!owner)
+	{
+		return nullptr;
+	}
 
 	SceneBase* scene = owner->GetOwner();
-	if (!scene) return nullptr;
+
+	if (!scene)
+	{
+		return nullptr;
+	}
 
 	return reference.Resolve(*scene);
 }
-
 
 void Camera::SetTargetActorReference(const ActorReference& target)
 {
@@ -321,7 +366,11 @@ void Camera::SetFollowActorReference(const ActorReference& target)
 
 bool Camera::SetAuthoredRigRotation(Quaternion rotation)
 {
-	if (!ValueValidation::NormalizeRotation(rotation)) return false;
+	if (!ValueValidation::NormalizeRotation(rotation))
+	{
+		return false;
+	}
+
 	m_cameraRig.offsetRotation = rotation;
 	m_isCameraInfoDirty = true;
 	return true;
@@ -329,7 +378,11 @@ bool Camera::SetAuthoredRigRotation(Quaternion rotation)
 
 bool Camera::SetAuthoredPoseRotation(Quaternion rotation)
 {
-	if (!ValueValidation::NormalizeRotation(rotation)) return false;
+	if (!ValueValidation::NormalizeRotation(rotation))
+	{
+		return false;
+	}
+
 	m_cameraPose.rotation = rotation;
 	m_isCameraInfoDirty = true;
 	return true;

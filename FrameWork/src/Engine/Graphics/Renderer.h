@@ -19,7 +19,6 @@
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
 #include "Engine/Graphics/LightTypes.h"
 
-
 // Forward declaration
 struct CameraInfo;
 class TextureManager;
@@ -112,11 +111,29 @@ private:
 	PSOKey m_selectionUIMaskKey;		// Selection UI mask PSO key
 	PSOKey m_colliderDebugKey;
 
-private:
-	void RenderMesh(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);			// Render a mesh
-	void RenderMeshForShadow(ID3D12GraphicsCommandList* p_commandList, const MeshRenderItem& item, int itemIndex);													// Render a mesh for shadow map
-	void RenderSprite(ID3D12GraphicsCommandList* p_commandList, const SpriteRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);		// Render a sprite
-	void RenderUI(ID3D12GraphicsCommandList* p_commandList, const UIRenderItem& item, int itemIndex, PSOKey& compare, RenderTargetFormat targetFormat);				// Render a UI element
+  private:
+	void RenderMesh(
+		ID3D12GraphicsCommandList* p_commandList,
+		const MeshRenderItem& item,
+		int itemIndex,
+		PSOKey& compare,
+		RenderTargetFormat targetFormat); // Render a mesh
+	void RenderMeshForShadow(
+		ID3D12GraphicsCommandList* p_commandList,
+		const MeshRenderItem& item,
+		int itemIndex); // Render a mesh for shadow map
+	void RenderSprite(
+		ID3D12GraphicsCommandList* p_commandList,
+		const SpriteRenderItem& item,
+		int itemIndex,
+		PSOKey& compare,
+		RenderTargetFormat targetFormat); // Render a sprite
+	void RenderUI(
+		ID3D12GraphicsCommandList* p_commandList,
+		const UIRenderItem& item,
+		int itemIndex,
+		PSOKey& compare,
+		RenderTargetFormat targetFormat); // Render a UI element
 
 	PipelineState* GetPipelineStateObject(PSOKey key);								// Get pipeline state object(if not exists, create it)
 	std::shared_ptr<PipelineState> CreatePipelineStateObject(const PSOKey& key);	// Create pipeline state object

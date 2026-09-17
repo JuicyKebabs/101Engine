@@ -6,7 +6,6 @@
 
 class Canvas;
 
-
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------
 // RendererComponent class
 // Base class for all renderer components in the engine
@@ -46,14 +45,26 @@ public:
 	std::vector<uint32_t> BuildCanvasSortPath() const;
 
 	// Setters
-	void SetVisible(bool visible) { m_isVisible = visible; m_isProxyDirty = true; }
-	void SetColor(const Vector4& color) { m_color = color; m_isProxyDirty = true; }
+	void SetVisible(bool visible)
+	{
+		m_isVisible = visible;
+		m_isProxyDirty = true;
+	}
+	void SetColor(const Vector4& color)
+	{
+		m_color = color;
+		m_isProxyDirty = true;
+	}
 	virtual void SetGoverningCanvas(Canvas* canvas)
 	{
 		m_pGoverningCanvas = canvas;
 		m_isProxyDirty = true;
 	}
-	void SetSortOrderInCanvas(uint32_t order) { m_sortOrderInCanvas = order; m_isProxyDirty = true; }
+	void SetSortOrderInCanvas(uint32_t order)
+	{
+		m_sortOrderInCanvas = order;
+		m_isProxyDirty = true;
+	}
 	void SetBlendMode(BlendMode blendMode)
 	{
 		m_blendMode = blendMode;

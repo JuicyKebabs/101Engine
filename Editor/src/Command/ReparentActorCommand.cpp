@@ -18,13 +18,20 @@ ReparentActorCommand::ReparentActorCommand(
 	if (actor && !actor->IsDestroyed() && actor->GetOwner() == m_scene)
 	{
 		Actor* oldParent = actor->GetParent();
-		if (oldParent) m_oldParentGuid = oldParent->GetGuid();
+
+		if (oldParent)
+		{
+			m_oldParentGuid = oldParent->GetGuid();
+		}
 	}
 }
 
 bool ReparentActorCommand::Execute()
 {
-	if (!m_scene || !m_actorGuid.IsValid()) return false;
+	if (!m_scene || !m_actorGuid.IsValid())
+	{
+		return false;
+	}
 
 	// Resolve the target Actor and validate it
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
@@ -38,13 +45,24 @@ bool ReparentActorCommand::Execute()
 
 	// Resolve the new parent Actor
 	Actor* newParent = nullptr;
-	if (!ResolveParent(m_newParentGuid, newParent)) return false;
-	if (!m_scene->CanReparent(actor, newParent).Report(&m_structuralResult)) return false;
+
+	if (!ResolveParent(m_newParentGuid, newParent))
+	{
+		return false;
+	}
+
+	if (!m_scene->CanReparent(actor, newParent))
+	{
+		return false;
+	}
 
 	if (!m_hasExecuted)
 	{// Initial execution
 		// Check if this Actor is a child of the expected old parent
-		if (!HasExpectedParent(actor, m_oldParentGuid)) return false;
+		if (!HasExpectedParent(actor, m_oldParentGuid))
+		{
+			return false;
+		}
 
 		// Get the handle of the new parent Actor (or null if root Actor)
 		const ActorHandle newParentHandle = newParent
@@ -52,13 +70,19 @@ bool ReparentActorCommand::Execute()
 			: ActorHandle::Null();
 
 		// No changes in parent, no need to reparent (Don't execute and stack the command)
-		if (actor->GetParentHandle() == newParentHandle) return false;
+		if (actor->GetParentHandle() == newParentHandle)
+		{
+			return false;
+		}
 
 		// Capture the Transform-family state of the subtree before reparenting
-		if (!m_beforeSnapshot.Capture(actor, m_scene)) return false;
+		if (!m_beforeSnapshot.Capture(actor, m_scene))
+		{
+			return false;
+		}
 
 		// Attempt to reparent the Actor
-		if (!m_scene->ReparentActor(actor, newParent, &m_structuralResult))
+		if (!m_scene->ReparentActor(actor, newParent))
 		{// Rollback to the state which was captured before reparenting
 			RollbackState(
 				actor,
@@ -87,7 +111,10 @@ bool ReparentActorCommand::Execute()
 
 	// Redo execution
 	// Not first execution means this execution is a Redo
-	if (!HasExpectedParent(actor, m_oldParentGuid)) return false;
+	if (!HasExpectedParent(actor, m_oldParentGuid))
+	{
+		return false;
+	}
 
 	// Apply the stored state after the first execution
 	return ApplyStoredState(
@@ -121,7 +148,10 @@ bool ReparentActorCommand::Undo()
 	}
 
 	// Check if this Actor is a child of the expected new parent
-	if (!HasExpectedParent(actor, m_newParentGuid)) return false;
+	if (!HasExpectedParent(actor, m_newParentGuid))
+	{
+		return false;
+	}
 
 	// Apply the stored state before the first execution
 	return ApplyStoredState(
@@ -140,10 +170,16 @@ bool ReparentActorCommand::ResolveParent(
 {
 	outParent = nullptr;
 
-	if (!m_scene) return false;
+	if (!m_scene)
+	{
+		return false;
+	}
 
 	// An invalid Guid represents the root hierarchy and resolves successfully to nullptr
-	if (!parentGuid.IsValid()) return true;
+	if (!parentGuid.IsValid())
+	{
+		return true;
+	}
 
 	// Resolve the parent Actor by its Guid and validate it
 	outParent = m_scene->ResolveActor(parentGuid);
@@ -164,7 +200,10 @@ bool ReparentActorCommand::HasExpectedParent(
 	const Guid& expectedParentGuid
 ) const
 {
-	if (!actor || !m_scene) return false;
+	if (!actor || !m_scene)
+	{
+		return false;
+	}
 
 	if (!expectedParentGuid.IsValid())
 	{
@@ -212,8 +251,12 @@ bool ReparentActorCommand::ApplyStoredState(
 	}
 
 	// Attempt to reparent the Actor to the target parent
-	if (!m_scene->CanReparent(actor, targetParent).Report(&m_structuralResult)) return false;
-	if (!m_scene->ReparentActor(actor, targetParent, &m_structuralResult))
+	if (!m_scene->CanReparent(actor, targetParent))
+	{
+		return false;
+	}
+
+	if (!m_scene->ReparentActor(actor, targetParent))
 	{// Rollback to the state given by rollbackParentGuid and rollbackSnapshot
 		RollbackState(
 			actor,
@@ -224,7 +267,7 @@ bool ReparentActorCommand::ApplyStoredState(
 		return false;
 	}
 
-	// Attempt to restore the Transform-family state of the subtree 
+	// Attempt to restore the Transform-family state of the subtree
 	// after reparenting successfully
 	if (!targetSnapshot.Restore(m_scene))
 	{// Rollback to the state given by rollbackParentGuid and rollbackSnapshot
@@ -246,11 +289,18 @@ bool ReparentActorCommand::RollbackState(
 	const TransformSubtreeSnapshot& snapshot
 )
 {
-	if (!actor || !snapshot.IsValid()) return false;
+	if (!actor || !snapshot.IsValid())
+	{
+		return false;
+	}
 
 	// Resolve the parent Actor used for rollback
 	Actor* parent = nullptr;
-	if (!ResolveParent(parentGuid, parent)) return false;
+
+	if (!ResolveParent(parentGuid, parent))
+	{
+		return false;
+	}
 
 	// Rebuild hierarchy-derived state first, then restore the exact
 	// Transform-family state captured before the failed operation

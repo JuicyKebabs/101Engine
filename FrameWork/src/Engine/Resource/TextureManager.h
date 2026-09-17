@@ -10,7 +10,6 @@
 #include "Engine/Core/ComPtr/ComPtr.h"
 #include "Engine/Graphics/DescriptorHeapAllocator.h"
 
-
 // Pending texture upload structure
 struct PendingTextureUpload
 {

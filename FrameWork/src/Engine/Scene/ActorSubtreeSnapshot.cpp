@@ -41,7 +41,11 @@ bool ActorSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 		DBG("ActorSubtreeSnapshot::Capture: Root Actor has an invalid Guid.");
 		return false;
 	}
-	if (!scene->CanCaptureOrdinarySubtree(rootActor)) return false;
+
+	if (!scene->CanCaptureOrdinarySubtree(rootActor))
+	{
+		return false;
+	}
 
 	std::vector<json> capturedRecords;			// Temporary result buffer for serialized Actor records
 	std::vector<Actor*> pendingActors;			// Stack to hold actors pending serialization
@@ -81,6 +85,7 @@ bool ActorSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 
 		// Get Guid and validate it
 		const Guid& actorId = actor->GetGuid();
+
 		if (!actorId.IsValid())
 		{
 			DBG("ActorSubtreeSnapshot::Capture: Actor '%s' has an invalid Guid.", actor->GetName().c_str());
@@ -90,12 +95,14 @@ bool ActorSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 		// Check for duplicate or cyclic relationships using the visitedActorIds set
 		if (visitedActorIds.insert(actorId).second == false)
 		{
-			DBG("ActorSubtreeSnapshot::Capture: Duplicate or cyclic Actor relationship detected at '%s'.", actor->GetName().c_str());
+			DBG("ActorSubtreeSnapshot::Capture: Duplicate or cyclic Actor relationship detected at '%s'.",
+				actor->GetName().c_str());
 			return false;
 		}
 
 		// Serialize actor data into JSON and store it in the captured records
 		json actorRecord;
+
 		if (!ActorSerializer::SerializeActorRecord(actor, scene, actorRecord))
 		{
 			DBG("ActorSubtreeSnapshot::Capture: Failed to serialize Actor '%s'.", actor->GetName().c_str());
@@ -112,14 +119,16 @@ bool ActorSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 
 			if (!child)
 			{
-				DBG("ActorSubtreeSnapshot::Capture: A child of Actor '%s' cannot be resolved.", actor->GetName().c_str());
+				DBG("ActorSubtreeSnapshot::Capture: A child of Actor '%s' cannot be resolved.",
+					actor->GetName().c_str());
 				return false;
 			}
 
 			// Check consistency of parent-child relationship
 			if (child->GetParentHandle() != actor->GetHandle())
 			{
-				DBG("ActorSubtreeSnapshot::Capture: Parent-child relationship is inconsistent for Actor '%s'.", child->GetName().c_str());
+				DBG("ActorSubtreeSnapshot::Capture: Parent-child relationship is inconsistent for Actor '%s'.",
+					child->GetName().c_str());
 				return false;
 			}
 

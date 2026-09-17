@@ -222,19 +222,28 @@ void Controller::UpdateStickState(ControllerState& contState, ControllerInputInf
 }
 
 // Check if a specific button was triggered
-bool Controller::IsButtonTriggered(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const
+bool Controller::IsButtonTriggered(
+	WORD buttonFlag,
+	const XINPUT_GAMEPAD& currentState,
+	const XINPUT_GAMEPAD& previousState) const
 {
 	return (currentState.wButtons & buttonFlag) && !(previousState.wButtons & buttonFlag);
 }
 
 // Check if a specific button is held down
-bool Controller::IsButtonDown(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const
+bool Controller::IsButtonDown(
+	WORD buttonFlag,
+	const XINPUT_GAMEPAD& currentState,
+	const XINPUT_GAMEPAD& previousState) const
 {
 	return currentState.wButtons & buttonFlag;
 }
 
 // Check if a specific button was released
-bool Controller::IsButtonUp(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const
+bool Controller::IsButtonUp(
+	WORD buttonFlag,
+	const XINPUT_GAMEPAD& currentState,
+	const XINPUT_GAMEPAD& previousState) const
 {
 	return !(currentState.wButtons & buttonFlag) && (previousState.wButtons & buttonFlag);
 }
@@ -251,7 +260,11 @@ DirectX::XMFLOAT2 Controller::ProcessStickInput(SHORT rawX, SHORT rawY, float de
 
 	//Normalize magnitude to range 0.0f - 1.0f
 	float normalized = (magnitude - deadZone) / (STICK_MAX - deadZone);
-	if (normalized > 1.0f) normalized = 1.0f;
+
+	if (normalized > 1.0f)
+	{
+		normalized = 1.0f;
+	}
 
 	float dirX = 0.0f;
 	float dirY = 0.0f;
@@ -269,8 +282,15 @@ DirectX::XMFLOAT2 Controller::ProcessStickInput(SHORT rawX, SHORT rawY, float de
 	}
 
 	//Apply deadzone
-	if (fabs(dirX) < deadZone) dirX = 0.0f;
-	if (fabs(dirY) < deadZone) dirY = 0.0f;
+	if (fabs(dirX) < deadZone)
+	{
+		dirX = 0.0f;
+	}
+
+	if (fabs(dirY) < deadZone)
+	{
+		dirY = 0.0f;
+	}
 
 	return DirectX::XMFLOAT2(dirX * normalized, dirY * normalized);
 }

@@ -27,19 +27,29 @@ bool RectTransformEditCommand::Undo()
 bool RectTransformEditCommand::Apply(const RectTransformEditState& state)
 {
 	// Validate Scene and Actor GUID
-	if (!m_scene || !m_actorGuid.IsValid()) return false;
+	if (!m_scene || !m_actorGuid.IsValid())
+	{
+		return false;
+	}
 
 	// Get Actor
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
 
 	// Validate Actor
-	if (!actor || actor->IsDestroyed() || actor->GetOwner() != m_scene) return false;
+	if (!actor || actor->IsDestroyed() || actor->GetOwner() != m_scene)
+	{
+		return false;
+	}
 
 	// Check if the actor has a RectTransform component
 	Component* component = actor->GetComponentByExactType(std::type_index(typeid(RectTransform)), 0);
 
 	RectTransform* rectTransform = static_cast<RectTransform*>(component);
-	if (!rectTransform) return false;
+
+	if (!rectTransform)
+	{
+		return false;
+	}
 
 	// Apply the state to the RectTransform component
 	state.ApplyTo(*rectTransform);

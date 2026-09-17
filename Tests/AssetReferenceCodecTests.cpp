@@ -41,14 +41,14 @@ namespace
 		Guid guid;
 		AssetType type = AssetType::Unknown;
 
-		AssetReferenceCodecResult Validate(
+		bool Validate(
 			const Guid& candidate,
 			AssetType expectedType) const override
 		{
 			return CheckReference(candidate, expectedType);
 		}
 
-		AssetReferenceCodecResult Resolve(
+		bool Resolve(
 			const Guid& candidate,
 			AssetType expectedType) const override
 		{
@@ -56,13 +56,13 @@ namespace
 		}
 
 	private:
-		AssetReferenceCodecResult CheckReference(
+		bool CheckReference(
 			const Guid& candidate,
 			AssetType expectedType) const
 		{
-			if (candidate != guid) return AssetReferenceCodecResult::AssetNotFound;
-			if (expectedType != type) return AssetReferenceCodecResult::AssetTypeMismatch;
-			return AssetReferenceCodecResult::Success;
+			if (candidate != guid) return false;
+			if (expectedType != type) return false;
+			return true;
 		}
 	};
 
@@ -90,7 +90,8 @@ namespace
 
 		const TypeMetadata metadata = BuildMetadata();
 		const PropertyMetadata* property = metadata.FindProperty("texture");
-		Check(property && property->GetLogicalType() == PropertyLogicalType::AssetReference &&
+		Check(property &&
+			property->GetLogicalType() == PropertyLogicalType::AssetReference &&
 			property->GetAssetType() == AssetType::Texture,
 			"PropertyMetadata retains the expected asset type");
 	}
@@ -139,7 +140,7 @@ namespace
 			"Deserialize preserves a typed unresolved Asset GUID");
 
 		AssetReferenceValue value = restored.texture.ToValue();
-		Check(codec.Resolve(value, catalog) == AssetReferenceCodecResult::Success &&
+		Check(codec.Resolve(value, catalog) == true &&
 			value.IsResolved() &&
 			restored.texture.SetValue(value) &&
 			restored.texture.IsResolved(),
@@ -156,23 +157,24 @@ namespace
 		nlohmann::json output;
 
 		Check(codec.Deserialize(42, AssetType::Texture, value) ==
-			AssetReferenceCodecResult::InvalidJsonType,
+			false,
 			"Non-string AssetReference JSON reports InvalidJsonType");
 		Check(codec.Deserialize("not-a-guid", AssetType::Texture, value) ==
-			AssetReferenceCodecResult::InvalidGuid,
+			false,
 			"Malformed Asset GUID reports InvalidGuid");
 
 		const Guid missingGuid = GuidGenerator::Generate();
 		Check(codec.Deserialize(missingGuid.ToString(), AssetType::Texture, value) ==
-			AssetReferenceCodecResult::Success && !value.IsResolved(),
+			true &&
+			!value.IsResolved(),
 			"A valid unregistered GUID can be restored unresolved");
-		Check(codec.Resolve(value, catalog) == AssetReferenceCodecResult::AssetNotFound,
+		Check(codec.Resolve(value, catalog) == false,
 			"An unregistered Asset reports AssetNotFound during resolution");
 
 		Check(codec.Deserialize(catalog.guid.ToString(), AssetType::Texture, value) ==
-			AssetReferenceCodecResult::Success &&
-			codec.Resolve(value, catalog) == AssetReferenceCodecResult::AssetTypeMismatch &&
-			codec.Serialize(value, catalog, output) == AssetReferenceCodecResult::AssetTypeMismatch,
+			true &&
+			codec.Resolve(value, catalog) == false &&
+			codec.Serialize(value, catalog, output) == false,
 			"A registered Asset of another type reports AssetTypeMismatch");
 	}
 
@@ -193,22 +195,27 @@ namespace
 		const Guid textureGuid = texture ? texture->guid : Guid{};
 		const Guid meshGuid = mesh ? mesh->guid : Guid{};
 
-		Check(texture && context.Resolve(texture->guid, AssetType::Texture) ==
-			AssetReferenceCodecResult::Success,
+		Check(texture &&
+			context.Resolve(texture->guid, AssetType::Texture) ==
+			true,
 			"AssetManager context resolves a registered Asset of the expected type");
-		Check(mesh && context.Resolve(mesh->guid, AssetType::Texture) ==
-			AssetReferenceCodecResult::AssetTypeMismatch,
+		Check(mesh &&
+			context.Resolve(mesh->guid, AssetType::Texture) ==
+			false,
 			"AssetManager context rejects a registered Asset of another type");
 		Check(context.Resolve(GuidGenerator::Generate(), AssetType::Texture) ==
-			AssetReferenceCodecResult::AssetNotFound,
+			false,
 			"AssetManager context distinguishes an unregistered Asset");
 
 		AssetManager repeatedManager;
 		const bool repeatedScan = repeatedManager.Initialize(directory.string(), nullptr, nullptr);
 		const AssetEntry* repeatedTexture = repeatedManager.GetAssetEntryByPath("texture.png");
 		const AssetEntry* repeatedMesh = repeatedManager.GetAssetEntryByPath("mesh.obj");
-		Check(repeatedScan && repeatedTexture && repeatedMesh &&
-			repeatedTexture->guid == textureGuid && repeatedMesh->guid == meshGuid,
+		Check(repeatedScan &&
+			repeatedTexture &&
+			repeatedMesh &&
+			repeatedTexture->guid == textureGuid &&
+			repeatedMesh->guid == meshGuid,
 			"Persisted Asset metadata keeps Guid identity across AssetManager instances");
 
 		const fs::path copiedDirectory = directory.string() + "-copy";
@@ -217,8 +224,11 @@ namespace
 		const bool copiedScan = copiedManager.Initialize(copiedDirectory.string(), nullptr, nullptr);
 		const AssetEntry* copiedTexture = copiedManager.GetAssetEntryByPath("texture.png");
 		const AssetEntry* copiedMesh = copiedManager.GetAssetEntryByPath("mesh.obj");
-		Check(copiedScan && copiedTexture && copiedMesh &&
-			copiedTexture->guid == textureGuid && copiedMesh->guid == meshGuid,
+		Check(copiedScan &&
+			copiedTexture &&
+			copiedMesh &&
+			copiedTexture->guid == textureGuid &&
+			copiedMesh->guid == meshGuid,
 			"Copied Asset tree retains Guid identity through its metadata sidecars");
 
 		fs::remove_all(copiedDirectory);

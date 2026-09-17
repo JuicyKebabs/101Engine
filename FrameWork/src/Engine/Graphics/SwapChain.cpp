@@ -9,8 +9,9 @@ bool SwapChain::Initialize(
 	ID3D12Device* pDevice,
 	ID3D12CommandQueue* pCommandQueue,
 	DescriptorHeapAllocator* pDescriptorHeapAllocator,
-	HWND hwnd, 
-	UINT width, UINT height
+	HWND hwnd,
+	UINT width,
+	UINT height
 )
 {
 	m_device = pDevice;
@@ -33,7 +34,10 @@ bool SwapChain::Initialize(
 
 HRESULT SwapChain::Present(UINT syncInterval, UINT flags)
 {
-	if (!m_pSwapChain) return E_POINTER;
+	if (!m_pSwapChain)
+	{
+		return E_POINTER;
+	}
 
 	return m_pSwapChain->Present(syncInterval, flags);
 }

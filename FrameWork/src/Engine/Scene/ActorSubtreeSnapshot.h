@@ -19,14 +19,20 @@ public:
 
 	void Clear();
 
-	bool IsValid() const { return m_rootActorId.IsValid() && !m_actorRecords.empty();; }
+	bool IsValid() const
+	{
+		return m_rootActorId.IsValid() && !m_actorRecords.empty();
+		;
+	}
 
 	const Guid& GetRootActorId() const { return m_rootActorId; }
 
-	const std::vector<nlohmann::json>& GetActorRecords() const { return m_actorRecords; }
+	const std::vector<nlohmann::json>& GetActorRecords() const
+	{
+		return m_actorRecords;
+	}
 
-
-private:
+  private:
 	// The GUID of the root actor of the subtree(Never store ownership)
 	Guid m_rootActorId;
 

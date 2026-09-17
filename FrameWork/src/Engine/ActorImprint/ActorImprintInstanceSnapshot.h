@@ -6,10 +6,8 @@
 class ActorImprintInstanceSnapshot
 {
 public:
-	bool Capture(const SceneBase& scene, ActorHandle root,
-		ActorImprintInstanceSerializationError* outError = nullptr);
-	Actor* Restore(SceneBase& scene, ActorImprintSystem& system,
-		ActorImprintInstanceDeserializationError* outError = nullptr) const;
+	bool Capture(const SceneBase& scene, ActorHandle root);
+	Actor* Restore(SceneBase& scene, ActorImprintSystem& system) const;
 	const ActorImprintSerializedInstanceRecord* GetRecord() const
 	{
 		return m_record ? &*m_record : nullptr;

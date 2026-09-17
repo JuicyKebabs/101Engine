@@ -14,6 +14,7 @@ void CameraSystem::Update()
 void CameraSystem::Flush(float deltaTime)
 {
 	Camera* mainCamera = ResolveMainCamera();
+
 	if (mainCamera)
 	{
 		mainCamera->Flush(deltaTime);
@@ -58,10 +59,17 @@ void CameraSystem::ClearMainCamera()
 
 Camera* CameraSystem::ResolveMainCamera() const
 {
-	if (!m_scene) return nullptr;
+	if (!m_scene)
+	{
+		return nullptr;
+	}
 
 	Actor* actor = m_mainCameraActor.Resolve(*m_scene);
-	if (!actor) return nullptr;
+
+	if (!actor)
+	{
+		return nullptr;
+	}
 
 	return actor->GetComponentByClass<Camera>();
 }

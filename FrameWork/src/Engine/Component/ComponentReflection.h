@@ -4,7 +4,6 @@
 
 class Component;
 class SceneBase;
-struct ReflectionError;
 
 struct ComponentRestoreOptions
 {
@@ -14,11 +13,9 @@ struct ComponentRestoreOptions
 bool SerializeReflectedComponent(
 	const Component& component,
 	nlohmann::json& outJson,
-	const SceneBase* scene = nullptr,
-	ReflectionError* outError = nullptr);
+	const SceneBase* scene = nullptr);
 
 bool DeserializeReflectedComponent(
 	Component& component,
 	const nlohmann::json& json,
-	ComponentRestoreOptions options = {},
-	ReflectionError* outError = nullptr);
+	ComponentRestoreOptions options = {});

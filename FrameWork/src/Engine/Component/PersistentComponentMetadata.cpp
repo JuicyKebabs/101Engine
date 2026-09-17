@@ -13,13 +13,17 @@ template<class T>
 void PersistentComponentMetadata::AddRendererProperties(TypeMetadataBuilder<T>& builder, bool writeLegacySortOrder)
 {
 	PersistentMetadata::AddComponentName(builder);
-	builder.Property("color", &T::GetColor, &T::SetColor).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
+	builder.Property("color", &T::GetColor, &T::SetColor)
+		.Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
 	builder.Property("visible", &T::GetVisible, &T::SetVisible);
 	builder.Property("blendMode", &T::GetBlendMode, &T::SetBlendMode)
 		.SerializedAs(EnumSerializationFormat::Integer).Optional();
 	// UI order is authoritative; retain the legacy JSON field without applying it twice.
 	builder.Property("sortOrderInCanvas", &T::GetSortOrderInCanvas,
-		[writeLegacySortOrder](T& c, std::uint32_t v) { if (writeLegacySortOrder) c.SetSortOrderInCanvas(v); }).Optional();
+			   [writeLegacySortOrder](T& c, std::uint32_t v)
+	{ if (writeLegacySortOrder) {
+c.SetSortOrderInCanvas(v);
+} }).Optional();
 }
 
 template<class T>
@@ -32,8 +36,14 @@ void PersistentComponentMetadata::AddUIRendererProperties(TypeMetadataBuilder<T>
 	builder.Property("flipX", &T::IsFlipX, &T::SetFlipX);
 	builder.Property("flipY", &T::IsFlipY, &T::SetFlipY);
 	builder.template Accessor<ActorReference>("canvasActorId",
-		[](const T& c, ActorReference& v) { return c.GetCanvasActorReference(v); },
-		[](T& c, const ActorReference& v) { c.SetCanvasActorReference(v); return true; });
+		[](const T& c, ActorReference& v)
+	{
+		return c.GetCanvasActorReference(v);
+	}, [](T& c, const ActorReference& v)
+	{
+		c.SetCanvasActorReference(v);
+		return true;
+	});
 }
 
 std::unique_ptr<TypeMetadata> PersistentComponentMetadata::MeshRenderer(std::string stableTypeName)
@@ -54,7 +64,8 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	builder.Property("uvScale", &T::GetUVScale, &T::SetUVScale).Validate(ValueValidation::Finite2);
 	builder.Property("uvOffset", &T::GetUVOffset, &T::SetUVOffset).Validate(ValueValidation::Finite2);
 	builder.Property("pivot", &T::GetPivot, &T::SetPivot).Validate(ValueValidation::UnitCoordinate2);
-	builder.Property("billboardType", &T::GetBillboardType, &T::SetBillboardType).SerializedAs(EnumSerializationFormat::Integer);
+	builder.Property("billboardType", &T::GetBillboardType, &T::SetBillboardType)
+		.SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("flipX", &T::IsFlipX, &T::SetFlipX);
 	builder.Property("flipY", &T::IsFlipY, &T::SetFlipY);
 	builder.Property("textureAssetId", &T::GetTextureAssetReference, &T::TrySetTextureAssetReference);
@@ -92,8 +103,11 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::Canvas(std::string st
 	using T = ::Canvas;
 	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
 	PersistentMetadata::AddComponentName(builder);
-	builder.Property("renderMode", &T::GetAuthoredRenderMode, &T::SetAuthoredRenderMode).SerializedAs(EnumSerializationFormat::Integer);
-	builder.Property("scaleMode", &T::GetScaleMode, &T::SetScaleMode).SerializedAs(EnumSerializationFormat::Integer).Optional();
+	builder.Property("renderMode", &T::GetAuthoredRenderMode, &T::SetAuthoredRenderMode)
+		.SerializedAs(EnumSerializationFormat::Integer);
+	builder.Property("scaleMode", &T::GetScaleMode, &T::SetScaleMode)
+		.SerializedAs(EnumSerializationFormat::Integer)
+		.Optional();
 	builder.Property("sortOrder", &T::GetSortOrder, &T::SetSortOrder);
 	builder.Property("visible", &T::IsVisible, &T::SetVisible);
 	builder.Property("referenceSize", &T::GetReferenceSize, &T::SetReferenceSize)

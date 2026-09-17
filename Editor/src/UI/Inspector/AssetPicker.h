@@ -10,8 +10,11 @@
 
 namespace AssetPicker
 {
-	bool TrySelectPayload(const AssetManager& assetManager, AssetType expectedType,
-		const EditorAssetDragDropPayload& payload, const Guid& currentAssetId,
+	bool TrySelectPayload(
+		const AssetManager& assetManager,
+		AssetType expectedType,
+		const EditorAssetDragDropPayload& payload,
+		const Guid& currentAssetId,
 		Guid& outSelectedAssetId);
 	bool Draw(
 		const char* label,

@@ -1,4 +1,5 @@
 #include "ActorImprintSystem.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "ActorImprintInstanceRegistry.h"
 #include "ActorImprintPropertyOverrides.h"
 #include "Detail/ActorImprintDetachedActors.h"
@@ -9,60 +10,72 @@
 
 namespace
 {
-	bool PrepareRestoredActorGuids(const ActorImprint& definition, const SceneBase& destination,
-		const ActorImprintRestoreInput& input, ActorImprintReferenceCodec::ActorGuids& outGuids,
-		const std::unordered_set<Guid>* reservedSceneGuids, std::string& outError)
+	bool PrepareRestoredActorGuids(
+		const ActorImprint& definition,
+		const SceneBase& destination,
+		const ActorImprintRestoreInput& input,
+		ActorImprintReferenceCodec::ActorGuids& outGuids,
+		const std::unordered_set<Guid>* reservedSceneGuids)
 	{
 		if (!input.sourceDefinitionRevision.IsValid())
 		{
-			outError = "Restored Instance requires a valid source DefinitionRevision.";
+			DBG("Restored Instance requires a valid source DefinitionRevision.");
 			return false;
 		}
+
 		if (!input.rootActorGuid.IsValid())
 		{
-			outError = "Restored Instance requires a nonzero root Actor GUID.";
+			DBG("Restored Instance requires a nonzero root Actor GUID.");
 			return false;
 		}
 
 		std::unordered_set<Guid> usedGuids;
 		usedGuids.reserve(input.actorGuids.size() + definition.GetActors().size());
+
 		for (const auto& [id, guid] : input.actorGuids)
 		{
 			if (id == InvalidLocalObjectId || !guid.IsValid() || !usedGuids.insert(guid).second)
 			{
-				outError = "Saved Actor GUID mappings require unique nonzero LocalObjectIDs and GUIDs.";
+				DBG("Saved Actor GUID mappings require unique nonzero LocalObjectIDs and GUIDs.");
 				return false;
 			}
 		}
 
 		const bool sameRevision = input.sourceDefinitionRevision == definition.GetRevision();
+
 		if (sameRevision && input.actorGuids.size() != definition.GetActors().size())
 		{
-			outError = "Same-revision Actor GUID mappings must cover exactly the current definition.";
+			DBG("Same-revision Actor GUID mappings must cover exactly the current definition.");
 			return false;
 		}
+
 		const auto root = input.actorGuids.find(definition.GetRootActorId());
+
 		if (root == input.actorGuids.end() || root->second != input.rootActorGuid)
 		{
-			outError = "The saved root Actor GUID does not match the current root LocalObjectID mapping.";
+			DBG("The saved root Actor GUID does not match the current root LocalObjectID mapping.");
 			return false;
 		}
 
 		ActorImprintReferenceCodec::ActorGuids migrated;
 		migrated.reserve(definition.GetActors().size());
+
 		for (const auto& actor : definition.GetActors())
 		{
 			const auto saved = input.actorGuids.find(actor.id);
+
 			if (saved != input.actorGuids.end())
 			{
 				migrated.emplace(actor.id, saved->second);
 				continue;
 			}
+
 			if (sameRevision)
 			{
-				outError = "Same-revision Actor GUID mapping is incomplete.";
+				DBG("Same-revision Actor GUID mapping is incomplete.");
 				return false;
 			}
+
 			Guid generated;
 			do generated = GuidGenerator::Generate();
 			while (!generated.IsValid() || usedGuids.contains(generated) ||
@@ -71,18 +84,31 @@ namespace
 			usedGuids.insert(generated);
 			migrated.emplace(actor.id, generated);
 		}
+
 		outGuids = std::move(migrated);
 		return true;
 	}
 }
 
-bool ActorImprintSystem::DestroyInstance(SceneBase& scene, ActorHandle root, StructuralMutationResult* result)
+bool ActorImprintSystem::DestroyInstance(SceneBase& scene, ActorHandle root)
 {
 	if (m_materializing || m_reloading || scene.m_actorBatchActive)
-		return StructuralMutationResult{ StructuralMutationReason::TransactionInProgress }.Report(result);
+	{
+		DBG("Structural operation rejected: TransactionInProgress.");
+		return false;
+	}
+
 	if (scene.m_imprintInstances.m_system != this)
-		return StructuralMutationResult{ StructuralMutationReason::InvalidInstance }.Report(result);
-	if (!scene.ValidateInstanceDestruction(root).Report(result)) return false;
+	{
+		DBG("Structural operation rejected: InvalidInstance.");
+		return false;
+	}
+
+	if (!scene.ValidateInstanceDestruction(root))
+	{
+		return false;
+	}
+
 	CommitDestroyInstance(scene, root);
 	return true;
 }
@@ -92,64 +118,83 @@ void ActorImprintSystem::CommitDestroyInstance(SceneBase& scene, ActorHandle roo
 	scene.CommitInstanceDestruction(root);
 }
 
-Actor* ActorImprintSystem::Instantiate(SceneBase& scene, ActorImprintHandle imprint,
-	ActorHandle externalParent, ActorImprintMaterializationError* outError)
+Actor* ActorImprintSystem::Instantiate(
+	SceneBase& scene,
+	ActorImprintHandle imprint,
+	ActorHandle externalParent)
 {
-	return Materialize(scene, imprint, externalParent, nullptr, nullptr, outError);
+	return Materialize(scene, imprint, externalParent, nullptr, nullptr);
 }
 
-Actor* ActorImprintSystem::Instantiate(SceneBase& scene, const AssetReference<ActorImprint>& imprint,
-	ActorHandle externalParent, ActorImprintMaterializationError* outError)
+Actor* ActorImprintSystem::Instantiate(
+	SceneBase& scene,
+	const AssetReference<ActorImprint>& imprint,
+	ActorHandle externalParent)
 {
-	ActorImprintLoadError loadError;
-	const auto handle = Load(imprint, &loadError);
+	const auto handle = Load(imprint);
+
 	if (handle.IsNull())
 	{
-		if (outError) *outError = { ActorImprintMaterializationErrorCode::InvalidAsset, 0, {}, loadError.message };
 		return nullptr;
 	}
-	return Materialize(scene, handle, externalParent, nullptr, nullptr, outError);
+
+	return Materialize(scene, handle, externalParent, nullptr, nullptr);
 }
 
-Actor* ActorImprintSystem::RestoreInstance(SceneBase& scene, ActorImprintHandle imprint,
-	const ActorImprintRestoreInput& input, ActorImprintMaterializationError* outError)
+Actor* ActorImprintSystem::RestoreInstance(
+	SceneBase& scene,
+	ActorImprintHandle imprint,
+	const ActorImprintRestoreInput& input)
 {
-	return Materialize(scene, imprint, input.externalParent, &input, nullptr, outError);
+	return Materialize(scene, imprint, input.externalParent, &input, nullptr);
 }
 
-Actor* ActorImprintSystem::RestoreInstanceForSceneCandidate(SceneBase& scene,
-	ActorImprintHandle imprint, const ActorImprintRestoreInput& input,
-	const std::unordered_set<Guid>& reservedSceneGuids,
-	ActorImprintMaterializationError* outError)
+Actor* ActorImprintSystem::RestoreInstanceForSceneCandidate(
+	SceneBase& scene,
+	ActorImprintHandle imprint,
+	const ActorImprintRestoreInput& input,
+	const std::unordered_set<Guid>& reservedSceneGuids)
 {
-	return Materialize(scene, imprint, input.externalParent, &input, &reservedSceneGuids, outError);
+	return Materialize(scene, imprint, input.externalParent, &input, &reservedSceneGuids);
 }
 
-Actor* ActorImprintSystem::Materialize(SceneBase& scene, ActorImprintHandle imprint, ActorHandle parentHandle,
-	const ActorImprintRestoreInput* restoreInput, const std::unordered_set<Guid>* reservedSceneGuids,
-	ActorImprintMaterializationError* outError)
+Actor* ActorImprintSystem::Materialize(
+	SceneBase& scene,
+	ActorImprintHandle imprint,
+	ActorHandle parentHandle,
+	const ActorImprintRestoreInput* restoreInput,
+	const std::unordered_set<Guid>* reservedSceneGuids)
 {
-	if (outError) *outError = {};
-	const auto fail = [&](ActorImprintMaterializationErrorCode code, std::string message,
-		LocalObjectId id = 0, std::string path = {}) -> Actor* {
-		if (outError) *outError = { code, id, std::move(path), std::move(message) };
-		return nullptr;
-	};
 	const auto* context = scene.GetEngineContext();
 	const bool buildingReloadCandidate = m_reloading && m_buildingReloadCandidate;
+
 	if (m_materializing || (m_reloading && !buildingReloadCandidate) ||
 		scene.m_actorBatchActive || scene.m_isFinalized || !context ||
 		context->pActorImprintSystem != this || context->pAssetManager != &m_assets)
-		return fail(ActorImprintMaterializationErrorCode::InvalidScene, "Scene must use this App's ActorImprintSystem and AssetManager.");
+	{
+		DBG("Scene must use this App's ActorImprintSystem and AssetManager.");
+		return nullptr;
+	}
+
 	const auto* definition = ResolveForSceneCandidate(imprint);
 	AssetManagerAssetReferenceContext assetContext(m_assets);
+
 	if (!definition || (!buildingReloadCandidate &&
 		(GetAvailability(imprint) != ActorImprintAvailability::Available ||
-		assetContext.Validate(GetAssetGuid(imprint), AssetType::ActorImprint) != AssetReferenceCodecResult::Success)))
-		return fail(ActorImprintMaterializationErrorCode::InvalidAsset, "Imprint handle is invalid or its asset is missing.");
+		assetContext.Validate(GetAssetGuid(imprint), AssetType::ActorImprint) != true)))
+	{
+		DBG("Imprint handle is invalid or its asset is missing.");
+		return nullptr;
+	}
+
 	Actor* parent = scene.ResolveActor(parentHandle);
-	if (!parentHandle.IsNull() && (!parent || parent->IsDestroyed() || scene.m_imprintInstances.FindMember(parentHandle)))
-		return fail(ActorImprintMaterializationErrorCode::InvalidParent, "External parent must be a live ordinary Actor in the destination Scene.");
+
+	if (!parentHandle.IsNull() &&
+		(!parent || parent->IsDestroyed() || scene.m_imprintInstances.FindMember(parentHandle)))
+	{
+		DBG("External parent must be a live ordinary Actor in the destination Scene.");
+		return nullptr;
+	}
 
 	struct BusyScope
 	{
@@ -163,61 +208,100 @@ Actor* ActorImprintSystem::Materialize(SceneBase& scene, ActorImprintHandle impr
 		const ActorImprintReferenceCodec::ActorGuids* restoredGuidInput = nullptr;
 		const std::vector<ActorImprintPropertyOverrideTarget>* overrides = nullptr;
 		ActorImprintOverrideRevisionRelation revisionRelation = ActorImprintOverrideRevisionRelation::Same;
+
 		if (restoreInput)
 		{
-			std::string identityError;
 			if (!PrepareRestoredActorGuids(*definition, scene, *restoreInput, restoredGuids,
-				reservedSceneGuids, identityError))
-				return fail(ActorImprintMaterializationErrorCode::CandidateFailed, std::move(identityError));
+					reservedSceneGuids))
+			{
+				return nullptr;
+			}
+
 			restoredGuidInput = &restoredGuids;
 			overrides = &restoreInput->propertyOverrides;
 			revisionRelation = restoreInput->sourceDefinitionRevision == definition->GetRevision()
-				? ActorImprintOverrideRevisionRelation::Same : ActorImprintOverrideRevisionRelation::Different;
+								   ? ActorImprintOverrideRevisionRelation::Same
+								   : ActorImprintOverrideRevisionRelation::Different;
 		}
+
 		SceneActorBatch batch(scene);
-		ActorImprintDetail::DetachedActorsError error;
-		auto detached = ActorImprintDetail::CreateDetachedActors(*definition, scene, restoredGuidInput,
-			overrides, revisionRelation, error);
-		if (!detached) return fail(ActorImprintMaterializationErrorCode::CandidateFailed,
-			std::move(error.message), error.objectId, std::move(error.path));
+		auto detached = ActorImprintDetail::CreateDetachedActors(
+			*definition, scene, restoredGuidInput, overrides, revisionRelation);
+
+		if (!detached)
+		{
+			return nullptr;
+		}
+
 		batch.Stage(std::move(*detached));
 		ActorImprintInstanceRecord record;
 		record.assetGuid = GetAssetGuid(imprint);
 		record.imprint = imprint;
 		record.sourceRevision = definition->GetRevision();
 		record.rootId = definition->GetRootActorId();
+
 		for (std::size_t i = 0; i < definition->GetActors().size(); ++i)
 		{
 			const auto& actorDefinition = definition->GetActors()[i];
 			const auto handle = batch.Handles()[i];
 			Actor* actor = batch.Candidate().ResolveActor(handle);
-			record.actors.emplace(actorDefinition.id, ActorImprintActorIdentity{ actor->GetGuid(), handle });
-			if (actorDefinition.id == record.rootId) record.root = handle;
+			record.actors.emplace(actorDefinition.id, ActorImprintActorIdentity{actor->GetGuid(), handle});
+
+			if (actorDefinition.id == record.rootId)
+			{
+				record.root = handle;
+			}
+
 			std::unordered_map<std::string, std::size_t> occurrences;
+
 			for (const auto& component : actorDefinition.components)
-				record.components.emplace(component.id, ActorImprintComponentLocator{
-					actorDefinition.id, component.typeName, occurrences[component.typeName]++ });
+			{
+				record.components.emplace(component.id, ActorImprintComponentLocator{actorDefinition.id,
+															component.typeName, occurrences[component.typeName]++});
+			}
 		}
+
 		for (const auto& actor : definition->GetActors())
 		{
-			if (actor.parentId == 0) continue;
+			if (actor.parentId == 0)
+			{
+				continue;
+			}
+
 			if (!batch.SetParent(batch.Candidate().ResolveActor(record.actors.at(actor.id).handle),
 				batch.Candidate().ResolveActor(record.actors.at(actor.parentId).handle)))
-				return fail(ActorImprintMaterializationErrorCode::CandidateFailed, "Candidate hierarchy failed.", actor.id);
+			{
+				DBG("Candidate hierarchy failed.");
+				return nullptr;
+			}
 		}
+
 		Actor* root = batch.Candidate().ResolveActor(record.root);
-		std::string validationError;
-		if (!scene.m_unpublishedCandidate && !batch.ResolveAndValidate(root, parent, validationError))
-			return fail(ActorImprintMaterializationErrorCode::CandidateFailed, std::move(validationError));
+
+		if (!scene.m_unpublishedCandidate && !batch.ResolveAndValidate(root, parent))
+		{
+			return nullptr;
+		}
 
 		auto& registry = scene.m_imprintInstances;
 		auto instances = registry.m_instances;
 		auto members = registry.m_members;
+
 		for (const auto& [id, actor] : record.actors)
-			if (!members.emplace(actor.handle, ActorImprintMembership{ record.root, id }).second)
-				return fail(ActorImprintMaterializationErrorCode::CandidateFailed, "Instance membership conflict.", id);
+		{
+			if (!members.emplace(actor.handle, ActorImprintMembership{record.root, id}).second)
+			{
+				DBG("Instance membership conflict.");
+				return nullptr;
+			}
+		}
+
 		if (!instances.emplace(record.root, std::move(record)).second)
-			return fail(ActorImprintMaterializationErrorCode::CandidateFailed, "Instance root already exists.");
+		{
+			DBG("Instance root already exists.");
+			return nullptr;
+		}
+
 		batch.PrepareCommit(root, parent);
 		// Recoverable validation and Actor/Registry storage preparation end here.
 		// Attach callbacks are non-failing; allocation failure there is fatal.
@@ -231,10 +315,12 @@ Actor* ActorImprintSystem::Materialize(SceneBase& scene, ActorImprintHandle impr
 	}
 	catch (const std::exception& error)
 	{
-		return fail(ActorImprintMaterializationErrorCode::CandidateFailed, error.what());
+		DBG("%s", error.what());
+		return nullptr;
 	}
 	catch (...)
 	{
-		return fail(ActorImprintMaterializationErrorCode::CandidateFailed, "Candidate construction threw an unknown exception.");
+		DBG("Candidate construction threw an unknown exception.");
+		return nullptr;
 	}
 }

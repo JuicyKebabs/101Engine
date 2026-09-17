@@ -50,7 +50,9 @@ private:
 		const Callbacks& callbacks
 	);
 
-	void RenderRootDropTarget(SceneBase* scene, EditorSelection& selection,
+	void RenderRootDropTarget(
+		SceneBase* scene,
+		EditorSelection& selection,
 		const Callbacks& callbacks
 	);
 
@@ -61,6 +63,8 @@ private:
 		const Guid& newParentGuid,
 		const Callbacks& callbacks
 	);
-	void ChangeSelection(EditorSelection& selection, const Guid& actorGuid,
+	void ChangeSelection(
+		EditorSelection& selection,
+		const Guid& actorGuid,
 		const Callbacks& callbacks);
 };

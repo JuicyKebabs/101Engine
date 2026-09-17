@@ -114,7 +114,6 @@ private:
 	struct InstanceLoadRecord
 	{
 		ActorImprintSerializedInstanceRecord record;
-		const nlohmann::json* sourceJson = nullptr;
 		std::size_t sourceIndex = 0;
 	};
 
@@ -139,9 +138,10 @@ private:
 	};
 
 	static bool BuildActorLoadRecords(
-		const nlohmann::json& sceneJson, bool strictV4,
+		const nlohmann::json& sceneJson,
+		bool strictV4,
 		std::vector<ActorLoadRecord>& outRecords,
-		std::unordered_map<Guid, ActorOrigin>& origins, 
+		std::unordered_map<Guid, ActorOrigin>& origins,
 		SceneLoadError& error);
 
 	static bool BuildInstanceLoadRecords(
@@ -166,16 +166,17 @@ private:
 
 	static bool RestoreOrdinaryHierarchy(
 		const std::vector<ActorLoadRecord>& records,
-		SceneBase& scene, SceneLoadError& error);
+		SceneBase& scene,
+		SceneLoadError& error);
 
 	static bool RestoreInstances(
 		const std::vector<InstanceLoadRecord>& records,
 		const std::unordered_set<Guid>& reservedSceneGuids,
 		std::unordered_map<Guid, ActorOrigin>& origins,
-		SceneBase& scene, SceneLoadError& error);
+		SceneBase& scene,
+		SceneLoadError& error);
 
 	static bool RestoreComponentReferences(
-		const std::vector<InstanceLoadRecord>& instanceRecords,
 		const std::unordered_map<Guid, ActorOrigin>& origins,
 		SceneBase& scene,
 		SceneLoadError& error);

@@ -8,7 +8,10 @@ CreateActorCommand::CreateActorCommand(SceneBase* scene, const Actor::InitDesc& 
 
 bool CreateActorCommand::Execute()
 {
-	if (!m_pScene) return false;
+	if (!m_pScene)
+	{
+		return false;
+	}
 
 	std::unique_ptr<Actor> actor;
 
@@ -16,7 +19,10 @@ bool CreateActorCommand::Execute()
 	{// Create new actor only if this command has not been executed before
 		actor = ActorFactory::CreateEmptyActor(m_desc);
 
-		if (!actor) return false;
+		if (!actor)
+		{
+			return false;
+		}
 
 		m_actorGuid = actor->GetGuid();
 	}
@@ -24,7 +30,10 @@ bool CreateActorCommand::Execute()
 	{// Restore the actor if this command has been executed before(in case of redo)
 		actor = ActorFactory::RestoreEmptyActor(m_desc, m_actorGuid);
 
-		if (!actor) return false;
+		if (!actor)
+		{
+			return false;
+		}
 	}
 
 	Actor* parentActor = nullptr;
@@ -41,15 +50,25 @@ bool CreateActorCommand::Execute()
 			return false;
 		}
 
-		if (!m_pScene->CanAddChildActor(parentActor).Report(&m_structuralResult)) return false;
-		if (!m_pScene->AddChildActor(std::move(actor), parentActor->GetHandle(), &m_structuralResult)) return false;
+		if (!m_pScene->CanAddChildActor(parentActor))
+		{
+			return false;
+		}
+
+		if (!m_pScene->AddChildActor(std::move(actor), parentActor->GetHandle()))
+		{
+			return false;
+		}
 
 		m_hasExecuted = true;
 		return true;
 	}
 
 	// If no parent is specified, add the new actor as a root actor in the scene
-	if (!m_pScene->AddRootActor(std::move(actor))) return false;
+	if (!m_pScene->AddRootActor(std::move(actor)))
+	{
+		return false;
+	}
 
 	m_hasExecuted = true;
 	return true;
@@ -57,13 +76,19 @@ bool CreateActorCommand::Execute()
 
 bool CreateActorCommand::Undo()
 {
-	if (!m_pScene) return false;
+	if (!m_pScene)
+	{
+		return false;
+	}
 
 	// Resolve the actor using the stored GUID
 	Actor* actor = m_pScene->ResolveActor(m_actorGuid);
 
-	if (!actor || actor->IsDestroyed()) return false;
+	if (!actor || actor->IsDestroyed())
+	{
+		return false;
+	}
 
 	// Remove the actor from the scene
-	return m_pScene->RemoveActor(actor, true, &m_structuralResult);
+	return m_pScene->RemoveActor(actor, true);
 }

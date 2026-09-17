@@ -42,21 +42,27 @@ namespace
 		const Guid id = fixture.Add("pilot.imprint");
 		AssetManager assets;
 		Check(assets.Initialize(fixture.root.string(), nullptr, nullptr), "Pilot: catalog initializes");
-		Check(assets.GetAssetEntry(id) && assets.GetAssetEntry(id)->type == AssetType::ActorImprint,
+		Check(assets.GetAssetEntry(id) &&
+			assets.GetAssetEntry(id)->type == AssetType::ActorImprint,
 			"Pilot: existing catalog discovers .imprint using .meta identity");
 		ActorImprintSystem system(assets);
 		Check(system.GetLoadedCount() == 0, "Pilot: catalog discovery does not load definitions");
 		AssetReference<ActorImprint> reference; reference.SetGuid(id);
-		ActorImprintLoadError error;
-		const auto handle = system.Load(reference, &error);
+
+		const auto handle = system.Load(reference);
 		const auto* definition = system.Resolve(handle);
 		Check(definition && system.GetAssetGuid(handle) == id, "Pilot: typed reference loads a complete ET-08 definition");
-		Check(system.Load(id) == handle && system.Resolve(handle) == definition && system.GetLoadedCount() == 1,
+		Check(system.Load(id) == handle &&
+			system.Resolve(handle) == definition &&
+			system.GetLoadedCount() == 1,
 			"Pilot: repeated load keeps the same handle and definition");
 		Check(system.Unload(handle) && !system.Resolve(handle), "Pilot: unload invalidates old handle");
 		const auto reused = system.Load(id);
-		Check(reused.index == handle.index && reused.generation != handle.generation &&
-			system.Resolve(reused) && !system.Resolve(handle), "Pilot: slot reuse cannot resolve a stale handle");
+		Check(reused.index == handle.index &&
+			reused.generation != handle.generation &&
+			system.Resolve(reused) &&
+			!system.Resolve(handle),
+			"Pilot: slot reuse cannot resolve a stale handle");
 	}
 
 	bool HasChange(const std::vector<AssetChange>& changes, AssetChangeKind kind, AssetType type, const Guid& guid, const std::string& path)
@@ -78,26 +84,33 @@ namespace
 		Check(MetaFile::TryLoad((fixture.root / "texture.png").string()) == textureId,
 			"Missing sidecar gets a persistent nonzero identity");
 		auto changes = assets.TakePendingChanges();
-		Check(changes.size() == 2 && HasChange(changes, AssetChangeKind::Added, AssetType::ActorImprint, imprint, "a.IMPRINT") &&
-			HasChange(changes, AssetChangeKind::Added, AssetType::Texture, textureId, "texture.png"), "Added notifications are generic and carry GUID/path/type");
+		Check(changes.size() == 2 &&
+			HasChange(changes, AssetChangeKind::Added, AssetType::ActorImprint, imprint, "a.IMPRINT") &&
+			HasChange(changes, AssetChangeKind::Added, AssetType::Texture, textureId, "texture.png"),
+			"Added notifications are generic and carry GUID/path/type");
 		Check(assets.Refresh() && assets.TakePendingChanges().empty(), "Unchanged refresh emits nothing");
 		Check(assets.NotifyAssetChanged("a.IMPRINT") && assets.NotifyAssetChanged("a.IMPRINT"), "Explicit changes do not depend on timestamps");
 		changes = assets.TakePendingChanges();
-		Check(changes.size() == 1 && HasChange(changes, AssetChangeKind::Modified, AssetType::ActorImprint, imprint, "a.IMPRINT"),
+		Check(changes.size() == 1 &&
+			HasChange(changes, AssetChangeKind::Modified, AssetType::ActorImprint, imprint, "a.IMPRINT"),
 			"Repeated notification coalesces in the pending queue");
 		{ std::ofstream file(fixture.root / "texture.png", std::ios::app); file << "changed size"; }
 		Check(assets.Refresh(), "External changes are discovered by the existing scanner");
 		changes = assets.TakePendingChanges();
-		Check(changes.size() == 1 && HasChange(changes, AssetChangeKind::Modified, AssetType::Texture, textureId, "texture.png"),
+		Check(changes.size() == 1 &&
+			HasChange(changes, AssetChangeKind::Modified, AssetType::Texture, textureId, "texture.png"),
 			"External Modified notifications also work for Texture");
 		fs::remove(fixture.root / "a.IMPRINT");
 		Check(assets.NotifyAssetChanged("a.IMPRINT") && !assets.GetAssetEntry(imprint), "Explicit removal updates catalog");
 		changes = assets.TakePendingChanges();
-		Check(changes.size() == 1 && HasChange(changes, AssetChangeKind::Removed, AssetType::ActorImprint, imprint, "a.IMPRINT"),
+		Check(changes.size() == 1 &&
+			HasChange(changes, AssetChangeKind::Removed, AssetType::ActorImprint, imprint, "a.IMPRINT"),
 			"Removed notification retains the old identity and type");
 		AssetCatalogError error;
-		Check(!assets.NotifyAssetChanged("../outside.imprint", &error) && error.code == AssetCatalogErrorCode::InvalidPath &&
-			assets.TakePendingChanges().empty(), "Explicit notification rejects paths outside asset root");
+		Check(!assets.NotifyAssetChanged("../outside.imprint", &error) &&
+			error.code == AssetCatalogErrorCode::InvalidPath &&
+			assets.TakePendingChanges().empty(),
+			"Explicit notification rejects paths outside asset root");
 	}
 
 	void TestCatalogFailureTransaction()
@@ -115,16 +128,23 @@ namespace
 		fixture.Add("duplicate.imprint");
 		MetaFile::Save((fixture.root / "duplicate.imprint").string(), original);
 		AssetCatalogError error;
-		Check(!assets.Refresh(&error) && error.code == AssetCatalogErrorCode::DuplicateGuid && !error.path.empty(),
+		Check(!assets.Refresh(&error) &&
+			error.code == AssetCatalogErrorCode::DuplicateGuid &&
+			!error.path.empty(),
 			"Duplicate GUID rejects the entire candidate catalog with a diagnostic");
-		Check(assets.GetAssetEntry(original) && !assets.GetAssetEntry(added) && assets.GetAssetEntries(AssetType::ActorImprint).size() == 1,
+		Check(assets.GetAssetEntry(original) &&
+			!assets.GetAssetEntry(added) &&
+			assets.GetAssetEntries(AssetType::ActorImprint).size() == 1,
 			"Failed refresh publishes neither partial additions nor overwritten identities");
 		const auto preserved = assets.TakePendingChanges();
-		Check(preserved.size() == 1 && HasChange(preserved, AssetChangeKind::Modified, AssetType::ActorImprint, original, "original.imprint"),
+		Check(preserved.size() == 1 &&
+			HasChange(preserved, AssetChangeKind::Modified, AssetType::ActorImprint, original, "original.imprint"),
 			"Failed refresh preserves already-pending notifications without publishing candidate events");
 		AssetManager cold;
-		Check(!cold.Initialize(fixture.root.string(), nullptr, nullptr) && cold.GetAssetEntries(AssetType::ActorImprint).empty() &&
-			cold.TakePendingChanges().empty(), "Cold initialization also rejects partial duplicate catalogs");
+		Check(!cold.Initialize(fixture.root.string(), nullptr, nullptr) &&
+			cold.GetAssetEntries(AssetType::ActorImprint).empty() &&
+			cold.TakePendingChanges().empty(),
+			"Cold initialization also rejects partial duplicate catalogs");
 		fs::remove(fixture.root / "duplicate.imprint");
 		Check(assets.Refresh() && assets.GetAssetEntry(added), "Valid refresh recovers after duplicate source is removed");
 		assets.TakePendingChanges();
@@ -133,14 +153,17 @@ namespace
 		{
 			const fs::path meta = fixture.root / "original.imprint.meta";
 			{ std::ofstream file(meta); file << contents; }
-			Check(!assets.Refresh(&error) && error.code == AssetCatalogErrorCode::InvalidMetadata && assets.GetAssetEntry(original),
+			Check(!assets.Refresh(&error) &&
+				error.code == AssetCatalogErrorCode::InvalidMetadata &&
+				assets.GetAssetEntry(original),
 				"Invalid existing metadata fails while previous catalog remains usable");
 			std::ifstream file(meta);
 			const std::string actual((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 			Check(actual == contents && assets.TakePendingChanges().empty(), "Invalid sidecar is never overwritten and emits no change");
 		}
 		Check(!assets.Initialize((fixture.root / "missing").string(), nullptr, nullptr, &error) &&
-			assets.GetAssetEntry(original) && assets.GetAssetPath(original) == (fixture.root / "original.imprint").string(),
+			assets.GetAssetEntry(original) &&
+			assets.GetAssetPath(original) == (fixture.root / "original.imprint").string(),
 			"Failed reinitialization preserves root and lookup indices");
 	}
 
@@ -180,39 +203,43 @@ namespace
 		fs::remove(fixture.root / "missing.imprint");
 		{ std::ofstream file(fixture.root / "bad.imprint"); file << "{}"; }
 		ActorImprintSystem system(assets);
-		ActorImprintLoadError error;
+
 		const auto valid = system.Load(good);
 		const auto* before = system.Resolve(valid);
-		Check(system.Load(Guid{}, &error).IsNull() && error.referenceResult == AssetReferenceCodecResult::InvalidGuid,
-			"Invalid GUID uses the existing AssetReference diagnostic");
-		Check(system.Load(GuidGenerator::Generate(), &error).IsNull() && error.referenceResult == AssetReferenceCodecResult::AssetNotFound,
-			"Unregistered GUID reports missing catalog asset");
-		Check(system.Load(wrongType, &error).IsNull() && error.referenceResult == AssetReferenceCodecResult::AssetTypeMismatch,
-			"Catalog type mismatch never starts Imprint parsing");
-		Check(system.Load(missing, &error).IsNull() && error.assetError.code == ActorImprintAssetErrorCode::IoError,
-			"Missing file preserves the ET-08 I/O diagnostic");
-		Check(system.Load(bad, &error).IsNull() && error.assetError.path == "/version",
-			"Malformed asset preserves the ET-08 schema location");
-		Check(system.GetLoadedCount() == 1 && system.Resolve(valid) == before && system.FindHandle(bad).IsNull(),
+		Check(system.Load(Guid{}).IsNull(), "Invalid GUID uses the existing AssetReference diagnostic");
+		Check(system.Load(GuidGenerator::Generate()).IsNull(), "Unregistered GUID reports missing catalog asset");
+		Check(system.Load(wrongType).IsNull(), "Catalog type mismatch never starts Imprint parsing");
+		Check(system.Load(missing).IsNull(), "Missing file preserves the ET-08 I/O diagnostic");
+		Check(system.Load(bad).IsNull(), "Malformed asset preserves the ET-08 schema location");
+		Check(system.GetLoadedCount() == 1 &&
+			system.Resolve(valid) == before &&
+			system.FindHandle(bad).IsNull(),
 			"All failed loads leave the existing pool and GUID map unchanged");
 		{ std::ofstream file(fixture.root / "good.imprint"); file << "{}"; }
-		Check(system.Load(good) == valid && system.Resolve(valid) == before,
+		Check(system.Load(good) == valid &&
+			system.Resolve(valid) == before,
 			"Loaded definition cannot be replaced by a subsequent file change before the reload transaction exists");
-		Check(!system.Resolve({ valid.index, valid.generation + 1 }) && !system.Unload({ UINT32_MAX, 0 }),
+		Check(!system.Resolve({ valid.index, valid.generation + 1 }) &&
+			!system.Unload({ UINT32_MAX, 0 }),
 			"Forged generations and null handles do not resolve or unload");
 		AssetManagerAssetReferenceContext context(assets);
 		AssetReferenceCodec codec;
 		AssetReferenceValue value;
 		nlohmann::json output;
-		Check(codec.Deserialize(good.ToString(), AssetType::ActorImprint, value) == AssetReferenceCodecResult::Success &&
-			codec.Resolve(value, context) == AssetReferenceCodecResult::Success &&
-			codec.Serialize(value, context, output) == AssetReferenceCodecResult::Success && output == good.ToString(),
+		Check(codec.Deserialize(good.ToString(), AssetType::ActorImprint, value) == true &&
+			codec.Resolve(value, context) == true &&
+			codec.Serialize(value, context, output) == true &&
+			output == good.ToString(),
 			"ActorImprint references reuse the generic AssetReference codec and catalog resolver");
 		fs::remove(fixture.root / "good.imprint");
-		Check(assets.Refresh() && system.Resolve(valid) == before && system.Load(good).IsNull(),
+		Check(assets.Refresh() &&
+			system.Resolve(valid) == before &&
+			system.Load(good).IsNull(),
 			"Catalog removal preserves borrowed loaded definition but refuses a fresh load request");
 		system.Clear();
-		Check(system.GetLoadedCount() == 0 && !system.Resolve(valid) && system.FindHandle(good).IsNull(),
+		Check(system.GetLoadedCount() == 0 &&
+			!system.Resolve(valid) &&
+			system.FindHandle(good).IsNull(),
 			"Clear invalidates handles before Component module teardown");
 		fs::copy_file("Tests/Fixtures/ActorImprint/Minimal.imprint", fixture.root / "good.imprint");
 		Check(assets.Refresh(), "Restored file reuses its surviving sidecar identity");

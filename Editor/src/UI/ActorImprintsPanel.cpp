@@ -23,6 +23,7 @@ std::vector<AssetEntry> ActorImprintsPanel::GetVisibleEntries(const AssetManager
 void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& callbacks)
 {
 	const bool visible = ImGui::Begin("Actor Imprints");
+
 	if (visible)
 	{
 		//{
@@ -48,19 +49,33 @@ void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& cal
 		{
 			ImGui::PushID(entry.guid.ToString().c_str());
 			const bool selected = entry.guid == m_selectedAssetGuid;
+
 			if (ImGui::Selectable(entry.relativePath.c_str(), selected))
+			{
 				m_selectedAssetGuid = entry.guid;
+			}
+
 			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
 				callbacks.canModify)
+			{
 				DispatchEdit(callbacks, entry.guid);
+			}
+
 			if (ImGui::BeginPopupContextItem("ActorImprintItemContext"))
 			{
 				if (ImGui::MenuItem("Edit", nullptr, false, callbacks.canModify))
+				{
 					DispatchEdit(callbacks, entry.guid);
+				}
+
 				if (ImGui::MenuItem("Delete", nullptr, false, callbacks.canModify))
+				{
 					RequestDeleteConfirmation(entry.guid);
+				}
+
 				ImGui::EndPopup();
 			}
+
 			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 			{
 				const EditorAssetDragDropPayload payload{entry.guid, entry.type};
@@ -68,27 +83,28 @@ void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& cal
 				ImGui::TextUnformatted(entry.relativePath.c_str());
 				ImGui::EndDragDropSource();
 			}
+
 			ImGui::PopID();
 		}
 
 		// Log message to indicate that there are no ActorImprint assets if the list is empty
-		if (entries.empty()) ImGui::TextDisabled("No ActorImprint assets found.");
-
+		if (entries.empty())
+		{
+			ImGui::TextDisabled("No ActorImprint assets found.");
+		}
 
 		if (ImGui::BeginPopupContextWindow("ActorImprintsEmptyContext",
 			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
 			if (ImGui::MenuItem("Create Actor Imprint...", nullptr, false, callbacks.canModify))
+			{
 				RequestCreateDialog();
+			}
+
 			ImGui::EndPopup();
 		}
-
-		if (!m_diagnostic.empty())
-		{
-			ImGui::Separator();
-			ImGui::TextWrapped("%s", m_diagnostic.c_str());
-		}
 	}
+
 	ImGui::End();
 
 	if (m_openCreatePopup)
@@ -97,13 +113,23 @@ void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& cal
 		m_openCreatePopup = false;
 		m_name[0] = '\0';
 	}
+
 	if (ImGui::BeginPopupModal("Create ActorImprint", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::InputText("Name", m_name, sizeof(m_name));
+
 		if (ImGui::Button("Create", ImVec2(120, 0)) && DispatchCreate(callbacks, m_name))
+		{
 			ImGui::CloseCurrentPopup();
+		}
+
 		ImGui::SameLine();
-		if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+
+		if (ImGui::Button("Cancel", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
 		ImGui::EndPopup();
 	}
 
@@ -112,26 +138,35 @@ void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& cal
 		ImGui::OpenPopup("Delete ActorImprint");
 		m_openDeletePopup = false;
 	}
+
 	if (ImGui::BeginPopupModal("Delete ActorImprint", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		const AssetEntry* entry = assets.GetAssetEntry(m_pendingDeleteGuid);
 		ImGui::Text("Delete '%s'?", entry ? entry->relativePath.c_str() : "Unknown");
 		ImGui::TextUnformatted("This action cannot be undone.");
+
 		if (ImGui::Button("Delete", ImVec2(120, 0)))
 		{
 			if (DispatchDelete(callbacks, m_pendingDeleteGuid))
 			{
-				if (m_selectedAssetGuid == m_pendingDeleteGuid) m_selectedAssetGuid = {};
+				if (m_selectedAssetGuid == m_pendingDeleteGuid)
+				{
+					m_selectedAssetGuid = {};
+				}
+
 				m_pendingDeleteGuid = {};
 				ImGui::CloseCurrentPopup();
 			}
 		}
+
 		ImGui::SameLine();
+
 		if (ImGui::Button("Cancel", ImVec2(120, 0)))
 		{
 			m_pendingDeleteGuid = {};
 			ImGui::CloseCurrentPopup();
 		}
+
 		ImGui::EndPopup();
 	}
 }

@@ -1,4 +1,5 @@
 #include "ActorImprintEditingSnapshot.h"
+#include "Engine/Core/Debug/Debug.h"
 
 #include "ActorImprintEditingObjectMap.h"
 #include "Engine/Actor/Actor.h"
@@ -22,33 +23,35 @@
 #include <unordered_map>
 
 std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::CreateDefault(
-	const AssetManager& assets, EngineContext& engineContext, nlohmann::json& outJson,
-	ActorImprintEditingSnapshotError* outError)
+	const AssetManager& assets,
+	EngineContext& engineContext,
+	nlohmann::json& outJson)
 {
-	if (outError) *outError = {};
-	auto fail = [&](std::string message) -> std::unique_ptr<const ActorImprint>
-	{
-		if (outError) *outError = { ActorImprintAssetErrorCode::InvalidObjectGraph,
-			InvalidLocalObjectId, {}, std::move(message) };
-		return nullptr;
-	};
 	if (engineContext.pAssetManager != &assets)
-		return fail("EngineContext does not own the supplied AssetManager.");
+	{
+		DBG("EngineContext does not own the supplied AssetManager.");
+		return nullptr;
+	}
 
 	auto scene = std::make_unique<SceneBase>();
 	scene->Initialize(engineContext);
-	Actor* root = scene->AddRootActor(ActorFactory::CreateEmptyActor(
-		Actor::InitDesc(true, TAG_NONE, "Root")));
+	Actor* root = scene->AddRootActor(ActorFactory::CreateEmptyActor(Actor::InitDesc(true, TAG_NONE, "Root")));
+
 	if (!root || !scene->EnableSingleRootClosedSubtreePolicy())
 	{
 		scene->Finalize();
-		return fail("Could not create the default single-root Working Scene.");
+		DBG("Could not create the default single-root Working Scene.");
+		return nullptr;
 	}
+
 	Transform* transform = root->GetComponentByClass<Transform>();
+
 	if (!transform)
 	{
 		scene->Finalize();
-		return fail("Default ActorImprint root is missing its required Transform.");
+		DBG("Default ActorImprint root is missing its required Transform.");
+		return nullptr;
+
 	}
 
 	ActorImprintDefinitionExpansion expansion;
@@ -56,52 +59,67 @@ std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::CreateDefault(
 	expansion.actorGuids.emplace(1, root->GetGuid());
 	expansion.components.emplace(2, transform);
 	ActorImprintEditingObjectMap objectMap;
+
 	if (!objectMap.Initialize(*scene, expansion, 3))
 	{
 		scene->Finalize();
-		return fail("Could not initialize default ActorImprint LocalObjectIDs.");
+		DBG("Could not initialize default ActorImprint LocalObjectIDs.");
+		return nullptr;
+
 	}
 
-	auto result = Capture(*scene, objectMap, assets, outJson, outError);
+	auto result = Capture(*scene, objectMap, assets, outJson);
 	scene->Finalize();
 	return result;
 }
 
 std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::Capture(
-	const SceneBase& scene, const ActorImprintEditingObjectMap& objectMap,
-	const AssetManager& assets, nlohmann::json& outJson,
-	ActorImprintEditingSnapshotError* outError)
+	const SceneBase& scene,
+	const ActorImprintEditingObjectMap& objectMap,
+	const AssetManager& assets,
+	nlohmann::json& outJson)
 {
-	if (outError) *outError = {};
-	auto fail = [&](ActorImprintAssetErrorCode code, LocalObjectId id,
-		std::string path, std::string message) -> std::unique_ptr<const ActorImprint>
-	{
-		if (outError) *outError = { code, id, std::move(path), std::move(message) };
-		return nullptr;
-	};
-
 	try
 	{
 		if (scene.GetStructurePolicy() != SceneStructurePolicy::SingleRootClosedSubtree ||
 			!scene.GetImprintInstances().GetInstances().empty())
-			return fail(ActorImprintAssetErrorCode::InvalidObjectGraph, 0, {},
-				"ActorImprint Working Scene policy or provenance is invalid.");
+		{
+			DBG("ActorImprint Working Scene policy or provenance is invalid.");
+			return nullptr;
+		}
+
 		const auto roots = scene.GetRootActors();
+
 		if (roots.size() != 1 || !roots.front() || roots.front()->IsDestroyed())
-			return fail(ActorImprintAssetErrorCode::InvalidObjectGraph, 0, {},
-				"ActorImprint Working Scene requires exactly one live root.");
+		{
+			DBG("ActorImprint Working Scene requires exactly one live root.");
+			return nullptr;
+		}
 
 		ActorImprintEditingObjectMap::Snapshot identities;
+
 		if (!objectMap.CaptureSnapshot(scene, identities))
-			return fail(ActorImprintAssetErrorCode::InvalidObjectGraph, 0, {},
-				"Working Scene and LocalObjectID map are inconsistent.");
+		{
+			DBG("Working Scene and LocalObjectID map are inconsistent.");
+			return nullptr;
+		}
+
 		const LocalObjectId rootId = objectMap.FindActor(roots.front()->GetGuid());
+
 		if (rootId == InvalidLocalObjectId)
-			return fail(ActorImprintAssetErrorCode::InvalidObjectGraph, 0, {}, "Root LocalObjectID is missing.");
+		{
+			DBG("Root LocalObjectID is missing.");
+			return nullptr;
+		}
 
 		ActorImprintReferenceCodec::ActorGuids actorGuids;
 		actorGuids.reserve(identities.actors.size());
-		for (const auto& actor : identities.actors) actorGuids.emplace(actor.id, actor.guid);
+
+		for (const auto& actor : identities.actors)
+		{
+			actorGuids.emplace(actor.id, actor.guid);
+		}
+
 		ActorImprintReferenceCodec actorCodec(std::move(actorGuids));
 		SceneActorReferenceContext actorContext(scene);
 		AssetReferenceCodec assetCodec;
@@ -114,73 +132,98 @@ std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::Capture(
 		};
 
 		std::unordered_map<Guid, std::vector<const ActorImprintEditingObjectMap::ComponentEntry*>> componentsByActor;
+
 		for (const auto& component : identities.components)
+		{
 			componentsByActor[component.actorGuid].push_back(&component);
+		}
 
 		nlohmann::json actors = nlohmann::json::array();
+
 		for (std::size_t i = 0; i < identities.actors.size(); ++i)
 		{
 			const auto& identity = identities.actors[i];
 			Actor* actor = scene.ResolveActor(identity.guid);
+
 			if (!actor || actor->IsDestroyed())
-				return fail(ActorImprintAssetErrorCode::InvalidObjectGraph, identity.id,
-					"/actors/" + std::to_string(i), "Mapped Actor is not live.");
+			{
+				DBG("Mapped Actor is not live.");
+				return nullptr;
+			}
 
 			nlohmann::json actorProperties;
-			ReflectionError reflectionError;
+
 			if (!ReflectionSerializer::Serialize(GetActorMetadata(), typeid(Actor), actor,
-				actorProperties, save, &reflectionError))
-				return fail(ActorImprintAssetErrorCode::InvalidProperty, identity.id,
-					"/actors/" + std::to_string(i) + "/properties" +
-					(reflectionError.path ? reflectionError.path->ToString() : std::string{}), reflectionError.message);
+					actorProperties, save))
+			{
+				return nullptr;
+			}
 
 			LocalObjectId parentId = InvalidLocalObjectId;
-			if (Actor* parent = actor->GetParent()) parentId = objectMap.FindActor(parent->GetGuid());
+
+			if (Actor* parent = actor->GetParent())
+			{
+				parentId = objectMap.FindActor(parent->GetGuid());
+			}
+
 			if (actor != roots.front() && parentId == InvalidLocalObjectId)
-				return fail(ActorImprintAssetErrorCode::InvalidObjectGraph, identity.id,
-					"/actors/" + std::to_string(i) + "/parentLocalObjectId", "Parent is outside the Working Scene map.");
+			{
+				DBG("Parent is outside the Working Scene map.");
+				return nullptr;
+			}
 
 			nlohmann::json components = nlohmann::json::array();
+
 			for (const auto* componentIdentity : componentsByActor[identity.guid])
 			{
 				const auto type = ComponentRegistry::Get().GetTypeId(componentIdentity->typeName);
-				Component* component = type
-					? actor->GetComponentByExactType(*type, componentIdentity->occurrenceIndex) : nullptr;
+				Component* component =
+					type ? actor->GetComponentByExactType(*type, componentIdentity->occurrenceIndex) : nullptr;
 				const TypeMetadata* metadata = type ? ComponentRegistry::Get().GetMetadata(*type) : nullptr;
+
 				if (!component || component->IsDestroyed() || !metadata)
-					return fail(ActorImprintAssetErrorCode::InvalidComponent, componentIdentity->id,
-						"/actors/" + std::to_string(i) + "/components", "Mapped Component is not live or registered.");
+				{
+					DBG("Mapped Component is not live or registered.");
+					return nullptr;
+				}
+
 				nlohmann::json properties;
-				ReflectionError componentError;
-				if (!ReflectionSerializer::Serialize(*metadata, *type, component, properties, save, &componentError))
-					return fail(ActorImprintAssetErrorCode::InvalidProperty, componentIdentity->id,
-						"/actors/" + std::to_string(i) + "/components/properties" +
-						(componentError.path ? componentError.path->ToString() : std::string{}), componentError.message);
+
+				if (!ReflectionSerializer::Serialize(*metadata, *type, component, properties, save))
+				{
+					return nullptr;
+				}
+
 				components.push_back({ { "localObjectId", componentIdentity->id },
 					{ "type", componentIdentity->typeName }, { "properties", std::move(properties) } });
 			}
 
-			actors.push_back({ { "localObjectId", identity.id },
-				{ "parentLocalObjectId", parentId == InvalidLocalObjectId ? nlohmann::json(nullptr) : nlohmann::json(parentId) },
-				{ "properties", std::move(actorProperties) }, { "components", std::move(components) } });
+			actors.push_back({{"localObjectId", identity.id},
+				{"parentLocalObjectId",
+					parentId == InvalidLocalObjectId ? nlohmann::json(nullptr) : nlohmann::json(parentId)},
+				{"properties", std::move(actorProperties)}, {"components", std::move(components)}});
 		}
 
 		nlohmann::json candidateJson{
-			{ "version", ActorImprint::SCHEMA_VERSION },
-			{ "definitionRevision", DefinitionRevision::Generate().ToString() },
-			{ "rootActorLocalObjectId", rootId },
-			{ "nextLocalObjectId", identities.nextLocalObjectId },
-			{ "actors", std::move(actors) },
+			{"version", ActorImprint::SCHEMA_VERSION},
+			{"definitionRevision", DefinitionRevision::Generate().ToString()},
+			{"rootActorLocalObjectId", rootId},
+			{"nextLocalObjectId", identities.nextLocalObjectId},
+			{"actors", std::move(actors)},
 		};
-		ActorImprintAssetError assetError;
-		auto candidate = ActorImprintAssetDeserializer::Deserialize(candidateJson, &assetContext, &assetError);
+		auto candidate = ActorImprintAssetDeserializer::Deserialize(candidateJson, &assetContext);
+
 		if (!candidate)
-			return fail(assetError.code, 0, std::move(assetError.path), std::move(assetError.message));
+		{
+			return nullptr;
+		}
+
 		outJson = ActorImprintAssetSerializer::Serialize(*candidate);
 		return candidate;
 	}
 	catch (const std::exception& error)
 	{
-		return fail(ActorImprintAssetErrorCode::InvalidProperty, 0, {}, error.what());
+		DBG("%s", error.what());
+		return nullptr;
 	}
 }

@@ -9,15 +9,18 @@ nlohmann::json ActorImprintAssetSerializer::Serialize(const ActorImprint& imprin
 	for (const auto& actor : imprint.GetActors())
 	{
 		json components = json::array();
+
 		for (const auto& component : actor.components)
 		{
-			components.push_back({ { "localObjectId", component.id }, { "type", component.typeName },
-				{ "properties", component.properties } });
+			components.push_back(
+				{{"localObjectId", component.id}, {"type", component.typeName}, {"properties", component.properties}});
 		}
-		actors.push_back({ { "localObjectId", actor.id },
-			{ "parentLocalObjectId", actor.parentId == 0 ? json(nullptr) : json(actor.parentId) },
-			{ "properties", actor.properties }, { "components", std::move(components) } });
+
+		actors.push_back({{"localObjectId", actor.id},
+			{"parentLocalObjectId", actor.parentId == 0 ? json(nullptr) : json(actor.parentId)},
+			{"properties", actor.properties}, {"components", std::move(components)}});
 	}
+
 	return { { "version", ActorImprint::SCHEMA_VERSION }, { "definitionRevision", imprint.GetRevision().ToString() },
 		{ "rootActorLocalObjectId", imprint.GetRootActorId() }, { "nextLocalObjectId", imprint.GetNextLocalObjectId() },
 		{ "actors", std::move(actors) } };

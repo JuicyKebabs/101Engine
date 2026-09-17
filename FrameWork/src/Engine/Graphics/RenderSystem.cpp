@@ -7,16 +7,28 @@
 
 bool RenderSystem::SetActiveSkyRenderer(SkyRenderer* renderer)
 {
-	if (!renderer || renderer->IsDestroyed()) return false;
+	if (!renderer || renderer->IsDestroyed())
+	{
+		return false;
+	}
+
 	Actor* owner = renderer->GetOwner();
-	if (!m_scene || !owner || owner->IsDestroyed() || owner->GetOwner() != m_scene) return false;
+
+	if (!m_scene || !owner || owner->IsDestroyed() || owner->GetOwner() != m_scene)
+	{
+		return false;
+	}
+
 	m_skyRenderer = renderer;
 	return true;
 }
 
 void RenderSystem::ClearActiveSkyRenderer(SkyRenderer* renderer)
 {
-	if (m_skyRenderer == renderer) m_skyRenderer = nullptr;
+	if (m_skyRenderer == renderer)
+	{
+		m_skyRenderer = nullptr;
+	}
 }
 
 void RenderSystem::Register(MeshRenderer* renderer)
@@ -48,7 +60,8 @@ void RenderSystem::Unregister(MeshRenderer* renderer)
 
 void RenderSystem::Unregister(SpriteRenderer* renderer)
 {
-	m_spriteRenderers.erase(std::remove(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer), m_spriteRenderers.end());
+	m_spriteRenderers.erase(
+		std::remove(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer), m_spriteRenderers.end());
 }
 
 void RenderSystem::Unregister(UIRenderer* renderer)
@@ -118,30 +131,29 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 
 	// Lamda funtion determine if a render item should be included 
 	// in the current render pass based on the view policy
-	const auto shouldIncludeRenderSpace =
-		[&viewPolicy, isCanvasView](const RendererComponent* renderer, RenderSpace renderSpace)
+	const auto shouldIncludeRenderSpace = [&viewPolicy, isCanvasView](
+											  const RendererComponent* renderer, RenderSpace renderSpace)
+	{
+		// In case of only rendering a elements in a subtree of given Canvas,
+		// check if the renderer is in the subtree of the given Canvas. If not, skip it.
+		if (isCanvasView)
 		{
-			// In case of only rendering a elements in a subtree of given Canvas,
-			// check if the renderer is in the subtree of the given Canvas. If not, skip it.
-			if (isCanvasView)
-			{
-				return viewPolicy.canvasViewRoot->ContainsRenderer(renderer);
-			}
+			return viewPolicy.canvasViewRoot->ContainsRenderer(renderer);
+		}
 
-			switch (viewPolicy.renderSpaceFilter)
-			{
-			case RenderSpaceFilter::WorldOnly:
-				return renderSpace == RenderSpace::World;
+		switch (viewPolicy.renderSpaceFilter)
+		{
+		case RenderSpaceFilter::WorldOnly:
+			return renderSpace == RenderSpace::World;
 
-			case RenderSpaceFilter::ScreenOnly:
-				return renderSpace == RenderSpace::Screen;
+		case RenderSpaceFilter::ScreenOnly:
+			return renderSpace == RenderSpace::Screen;
 
-			case RenderSpaceFilter::All:
-			default:
-				return true;
-			}
-		};
-
+		case RenderSpaceFilter::All:
+		default:
+			return true;
+		}
+	};
 
 	// Build draw packets for mesh renderers
 	for (const auto& renderer : m_meshRenderers)
@@ -156,13 +168,19 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 				auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
 
 				// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-				if (isCanvasView) item.common.worldMatrix *= worldToCanvas;
+				if (isCanvasView)
+				{
+					item.common.worldMatrix *= worldToCanvas;
+				}
 
 				RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
 				NormalizePSOKey(item.common.materialDesc.psoKey, queue);
 
 				// Skip render items that do not match the current render space filter
-				if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace)) continue;
+				if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
+				{
+					continue;
+				}
 
 				if (shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
 				{
@@ -218,14 +236,19 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
 
 			// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-			if (isCanvasView) item.common.worldMatrix *= worldToCanvas;
-
+			if (isCanvasView)
+			{
+				item.common.worldMatrix *= worldToCanvas;
+			}
 
 			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
 			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
 
 			// Skip render items that do not match the current render space filter
-			if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace)) continue;
+			if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
+			{
+				continue;
+			}
 
 			if (shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
 			{
@@ -283,7 +306,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 				auto item = CreateUIRenderItem(element, renderProxy);
 
 				// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-				if (isCanvasView) item.common.worldMatrix *= worldToCanvas;
+				if (isCanvasView)
+				{
+					item.common.worldMatrix *= worldToCanvas;
+				}
 
 				RenderItemRef ref;
 				ref.renderType = RenderType::UI;
@@ -291,7 +317,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 				PSOKey& psoKey = item.common.materialDesc.psoKey;
 
 				// Skip render items that do not match the current render space filter
-				if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace)) continue;
+				if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
+				{
+					continue;
+				}
 
 				if (!shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
 				{// World-space UI elements
@@ -300,7 +329,10 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 
 					// UI in world -space have to be as a transparent object, 
 					// so if the depth is disabled, we need to set it to TestNoWrite
-					if (psoKey.depth == DepthMode::Disable) psoKey.depth = DepthMode::TestNoWrite;
+					if (psoKey.depth == DepthMode::Disable)
+					{
+						psoKey.depth = DepthMode::TestNoWrite;
+					}
 
 					NormalizePSOKey(psoKey, queue);
 
@@ -344,21 +376,27 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 	SortScreenSpace();	// Sort screen-space draw packets (e.g., UI)
 }
 
-MeshRenderItem RenderSystem::CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy)
+MeshRenderItem RenderSystem::CreateMeshRenderItem(
+	const SubmeshRenderTemplate& renderTemplate,
+	const MeshRendererProxy& renderProxy)
 {
 	MeshRenderItem item;
 	item.meshDesc = renderTemplate.meshDesc;
 	item.common.materialDesc = renderTemplate.materialDesc;
+
 	if (renderProxy.textureOverrideHandle != InvalidTextureHandle)
 	{
 		item.common.materialDesc.textureHandle = renderProxy.textureOverrideHandle;
 	}
+
 	item.common.worldMatrix = renderProxy.common.worldMatrix;
 	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
 	return item;
 }
 
-SpriteRenderItem RenderSystem::CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy)
+SpriteRenderItem RenderSystem::CreateSpriteRenderItem(
+	const SpriteRenderTemplate& renderTemplate,
+	const SpriteRendererProxy& renderProxy)
 {
 	SpriteRenderItem item;
 	item.common.materialDesc = renderTemplate.materialDesc;
@@ -449,8 +487,8 @@ void RenderSystem::NormalizePSOKey(PSOKey& psoKey, RenderQueue queue)
 		psoKey.depth = DepthMode::TestNoWrite;
 	}
 
-	const uint64_t multiplyAlphaControl =
-		static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll);
+	const uint64_t multiplyAlphaControl = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll);
+
 	if (psoKey.blend == BlendMode::Multiply)
 	{
 		psoKey.psKey.defines |= multiplyAlphaControl;

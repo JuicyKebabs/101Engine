@@ -140,6 +140,7 @@ void AssimpLoader::LoadMesh(
 		{
 			uv->x = 1 - uv->x;
 		}
+
 		if (inverseV)
 		{
 			uv->y = 1 - uv->y;

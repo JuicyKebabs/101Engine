@@ -25,14 +25,24 @@ void SceneAssetPanel::Render(
 	if (ImGui::Begin("Scenes"))
 	{
 		const auto entries = GetVisibleEntries(assets);
+
 		for (const AssetEntry& entry : entries)
 		{
 			ImGui::PushID(entry.guid.ToString().c_str());
 			const bool isStartup = entry.guid == editorStartupSceneGuid;
 			const std::string label = std::string(isStartup ? "* " : "  ") + entry.relativePath;
-			if (ImGui::Selectable(label.c_str(), entry.guid == m_selectedGuid)) m_selectedGuid = entry.guid;
-			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.canModify && callbacks.onOpen)
+
+			if (ImGui::Selectable(label.c_str(), entry.guid == m_selectedGuid))
+			{
+				m_selectedGuid = entry.guid;
+			}
+
+			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && callbacks.canModify &&
+				callbacks.onOpen)
+			{
 				callbacks.onOpen(entry.guid);
+			}
+
 			if (ImGui::BeginPopupContextItem("SceneItemContext"))
 			{
 				if (ImGui::MenuItem("Open", nullptr, false, callbacks.canModify) && callbacks.onOpen)
@@ -62,6 +72,7 @@ void SceneAssetPanel::Render(
 
 				ImGui::EndPopup();
 			}
+
 			ImGui::PopID();
 		}
 
@@ -73,17 +84,23 @@ void SceneAssetPanel::Render(
 		if (ImGui::BeginPopupContextWindow("ScenesEmptyContext",
 			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
-			if (ImGui::MenuItem("Create Scene...", nullptr, false, callbacks.canModify)) m_openCreatePopup = true;
+			if (ImGui::MenuItem("Create Scene...", nullptr, false, callbacks.canModify))
+			{
+				m_openCreatePopup = true;
+			}
+
 			{
 				ImGui::EndPopup();
 			}
 		}
+
 		if (!m_diagnostic.empty())
 		{
 			ImGui::Separator();
 			ImGui::TextWrapped("%s", m_diagnostic.c_str());
 		}
 	}
+
 	ImGui::End();
 
 	if (m_openCreatePopup)
@@ -92,18 +109,23 @@ void SceneAssetPanel::Render(
 		m_openCreatePopup = false;
 		m_name[0] = '\0';
 	}
+
 	if (ImGui::BeginPopupModal("Create Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::InputText("Name", m_name, sizeof(m_name));
 
-		if (ImGui::Button("Create", ImVec2(120, 0)) && callbacks.onCreate && callbacks.canModify && callbacks.onCreate(m_name))
-			{
-				ImGui::CloseCurrentPopup();
-			}
+		if (ImGui::Button("Create", ImVec2(120, 0)) && callbacks.onCreate && callbacks.canModify &&
+			callbacks.onCreate(m_name))
+		{
+			ImGui::CloseCurrentPopup();
+		}
 
 		ImGui::SameLine();
 
-		if (ImGui::Button("Cancel", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+		if (ImGui::Button("Cancel", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
 
 		ImGui::EndPopup();
 	}

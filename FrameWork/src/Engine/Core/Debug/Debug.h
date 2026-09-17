@@ -14,11 +14,12 @@ static void DBG(const char* fmt, ...)
 	va_end(args);
 
 	size_t len = strlen(buf);
+
 	if (len > 0 && buf[len - 1] != '\n' && len < sizeof(buf) - 1)
 	{
 		buf[len] = '\n';
 		buf[len + 1] = '\0';
-
 	}
+
 	OutputDebugStringA(buf);
 }

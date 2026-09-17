@@ -1,4 +1,4 @@
-#include "Engine/Audio/Audio.h"
+#include "Engine/Audio/AudioManager.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Resource/AssetManager.h"
 #include "Engine/Resource/AssetManagerAssetReferenceContext.h"
@@ -67,16 +67,20 @@ namespace
 			"Audio pilot: catalog initializes without a runtime AudioManager");
 		const AssetEntry* player = assets.GetAssetEntryByPath("Player/hit.wav");
 		const AssetEntry* enemy = assets.GetAssetEntryByPath("Enemy/hit.WAV");
-		Check(player && enemy && player->type == AssetType::Audio && enemy->type == AssetType::Audio,
+		Check(player &&
+			enemy &&
+			player->type == AssetType::Audio &&
+			enemy->type == AssetType::Audio,
 			"WAV discovery is case-insensitive and distinguishes equal filenames by relative path");
 		if (!player || !enemy) return;
 
-		Check(player->guid != enemy->guid && assets.GetAssetEntries(AssetType::Audio).size() == 2,
+		Check(player->guid != enemy->guid &&
+			assets.GetAssetEntries(AssetType::Audio).size() == 2,
 			"Each discovered Audio asset has a distinct catalog identity");
 		AssetManagerAssetReferenceContext context(assets);
-		Check(context.Resolve(player->guid, AssetType::Audio) == AssetReferenceCodecResult::Success,
+		Check(context.Resolve(player->guid, AssetType::Audio) == true,
 			"Typed Audio references resolve through the existing catalog boundary");
-		Check(context.Resolve(player->guid, AssetType::Texture) == AssetReferenceCodecResult::AssetTypeMismatch,
+		Check(context.Resolve(player->guid, AssetType::Texture) == false,
 			"Audio references reject a different expected asset type");
 		Check(assets.GetAudioHandle(player->guid) == InvalidAudioHandle &&
 			assets.GetAudioHandleByPath("Player/../Player/hit.wav") == InvalidAudioHandle,
@@ -121,17 +125,23 @@ namespace
 		const Guid guid = entry ? entry->guid : Guid{};
 		const AudioHandle first = assets.GetAudioHandle(guid);
 		const AudioHandle repeated = assets.GetAudioHandleByPath("Player/silence.wav");
-		Check(first != InvalidAudioHandle && repeated == first && audio.IsLoaded(first),
+		Check(first != InvalidAudioHandle &&
+			repeated == first &&
+			audio.IsLoaded(first),
 			"GUID and relative-path lookup share one lazily loaded AudioHandle");
-		Check(audio.Play(first) && audio.Stop(first) && audio.Unload(first),
+		Check(audio.Play(first) &&
+			audio.Stop(first) &&
+			audio.Unload(first),
 			"Valid AudioHandle operations enter the existing command pipeline");
 		audio.Update();
 		Check(!audio.IsLoaded(first), "Unload releases the runtime AudioHandle");
 		const AudioHandle reloaded = assets.GetAudioHandle(guid);
-		Check(reloaded != InvalidAudioHandle && audio.IsLoaded(reloaded),
+		Check(reloaded != InvalidAudioHandle &&
+			audio.IsLoaded(reloaded),
 			"AssetManager detects an unloaded cached handle and reloads the asset");
 		fs::remove(fixture.root / "Player/silence.wav");
-		Check(assets.Refresh() && assets.GetAudioHandle(guid) == InvalidAudioHandle,
+		Check(assets.Refresh() &&
+			assets.GetAudioHandle(guid) == InvalidAudioHandle,
 			"A removed catalog identity cannot resolve through a stale handle cache");
 		audio.Terminate();
 	}

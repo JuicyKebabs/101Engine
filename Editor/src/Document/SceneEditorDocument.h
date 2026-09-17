@@ -8,8 +8,12 @@
 class SceneEditorDocument final : public IEditorDocument
 {
 public:
-	SceneEditorDocument(std::unique_ptr<SceneBase> scene, std::string filePath,
-		uint32_t viewportWidth, uint32_t viewportHeight, Guid sourceAssetGuid = {});
+	SceneEditorDocument(
+		std::unique_ptr<SceneBase> scene,
+		std::string filePath,
+		uint32_t viewportWidth,
+		uint32_t viewportHeight,
+		Guid sourceAssetGuid = {});
 	~SceneEditorDocument() override;
 
 	SceneBase* GetWorkingScene() override { return m_scene.get(); }
@@ -20,8 +24,11 @@ public:
 	std::string_view GetDisplayName() const override { return m_displayName; }
 	Guid GetSourceAssetGuid() const override { return m_sourceAssetGuid; }
 
-	void ReplaceScene(std::unique_ptr<SceneBase> scene, std::string filePath,
-		bool markDirty = false, Guid sourceAssetGuid = {});
+	void ReplaceScene(
+		std::unique_ptr<SceneBase> scene,
+		std::string filePath,
+		bool markDirty = false,
+		Guid sourceAssetGuid = {});
 	bool UpdateAssetPath(const Guid& expectedGuid, std::string filePath);
 	void ReleaseScene();
 	const std::string& GetFilePath() const { return m_filePath; }

@@ -6,16 +6,16 @@ class ActorImprintInstanceRecordReader
 {
 public:
 	// On failure, outRecord is unchanged.
-	static bool Read(const nlohmann::json& source,
-		ActorImprintSerializedInstanceRecord& outRecord,
-		ActorImprintInstanceRecordError* outError = nullptr);
+	static bool Read(
+		const nlohmann::json& source,
+		ActorImprintSerializedInstanceRecord& outRecord);
 };
 
 class ActorImprintInstanceRecordWriter
 {
 public:
 	// On failure, outJson is unchanged.
-	static bool Write(const ActorImprintSerializedInstanceRecord& record,
-		nlohmann::json& outJson,
-		ActorImprintInstanceRecordError* outError = nullptr);
+	static bool Write(
+		const ActorImprintSerializedInstanceRecord& record,
+		nlohmann::json& outJson);
 };

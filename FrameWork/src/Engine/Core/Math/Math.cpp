@@ -72,6 +72,7 @@ Vector2 Vector2::Abs() const
 Vector2 Vector2::Normalized() const
 {
     float length = sqrtf(x * x + y * y);
+
     if (length > 0.0f)
     {
         return Vector2(x / length, y / length);
@@ -129,6 +130,7 @@ Vector2& Vector2::operator=(const Vector2& rhs)
         x = rhs.x;
         y = rhs.y;
     }
+
     return *this;
 }
 
@@ -208,8 +210,9 @@ Vector2& Vector2::operator/=(float scalar)
 		assert(scalar != 0.0f && "Division by zero in Vector2::operator/=.");
 #endif // _DEBUG
 		x = 0.0f;
-		y = 0.0f;
+        y = 0.0f;
     }
+
     return *this;
 }
 
@@ -298,6 +301,7 @@ Vector3 Vector3::Abs() const
 Vector3 Vector3::Normalized() const
 {
     float length = sqrtf(x * x + y * y + z * z);
+
     if (length > 0.0f)
     {
         return Vector3(x / length, y / length, z / length);
@@ -332,6 +336,7 @@ Vector3 Vector3::Refract(const Vector3& normal, float eta) const
     float cosi = std::clamp(Dot(normal), -1.0f, 1.0f);
     float etai = 1.0f, etat = eta;
     Vector3 n = normal;
+
     if (cosi < 0)
     {
         cosi = -cosi;
@@ -341,8 +346,10 @@ Vector3 Vector3::Refract(const Vector3& normal, float eta) const
         std::swap(etai, etat);
         n = -normal;
     }
+
     float etaRatio = etai / etat;
     float k = 1.0f - etaRatio * etaRatio * (1.0f - cosi * cosi);
+
     if (k < 0.0f)
     {
         return Vector3(0.0f, 0.0f, 0.0f); // Total internal reflection
@@ -362,6 +369,7 @@ Vector3 Vector3::Project(const Vector3& onto) const
 {
     float dotProduct = Dot(onto);
     float ontoLengthSq = onto.LengthSq();
+
     if (ontoLengthSq > 0.0f)
     {
         return onto * (dotProduct / ontoLengthSq);
@@ -381,6 +389,7 @@ float Vector3::Angle(const Vector3& other) const
 {
     float dotProduct = Dot(other);
     float lengthsProduct = Length() * other.Length();
+
     if (lengthsProduct > 0.0f)
     {
         float cosine = std::clamp(dotProduct / lengthsProduct, -1.0f, 1.0f);
@@ -447,6 +456,7 @@ Vector3& Vector3::operator=(const Vector3& rhs)
         y = rhs.y;
         z = rhs.z;
     }
+
     return *this;
 }
 
@@ -531,8 +541,9 @@ Vector3 & Vector3::operator/=(float scalar)
 #endif // _DEBUG
 		x = 0.0f;
 		y = 0.0f;
-		z = 0.0f;
+        z = 0.0f;
     }
+
     return *this;
 }
 
@@ -622,6 +633,7 @@ Vector4 Vector4::Abs() const
 Vector4 Vector4::Normalized() const
 {
     float length = sqrtf(x * x + y * y + z * z + w * w);
+
     if (length > 0.0f)
     {
         return Vector4(x / length, y / length, z / length, w / length);
@@ -639,7 +651,8 @@ float Vector4::Dot(const Vector4& other) const
 
 bool Vector4::NearEqual(const Vector4& other, float epsilon) const
 {
-    return (std::fabs(x - other.x) <= epsilon) && (std::fabs(y - other.y) <= epsilon) && (std::fabs(z - other.z) <= epsilon) && (std::fabs(w - other.w) <= epsilon);
+    return (std::fabs(x - other.x) <= epsilon) && (std::fabs(y - other.y) <= epsilon) &&
+           (std::fabs(z - other.z) <= epsilon) && (std::fabs(w - other.w) <= epsilon);
 }
 
 float Vector4::Distance(const Vector4& a, const Vector4& b)
@@ -681,6 +694,7 @@ Vector4& Vector4::operator=(const Vector4& rhs)
         z = rhs.z;
         w = rhs.w;
     }
+
     return *this;
 }
 
@@ -775,8 +789,9 @@ Vector4& Vector4::operator/=(float scalar)
 		x = 0.0f;
 		y = 0.0f;
 		z = 0.0f;
-		w = 0.0f;
+        w = 0.0f;
     }
+
     return *this;
 }
 
@@ -796,6 +811,7 @@ float Quaternion::LengthSq() const
 Quaternion Quaternion::Normalized() const
 {
     float length = sqrtf(x * x + y * y + z * z + w * w);
+
     if (length > 0.0f)
     {
         return Quaternion(x / length, y / length, z / length, w / length);
@@ -869,6 +885,7 @@ Quaternion Quaternion::Lerp(const Quaternion& target, float t) const
     t = std::clamp(t, 0.0f, 1.0f);
 
     Quaternion to = target;
+
     if (Dot(target) < 0.0f) {
 		to = Quaternion(-target.x, -target.y, -target.z, -target.w);
     }
@@ -886,6 +903,7 @@ Quaternion Quaternion::Slerp(const Quaternion& target, float t) const
     t = std::clamp(t, 0.0f, 1.0f);
 
     Quaternion to = target;
+
     if (Dot(target) < 0.0f) {
         to = Quaternion(-target.x, -target.y, -target.z, -target.w);
     }
@@ -899,7 +917,8 @@ Quaternion Quaternion::Slerp(const Quaternion& target, float t) const
 
 bool Quaternion::NearEqual(const Quaternion& other, float epsilon) const
 {
-	return (std::fabs(x - other.x) <= epsilon) && (std::fabs(y - other.y) <= epsilon) && (std::fabs(z - other.z) <= epsilon) && (std::fabs(w - other.w) <= epsilon);
+    return (std::fabs(x - other.x) <= epsilon) && (std::fabs(y - other.y) <= epsilon) &&
+           (std::fabs(z - other.z) <= epsilon) && (std::fabs(w - other.w) <= epsilon);
 }
 
 Quaternion Quaternion::CreateFromAxisAngle(const Vector3& axis, float angleRad)
@@ -986,8 +1005,12 @@ Quaternion Quaternion::FromToRotation(const Vector3& from, const Vector3& to)
     {
         // 180 degree rotation around any orthogonal vector
         rotationAxis = Vector3(0.0f, 0.0f, 1.0f).Cross(f);
+
         if (rotationAxis.Length() < 0.01f) // If collinear, try another axis
+        {
             rotationAxis = Vector3(1.0f, 0.0f, 0.0f).Cross(f);
+        }
+
         rotationAxis = rotationAxis.Normalized();
         return CreateFromAxisAngle(rotationAxis, PI);
     }
@@ -1017,9 +1040,12 @@ Quaternion Quaternion::LookRotation(const Vector3& forward, const Vector3& up)
     if(r.Length() < 0.001f) // If forward and up are parallel, choose an arbitrary right vector
     {
         r = Vector3(0.0f, 0.0f, 1.0f).Cross(f).Normalized();
+
         if (r.Length() < 0.001f) // If still parallel, try another axis
+        {
             r = Vector3(1.0f, 0.0f, 0.0f).Cross(f).Normalized();
-	}
+        }
+    }
 
     Vector3 u = f.Cross(r);
     float trace = r.x + u.y + f.z;
@@ -1083,6 +1109,7 @@ Quaternion& Quaternion::operator=(const Quaternion& rhs)
         z = rhs.z;
         w = rhs.w;
     }
+
     return *this;
 }
 
@@ -1137,11 +1164,13 @@ Vector3 Matrix4x4::GetTranslation() const
 Quaternion Matrix4x4::GetRotation() const
 {
     XMVECTOR scale, rotQuat, translation;
+
     if (XMMatrixDecompose(&scale, &rotQuat, &translation, *this))
     {
         return Quaternion(rotQuat);
     }
-	return Quaternion::Identity();
+
+    return Quaternion::Identity();
 }
 
 Vector3 Matrix4x4::GetScale() const
@@ -1152,6 +1181,7 @@ Vector3 Matrix4x4::GetScale() const
 bool Matrix4x4::Decompose(Vector3& outTranslation, Quaternion& outRotation, Vector3& outScale) const
 {
     XMVECTOR scale, rotQuat, translation;
+
     if (XMMatrixDecompose(&scale, &rotQuat, &translation, *this))
     {
         outTranslation = Vector3(translation);
@@ -1159,7 +1189,8 @@ bool Matrix4x4::Decompose(Vector3& outTranslation, Quaternion& outRotation, Vect
         outScale = Vector3(scale);
         return true;
     }
-	return false;
+
+    return false;
 }
 
 Vector3 Matrix4x4::TransformPoint(const Vector3& point) const
@@ -1192,6 +1223,7 @@ Matrix4x4 Matrix4x4::ToBillboard(const Vector3& cameraPos, const Vector3& camera
     Vector3 objectPos(_41, _42, _43);
 
     Vector3 view = cameraPos - objectPos;
+
     if (view.LengthSq() <= kEpsilon)
     {
         return *this;
@@ -1199,18 +1231,28 @@ Matrix4x4 Matrix4x4::ToBillboard(const Vector3& cameraPos, const Vector3& camera
 
     Vector3 forward = view.Normalized();
     Vector3 right = cameraUp.Cross(forward);
+
     if (right.LengthSq() <= kEpsilon)
     {
         right = Vector3::Right();
     }
+
     right = right.Normalized();
     Vector3 up = forward.Cross(right).Normalized();
 
     Matrix4x4 result = Matrix4x4::Identity();
-    result._11 = right.x * sx;  result._12 = right.y * sx;  result._13 = right.z * sx;
-    result._21 = up.x * sy;  result._22 = up.y * sy;  result._23 = up.z * sy;
-    result._31 = forward.x * sz;  result._32 = forward.y * sz;  result._33 = forward.z * sz;
-    result._41 = objectPos.x;     result._42 = objectPos.y;     result._43 = objectPos.z;
+    result._11 = right.x * sx;
+    result._12 = right.y * sx;
+    result._13 = right.z * sx;
+    result._21 = up.x * sy;
+    result._22 = up.y * sy;
+    result._23 = up.z * sy;
+    result._31 = forward.x * sz;
+    result._32 = forward.y * sz;
+    result._33 = forward.z * sz;
+    result._41 = objectPos.x;
+    result._42 = objectPos.y;
+    result._43 = objectPos.z;
     return result;
 }
 
@@ -1224,24 +1266,48 @@ Matrix4x4 Matrix4x4::ToCylindricalBillboard(const Vector3& cameraPos, const Vect
     Vector3 objectPos(_41, _42, _43);
 
     Vector3 view = cameraPos - objectPos;
-    if (view.LengthSq() <= kEpsilon) return *this;
+
+    if (view.LengthSq() <= kEpsilon)
+    {
+        return *this;
+    }
 
     Vector3 up = Vector3::Up();
 
     Vector3 planar = view.Reject(up);
-    if (planar.LengthSq() <= kEpsilon) planar = cameraUp.Reject(up);
-    if (planar.LengthSq() <= kEpsilon) planar = Vector3::Forward().Reject(up);
-    if (planar.LengthSq() <= kEpsilon) planar = Vector3::Right().Reject(up);
+
+    if (planar.LengthSq() <= kEpsilon)
+    {
+        planar = cameraUp.Reject(up);
+    }
+
+    if (planar.LengthSq() <= kEpsilon)
+    {
+        planar = Vector3::Forward().Reject(up);
+    }
+
+    if (planar.LengthSq() <= kEpsilon)
+    {
+        planar = Vector3::Right().Reject(up);
+    }
 
     Vector3 forward = planar.Normalized();
     Vector3 right = up.Cross(forward).Normalized();
     forward = right.Cross(up).Normalized();
 
     Matrix4x4 result = Matrix4x4::Identity();
-    result._11 = right.x * sx;  result._12 = right.y * sx;  result._13 = right.z * sx;
-    result._21 = up.x * sy;  result._22 = up.y * sy;  result._23 = up.z * sy;
-    result._31 = forward.x * sz;  result._32 = forward.y * sz;  result._33 = forward.z * sz;
-    result._41 = objectPos.x;     result._42 = objectPos.y;     result._43 = objectPos.z;
+    result._11 = right.x * sx;
+    result._12 = right.y * sx;
+    result._13 = right.z * sx;
+    result._21 = up.x * sy;
+    result._22 = up.y * sy;
+    result._23 = up.z * sy;
+    result._31 = forward.x * sz;
+    result._32 = forward.y * sz;
+    result._33 = forward.z * sz;
+    result._41 = objectPos.x;
+    result._42 = objectPos.y;
+    result._43 = objectPos.z;
     return result;
 }
 
@@ -1318,12 +1384,25 @@ Matrix4x4& Matrix4x4::operator=(const Matrix4x4& rhs)
 {
     if (this != &rhs)
     {
-        _11 = rhs._11; _12 = rhs._12; _13 = rhs._13; _14 = rhs._14;
-        _21 = rhs._21; _22 = rhs._22; _23 = rhs._23; _24 = rhs._24;
-        _31 = rhs._31; _32 = rhs._32; _33 = rhs._33; _34 = rhs._34;
-        _41 = rhs._41; _42 = rhs._42; _43 = rhs._43; _44 = rhs._44;
+        _11 = rhs._11;
+        _12 = rhs._12;
+        _13 = rhs._13;
+        _14 = rhs._14;
+        _21 = rhs._21;
+        _22 = rhs._22;
+        _23 = rhs._23;
+        _24 = rhs._24;
+        _31 = rhs._31;
+        _32 = rhs._32;
+        _33 = rhs._33;
+        _34 = rhs._34;
+        _41 = rhs._41;
+        _42 = rhs._42;
+        _43 = rhs._43;
+        _44 = rhs._44;
     }
-	return *this;
+
+    return *this;
 }
 
 Matrix4x4 Matrix4x4::operator*(const Matrix4x4& rhs) const

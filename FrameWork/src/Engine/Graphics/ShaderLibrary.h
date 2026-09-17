@@ -123,24 +123,35 @@ public:
     ShaderLibrary();
     ~ShaderLibrary() { m_shaderCache.clear(); };
 
-	// Get vertex/pixel shader
-    Microsoft::WRL::ComPtr<ID3DBlob> GetVS(VS_FILE_ID shaderID, VS_ENTRY_ID entryID, uint64_t stageDefines = 0, uint64_t commonDefines = 0);
-    Microsoft::WRL::ComPtr<ID3DBlob> GetPS(PS_FILE_ID shaderID, PS_ENTRY_ID entryID, uint64_t stageDefines = 0, uint64_t commonDefines = 0);
+    // Get vertex/pixel shader
+    Microsoft::WRL::ComPtr<ID3DBlob> GetVS(
+    	VS_FILE_ID shaderID,
+    	VS_ENTRY_ID entryID,
+    	uint64_t stageDefines = 0,
+    	uint64_t commonDefines = 0);
+    Microsoft::WRL::ComPtr<ID3DBlob> GetPS(
+    	PS_FILE_ID shaderID,
+    	PS_ENTRY_ID entryID,
+    	uint64_t stageDefines = 0,
+    	uint64_t commonDefines = 0);
 
 private:
     std::unordered_map<ShaderKey, Microsoft::WRL::ComPtr<ID3DBlob>, ShaderKeyHash> m_shaderCache{};
 
 private:
-	// Get or compile shader
-    Microsoft::WRL::ComPtr<ID3DBlob> GetOrCompileShader(SHADER_STAGE stage, const ShaderDesc& desc, uint64_t stageDefines, uint64_t commonDefines);
+    // Get or compile shader
+    Microsoft::WRL::ComPtr<ID3DBlob> GetOrCompileShader(
+    	SHADER_STAGE stage,
+    	const ShaderDesc& desc,
+    	uint64_t stageDefines,
+    	uint64_t commonDefines);
 
     static std::vector<D3D_SHADER_MACRO> BuildMacros(SHADER_STAGE stage, uint64_t stageDefines, uint64_t commonDefines);
     static void AppendMacros(
-        std::vector<D3D_SHADER_MACRO>& out,
-        uint64_t defines,
-        const MacroDefinition* table,
-        size_t count
-    );
+    	std::vector<D3D_SHADER_MACRO>& out,
+    	uint64_t defines,
+    	const MacroDefinition* table,
+    	size_t count);
 
-    static std::wstring ResolveShaderPath(const  std::wstring& relativePath);
+    static std::wstring ResolveShaderPath(const std::wstring& relativePath);
 };

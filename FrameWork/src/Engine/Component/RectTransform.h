@@ -3,7 +3,6 @@
 
 class Actor;
 
-
 // Anchor modes enumeration
 enum class AnchorMode
 {
@@ -45,10 +44,26 @@ public:
 	void UpdateGeometry() override;	// Update the geometry of the RectTransform based on its properties (anchored position, pivot, size delta)
 
 	// Setters
-	void SetAnchorMode(AnchorMode mode) { m_anchorMode = mode; MarkDirty(); }											// Set the anchor mode and mark as dirty
-	void SetAnchoredPosition(const Vector2& anchoredPosition) { m_anchoredPosition = anchoredPosition; MarkDirty(); }	// Set the anchored position and mark as dirty
-	void SetPivot(const Vector2& pivot) { m_pivot = pivot; MarkDirty(); }												// Set the pivot and mark as dirty
-	void SetSizeDelta(const Vector2& sizeDelta) { m_size = sizeDelta; MarkDirty(); }									// Set the size delta and mark as dirty
+	void SetAnchorMode(AnchorMode mode)
+	{
+		m_anchorMode = mode;
+		MarkDirty();
+	} // Set the anchor mode and mark as dirty
+	void SetAnchoredPosition(const Vector2& anchoredPosition)
+	{
+		m_anchoredPosition = anchoredPosition;
+		MarkDirty();
+	} // Set the anchored position and mark as dirty
+	void SetPivot(const Vector2& pivot)
+	{
+		m_pivot = pivot;
+		MarkDirty();
+	} // Set the pivot and mark as dirty
+	void SetSizeDelta(const Vector2& sizeDelta)
+	{
+		m_size = sizeDelta;
+		MarkDirty();
+	} // Set the size delta and mark as dirty
 
 	// Getters
 	AnchorMode GetAnchorMode() const { return m_anchorMode; }					// Get the anchor mode

@@ -195,9 +195,16 @@ bool Window::ApplyPendingModeChange()
 		return true;
 	}
 
-	const bool succeeded = requestedMode == Mode::BorderlessFullscreen
-		? EnterBorderlessFullscreen()
-		: ExitBorderlessFullscreen();
+	bool succeeded;
+
+	if (requestedMode == Mode::BorderlessFullscreen)
+	{
+		succeeded = EnterBorderlessFullscreen();
+	}
+	else
+	{
+		succeeded = ExitBorderlessFullscreen();
+	}
 
 	if (succeeded)
 	{
@@ -268,6 +275,7 @@ LRESULT Window::HandleMessage(
 			m_isMinimized = false;
 			RequestResize(LOWORD(lParam), HIWORD(lParam));
 		}
+
 		handled = true;
 		break;
 
@@ -289,8 +297,10 @@ LRESULT Window::HandleMessage(
 				// Request a toggle between windowed and borderless fullscreen mode
 				RequestToggleFullscreen();
 			}
+
 			handled = true;
 		}
+
 		break;
 	}
 	}
@@ -298,6 +308,7 @@ LRESULT Window::HandleMessage(
 	if (m_messageCallback)
 	{
 		LRESULT callbackResult = 0;
+
 		if (m_messageCallback(m_hwnd, message, wParam, lParam, callbackResult))
 		{
 			return callbackResult;
@@ -331,7 +342,8 @@ bool Window::EnterBorderlessFullscreen()
 		return false;
 	}
 
-	WINDOWPLACEMENT placement{ sizeof(WINDOWPLACEMENT) };
+	WINDOWPLACEMENT placement{sizeof(WINDOWPLACEMENT)};
+
 	if (!GetWindowPlacement(m_hwnd, &placement))
 	{
 		DBG("Window::EnterBorderlessFullscreen: Failed to get window placement. Error: %lu", GetLastError());
@@ -339,6 +351,7 @@ bool Window::EnterBorderlessFullscreen()
 	}
 
 	LONG_PTR currentStyle = 0;
+
 	if (!TryGetWindowStyle(currentStyle))
 	{
 		return false;
@@ -363,6 +376,7 @@ bool Window::EnterBorderlessFullscreen()
 
 	SetLastError(ERROR_SUCCESS);
 	const LONG_PTR previousStyle = SetWindowLongPtrW(m_hwnd, GWL_STYLE, fullscreenStyle);
+
 	if (previousStyle == 0 && GetLastError() != ERROR_SUCCESS)
 	{
 		DBG("Window::EnterBorderlessFullscreen: Failed to set window style. Error: %lu", GetLastError());
@@ -371,6 +385,7 @@ bool Window::EnterBorderlessFullscreen()
 	}
 
 	const RECT& monitorRect = monitorInfo.rcMonitor;
+
 	if (!SetWindowPos(
 		m_hwnd,
 		HWND_TOP,
@@ -400,6 +415,7 @@ bool Window::ExitBorderlessFullscreen()
 	}
 
 	LONG_PTR fullscreenStyle = 0;
+
 	if (!TryGetWindowStyle(fullscreenStyle))
 	{
 		return false;
@@ -407,6 +423,7 @@ bool Window::ExitBorderlessFullscreen()
 
 	SetLastError(ERROR_SUCCESS);
 	const LONG_PTR previousStyle = SetWindowLongPtrW(m_hwnd, GWL_STYLE, m_windowedStyle);
+
 	if (previousStyle == 0 && GetLastError() != ERROR_SUCCESS)
 	{
 		DBG("Window::ExitBorderlessFullscreen: Failed to restore window style. Error: %lu", GetLastError());

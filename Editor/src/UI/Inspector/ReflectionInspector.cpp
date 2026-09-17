@@ -1,4 +1,5 @@
 #include "ReflectionInspector.h"
+#include "Engine/Core/Debug/Debug.h"
 
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
@@ -17,8 +18,20 @@ namespace
 
 	struct DisabledScope
 	{
-		explicit DisabledScope(bool disabled) : active(disabled) { if (active) ImGui::BeginDisabled(); }
-		~DisabledScope() { if (active) ImGui::EndDisabled(); }
+		explicit DisabledScope(bool disabled) : active(disabled)
+		{
+			if (active)
+			{
+				ImGui::BeginDisabled();
+			}
+		}
+		~DisabledScope()
+		{
+			if (active)
+			{
+				ImGui::EndDisabled();
+			}
+		}
 		bool active;
 	};
 
@@ -38,7 +51,10 @@ namespace
 
 	float ConvertUnit(float value, NumericUnit source, NumericUnit destination)
 	{
-		if (source == destination) return value;
+		if (source == destination)
+		{
+			return value;
+		}
 
 		if (source == NumericUnit::Radians && destination == NumericUnit::Degrees)
 		{
@@ -68,14 +84,25 @@ namespace
 			storedValue, numeric.storageUnit, numeric.displayUnit);
 
 		float minimum = 0.0f;
-		if (numeric.minimum) minimum = static_cast<float>(*numeric.minimum);
+
+		if (numeric.minimum)
+		{
+			minimum = static_cast<float>(*numeric.minimum);
+		}
 
 		float maximum = 0.0f;
-		if (numeric.maximum) maximum = static_cast<float>(*numeric.maximum);
 
-		const bool changed = ImGui::DragFloat(
-			label, &displayValue, numeric.dragSpeed, minimum, maximum);
-		if (!changed) return false;
+		if (numeric.maximum)
+		{
+			maximum = static_cast<float>(*numeric.maximum);
+		}
+
+		const bool changed = ImGui::DragFloat(label, &displayValue, numeric.dragSpeed, minimum, maximum);
+
+		if (!changed)
+		{
+			return false;
+		}
 
 		storedValue = ConvertUnit(
 			displayValue, numeric.displayUnit, numeric.storageUnit);
@@ -85,14 +112,22 @@ namespace
 	const char* GetInspectorLabel(const PropertyMetadata& property)
 	{
 		const InspectorMetadata* inspector = property.GetInspectorMetadata();
-		if (inspector && !inspector->label.empty()) return inspector->label.c_str();
+
+		if (inspector && !inspector->label.empty())
+		{
+			return inspector->label.c_str();
+		}
+
 		return property.GetSerializedName().c_str();
 	}
 
 	template<class ValueType, class DrawFunction>
 	void DrawValue(PropertyValue& value, bool& changed, DrawFunction draw)
 	{
-		if (ValueType* typed = std::get_if<ValueType>(&value)) changed = draw(*typed);
+		if (ValueType* typed = std::get_if<ValueType>(&value))
+		{
+			changed = draw(*typed);
+		}
 	}
 
 	PropertyEditorResult DrawPropertyEditor(
@@ -156,18 +191,31 @@ namespace
 			{
 				Vector3 euler = value->ToEulerDeg();
 				result.changed = ImGui::DragFloat3(label, &euler.x, 0.25f);
-				if (result.changed) *value = Quaternion::CreateFromEulerDeg(euler);
+
+				if (result.changed)
+				{
+					*value = Quaternion::CreateFromEulerDeg(euler);
+				}
 			}
+
 			break;
 		case PropertyEditorKind::Enum:
 			if (EnumPropertyValue* value = std::get_if<EnumPropertyValue>(&result.value))
 			{
 				const EnumMetadata* enumMetadata = property.GetEnumMetadata();
 				const EnumEntry* selected = nullptr;
-				if (enumMetadata) selected = enumMetadata->FindByValue(value->value);
+
+				if (enumMetadata)
+				{
+					selected = enumMetadata->FindByValue(value->value);
+				}
 
 				const char* preview = "<Invalid>";
-				if (selected) preview = selected->serializedName.c_str();
+
+				if (selected)
+				{
+					preview = selected->serializedName.c_str();
+				}
 
 				if (enumMetadata && ImGui::BeginCombo(label, preview))
 				{
@@ -179,9 +227,11 @@ namespace
 							result.changed = true;
 						}
 					}
+
 					ImGui::EndCombo();
 				}
 			}
+
 			break;
 		case PropertyEditorKind::ActorReference:
 			if (services.drawActorReference)
@@ -190,10 +240,18 @@ namespace
 				{
 					ActorReference selected;
 					result.changed = services.drawActorReference(label, property, *value, selected);
-					if (result.changed) *value = selected;
+
+					if (result.changed)
+					{
+						*value = selected;
+					}
 				}
 			}
-			else ImGui::TextDisabled("%s: unavailable", label);
+			else
+			{
+				ImGui::TextDisabled("%s: unavailable", label);
+			}
+
 			break;
 		case PropertyEditorKind::AssetReference:
 			if (services.drawAssetReference)
@@ -202,17 +260,29 @@ namespace
 				{
 					AssetReferenceValue selected;
 					result.changed = services.drawAssetReference(label, property, *value, selected);
-					if (result.changed) *value = selected;
+
+					if (result.changed)
+					{
+						*value = selected;
+					}
 				}
 			}
-			else ImGui::TextDisabled("%s: unavailable", label);
+			else
+			{
+				ImGui::TextDisabled("%s: unavailable", label);
+			}
+
 			break;
 		default:
 			ImGui::TextDisabled("%s: unsupported property type", label);
 			break;
 		}
 
-		if (!row.editable) return result;
+		if (!row.editable)
+		{
+			return result;
+		}
+
 		if (IsContinuousEditor(row.editor))
 		{
 			result.began = ImGui::IsItemActivated();
@@ -224,6 +294,7 @@ namespace
 			result.began = result.changed;
 			result.committed = result.changed;
 		}
+
 		return result;
 	}
 }
@@ -254,25 +325,31 @@ std::vector<PropertyInspectorRow> ReflectionInspector::BuildRows(
 	ReflectionInspectorPolicy policy)
 {
 	std::vector<PropertyInspectorRow> rows;
+
 	for (const PropertyMetadata& property : metadata.GetProperties())
 	{
 		const InspectorMetadata* inspector = property.GetInspectorMetadata();
-		if (!inspector) continue;
-		const PropertyEditorKind editor = property.GetLogicalType() == PropertyLogicalType::Vector4 &&
-			inspector->presentation == InspectorPresentation::Color
-			? PropertyEditorKind::Color : GetEditorKind(property.GetLogicalType());
+
+		if (!inspector)
+		{
+			continue;
+		}
+
+		const bool useColorEditor =
+			property.GetLogicalType() == PropertyLogicalType::Vector4 &&
+			inspector->presentation == InspectorPresentation::Color;
+		const PropertyEditorKind editor = useColorEditor
+			? PropertyEditorKind::Color
+			: GetEditorKind(property.GetLogicalType());
 		const bool supported = editor != PropertyEditorKind::Unsupported;
 		const bool editablePolicy = policy == ReflectionInspectorPolicy::Editable;
-		rows.push_back({
-			&property,
-			editor,
-			editablePolicy && supported && !inspector->readOnly
-		});
+		rows.push_back({&property, editor, editablePolicy && supported && !inspector->readOnly});
 	}
+
 	return rows;
 }
 
-ReflectionInspectorResult ReflectionInspector::Draw(
+bool ReflectionInspector::Draw(
 	const TypeMetadata& metadata,
 	std::type_index objectType,
 	void* object,
@@ -280,66 +357,78 @@ ReflectionInspectorResult ReflectionInspector::Draw(
 	const ReflectionInspectorCallbacks& callbacks,
 	const ReflectionInspectorServices& services)
 {
-	ReflectionInspectorResult summary;
+	bool succeeded = true;
+
 	for (const PropertyInspectorRow& row : BuildRows(metadata, policy))
 	{
-		++summary.displayedProperties;
-		if (row.editor == PropertyEditorKind::Unsupported) ++summary.unsupportedProperties;
-
 		PropertyValue current;
+
 		if (!row.property->Read(objectType, object, current))
 		{
-			++summary.readFailures;
-			ImGui::TextDisabled("%s: read failed", row.property->GetPath().ToString().c_str());
+			succeeded = false;
+			ImGui::TextDisabled("%s", row.property->GetPath().ToString().c_str());
 			continue;
 		}
 
 		ImGui::PushID(row.property->GetPath().ToString().c_str());
 		const PropertyEditorResult edit = DrawPropertyEditor(row, current, services);
 		ImGui::PopID();
-		if (!row.editable) continue;
+
+		if (!row.editable)
+		{
+			continue;
+		}
 
 		if (edit.began && !Matches(metadata, objectType, object, *row.property))
 		{
 			BeginEdit(metadata, objectType, object, *row.property, current, callbacks);
 		}
+
 		bool previewSucceeded = true;
+
 		if (edit.changed)
 		{
-			previewSucceeded = PreviewEdit(
-				metadata, objectType, object, *row.property, edit.value, callbacks);
+			previewSucceeded = PreviewEdit(metadata, objectType, object, *row.property, edit.value, callbacks);
 		}
+
 		if (!previewSucceeded)
 		{
-			++summary.writeFailures;
-			const bool restored = CancelEdit(
-				metadata, objectType, object, *row.property, callbacks);
+			succeeded = false;
+			DBG("Reflected property edit failed.");
+			const bool restored = CancelEdit(metadata, objectType, object, *row.property, callbacks);
+
 			if (!restored)
 			{
-				++summary.restoreFailures;
+				succeeded = false;
+				DBG("Reflected property transaction could not be completed.");
 			}
+
 			continue;
 		}
+
 		if (edit.canceled)
 		{
-			const bool restored = CancelEdit(
-				metadata, objectType, object, *row.property, callbacks);
+			const bool restored = CancelEdit(metadata, objectType, object, *row.property, callbacks);
+
 			if (!restored)
 			{
-				++summary.restoreFailures;
+				succeeded = false;
+				DBG("Reflected property transaction could not be completed.");
 			}
 		}
 		else if (edit.committed)
 		{
-			const bool committed = CommitEdit(
-				metadata, objectType, object, *row.property, edit.value, callbacks);
+			const bool committed = CommitEdit(metadata, objectType, object, *row.property, edit.value, callbacks);
+
 			if (!committed)
 			{
-				++summary.restoreFailures;
+				succeeded = false;
+				DBG("Reflected property transaction could not be completed.");
 			}
 		}
 	}
-	return summary;
+
+	return succeeded;
 }
 
 bool ReflectionInspector::BeginEdit(
@@ -354,23 +443,24 @@ bool ReflectionInspector::BeginEdit(
 	{
 		return false;
 	}
-	const bool conflictsWithActiveEdit = m_transaction
-		&& !Matches(metadata, objectType, object, property);
+
+	const bool conflictsWithActiveEdit = m_transaction && !Matches(metadata, objectType, object, property);
+
 	if (conflictsWithActiveEdit)
 	{
 		return false;
 	}
+
 	if (!m_transaction)
 	{
-		m_transaction = Transaction{
-			&metadata,
-			objectType,
-			object,
-			&property,
-			before,
-			callbacks.restoreValue };
-		if (callbacks.onEditBegin) callbacks.onEditBegin(property, before);
+		m_transaction = Transaction{&metadata, objectType, object, &property, before, callbacks.restoreValue};
+
+		if (callbacks.onEditBegin)
+		{
+			callbacks.onEditBegin(property, before);
+		}
 	}
+
 	return true;
 }
 
@@ -382,7 +472,11 @@ bool ReflectionInspector::PreviewEdit(
 	const PropertyValue& value,
 	const ReflectionInspectorCallbacks&)
 {
-	if (!Matches(metadata, objectType, object, property)) return false;
+	if (!Matches(metadata, objectType, object, property))
+	{
+		return false;
+	}
+
 	return metadata.TryWriteProperty(objectType, object, property, value);
 }
 
@@ -394,16 +488,21 @@ bool ReflectionInspector::CommitEdit(
 	const PropertyValue& after,
 	const ReflectionInspectorCallbacks& callbacks)
 {
-	if (!Matches(metadata, objectType, object, property)) return false;
+	if (!Matches(metadata, objectType, object, property))
+	{
+		return false;
+	}
+
 	const Transaction transaction = *m_transaction;
 	const PropertyValue before = transaction.before;
 	m_transaction.reset();
-	const bool commandRecorded = !callbacks.onEditCommit
-		|| callbacks.onEditCommit(property, before, after);
+	const bool commandRecorded = !callbacks.onEditCommit || callbacks.onEditCommit(property, before, after);
+
 	if (commandRecorded)
 	{
 		return true;
 	}
+
 	return RestoreTransaction(transaction);
 }
 
@@ -414,23 +513,40 @@ bool ReflectionInspector::CancelEdit(
 	const PropertyMetadata& property,
 	const ReflectionInspectorCallbacks& callbacks)
 {
-	if (!Matches(metadata, objectType, object, property)) return false;
+	if (!Matches(metadata, objectType, object, property))
+	{
+		return false;
+	}
+
 	const PropertyValue before = m_transaction->before;
 	const Transaction transaction = *m_transaction;
 	const bool restored = RestoreTransaction(transaction);
 	m_transaction.reset();
-	if (callbacks.onEditCancel) callbacks.onEditCancel(property, before, restored);
+
+	if (callbacks.onEditCancel)
+	{
+		callbacks.onEditCancel(property, before, restored);
+	}
+
 	return restored;
 }
 
 bool ReflectionInspector::CancelActiveEdit(const ReflectionInspectorCallbacks& callbacks)
 {
-	if (!m_transaction) return true;
+	if (!m_transaction)
+	{
+		return true;
+	}
+
 	const Transaction transaction = *m_transaction;
 	m_transaction.reset();
 	const bool restored = RestoreTransaction(transaction);
+
 	if (callbacks.onEditCancel)
+	{
 		callbacks.onEditCancel(*transaction.property, transaction.before, restored);
+	}
+
 	return restored;
 }
 
@@ -440,10 +556,26 @@ bool ReflectionInspector::Matches(
 	const void* object,
 	const PropertyMetadata& property) const
 {
-	if (!m_transaction) return false;
-	if (m_transaction->metadata != &metadata) return false;
-	if (m_transaction->objectType != objectType) return false;
-	if (m_transaction->object != object) return false;
+	if (!m_transaction)
+	{
+		return false;
+	}
+
+	if (m_transaction->metadata != &metadata)
+	{
+		return false;
+	}
+
+	if (m_transaction->objectType != objectType)
+	{
+		return false;
+	}
+
+	if (m_transaction->object != object)
+	{
+		return false;
+	}
+
 	return m_transaction->property->GetPath() == property.GetPath();
 }
 

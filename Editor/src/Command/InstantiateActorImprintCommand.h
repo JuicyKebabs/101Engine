@@ -15,13 +15,15 @@ class SceneBase;
 class InstantiateActorImprintCommand final : public IEditorCommand
 {
 public:
-	InstantiateActorImprintCommand(SceneBase& scene, ActorImprintSystem& system,
-		Guid assetGuid, Guid externalParentGuid = {});
+	InstantiateActorImprintCommand(
+		SceneBase& scene,
+		ActorImprintSystem& system,
+		Guid assetGuid,
+		Guid externalParentGuid = {});
 
 	bool Execute() override;
 	bool Undo() override;
 	const Guid& GetRootActorGuid() const { return m_rootActorGuid; }
-	const std::string& GetErrorMessage() const { return m_errorMessage; }
 
 private:
 	SceneBase* m_scene;
@@ -31,5 +33,4 @@ private:
 	Guid m_rootActorGuid;
 	ActorImprintInstanceSnapshot m_snapshot;
 	bool m_hasExecuted = false;
-	std::string m_errorMessage;
 };

@@ -18,20 +18,14 @@ struct ActorImprintDefinitionExpansion
 	std::unordered_map<LocalObjectId, Component*> components;
 };
 
-struct ActorImprintDefinitionExpansionError
-{
-	LocalObjectId objectId = InvalidLocalObjectId;
-	std::string path;
-	std::string message;
-};
-
 // Expands one validated immutable definition into ordinary Scene objects. This
 // deliberately does not create ActorImprint Instance provenance or register an
 // Instance. The caller owns the destination Scene and its authoring policy.
 class ActorImprintDefinitionExpander
 {
 public:
-	static bool Expand(const ActorImprint& definition, SceneBase& destination,
-		ActorImprintDefinitionExpansion& outExpansion,
-		ActorImprintDefinitionExpansionError* outError = nullptr);
+	static bool Expand(
+		const ActorImprint& definition,
+		SceneBase& destination,
+		ActorImprintDefinitionExpansion& outExpansion);
 };

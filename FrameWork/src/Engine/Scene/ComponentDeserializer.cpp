@@ -21,10 +21,18 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
 	ComponentRestoreOptions options,
 	ComponentDeserializationError* outError)
 {
-	if (outError) *outError = {};
+	if (outError)
+	{
+		*outError = {};
+	}
+
 	const auto Fail = [&](std::string path, std::string message) -> std::unique_ptr<Component>
 	{
-		if (outError) *outError = { std::move(path), std::move(message) };
+		if (outError)
+		{
+			*outError = {std::move(path), std::move(message)};
+		}
+
 		return nullptr;
 	};
 
@@ -39,10 +47,17 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
 	const bool hasData = componentJson.contains("data");
 	const bool hasValidType = hasType && componentJson["type"].is_string();
 	const bool hasValidData = hasData && componentJson["data"].is_object();
+
 	if (!hasValidType || !hasValidData)
 	{
-		DBG("ComponentDeserializer::DeserializeRecord: Component record must contain a string 'type' and an object 'data'.");
-		if (!hasValidType) return Fail("/type", "Component type must be a string.");
+		DBG("ComponentDeserializer::DeserializeRecord: Component record must "
+			"contain a string 'type' and an object 'data'.");
+
+		if (!hasValidType)
+		{
+			return Fail("/type", "Component type must be a string.");
+		}
+
 		return Fail("/data", "Component data must be an object.");
 	}
 
@@ -66,18 +81,9 @@ std::unique_ptr<Component> ComponentDeserializer::DeserializeRecord(
 	}
 
 	// Deserialize the component data
-	ReflectionError error;
-	if (!DeserializeReflectedComponent(*component, componentData, options, &error))
+	if (!DeserializeReflectedComponent(*component, componentData, options))
 	{
-		std::string path = "<type>";
-		if (error.path)
-		{
-			path = error.path->ToString();
-		}
-		DBG(
-			"ComponentDeserializer::DeserializeRecord: Failed to deserialize component '%s' at '%s': %s",
-			componentTypeName.c_str(), path.c_str(), error.message.c_str());
-		return Fail("/data" + (error.path ? error.path->ToString() : std::string{}), error.message);
+		return Fail("/data", "Reflected Component data is invalid.");
 	}
 
 	return component;

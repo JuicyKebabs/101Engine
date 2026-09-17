@@ -253,10 +253,23 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 {
 	// Constructors
 	Matrix4x4() : DirectX::XMFLOAT4X4() {}
-	Matrix4x4(float a, float b, float c, float d,
-			  float e, float f, float g, float h,
-			  float i, float j, float k, float l,
-			  float m, float n, float o, float p) : DirectX::XMFLOAT4X4(
+	Matrix4x4(
+		float a,
+		float b,
+		float c,
+		float d,
+		float e,
+		float f,
+		float g,
+		float h,
+		float i,
+		float j,
+		float k,
+		float l,
+		float m,
+		float n,
+		float o,
+		float p) : DirectX::XMFLOAT4X4(
 				  a, b, c, d,
 				  e, f, g, h,
 				  i, j, k, l,
@@ -379,16 +392,6 @@ inline Vector3 RadToDeg(const Vector3& radians) {
 	return Vector3(RadToDeg(radians.x), RadToDeg(radians.y), RadToDeg(radians.z));
 }
 
-
-
-
-
-
-
-
-
-
-
 // Add two vectors
 inline static DirectX::XMFLOAT3 AddXMF3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
 {
@@ -455,6 +458,7 @@ inline static float LengthXMV(const DirectX::XMVECTOR& v)
 inline static DirectX::XMFLOAT3 Normalize(const DirectX::XMFLOAT3& v)
 {
 	float len = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+
 	if (len > 0.0f)
 	{
 		return DirectX::XMFLOAT3{ v.x / len, v.y / len, v.z / len };

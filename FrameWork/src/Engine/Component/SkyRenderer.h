@@ -67,7 +67,9 @@ private:
 	void OnDestroyOverride() override;
 	void ApplyBlendModeToRenderTemplates() override;
 
-	AssetPrepareResult PrepareSkyRendererState(PreparedTextureAssetState& outPreparedState, const Guid& textureId) const;
+	AssetPrepareResult PrepareSkyRendererState(
+		PreparedTextureAssetState& outPreparedState,
+		const Guid& textureId) const;
 	void CommitSkyTextureState(PreparedTextureAssetState&& state);
 	bool SetPendingSkyTextureAssetReference(const AssetReference<TextureAsset>& value);
 	void InvalidateFollowCache();

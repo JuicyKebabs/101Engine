@@ -30,7 +30,10 @@ void Transform::OnDestroyOverride()
 // Mark the local transform as dirty (has been modified since last world transform update)
 void Transform::MarkDirty()
 {
-	if (m_isDirty) return;
+	if (m_isDirty)
+	{
+		return;
+	}
 
 	m_isDirty = true;
 
@@ -40,7 +43,11 @@ void Transform::MarkDirty()
 	for(auto& child : children)
 	{
 		auto transform = child->GetComponentByClass<Transform>();
-		if (transform) transform->MarkDirty();
+
+		if (transform)
+		{
+			transform->MarkDirty();
+		}
 	}
 }
 
@@ -114,7 +121,11 @@ void Transform::SetLocalRotationQuat(Quaternion quaternion)
 
 bool Transform::SetAuthoredLocalRotation(Quaternion quaternion)
 {
-	if (!ValueValidation::NormalizeRotation(quaternion)) return false;
+	if (!ValueValidation::NormalizeRotation(quaternion))
+	{
+		return false;
+	}
+
 	SetLocalRotationQuat(quaternion);
 	return true;
 }
@@ -323,7 +334,10 @@ Vector3 Transform::InverseTransformDirection(Vector3 localDirection) const
 // Update world transform based on local transform and parent's world transform
 void Transform::UpdateGeometry()
 {
-	if(!m_isDirty) return;
+	if (!m_isDirty)
+	{
+		return;
+	}
 
 	auto owner = GetOwner();
 	auto parent = owner ? owner->GetParent() : nullptr;

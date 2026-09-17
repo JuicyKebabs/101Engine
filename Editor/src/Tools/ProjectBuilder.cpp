@@ -25,7 +25,10 @@ static std::string GetVSInstallPath()
         "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\""
         " -latest -property installationPath 2>NUL", "r");
 
-    if (!pipe) return "";
+    if (!pipe)
+    {
+        return "";
+    }
 
     char buf[512] = {};
     std::string path;
@@ -47,6 +50,7 @@ static std::string GetVSInstallPath()
 static std::string ResolveCMakePath()
 {
     std::string installPath = GetVSInstallPath();
+
     if (!installPath.empty())
     {
         std::string cmakePath = installPath +
@@ -54,6 +58,7 @@ static std::string ResolveCMakePath()
         DBG("ProjectBuilder: cmake found at '%s'", cmakePath.c_str());
         return cmakePath;
     }
+
     DBG("ProjectBuilder: vswhere.exe not found, falling back to 'cmake' in PATH");
     return "cmake";
 }
@@ -126,7 +131,11 @@ bool ProjectBuilder::Build(const std::string& target, const std::string& config,
 
 bool ProjectBuilder::ReconfigureAndBuild(const std::string& target, const std::string& config, bool buildDependencies)
 {
-    if (!Reconfigure()) return false;
+    if (!Reconfigure())
+    {
+        return false;
+    }
+
     return Build(target, config, buildDependencies);
 }
 
@@ -136,14 +145,16 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 
 	// Construct paths for the project root and Visual Studio installation
     std::string projectRoot = PathManager::GetProjectRoot();
-	const auto hotReloadConfig = ResolveGameCodeHotReloadConfig(projectRoot, config);
-	if (!hotReloadConfig)
+    const auto hotReloadConfig = ResolveGameCodeHotReloadConfig(projectRoot, config);
+
+    if (!hotReloadConfig)
 	{
 		DBG("ProjectBuilder: Unsupported hot reload configuration '%s'", config.c_str());
 		return false;
 	}
 
     std::string vsPath = GetVSInstallPath();
+
     if (vsPath.empty())
     {
         DBG("ProjectBuilder: VS installation not found via vswhere.exe");
@@ -175,7 +186,8 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
     std::error_code error;
 
     fs::remove(outputDll, error);
-	if (error)
+
+    if (error)
 	{
 		DBG("ProjectBuilder: Failed to remove %s (error %s)", outputDll.c_str(), error.message().c_str());
         return false;
@@ -184,7 +196,8 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
     error.clear();
 
     fs::remove(outputLib, error);
-	if (error)
+
+    if (error)
     {
 		DBG("ProjectBuilder: Failed to remove %s (error %s)", outputLib.c_str(), error.message().c_str());
 		return false;
@@ -192,9 +205,13 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 
     // Collect all source files for hot reload
     std::vector<std::string> sources;
+
     for (const auto& entry : fs::recursive_directory_iterator(gameCodeDir))
     {
-		if (entry.path().extension() == ".cpp") sources.push_back(entry.path().string());
+        if (entry.path().extension() == ".cpp")
+        {
+            sources.push_back(entry.path().string());
+        }
     }
 
     // Check if hot reload is needed
@@ -234,8 +251,12 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
         bat << " /I\"" << imguiInc << "\"";
         bat << " /I\"" << imguiBackendInc << "\"";
         bat << " /Fo\"" << objDir << "\\\\\"";
+
         for (const auto& src : sources)
+        {
             bat << " \"" << src << "\"";
+        }
+
         bat << " > \"" << logPath << "\" 2>&1\n";
         bat << "if errorlevel 1 (\n";
         bat << "    echo [HotReload] Compile FAILED - see hotreload_compile.log\n";
@@ -248,11 +269,13 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
         bat << " /OUT:\"" << outputDll << "\"";
         bat << " /IMPLIB:\"" << outputLib << "\"";
         bat << " \"" << frameworkLib << "\"";
+
         for (const auto& src : sources)
         {
             std::string stem = fs::path(src).stem().string();
             bat << " \"" << objDir << "\\" << stem << ".obj\"";
         }
+
         bat << " >> \"" << logPath << "\" 2>&1\n";
         bat << "if errorlevel 1 (\n";
         bat << "    echo [HotReload] Link FAILED - see hotreload_compile.log\n";

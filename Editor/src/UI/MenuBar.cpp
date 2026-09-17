@@ -10,22 +10,32 @@ void MenuBar::Render(const Callbacks& callbacks)
         {
 			if (ImGui::MenuItem("Save", "Ctrl+S", false, callbacks.canSave))
             {
-				if (callbacks.onSaveDocument) callbacks.onSaveDocument();
-            }
-            ImGui::EndMenu();
+				if (callbacks.onSaveDocument)
+				{
+					callbacks.onSaveDocument();
+				}
+			}
+
+			ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("Edit"))
         {
             if (ImGui::MenuItem("Undo", nullptr, false, callbacks.canUndo))
             {
-                if (callbacks.onUndo) callbacks.onUndo();
-            }
+				if (callbacks.onUndo)
+				{
+					callbacks.onUndo();
+				}
+			}
 
             if (ImGui::MenuItem("Redo", nullptr, false, callbacks.canRedo))
             {
-                if (callbacks.onRedo) callbacks.onRedo();
-            }
+				if (callbacks.onRedo)
+				{
+					callbacks.onRedo();
+				}
+			}
 
             ImGui::EndMenu();
         }
@@ -34,9 +44,13 @@ void MenuBar::Render(const Callbacks& callbacks)
         {
             if (ImGui::MenuItem("Reset Layout"))
             {
-                if (callbacks.onResetLayout) callbacks.onResetLayout();
-            }
-            ImGui::EndMenu();
+				if (callbacks.onResetLayout)
+				{
+					callbacks.onResetLayout();
+				}
+			}
+
+			ImGui::EndMenu();
         }
 
 		// Assets menu for creating new assets like behaviors
@@ -47,14 +61,17 @@ void MenuBar::Render(const Callbacks& callbacks)
 			{
 				DispatchCreateActorImprint(callbacks);
 			}
+
 			ImGui::Separator();
-            if (ImGui::MenuItem("Create Script...", nullptr, false, callbacks.canModifyScripts))
+
+			if (ImGui::MenuItem("Create Script...", nullptr, false, callbacks.canModifyScripts))
             {
                 m_showCreateScriptPopup = true;
                 m_newScriptNameBuffer[0] = '\0';
-                m_createAsBehavior = true;
-            }
-            ImGui::EndMenu();
+				m_createAsBehavior = true;
+			}
+
+			ImGui::EndMenu();
         }
 
 		// Build menu for building the game and hot-reloading game code
@@ -62,23 +79,36 @@ void MenuBar::Render(const Callbacks& callbacks)
         {
             if (ImGui::MenuItem("Build Game", nullptr, false, callbacks.canBuild))
             {
-                if (callbacks.onBuildGame) callbacks.onBuildGame();
-            }
-            if (ImGui::MenuItem("Reload GameCode", nullptr, false, callbacks.canBuild))
+				if (callbacks.onBuildGame)
+				{
+					callbacks.onBuildGame();
+				}
+			}
+
+			if (ImGui::MenuItem("Reload GameCode", nullptr, false, callbacks.canBuild))
             {
                 // Build without reconfigure
-                if (callbacks.onReloadGameCode) callbacks.onReloadGameCode(false);
-            }
-            if (ImGui::MenuItem("Reload GameCode (with Reconfigure)", nullptr, false, callbacks.canBuild))
+				if (callbacks.onReloadGameCode)
+				{
+					callbacks.onReloadGameCode(false);
+				}
+			}
+
+			if (ImGui::MenuItem("Reload GameCode (with Reconfigure)", nullptr, false, callbacks.canBuild))
             {
                 // Build with reconfigure
-                if (callbacks.onReloadGameCode) callbacks.onReloadGameCode(true);
-            }
-            ImGui::EndMenu();
+				if (callbacks.onReloadGameCode)
+				{
+					callbacks.onReloadGameCode(true);
+				}
+			}
+
+			ImGui::EndMenu();
         }
 
 		ImGui::EndMainMenuBar();
 	}
+
 	const ImGuiIO& io = ImGui::GetIO();
 	DispatchSaveShortcut(callbacks, io.KeyCtrl,
 		ImGui::IsKeyPressed(ImGuiKey_S, false), io.WantTextInput);
@@ -102,9 +132,10 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// Radio button to create Behavior Component
         if (ImGui::RadioButton("Behavior Component", m_createAsBehavior))
         {
-            m_createAsBehavior = true;
-        }
-        ImGui::SameLine();
+			m_createAsBehavior = true;
+		}
+
+		ImGui::SameLine();
 
 		// Radio button to create Plain Class
         if (ImGui::RadioButton("Plain Class", !m_createAsBehavior))
@@ -116,15 +147,18 @@ void MenuBar::Render(const Callbacks& callbacks)
 
 		// Create button triggers the callback to create the script
         if (ImGui::Button("Create", ImVec2(120, 0)))
-        {
-            std::string name = m_newScriptNameBuffer;
-            if (!name.empty() && callbacks.onCreateScript)
+		{
+			std::string name = m_newScriptNameBuffer;
+
+			if (!name.empty() && callbacks.onCreateScript)
             {
-                callbacks.onCreateScript(name, m_createAsBehavior);
-            }
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SetItemDefaultFocus();
+				callbacks.onCreateScript(name, m_createAsBehavior);
+			}
+
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::SetItemDefaultFocus();
         ImGui::SameLine();
 
 		// Cancel button just closes the popup without doing anything

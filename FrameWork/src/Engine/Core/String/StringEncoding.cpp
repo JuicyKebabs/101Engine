@@ -14,21 +14,15 @@ namespace StringEncoding
 
         const int sourceLength = static_cast<int>(value.size());
         const int resultLength = WideCharToMultiByte(
-            CP_UTF8,
-            WC_ERR_INVALID_CHARS,
-            value.data(),
-            sourceLength,
-            nullptr,
-            0,
-            nullptr,
-            nullptr
-        );
+            CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), sourceLength, nullptr, 0, nullptr, nullptr);
+
         if (resultLength <= 0)
         {
             return {};
         }
 
         std::string result(static_cast<size_t>(resultLength), '\0');
+
         if (WideCharToMultiByte(
             CP_UTF8,
             WC_ERR_INVALID_CHARS,
@@ -54,20 +48,16 @@ namespace StringEncoding
         }
 
         const int sourceLength = static_cast<int>(value.size());
-        const int resultLength = MultiByteToWideChar(
-            CP_UTF8,
-            MB_ERR_INVALID_CHARS,
-            value.data(),
-            sourceLength,
-            nullptr,
-            0
-        );
+        const int resultLength =
+            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), sourceLength, nullptr, 0);
+
         if (resultLength <= 0)
         {
             return {};
         }
 
         std::wstring result(static_cast<size_t>(resultLength), L'\0');
+
         if (MultiByteToWideChar(
             CP_UTF8,
             MB_ERR_INVALID_CHARS,

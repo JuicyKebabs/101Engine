@@ -189,6 +189,7 @@ Model MakeSphereModel(int slices, int stacks)
 
 	//インデックスデータの作成
 	int ringStride = slices + 1; //リングあたりの頂点数
+
 	for (int stack = 0; stack < stacks; stack++)
 	{//スタックループ
 		for (int slice = 0; slice < slices; slice++)
@@ -221,8 +222,15 @@ Model MakeSphereModel(int slices, int stacks)
 Model MakeCapsuleModel(int slices, int stacks)
 {
 	//引数の補正
-	if (slices < 3) slices = 3;	//スライスは最低3
-	if (stacks < 4) stacks = 4;	//スタックは最低4
+	if (slices < 3)
+	{
+		slices = 3; //スライスは最低3
+	}
+
+	if (stacks < 4)
+	{
+		stacks = 4; //スタックは最低4
+	}
 
 	//必要な構造体の生成
 	Mesh cylinder;				//シリンダー部分のメッシュデータ構造体
@@ -235,9 +243,13 @@ Model MakeCapsuleModel(int slices, int stacks)
 	const float halfHeight = 0.5f;	//半分の高さ
 
 	//スタック数の内訳計算
-	const int hemiStacks = stacks / 4;				//半球のスタック数
-	int cylinderStacks = stacks - hemiStacks * 2;	//円柱のスタック数
-	if (cylinderStacks < 1) cylinderStacks = 1;		//円柱のスタック数は最低1にする
+	const int hemiStacks = stacks / 4;			  //半球のスタック数
+	int cylinderStacks = stacks - hemiStacks * 2; //円柱のスタック数
+
+	if (cylinderStacks < 1)
+	{
+		cylinderStacks = 1; //円柱のスタック数は最低1にする
+	}
 
 	//頂点・インデックスデータ配列の予約
 	const int ringStride = slices + 1;					//リングあたりの頂点数	
@@ -387,6 +399,7 @@ Model MakeCapsuleModel(int slices, int stacks)
 
 	//上半球部分のインデックスデータ作成
 	const int ringCountTop = hemiStacks + 1;
+
 	for (int stack = 0; stack < ringCountTop - 1; stack++)
 	{
 		for (int slice = 0; slice < slices; slice++)
@@ -406,6 +419,7 @@ Model MakeCapsuleModel(int slices, int stacks)
 
 	//下半球部分のインデックスデータ作成
 	const int ringCountBottom = hemiStacks + 1;
+
 	for (int stack = 0; stack < ringCountBottom - 1; stack++)
 	{
 		for (int slice = 0; slice < slices; slice++)
@@ -448,9 +462,13 @@ Model MakeCylinderModel(int slices, int stacks)
 	const float radius = 0.5f;		//半径
 	const float halfHeight = 0.5f;	//半分の高さ
 
-	const int hemiStacks = stacks / 4;				//半球のスタック数
-	int cylinderStacks = stacks - hemiStacks * 2;	//円柱のスタック数
-	if (cylinderStacks < 1) cylinderStacks = 1;		//円柱のスタック数は最低1にする
+	const int hemiStacks = stacks / 4;			  //半球のスタック数
+	int cylinderStacks = stacks - hemiStacks * 2; //円柱のスタック数
+
+	if (cylinderStacks < 1)
+	{
+		cylinderStacks = 1; //円柱のスタック数は最低1にする
+	}
 
 	const int ringStride = slices + 1; //リングあたりの頂点数	
 

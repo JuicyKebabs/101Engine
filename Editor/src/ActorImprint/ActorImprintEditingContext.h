@@ -12,37 +12,14 @@ class AssetManager;
 struct EngineContext;
 class SceneBase;
 
-enum class ActorImprintEditingSaveErrorCode
-{
-	None,
-	InvalidContext,
-	SnapshotFailed,
-	TemporaryFileFailed,
-	TemporaryValidationFailed,
-	AtomicReplaceFailed,
-	NotificationFailed,
-	RollbackFailed,
-};
-
-struct ActorImprintEditingSaveError
-{
-	ActorImprintEditingSaveErrorCode code = ActorImprintEditingSaveErrorCode::None;
-	std::string path;
-	std::string message;
-};
-
-struct ActorImprintEditingOpenError
-{
-	std::string path;
-	std::string message;
-};
-
 class ActorImprintEditingContext
 {
 public:
 	static std::unique_ptr<ActorImprintEditingContext> Open(
-		const Guid& assetGuid, AssetManager& assets, ActorImprintSystem& system,
-		EngineContext& engineContext, ActorImprintEditingOpenError* outError = nullptr);
+		const Guid& assetGuid,
+		AssetManager& assets,
+		ActorImprintSystem& system,
+		EngineContext& engineContext);
 	~ActorImprintEditingContext();
 
 	ActorImprintEditingContext(const ActorImprintEditingContext&) = delete;
@@ -55,18 +32,20 @@ public:
 	const Guid& GetAssetGuid() const { return m_assetGuid; }
 	const std::string& GetAssetPath() const { return m_assetPath; }
 
-	std::unique_ptr<const ActorImprint> CaptureSnapshot(nlohmann::json& outJson,
-		ActorImprintEditingSnapshotError* outError = nullptr) const;
-	bool Save(ActorImprintEditingSaveError* outError = nullptr);
+	std::unique_ptr<const ActorImprint> CaptureSnapshot(nlohmann::json& outJson) const;
+	bool Save();
 	void CommitPendingSave();
-	bool RollbackPendingSave(ActorImprintEditingSaveError* outError = nullptr);
+	bool RollbackPendingSave();
 	bool HasPendingSave() const { return m_hasPendingSave; }
-	const ActorImprintEditingSaveError& GetLastSaveError() const { return m_lastSaveError; }
 
 private:
-	ActorImprintEditingContext(Guid assetGuid, std::string assetPath,
-		AssetManager& assets, std::unique_ptr<SceneBase> workingScene,
-		ActorImprintEditingObjectMap objectMap, nlohmann::json savedSnapshot);
+	ActorImprintEditingContext(
+		Guid assetGuid,
+		std::string assetPath,
+		AssetManager& assets,
+		std::unique_ptr<SceneBase> workingScene,
+		ActorImprintEditingObjectMap objectMap,
+		nlohmann::json savedSnapshot);
 
 	Guid m_assetGuid;
 	std::string m_assetPath;
@@ -77,5 +56,4 @@ private:
 	nlohmann::json m_preSaveSnapshot;
 	std::string m_preSaveBytes;
 	bool m_hasPendingSave = false;
-	ActorImprintEditingSaveError m_lastSaveError;
 };

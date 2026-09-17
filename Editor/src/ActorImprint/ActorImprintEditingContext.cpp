@@ -1,4 +1,5 @@
 #include "ActorImprintEditingContext.h"
+#include "Engine/Core/Debug/Debug.h"
 
 #include "Core/AtomicFileReplacement.h"
 #include "Engine/ActorImprint/ActorImprint.h"
@@ -14,9 +15,13 @@
 #include <filesystem>
 #include <fstream>
 
-ActorImprintEditingContext::ActorImprintEditingContext(Guid assetGuid,
-	std::string assetPath, AssetManager& assets, std::unique_ptr<SceneBase> workingScene,
-	ActorImprintEditingObjectMap objectMap, nlohmann::json savedSnapshot)
+ActorImprintEditingContext::ActorImprintEditingContext(
+	Guid assetGuid,
+	std::string assetPath,
+	AssetManager& assets,
+	std::unique_ptr<SceneBase> workingScene,
+	ActorImprintEditingObjectMap objectMap,
+	nlohmann::json savedSnapshot)
 	: m_assetGuid(assetGuid), m_assetPath(std::move(assetPath)), m_assets(&assets),
 	  m_workingScene(std::move(workingScene)), m_objectMap(std::move(objectMap)),
 	  m_savedSnapshot(std::move(savedSnapshot))
@@ -24,104 +29,130 @@ ActorImprintEditingContext::ActorImprintEditingContext(Guid assetGuid,
 
 ActorImprintEditingContext::~ActorImprintEditingContext()
 {
-	if (m_workingScene) m_workingScene->Finalize();
+	if (m_workingScene)
+	{
+		m_workingScene->Finalize();
+	}
 }
 
 std::unique_ptr<ActorImprintEditingContext> ActorImprintEditingContext::Open(
-	const Guid& assetGuid, AssetManager& assets, ActorImprintSystem& system,
-	EngineContext& engineContext, ActorImprintEditingOpenError* outError)
+	const Guid& assetGuid,
+	AssetManager& assets,
+	ActorImprintSystem& system,
+	EngineContext& engineContext)
 {
-	if (outError) *outError = {};
-	auto fail = [&](std::string path, std::string message)
-		-> std::unique_ptr<ActorImprintEditingContext>
+	if (!assetGuid.IsValid())
 	{
-		if (outError) *outError = { std::move(path), std::move(message) };
+		DBG("ActorImprint AssetGUID must be nonzero.");
 		return nullptr;
-	};
-	if (!assetGuid.IsValid()) return fail({}, "ActorImprint AssetGUID must be nonzero.");
-	if (engineContext.pAssetManager != &assets || engineContext.pActorImprintSystem != &system)
-		return fail({}, "EngineContext does not own the supplied AssetManager and ActorImprintSystem.");
-	const AssetEntry* entry = assets.GetAssetEntry(assetGuid);
-	if (!entry || entry->type != AssetType::ActorImprint)
-		return fail({}, "AssetGUID is not a catalogued ActorImprint.");
-	const std::string assetPath = assets.GetAssetPath(assetGuid);
-	if (assetPath.empty()) return fail(entry->relativePath, "ActorImprint asset path is unavailable.");
+	}
 
-	ActorImprintLoadError loadError;
-	const ActorImprintHandle handle = system.Load(assetGuid, &loadError);
+	if (engineContext.pAssetManager != &assets || engineContext.pActorImprintSystem != &system)
+	{
+		DBG("EngineContext does not own the supplied AssetManager and ActorImprintSystem.");
+		return nullptr;
+	}
+
+	const AssetEntry* entry = assets.GetAssetEntry(assetGuid);
+
+	if (!entry || entry->type != AssetType::ActorImprint)
+	{
+		DBG("AssetGUID is not a catalogued ActorImprint.");
+		return nullptr;
+	}
+
+	const std::string assetPath = assets.GetAssetPath(assetGuid);
+
+	if (assetPath.empty())
+	{
+		DBG("ActorImprint asset path is unavailable.");
+		return nullptr;
+	}
+
+	const ActorImprintHandle handle = system.Load(assetGuid);
 	const ActorImprint* definition = system.Resolve(handle);
+
 	if (handle.IsNull() || !definition)
-		return fail(loadError.assetError.path.empty() ? entry->relativePath : loadError.assetError.path,
-			loadError.message.empty() ? "ActorImprint definition could not be loaded." : loadError.message);
+	{
+		return nullptr;
+	}
 
 	auto scene = std::make_unique<SceneBase>();
 	scene->Initialize(engineContext);
 	ActorImprintDefinitionExpansion expansion;
-	ActorImprintDefinitionExpansionError expansionError;
-	if (!ActorImprintDefinitionExpander::Expand(*definition, *scene, expansion, &expansionError))
+
+	if (!ActorImprintDefinitionExpander::Expand(*definition, *scene, expansion))
 	{
 		scene->Finalize();
-		return fail(std::move(expansionError.path), std::move(expansionError.message));
+		return nullptr;
 	}
+
 	if (!scene->EnableSingleRootClosedSubtreePolicy())
 	{
 		scene->Finalize();
-		return fail({}, "Expanded Working Scene does not form one closed root subtree.");
+		DBG("Expanded Working Scene does not form one closed root subtree.");
+		return nullptr;
+
 	}
 
 	ActorImprintEditingObjectMap objectMap;
+
 	if (!objectMap.Initialize(*scene, expansion, definition->GetNextLocalObjectId()))
 	{
 		scene->Finalize();
-		return fail({}, "Expanded Working Scene does not match the definition LocalObjectIDs.");
+		DBG("Expanded Working Scene does not match the definition LocalObjectIDs.");
+		return nullptr;
 	}
+
 	return std::unique_ptr<ActorImprintEditingContext>(new ActorImprintEditingContext(
 		assetGuid, assetPath, assets, std::move(scene), std::move(objectMap),
 		ActorImprintAssetSerializer::Serialize(*definition)));
 }
 
 std::unique_ptr<const ActorImprint> ActorImprintEditingContext::CaptureSnapshot(
-	nlohmann::json& outJson, ActorImprintEditingSnapshotError* outError) const
+	nlohmann::json& outJson) const
 {
 	if (!m_workingScene || !m_assets)
 	{
-		if (outError) *outError = { ActorImprintAssetErrorCode::InvalidObjectGraph,
-			InvalidLocalObjectId, {}, "ActorImprint editing context is unavailable." };
+		DBG("ActorImprint editing context is unavailable.");
 		return nullptr;
 	}
+
 	return ActorImprintEditingSnapshot::Capture(*m_workingScene, m_objectMap, *m_assets,
-		outJson, outError);
+		outJson);
 }
 
-bool ActorImprintEditingContext::Save(ActorImprintEditingSaveError* outError)
+bool ActorImprintEditingContext::Save()
 {
-	m_lastSaveError = {};
-	if (outError) *outError = {};
-	auto fail = [&](ActorImprintEditingSaveErrorCode code, std::string path, std::string message)
-	{
-		m_lastSaveError = { code, std::move(path), std::move(message) };
-		if (outError) *outError = m_lastSaveError;
-		return false;
-	};
 	if (!m_assets || !m_workingScene || m_assetPath.empty())
-		return fail(ActorImprintEditingSaveErrorCode::InvalidContext, m_assetPath,
-			"ActorImprint editing context is unavailable.");
+	{
+		DBG("ActorImprint editing context is unavailable.");
+		return false;
+	}
+
 	if (m_hasPendingSave)
-		return fail(ActorImprintEditingSaveErrorCode::InvalidContext, m_assetPath,
-			"The previous ActorImprint save has not reached its reload commit boundary.");
+	{
+		DBG("The previous ActorImprint save has not reached its reload commit boundary.");
+		return false;
+	}
+
 	const AssetEntry* entry = m_assets->GetAssetEntry(m_assetGuid);
+
 	if (!entry || entry->type != AssetType::ActorImprint ||
 		std::filesystem::path(m_assets->GetAssetPath(m_assetGuid)).lexically_normal() !=
 		std::filesystem::path(m_assetPath).lexically_normal())
-		return fail(ActorImprintEditingSaveErrorCode::InvalidContext, m_assetPath,
-			"ActorImprint catalog identity changed before save.");
+	{
+		DBG("ActorImprint catalog identity changed before save.");
+		return false;
+	}
 
 	nlohmann::json serialized;
-	ActorImprintEditingSnapshotError snapshotError;
-	auto snapshot = CaptureSnapshot(serialized, &snapshotError);
+	auto snapshot = CaptureSnapshot(serialized);
+
 	if (!snapshot)
-		return fail(ActorImprintEditingSaveErrorCode::SnapshotFailed, snapshotError.path,
-			snapshotError.message.empty() ? "Could not capture the Working Scene snapshot." : snapshotError.message);
+	{
+		return false;
+	}
 
 	// DefinitionRevision identifies meaningful normalized content. Ignore only
 	// that field for the comparison so repeated equivalent saves retain the
@@ -130,24 +161,29 @@ bool ActorImprintEditingContext::Save(ActorImprintEditingSaveError* outError)
 	nlohmann::json savedContent = m_savedSnapshot;
 	candidateContent.erase("definitionRevision");
 	savedContent.erase("definitionRevision");
+
 	if (candidateContent == savedContent && m_savedSnapshot.contains("definitionRevision"))
 	{
 		serialized["definitionRevision"] = m_savedSnapshot["definitionRevision"];
 		AssetManagerAssetReferenceContext assetContext(*m_assets);
-		ActorImprintAssetError revisionError;
-		snapshot = ActorImprintAssetDeserializer::Deserialize(serialized, &assetContext, &revisionError);
+		snapshot = ActorImprintAssetDeserializer::Deserialize(serialized, &assetContext);
+
 		if (!snapshot)
-			return fail(ActorImprintEditingSaveErrorCode::SnapshotFailed,
-				revisionError.path, revisionError.message);
+		{
+			return false;
+		}
 	}
 
 	std::filesystem::path temporary;
-	AtomicFileReplacementError fileError;
+
 	const std::string bytes = serialized.dump(2) + '\n';
+
 	if (!AtomicFileReplacement::WriteTemporary(
-		std::filesystem::path(m_assetPath), bytes, temporary, &fileError))
-		return fail(ActorImprintEditingSaveErrorCode::TemporaryFileFailed,
-			fileError.path.string(), fileError.message);
+		std::filesystem::path(m_assetPath), bytes, temporary))
+	{
+		DBG("ActorImprint file operation failed.");
+		return false;
+	}
 
 	struct TemporaryCleanup
 	{
@@ -156,32 +192,46 @@ bool ActorImprintEditingContext::Save(ActorImprintEditingSaveError* outError)
 	} cleanup{temporary};
 
 	AssetManagerAssetReferenceContext assetContext(*m_assets);
-	ActorImprintAssetError validationError;
-	auto validated = ActorImprintAssetDeserializer::Load(
-		temporary.string(), &assetContext, &validationError);
+	auto validated = ActorImprintAssetDeserializer::Load(temporary.string(), &assetContext);
+
 	if (!validated)
-		return fail(ActorImprintEditingSaveErrorCode::TemporaryValidationFailed,
-			validationError.path, validationError.message);
+	{
+		return false;
+	}
+
 	const nlohmann::json repeated = ActorImprintAssetSerializer::Serialize(*validated);
+
 	if (repeated != serialized)
-		return fail(ActorImprintEditingSaveErrorCode::TemporaryValidationFailed,
-			temporary.string(), "Temporary Serialize-Deserialize-Serialize verification changed the asset.");
+	{
+		DBG("Temporary Serialize-Deserialize-Serialize verification changed the asset.");
+		return false;
+	}
 
 	std::ifstream originalFile(m_assetPath, std::ios::binary);
+
 	if (!originalFile)
-		return fail(ActorImprintEditingSaveErrorCode::InvalidContext, m_assetPath,
-			"Could not read the original ActorImprint before replacement.");
-	const std::string originalBytes(
-		(std::istreambuf_iterator<char>(originalFile)), std::istreambuf_iterator<char>());
+	{
+		DBG("Could not read the original ActorImprint before replacement.");
+		return false;
+	}
+
+	const std::string originalBytes((std::istreambuf_iterator<char>(originalFile)), std::istreambuf_iterator<char>());
+
 	if (!originalFile.good() && !originalFile.eof())
-		return fail(ActorImprintEditingSaveErrorCode::InvalidContext, m_assetPath,
-			"Could not read the complete original ActorImprint before replacement.");
+	{
+		DBG("Could not read the complete original ActorImprint before replacement.");
+		return false;
+	}
+
 	originalFile.close();
 
 	if (!AtomicFileReplacement::Replace(temporary,
-		std::filesystem::path(m_assetPath), &fileError))
-		return fail(ActorImprintEditingSaveErrorCode::AtomicReplaceFailed,
-			fileError.path.string(), fileError.message);
+		std::filesystem::path(m_assetPath)))
+	{
+		DBG("ActorImprint file operation failed.");
+		return false;
+	}
+
 	temporary.clear();
 	m_preSaveBytes = originalBytes;
 	m_preSaveSnapshot = m_savedSnapshot;
@@ -191,13 +241,15 @@ bool ActorImprintEditingContext::Save(ActorImprintEditingSaveError* outError)
 	// scan. This single-threaded context prevalidated the identity above.
 	if (!m_assets->NotifyAssetContentReplaced(m_assetGuid))
 	{
-		ActorImprintEditingSaveError rollbackError;
-		if (!RollbackPendingSave(&rollbackError))
-			return fail(ActorImprintEditingSaveErrorCode::RollbackFailed,
-				rollbackError.path, rollbackError.message);
-		return fail(ActorImprintEditingSaveErrorCode::NotificationFailed, m_assetPath,
-			"Saved asset is no longer present in the active catalog; the original file was restored.");
+		if (!RollbackPendingSave())
+		{
+			return false;
+		}
+
+		DBG("Saved asset is no longer present in the active catalog; the original file was restored.");
+		return false;
 	}
+
 	m_savedSnapshot = std::move(serialized);
 	return true;
 }
@@ -209,25 +261,25 @@ void ActorImprintEditingContext::CommitPendingSave()
 	m_hasPendingSave = false;
 }
 
-bool ActorImprintEditingContext::RollbackPendingSave(ActorImprintEditingSaveError* outError)
+bool ActorImprintEditingContext::RollbackPendingSave()
 {
-	if (outError) *outError = {};
-	if (!m_hasPendingSave) return true;
+	if (!m_hasPendingSave)
+	{
+		return true;
+	}
+
 	std::filesystem::path temporary;
-	AtomicFileReplacementError fileError;
+
 	if (!AtomicFileReplacement::WriteTemporary(
-		std::filesystem::path(m_assetPath), m_preSaveBytes, temporary, &fileError) ||
+		std::filesystem::path(m_assetPath), m_preSaveBytes, temporary) ||
 		!AtomicFileReplacement::Replace(
-			temporary, std::filesystem::path(m_assetPath), &fileError))
+			temporary, std::filesystem::path(m_assetPath)))
 	{
 		AtomicFileReplacement::RemoveTemporary(temporary);
-		m_lastSaveError = { ActorImprintEditingSaveErrorCode::RollbackFailed,
-			fileError.path.string(), fileError.message.empty()
-				? "Could not restore the original ActorImprint after reload failure."
-				: fileError.message };
-		if (outError) *outError = m_lastSaveError;
+		DBG("Could not restore the original ActorImprint after reload failure.");
 		return false;
 	}
+
 	m_savedSnapshot = std::move(m_preSaveSnapshot);
 	m_preSaveBytes.clear();
 	m_preSaveSnapshot = {};

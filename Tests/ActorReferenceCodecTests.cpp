@@ -89,13 +89,13 @@ namespace
 			restored.target.GetGuid() == targetGuid &&
 			restored.target.Resolve(restoredScene) == nullptr,
 			"Deserialize preserves an unresolved Actor Guid");
-		Check(codec.Resolve(restored.target, restoredContext) == ActorReferenceCodecResult::ActorNotFound,
+		Check(codec.Resolve(restored.target, restoredContext) == false,
 			"Missing Actor is reported before registration");
 
 		Actor* restoredTarget = restoredScene.AddRootActor(
 			ActorFactory::RestoreEmptyActor(
 				Actor::InitDesc(true, TAG_NONE, "RestoredTarget"), targetGuid));
-		Check(codec.Resolve(restored.target, restoredContext) == ActorReferenceCodecResult::Success &&
+		Check(codec.Resolve(restored.target, restoredContext) == true &&
 			restored.target.Resolve(restoredScene) == restoredTarget,
 			"Explicit resolution connects the reference after registration");
 	}
@@ -108,28 +108,28 @@ namespace
 		ActorReference reference;
 
 		nlohmann::json output;
-		Check(codec.Deserialize(42, reference) == ActorReferenceCodecResult::InvalidJsonType,
+		Check(codec.Deserialize(42, reference) == false,
 			"Non-string ActorReference JSON reports InvalidJsonType");
-		Check(codec.Deserialize("not-a-guid", reference) == ActorReferenceCodecResult::InvalidGuid,
+		Check(codec.Deserialize("not-a-guid", reference) == false,
 			"Malformed Guid reports InvalidGuid");
 
 		const Guid missingGuid = GuidGenerator::Generate();
 		reference.SetGuid(missingGuid);
-		Check(codec.Serialize(reference, context, output) == ActorReferenceCodecResult::ActorNotFound &&
-			codec.Resolve(reference, context) == ActorReferenceCodecResult::ActorNotFound,
+		Check(codec.Serialize(reference, context, output) == false &&
+			codec.Resolve(reference, context) == false,
 			"Unknown Guid reports ActorNotFound");
 
 		SceneBase otherScene;
 		Actor* otherActor = otherScene.AddRootActor(MakeActor("OtherScene"));
 		reference.Set(otherActor);
-		Check(codec.Serialize(reference, context, output) == ActorReferenceCodecResult::ActorNotFound,
+		Check(codec.Serialize(reference, context, output) == false,
 			"Cross-Scene reference is treated as ActorNotFound");
 
 		Actor* pending = scene.AddRootActor(MakeActor("Pending"));
 		reference.Set(pending);
 		scene.RemoveActor(pending);
-		Check(codec.Serialize(reference, context, output) == ActorReferenceCodecResult::PendingDestroy &&
-			codec.Resolve(reference, context) == ActorReferenceCodecResult::PendingDestroy,
+		Check(codec.Serialize(reference, context, output) == false &&
+			codec.Resolve(reference, context) == false,
 			"Actor pending destruction reports PendingDestroy");
 	}
 }

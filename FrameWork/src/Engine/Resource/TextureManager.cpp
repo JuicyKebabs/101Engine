@@ -177,17 +177,20 @@ TextureHandle TextureManager::LoadTexture(const std::wstring& path)
 	pending.uploadBuffer = pUploadBuffer;	// Upload buffer
 
 	// Calculate total size of pixel and reserve space in owned data vector
-	auto pixels = img.GetImages()->pixels;	// Get pixel data pointer
-	size_t totalSize = 0;					// Total size of pixel data
+	auto pixels = img.GetImages()->pixels; // Get pixel data pointer
+	size_t totalSize = 0;				   // Total size of pixel data
+
 	for (size_t i = 0; i < count; i++)
 	{
 		totalSize += img.GetImages()[i].slicePitch; // Accumulate slice pitch for each image
 	}
+
 	pending.ownedData.resize(totalSize);	// Resize owned data vector to fit pixel data
 
 	// Prepare subresource data for texture upload
-	pending.subresources.resize(count);	// Resize subresource array to match image count
+	pending.subresources.resize(count); // Resize subresource array to match image count
 	size_t offset = 0;					// Offset for copying pixel data
+
 	for (size_t i = 0; i < count; ++i)
 	{
 		std::memcpy(pending.ownedData.data() + offset, images[i].pixels, img.GetImages()[i].slicePitch); // Copy pixel data to owned data vector
@@ -251,7 +254,12 @@ void TextureManager::UploadPendingTextures(ID3D12GraphicsCommandList* cmdList)
 		if (!texture || !pending.uploadBuffer || pending.subresources.empty())
 		{
 			DBG("PendingTextureUpload has null member\n");
-			if (texture) texture->MarkAsFailed(); // Mark texture as failed if it exists
+
+			if (texture)
+			{
+				texture->MarkAsFailed(); // Mark texture as failed if it exists
+			}
+
 			continue;
 		}
 
@@ -287,9 +295,11 @@ void TextureManager::UploadPendingTextures(ID3D12GraphicsCommandList* cmdList)
 Texture* TextureManager::GetTexture(TextureHandle handle) const
 {
 	auto it = m_textures.find(handle);
+
 	if (it != m_textures.end()) {
 		return it->second.get();
 	}
+
 	return nullptr;
 }
 
@@ -302,12 +312,17 @@ SrvIndex TextureManager::GetTextureSrvIndex(TextureHandle handle) const
 	}
 
 	auto texture = GetTexture(handle);
+
 	if (texture) {
-		if(texture->GetState() != Texture::State::Ready){
-			DBG("[TextureManager] Texture handle %u is not ready (state: %u)\n", handle, static_cast<uint32_t>(texture->GetState()));
+		if (texture->GetState() != Texture::State::Ready)
+		{
+			DBG("[TextureManager] Texture handle %u is not ready (state: %u)\n", handle,
+				static_cast<uint32_t>(texture->GetState()));
 		}
-		else {
+		else
+		{
 			SrvIndex srvIndex = texture->GetSrvIndex();
+
 			if (srvIndex != InvalidSrvIndex)
 			{
 				return srvIndex;
@@ -320,6 +335,7 @@ SrvIndex TextureManager::GetTextureSrvIndex(TextureHandle handle) const
 	} else{
 		DBG("[TextureManager] Texture handle not found for GetTextureSrvIndex: %u\n", handle);
 	}
+
 	return m_defaultTextureHandle; // Return default texture index if not found
 }
 

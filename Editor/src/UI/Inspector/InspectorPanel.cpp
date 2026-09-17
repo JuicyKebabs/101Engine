@@ -24,8 +24,9 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
         return;
     }
 
-    // Basic info
-    ImGui::Text("Name: %s", selectedActor->GetName().c_str());
+	// Basic info
+	ImGui::Text("Name: %s", selectedActor->GetName().c_str());
+
 	if (m_propertyEditDiagnosticActorGuid != selectedActor->GetGuid())
 	{
 		m_propertyEditDiagnostic.clear();
@@ -37,17 +38,21 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 		EditorUI::DisabledScope disabledScope(readOnly);
 		auto tags = TagRegistry::Get().GetRegisteredTags();
 		const TagId currentTag = selectedActor->GetTag();
+
 		if (std::none_of(tags.begin(), tags.end(),
 			[currentTag](const auto& entry) { return entry.first == currentTag; }))
 		{
 			tags.emplace_back(currentTag, TagRegistry::Get().GetName(currentTag));
 		}
+
 		const std::string currentName = TagRegistry::Get().GetName(currentTag);
+
 		if (ImGui::BeginCombo("Tag", currentName.c_str()))
 		{
 			for (const auto& [tagId, tagName] : tags)
 			{
 				const bool selected = tagId == currentTag;
+
 				if (ImGui::Selectable(tagName.c_str(), selected) && !selected &&
 					callbacks.onChangeActorTag &&
 					!callbacks.onChangeActorTag(selectedActor->GetGuid(), tagId))
@@ -55,22 +60,29 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 					m_propertyEditDiagnostic = "The Actor tag edit could not be committed to the active Document.";
 					m_propertyEditDiagnosticActorGuid = selectedActor->GetGuid();
 				}
-				if (selected) ImGui::SetItemDefaultFocus();
+
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
 			}
+
 			ImGui::EndCombo();
 		}
 	}
 
     {
-        EditorUI::DisabledScope disabledScope(readOnly);
-        bool isActive = selectedActor->IsActive();
-        if (ImGui::Checkbox("Active", &isActive))
+		EditorUI::DisabledScope disabledScope(readOnly);
+		bool isActive = selectedActor->IsActive();
+
+		if (ImGui::Checkbox("Active", &isActive))
         {
             selectedActor->SetActive(isActive);
         }
     }
 
-    ImGui::Separator();
+	ImGui::Separator();
+
 	if (!m_propertyEditDiagnostic.empty())
 	{
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.45f, 0.35f, 1.0f));
@@ -86,20 +98,19 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 	// Draw each component using the registered drawer functions
     for (auto& component : selectedActor->GetAllComponents())
     {
-		if (!component || component->IsDestroyed()) continue;
+		if (!component || component->IsDestroyed())
+		{
+			continue;
+		}
 
-        const std::type_index typeId = typeid(*component);
+		const std::type_index typeId = typeid(*component);
         const std::size_t occurrenceIndex = occurrenceCounts[typeId]++;
 
 		// Draw the component using reflection metadata.
-		const bool removeRequested = DrawComponent(
-			*component,
-			occurrenceIndex,
-			selectedActor->GetGuid(),
-			context,
-			callbacks,
-			readOnly);
-        if (removeRequested)
+		const bool removeRequested =
+			DrawComponent(*component, occurrenceIndex, selectedActor->GetGuid(), context, callbacks, readOnly);
+
+		if (removeRequested)
 		{// If the "Remove" button was clicked, prepare a removal request
             const std::string componentName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
 
@@ -129,12 +140,16 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 	// Buffer to hold the name of the component to be added
     std::string pendingAddComponent;
 
-    {
-        EditorUI::DisabledScope addComponentDisabledScope(readOnly);
-        if (ImGui::Button("Add Component", ImVec2(-1.0f, 0.0f))) ImGui::OpenPopup("AddComponentPopup");
-    }
+	{
+		EditorUI::DisabledScope addComponentDisabledScope(readOnly);
 
-    if (ImGui::BeginPopup("AddComponentPopup"))
+		if (ImGui::Button("Add Component", ImVec2(-1.0f, 0.0f)))
+		{
+			ImGui::OpenPopup("AddComponentPopup");
+		}
+	}
+
+	if (ImGui::BeginPopup("AddComponentPopup"))
     {
 		// Get the list of names of all registered components from the ComponentRegistry
         const std::vector<std::string> names = ComponentRegistry::Get().GetRegisteredComponentNames();
@@ -193,7 +208,7 @@ bool InspectorPanel::DrawComponent(
 
 	if (componentName.empty())
 	{
-		// If the component name is not registered, 
+		// If the component name is not registered,
         // use the component's own name or a default
 		componentName = component.GetName();
 
@@ -208,7 +223,7 @@ bool InspectorPanel::DrawComponent(
 
 	// Draw a collapsible header for the component
 	const bool opened = ImGui::CollapsingHeader(
-        componentName.c_str(), 
+        componentName.c_str(),
         ImGuiTreeNodeFlags_DefaultOpen |
         ImGuiTreeNodeFlags_AllowOverlap
     );
@@ -225,13 +240,18 @@ bool InspectorPanel::DrawComponent(
 
 		// Draw the "Remove" button and set the flag if clicked
 		EditorUI::DisabledScope disabledScope(readOnly);
-        if (ImGui::SmallButton("Remove")) removeRequested = true;
-    }
+
+		if (ImGui::SmallButton("Remove"))
+		{
+			removeRequested = true;
+		}
+	}
 
 	// Draw the inspector UI for the component if the header is opened
     if (opened)
-    {
+	{
 		const TypeMetadata* metadata = ComponentRegistry::Get().GetMetadata(typeId);
+
 		if (!metadata)
 		{
 			ImGui::TextDisabled("Reflection metadata is not registered for this component.");
@@ -239,10 +259,12 @@ bool InspectorPanel::DrawComponent(
 		else
 		{
 			ReflectionInspectorPolicy inspectorPolicy = ReflectionInspectorPolicy::Editable;
+
 			if (readOnly)
 			{
 				inspectorPolicy = ReflectionInspectorPolicy::ReadOnly;
 			}
+
 			if (ReflectionInspector::BuildRows(*metadata, inspectorPolicy).empty())
 			{
 				ImGui::TextDisabled("No inspectable properties.");
@@ -273,11 +295,15 @@ bool InspectorPanel::DrawComponent(
 					return ApplyComponentPropertyValue(editScene, identity, value);
 				};
 				reflectionCallbacks.onEditCommit = [&, typeId](
-					const PropertyMetadata& property,
-					const PropertyValue& before,
-					const PropertyValue& after)
+													   const PropertyMetadata& property,
+													   const PropertyValue& before,
+													   const PropertyValue& after)
 				{
-					if (!callbacks.onEditProperty) return false;
+					if (!callbacks.onEditProperty)
+					{
+						return false;
+					}
+
 					return callbacks.onEditProperty(
 						ComponentPropertyIdentity{ actorGuid, typeId, occurrenceIndex, property.GetPath() },
 						before, after);
@@ -291,87 +317,96 @@ bool InspectorPanel::DrawComponent(
 					{
 						return false;
 					}
+
 					Actor* currentActor = current.Resolve(*context.scene);
 					const char* preview = "<None>";
+
 					if (current.HasValue())
 					{
 						preview = "<Missing Actor>";
+
 						if (currentActor)
 						{
 							preview = currentActor->GetName().c_str();
 						}
 					}
-					if (!ImGui::BeginCombo(label, preview)) return false;
+
+					if (!ImGui::BeginCombo(label, preview))
+					{
+						return false;
+					}
+
 					bool changed = false;
+
 					if (ImGui::Selectable("<None>", !current.HasValue()) && current.HasValue())
 					{
 						selected.Clear();
 						changed = true;
 					}
+
 					for (Actor* actor : context.scene->GetAllActors())
 					{
 						if (!actor)
 						{
 							continue;
 						}
+
 						if (actor->IsDestroyed())
 						{
 							continue;
 						}
+
 						if (actor->GetOwner() != context.scene)
 						{
 							continue;
 						}
+
 						const bool isSelected = current.GetGuid() == actor->GetGuid();
 						ImGui::PushID(actor);
+
 						if (ImGui::Selectable(actor->GetName().c_str(), isSelected) && !isSelected)
 						{
 							selected.Set(actor);
 							changed = true;
 						}
+
 						ImGui::PopID();
 					}
+
 					ImGui::EndCombo();
 					return changed;
 				};
 				services.drawAssetReference = [&context](
-					const char* label, const PropertyMetadata& property,
-					const AssetReferenceValue& current, AssetReferenceValue& selected)
+												  const char* label, const PropertyMetadata& property,
+												  const AssetReferenceValue& current, AssetReferenceValue& selected)
 				{
-					if (!context.assetManager) return false;
+					if (!context.assetManager)
+					{
+						return false;
+					}
+
 					Guid selectedGuid;
 					const bool selectionChanged = AssetPicker::Draw(
-						label,
-						*context.assetManager,
-						property.GetAssetType(),
-						current.guid,
-						selectedGuid);
+						label, *context.assetManager, property.GetAssetType(), current.guid, selectedGuid);
+
 					if (!selectionChanged)
+					{
 						return false;
+					}
+
 					// AssetPicker only exposes catalog entries of the requested type, so
 					// this is a validated live edit rather than a deferred load value.
 					selected = { selectedGuid, property.GetAssetType(), true };
 					return true;
 				};
 
-				const ReflectionInspectorResult result = m_reflectionInspector.Draw(
+				m_reflectionInspector.Draw(
 					*metadata, typeId, &component, inspectorPolicy,
 					reflectionCallbacks, services);
-				if (result.restoreFailures > 0)
-				{
-					m_propertyEditDiagnostic =
-						"Property change failed, and the previous value could not be restored.";
-					m_propertyEditDiagnosticActorGuid = actorGuid;
-				}
-				else if (result.writeFailures > 0)
-				{
-					m_propertyEditDiagnostic =
-						"Property change failed because the new value could not be applied. The previous value was preserved.";
-					m_propertyEditDiagnosticActorGuid = actorGuid;
-				}
+
 			}
 		}
-    }
+	}
 
 	ImGui::PopID(); // Pop the unique ID for ImGui
 

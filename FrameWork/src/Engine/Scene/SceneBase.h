@@ -13,7 +13,6 @@
 #include "Engine/Graphics/LightTypes.h"
 #include "Engine/Physics/CollisionSystem.h"
 #include "Engine/ActorImprint/ActorImprintInstanceRegistry.h"
-#include "StructuralMutationResult.h"
 
 // Forward declarations
 class SceneManager;
@@ -28,7 +27,6 @@ enum class SceneStructurePolicy
 	Unrestricted,
 	SingleRootClosedSubtree,
 };
-
 
 //----------------------------------------------------------------------------------------
 // SceneBase class
@@ -60,30 +58,27 @@ public:
 	void EditorUpdate(float deltaTime);		// Update limited elements for editor
 
 	// Add an actor to the scene
-	Actor* AddRootActor(std::unique_ptr<Actor> actor,
-		StructuralMutationResult* result = nullptr);
+	Actor* AddRootActor(std::unique_ptr<Actor> actor);
 
 	// Add a child actor to the scene
 	// Called by Actor::AddChildActor to add a child actor to the scene
-	Actor* AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle,
-		StructuralMutationResult* result = nullptr);
-	StructuralMutationResult CanDestroy(const Actor* actor, bool cascadeToChildren = true) const;
-	StructuralMutationResult CanDestroy(ActorHandle actor, bool cascadeToChildren = true) const;
-	StructuralMutationResult CanAddComponent(const Actor* actor, std::type_index type) const;
-	StructuralMutationResult CanRemoveComponent(const Actor* actor, const Component* component) const;
-	StructuralMutationResult CanReparent(const Actor* actor, const Actor* newParent) const;
-	StructuralMutationResult CanAddChildActor(const Actor* parent) const;
-	StructuralMutationResult CanAddRootActor() const;
-	StructuralMutationResult CanCaptureOrdinarySubtree(const Actor* root) const;
-	StructuralMutationResult CanReplaceTransform(const Actor* actor, TransformKind kind) const;
-	StructuralMutationResult CanReferenceActor(const Guid& guid) const;
-	Component* AddActorComponent(Actor* actor, std::unique_ptr<Component> component,
-		StructuralMutationResult* result = nullptr);
-	bool RemoveActorComponent(Actor* actor, Component* component, StructuralMutationResult* result = nullptr);
+	Actor* AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle);
+	bool CanDestroy(const Actor* actor, bool cascadeToChildren = true) const;
+	bool CanDestroy(ActorHandle actor, bool cascadeToChildren = true) const;
+	bool CanAddComponent(const Actor* actor, std::type_index type) const;
+	bool CanRemoveComponent(const Actor* actor, const Component* component) const;
+	bool CanReparent(const Actor* actor, const Actor* newParent) const;
+	bool CanAddChildActor(const Actor* parent) const;
+	bool CanAddRootActor() const;
+	bool CanCaptureOrdinarySubtree(const Actor* root) const;
+	bool CanReplaceTransform(const Actor* actor, TransformKind kind) const;
+	bool CanReferenceActor(const Guid& guid) const;
+	Component* AddActorComponent(Actor* actor, std::unique_ptr<Component> component);
+	bool RemoveActorComponent(Actor* actor, Component* component);
 
 	// Remove an actor from the scene (mark it for destruction)
 	// Actual release happens at the end of the LateUpdate via ActorPool::CollectGarbage
-	bool RemoveActor(Actor* actor, bool cascadeToChildren = true, StructuralMutationResult* result = nullptr);
+	bool RemoveActor(Actor* actor, bool cascadeToChildren = true);
 
 	// Remove an actor from the scene by name
 	void RemoveActor(const std::string& name)
@@ -104,7 +99,11 @@ public:
 
 	Actor* ResolveActor(ActorHandle handle) const
 	{
-		if (Actor* actor = m_actorPool.Resolve(handle)) return actor;
+		if (Actor* actor = m_actorPool.Resolve(handle))
+		{
+			return actor;
+		}
+
 		return m_actorLookupFallback ? m_actorLookupFallback->ResolveActor(handle) : nullptr;
 	}		// Resolve an actor handle to an actor pointer
 	Actor* ResolveActor(const Guid& guid) const { return ResolveActor(FindActorHandle(guid)); }	// Resolve an actor GUID to an actor pointer
@@ -138,7 +137,12 @@ public:
 	ActorHandle FindActorHandle(const Guid& guid) const
 	{
 		auto it = m_actorGuidMap.find(guid);
-		if (it != m_actorGuidMap.end() && m_actorPool.IsValid(it->second)) return it->second;
+
+		if (it != m_actorGuidMap.end() && m_actorPool.IsValid(it->second))
+		{
+			return it->second;
+		}
+
 		return m_actorLookupFallback ? m_actorLookupFallback->FindActorHandle(guid) : ActorHandle::Null();
 	}
 
@@ -147,17 +151,16 @@ public:
 	Component* AddActorComponentImmediate(
 		Actor* actor,
 		std::unique_ptr<Component> component,
-		std::size_t occurrenceIndex,
-		StructuralMutationResult* result = nullptr
+		std::size_t occurrenceIndex
 	);
 
 	// Removing given component from given actor immediately, without waiting for the next update cycle
 	// Never call this from runtime game code. This function is intended for Editor commands.
-	bool RemoveActorComponentImmediate(Actor* actor, Component* component, StructuralMutationResult* result = nullptr);
+	bool RemoveActorComponentImmediate(Actor* actor, Component* component);
 
 	// Change the parent of an actor to a new parent
 	// Passing nullptr as newParent will make the actor a root actor
-	bool ReparentActor(Actor* actor, Actor* newParent, StructuralMutationResult* result = nullptr);
+	bool ReparentActor(Actor* actor, Actor* newParent);
 
 	// Set the render mode of a canvas
 	// This ensure that all canvas in the hierarchy of the given actor have the same render mode as the governing canvas
@@ -172,10 +175,10 @@ public:
 
 	// Set the match width or height of a canvas
 	bool SetCanvasMatchWidthOrHeight(Canvas* canvas, float match);
-	
+
 	// Setters
 	void SetDirectionalLight(const DirectionalLight& light) { m_directionalLight = light; }	// Set directional light
-	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager	
+	void SetSceneManager(SceneManager* sceneManager) { m_pSceneManager = sceneManager; }	// Set scene manager
 	void SetViewportSize(const UINT width, const UINT height);								// Set viewport size and apply it to all affected systems and components
 
 	// Getters
@@ -207,9 +210,18 @@ private:
 		explicit StructuralMutationScope(SceneBase* scene) noexcept
 			: m_scene(scene), m_previous(scene && scene->m_actorBatchActive)
 		{
-			if (m_scene) m_scene->m_actorBatchActive = true;
+			if (m_scene)
+			{
+				m_scene->m_actorBatchActive = true;
+			}
 		}
-		~StructuralMutationScope() { if (m_scene) m_scene->m_actorBatchActive = m_previous; }
+		~StructuralMutationScope()
+		{
+			if (m_scene)
+			{
+				m_scene->m_actorBatchActive = m_previous;
+			}
+		}
 		StructuralMutationScope(const StructuralMutationScope&) = delete;
 		StructuralMutationScope& operator=(const StructuralMutationScope&) = delete;
 	private:
@@ -244,11 +256,14 @@ private:
 	friend class ActorImprintSystem;
 	friend class ActorImprintInstanceSerializer;
 	friend class SceneActorBatch;
-	StructuralMutationResult ValidateMutationActor(const Actor* actor) const;
-	StructuralMutationResult ValidateInstanceDestruction(ActorHandle root) const;
+	bool ValidateMutationActor(const Actor* actor) const;
+	bool ValidateInstanceDestruction(ActorHandle root) const;
 	void CommitInstanceDestruction(ActorHandle root);
-	StructuralMutationResult CanApplyUIHierarchy(const Actor* root, const Canvas* governingCanvas,
-		const Actor* canvasOverrideOwner = nullptr, std::optional<CanvasRenderMode> canvasOverride = std::nullopt) const;
+	bool CanApplyUIHierarchy(
+		const Actor* root,
+		const Canvas* governingCanvas,
+		const Actor* canvasOverrideOwner = nullptr,
+		std::optional<CanvasRenderMode> canvasOverride = std::nullopt) const;
 	static TransformKind RequiredUITransformKind(bool underCanvas, std::optional<CanvasRenderMode> canvasMode);
 
 	// Helper function for Actor registration
@@ -291,8 +306,11 @@ private:
 	Canvas* FindClosestCanvas(Actor* actor) const;
 
 	// Apply UI hierarchy constraints to the given actor based on the governing canvas
-	bool ApplyUIHierarchyConstraints(Actor* actor, Canvas* governingCanvas,
-		bool allowTransformConversion = true, Actor** outInvalidActor = nullptr);
+	bool ApplyUIHierarchyConstraints(
+		Actor* actor,
+		Canvas* governingCanvas,
+		bool allowTransformConversion = true,
+		Actor** outInvalidActor = nullptr);
 
 	// Apply UI hierarchy constraints to all actors in the scene
 	bool ApplyAllUIHierarchyConstraints(Actor** outInvalidActor = nullptr);

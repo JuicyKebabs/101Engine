@@ -1,4 +1,5 @@
 #include "ActorImprintDefinitionExpander.h"
+#include "Engine/Core/Debug/Debug.h"
 
 #include "ActorImprint.h"
 #include "Detail/ActorImprintDetachedActors.h"
@@ -7,68 +8,101 @@
 
 #include <unordered_map>
 
-bool ActorImprintDefinitionExpander::Expand(const ActorImprint& definition,
-	SceneBase& destination, ActorImprintDefinitionExpansion& outExpansion,
-	ActorImprintDefinitionExpansionError* outError)
+bool ActorImprintDefinitionExpander::Expand(
+	const ActorImprint& definition,
+	SceneBase& destination,
+	ActorImprintDefinitionExpansion& outExpansion)
 {
-	if (outError) *outError = {};
 	ActorImprintDefinitionExpansion candidate;
-	auto fail = [&](LocalObjectId id, std::string path, std::string message)
-	{
-		if (outError) *outError = { id, std::move(path), std::move(message) };
-		return false;
-	};
 
 	try
 	{
 		if (!destination.GetAllActors().empty() || destination.IsStructuralMutationBlocked())
-			return fail(InvalidLocalObjectId, {}, "Working Scene must be empty and idle before definition expansion.");
+		{
+			DBG("Working Scene must be empty and idle before definition expansion.");
+			return false;
+		}
 
-		ActorImprintDetail::DetachedActorsError detachedError;
-		auto detached = ActorImprintDetail::CreateDetachedActors(definition, destination, nullptr, detachedError);
+		auto detached = ActorImprintDetail::CreateDetachedActors(definition, destination, nullptr);
+
 		if (!detached)
-			return fail(detachedError.objectId, std::move(detachedError.path), std::move(detachedError.message));
+		{
+			return false;
+		}
 
 		SceneActorBatch batch(destination);
 		batch.Stage(std::move(*detached));
 		const auto& records = definition.GetActors();
+
 		if (records.size() != batch.Handles().size())
-			return fail(InvalidLocalObjectId, {}, "Definition expansion Actor count is inconsistent.");
+		{
+			DBG("Definition expansion Actor count is inconsistent.");
+			return false;
+		}
 
 		std::unordered_map<LocalObjectId, Actor*> actors;
 		actors.reserve(records.size());
 		candidate.actorGuids.reserve(records.size());
+
 		for (std::size_t i = 0; i < records.size(); ++i)
 		{
 			Actor* actor = batch.Candidate().ResolveActor(batch.Handles()[i]);
+
 			if (!actor || !actors.emplace(records[i].id, actor).second ||
 				!candidate.actorGuids.emplace(records[i].id, actor->GetGuid()).second)
-				return fail(records[i].id, {}, "Definition expansion Actor identity is invalid.");
-			if (records[i].id == definition.GetRootActorId()) candidate.root = actor;
+			{
+				DBG("Definition expansion Actor identity is invalid.");
+				return false;
+			}
+
+			if (records[i].id == definition.GetRootActorId())
+			{
+				candidate.root = actor;
+			}
 
 			std::unordered_map<std::string, std::size_t> occurrences;
+
 			for (const auto& componentDefinition : records[i].components)
 			{
 				Component* component = actor->GetComponentByExactType(
 					componentDefinition.type, occurrences[componentDefinition.typeName]++);
+
 				if (!component || !candidate.components.emplace(componentDefinition.id, component).second)
-					return fail(componentDefinition.id, {}, "Definition expansion Component identity is invalid.");
+				{
+					DBG("Definition expansion Component identity is invalid.");
+					return false;
+				}
 			}
 		}
-		if (!candidate.root) return fail(definition.GetRootActorId(), {}, "Definition root was not expanded.");
+
+		if (!candidate.root)
+		{
+			DBG("Definition root was not expanded.");
+			return false;
+		}
 
 		for (const auto& record : records)
 		{
-			if (record.parentId == InvalidLocalObjectId) continue;
+			if (record.parentId == InvalidLocalObjectId)
+			{
+				continue;
+			}
+
 			const auto child = actors.find(record.id);
 			const auto parent = actors.find(record.parentId);
+
 			if (child == actors.end() || parent == actors.end() || !batch.SetParent(child->second, parent->second))
-				return fail(record.id, {}, "Definition hierarchy could not be expanded.");
+			{
+				DBG("Definition hierarchy could not be expanded.");
+				return false;
+			}
 		}
 
-		std::string validationError;
-		if (!batch.ResolveAndValidate(candidate.root, nullptr, validationError))
-			return fail(InvalidLocalObjectId, {}, std::move(validationError));
+		if (!batch.ResolveAndValidate(candidate.root, nullptr))
+		{
+			return false;
+		}
+
 		batch.PrepareCommit(candidate.root, nullptr);
 		batch.Commit();
 		batch.Attach();
@@ -77,6 +111,7 @@ bool ActorImprintDefinitionExpander::Expand(const ActorImprint& definition,
 	}
 	catch (const std::exception& error)
 	{
-		return fail(InvalidLocalObjectId, {}, error.what());
+		DBG("%s", error.what());
+		return false;
 	}
 }

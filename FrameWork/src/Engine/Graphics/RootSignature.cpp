@@ -58,6 +58,7 @@ RootSignature::RootSignature(ID3D12Device* pDevice)
 			OutputDebugStringA((char*)pError->GetBufferPointer());
 			m_isValid = false;
 		}
+
 		return;
 	}
 

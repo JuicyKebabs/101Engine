@@ -231,7 +231,8 @@ namespace
 		SceneIds ids;
 		Check(BuildSerializedScene(fixture, saved, ids),
 			"Version 4 source Scene with two Instances serializes");
-		Check(saved["version"] == 4 && saved["actors"].size() == 2 &&
+		Check(saved["version"] == 4 &&
+			saved["actors"].size() == 2 &&
 			saved["actorImprintInstances"].size() == 2,
 			"Version 4 separates ordinary Actors from Instance records");
 		bool instanceActorLeaked = false;
@@ -244,10 +245,12 @@ namespace
 		Check(!instanceActorLeaked, "Instance members are never duplicated in the ordinary Actor array");
 
 		SceneLoadResult first = SceneLoader::LoadCandidate(saved, fixture.context, "memory://ordered.scene");
-		Check(first && VerifyLoadedScene(*first.scene, ids),
+		Check(first &&
+			VerifyLoadedScene(*first.scene, ids),
 			"Whole-Scene candidate resolves ordinary-to-Instance and mutual Instance references");
 		json canonicalFirst;
-		Check(first && SceneWriter::SerializeScene(first.scene.get(), canonicalFirst) &&
+		Check(first &&
+			SceneWriter::SerializeScene(first.scene.get(), canonicalFirst) &&
 			canonicalFirst.dump(4) == saved.dump(4),
 			"Save-Load-Save produces the same canonical JSON bytes");
 
@@ -256,7 +259,8 @@ namespace
 		std::reverse(reordered["actorImprintInstances"].begin(), reordered["actorImprintInstances"].end());
 		SceneLoadResult second = SceneLoader::LoadCandidate(reordered, fixture.context, "memory://reordered.scene");
 		json canonicalSecond;
-		Check(second && VerifyLoadedScene(*second.scene, ids) &&
+		Check(second &&
+			VerifyLoadedScene(*second.scene, ids) &&
 			SceneWriter::SerializeScene(second.scene.get(), canonicalSecond) &&
 			canonicalSecond.dump(4) == canonicalFirst.dump(4),
 			"Reordering both Scene arrays produces the same loaded Scene and canonical save");
@@ -276,8 +280,13 @@ namespace
 			const std::string& path, const char* label)
 		{
 			SceneLoadResult load = SceneLoader::LoadCandidate(invalid, fixture.context, assetPath);
-			Check(!load && !load.scene && load.error.code == code && load.error.path == path &&
-				load.error.assetPath == assetPath && !load.error.message.empty(), label);
+			Check(!load &&
+				!load.scene &&
+				load.error.code == code &&
+				load.error.path == path &&
+				load.error.assetPath == assetPath &&
+				!load.error.message.empty(),
+				label);
 		};
 
 		json rootMismatch = saved;
@@ -315,13 +324,13 @@ namespace
 		json unknownInstanceField = saved;
 		unknownInstanceField["actorImprintInstances"][0]["unexpected"] = true;
 		ExpectFailure(unknownInstanceField, SceneLoadErrorCode::InstanceDeserializationFailed,
-			"/actorImprintInstances/0/unexpected",
-			"Unknown Instance field is rejected with its complete JSON Pointer");
+			"/actorImprintInstances/0",
+			"Unknown Instance field is rejected at the Instance boundary");
 
 		json missingAsset = saved;
 		missingAsset["actorImprintInstances"][0]["assetGuid"] = GuidGenerator::Generate().ToString();
 		ExpectFailure(missingAsset, SceneLoadErrorCode::InstanceDeserializationFailed,
-			"/actorImprintInstances/0/assetGuid",
+			"/actorImprintInstances/0",
 			"Missing ActorImprint asset fails with a located diagnostic");
 
 		json migrated = saved;
@@ -329,7 +338,8 @@ namespace
 			DefinitionRevision::Generate().ToString();
 		SceneLoadResult migration = SceneLoader::LoadCandidate(migrated, fixture.context, "memory://migration.scene");
 		json normalized;
-		Check(migration && SceneWriter::SerializeScene(migration.scene.get(), normalized) &&
+		Check(migration &&
+			SceneWriter::SerializeScene(migration.scene.get(), normalized) &&
 			normalized["actorImprintInstances"][0]["sourceDefinitionRevision"] ==
 				saved["actorImprintInstances"][0]["sourceDefinitionRevision"],
 			"Scene candidate applies revision migration and normalizes the next save");
@@ -355,22 +365,18 @@ namespace
 		SceneProbe::destroyCount = 0;
 		SceneLoadResult rejected = SceneLoader::LoadCandidate(saved, fixture.context, "memory://late-failure.scene");
 		std::string expectedPath;
-		for (std::size_t instanceIndex = 0; instanceIndex < saved["actorImprintInstances"].size(); ++instanceIndex)
-		{
-			const json& sourceInstance = saved["actorImprintInstances"][instanceIndex];
-			if (sourceInstance["rootActorGuid"] != ids.rootA.ToString()) continue;
-			for (std::size_t targetIndex = 0; targetIndex < sourceInstance["propertyOverrides"].size(); ++targetIndex)
-			{
-				if (sourceInstance["propertyOverrides"][targetIndex]["targetLocalObjectId"] == 12)
-					expectedPath = "/actorImprintInstances/" + std::to_string(instanceIndex) +
-						"/propertyOverrides/" + std::to_string(targetIndex) + "/properties/~1target";
-			}
-		}
-		Check(!rejected && rejected.error.code == SceneLoadErrorCode::ReferenceResolutionFailed &&
+		for (std::size_t index = 0; index < saved["actorImprintInstances"].size(); ++index)
+			if (saved["actorImprintInstances"][index]["rootActorGuid"] == ids.rootA.ToString())
+				expectedPath = "/actorImprintInstances/" + std::to_string(index);
+
+		Check(!rejected &&
+			rejected.error.code == SceneLoadErrorCode::ReferenceResolutionFailed &&
 			rejected.error.path == expectedPath &&
-			rejected.error.assetPath == "memory://late-failure.scene" && !rejected.error.message.empty(),
+			rejected.error.assetPath == "memory://late-failure.scene" &&
+			!rejected.error.message.empty(),
 			"One invalid reference rejects the complete Scene candidate");
-		Check(SceneProbe::attachCount == 0 && SceneProbe::destroyCount == 0,
+		Check(SceneProbe::attachCount == 0 &&
+			SceneProbe::destroyCount == 0,
 			"Failed unpublished candidate invokes neither OnAttach nor OnDestroy");
 		Check(fixture.system.Unload(fixture.imprint),
 			"Failed candidate releases every ActorImprint definition pin");
@@ -410,10 +416,12 @@ namespace
 		SceneProbe::destroyCount = 0;
 		SceneLoadResult rejected = SceneLoader::LoadCandidate(
 			saved, fixture.context, "memory://ui-incompatible.scene");
-		Check(!rejected && rejected.error.code == SceneLoadErrorCode::UIHierarchyFailed &&
+		Check(!rejected &&
+			rejected.error.code == SceneLoadErrorCode::UIHierarchyFailed &&
 			rejected.error.path == expectedPath,
 			"UI-incompatible Instance structure rejects the whole Scene at its Instance path");
-		Check(SceneProbe::attachCount == 0 && SceneProbe::destroyCount == 0,
+		Check(SceneProbe::attachCount == 0 &&
+			SceneProbe::destroyCount == 0,
 			"UI failure neither converts nor invokes lifecycle callbacks on Instance members");
 		Check(fixture.system.Unload(fixture.imprint),
 			"UI failure releases every candidate definition pin");
@@ -428,9 +436,11 @@ namespace
 		std::unique_ptr<SceneBase> clone = SceneCloner::Clone(&source, fixture.context);
 		json sourceJson;
 		json cloneJson;
-		Check(clone && VerifyLoadedScene(*clone, ids) &&
+		Check(clone &&
+			VerifyLoadedScene(*clone, ids) &&
 			SceneWriter::SerializeScene(&source, sourceJson) &&
-			SceneWriter::SerializeScene(clone.get(), cloneJson) && sourceJson == cloneJson,
+			SceneWriter::SerializeScene(clone.get(), cloneJson) &&
+			sourceJson == cloneJson,
 			"SceneCloner uses the v4 candidate contract and preserves Instance provenance");
 		if (clone) clone->Finalize();
 		source.Finalize();

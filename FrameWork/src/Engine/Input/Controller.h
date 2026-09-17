@@ -53,8 +53,14 @@ private:
 	void UpdateStickState(ControllerState& contState, ControllerInputInfo& inputInfo);		//Stick State
 
 	//Input Helper Functions
-	bool IsButtonTriggered(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const;	//Button Trigger
-	bool IsButtonDown(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const;		//Button Down
+	bool IsButtonTriggered(
+		WORD buttonFlag,
+		const XINPUT_GAMEPAD& currentState,
+		const XINPUT_GAMEPAD& previousState) const; //Button Trigger
+	bool IsButtonDown(
+		WORD buttonFlag,
+		const XINPUT_GAMEPAD& currentState,
+		const XINPUT_GAMEPAD& previousState) const; //Button Down
 	bool IsButtonUp(WORD buttonFlag, const XINPUT_GAMEPAD& currentState, const XINPUT_GAMEPAD& previousState) const;		//Button Up
 	DirectX::XMFLOAT2 ProcessStickInput(SHORT rawX, SHORT rawY, float deadZone) const;										//Stick Processing
 };

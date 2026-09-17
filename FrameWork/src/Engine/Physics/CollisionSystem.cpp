@@ -18,21 +18,35 @@ void CollisionSystem::Register(Collider* collider)
 
 void CollisionSystem::Unregister(Collider* collider)
 {
-	m_pCollidersList.erase(std::remove(m_pCollidersList.begin(), m_pCollidersList.end(), collider), m_pCollidersList.end());
+	m_pCollidersList.erase(
+		std::remove(m_pCollidersList.begin(), m_pCollidersList.end(), collider), m_pCollidersList.end());
 }
 
 void CollisionSystem::CheckColliders()
 {
 	for (auto& c : m_pCollidersList)
 	{
-		if (c->deleteFlag() || !c->GetOwner()) { Unregister(c); }
-		else if (!c->GetOwner()->IsActive()) { c->SetActive(false); }
+		if (c->deleteFlag() || !c->GetOwner())
+		{
+			Unregister(c);
+		}
+		else if (!c->GetOwner()->IsActive())
+		{
+			c->SetActive(false);
+		}
 	}
 
 	//前回の衝突ペアリストを走査してデリートフラグが立っているコライダーを含むペアを削除
-	for (auto it = m_previousCollisionPairs.begin(); it != m_previousCollisionPairs.end(); ) {
-		if (it->colliderA->deleteFlag() || it->colliderB->deleteFlag()) { it = m_previousCollisionPairs.erase(it); }
-		else { it++; }
+	for (auto it = m_previousCollisionPairs.begin(); it != m_previousCollisionPairs.end();)
+	{
+		if (it->colliderA->deleteFlag() || it->colliderB->deleteFlag())
+		{
+			it = m_previousCollisionPairs.erase(it);
+		}
+		else
+		{
+			it++;
+		}
 	}
 }
 
@@ -133,7 +147,10 @@ void CollisionSystem::NarrowPhase()
 		result = NarrowPhaseCollision(colliderA, colliderB);
 
 		//衝突していなければスキップ
-		if (!result.isCollided) continue;
+		if (!result.isCollided)
+		{
+			continue;
+		}
 
 		//法線向きのチェック
 		OrientNormalAToB(
@@ -329,10 +346,16 @@ void CollisionSystem::RaycastSegmentQuery(
 	for(auto& collider : m_pCollidersList)
 	{
 		//非アクティブなコライダーはスキップ
-		if (!collider->isActive()) continue;
-		
+		if (!collider->isActive())
+		{
+			continue;
+		}
+
 		//レイヤーチェック
-		if (!CheckLayerRaycast(ray, collider)) continue;
+		if (!CheckLayerRaycast(ray, collider))
+		{
+			continue;
+		}
 
 		RaycastHitInfo info{};	//レイキャストヒット情報構造体
 		bool hit = false;		//ヒットフラグ
@@ -398,9 +421,20 @@ bool CollisionSystem::CollisionAABB(
 	AABB aabbB = colliderB->GetSewptAABB();	//コライダーBのAABB取得
 
 	//衝突検知
-	if (!(aabbA.min.x <= aabbB.max.x && aabbA.max.x >= aabbB.min.x)) return false;	//X軸方向
-	if (!(aabbA.min.y <= aabbB.max.y && aabbA.max.y >= aabbB.min.y)) return false;	//Y軸方向
-	if (!(aabbA.min.z <= aabbB.max.z && aabbA.max.z >= aabbB.min.z)) return false;	//Z軸方向
+	if (!(aabbA.min.x <= aabbB.max.x && aabbA.max.x >= aabbB.min.x))
+	{
+		return false; //X軸方向
+	}
+
+	if (!(aabbA.min.y <= aabbB.max.y && aabbA.max.y >= aabbB.min.y))
+	{
+		return false; //Y軸方向
+	}
+
+	if (!(aabbA.min.z <= aabbB.max.z && aabbA.max.z >= aabbB.min.z))
+	{
+		return false; //Z軸方向
+	}
 
 	return true;
 }
@@ -562,6 +596,7 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 
 	//コライダーAのローカル座標系で見たコライダーBの位置ベクトルを計算
 	float t[3]; //コライダーAのローカル座標系で見たコライダーBの位置ベクトル
+
 	for (int i = 0; i < 3; ++i)
 	{//各軸について内積計算
 		t[i] = XMVectorGetX(XMVector3Dot(tWorld, a.axis[i]));
@@ -571,6 +606,7 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 	float R[3][3];					//各軸の方向ベクトルの内積を格納する配列
 	float absR[3][3];				//絶対値を格納する配列
 	const float EPSILON = 0.0001f;	//ゼロ除算防止用の微小値
+
 	for (int i = 0; i < 3; i++)
 	{
 		for (int j = 0; j < 3; j++)
@@ -595,15 +631,18 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 
 		float overlap = ra + rb - fabsf(t[i]);
 
-		if (overlap < 0) return result; // 分離軸あり
+		if (overlap < 0)
+		{
+			return result; // 分離軸あり
+		}
 
 		if (overlap < minOverlap || minOverlap == 0)
 		{
 			minOverlap = overlap;
 			minAxis = a.axis[i];
 		}
-
 	}
+
 	//コライダーBの各軸
 	for (int i = 0; i < 3; ++i)
 	{
@@ -620,7 +659,10 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 
 		float overlap = ra + rb - tProj;
 
-		if (overlap < 0) return result; // 分離軸あり
+		if (overlap < 0)
+		{
+			return result; // 分離軸あり
+		}
 
 		if (overlap < minOverlap || minOverlap == 0)
 		{
@@ -631,15 +673,22 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 	}
 
 	//交差軸の更新ラムダ式
-	auto UpdateMinAxis = [&](XMVECTOR axis, float overlap) {
-		const float eps = 1e-6f;	//微小値
+	auto UpdateMinAxis = [&](XMVECTOR axis, float overlap)
+	{
+		const float eps = 1e-6f; //微小値
 		float lenSq = XMVectorGetX(XMVector3LengthSq(axis));
-		if (lenSq < eps) return;	// ほぼ平行で無効
-		if (overlap < minOverlap) {
+
+		if (lenSq < eps)
+		{
+			return; // ほぼ平行で無効
+		}
+
+		if (overlap < minOverlap)
+		{
 			minOverlap = overlap;
 			minAxis = axis;			// そのAi×Bjを採用
 		}
-		};
+	};
 
 	//交差軸の判定
 	//A0 x B0
@@ -648,7 +697,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.y * absR[0][2] + eb.z * absR[0][1];
 		float tProj = fabs(t[2] * R[1][0] - t[1] * R[2][0]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[0], b.axis[0]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -658,7 +712,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.x * absR[0][2] + eb.z * absR[0][0];
 		float tProj = fabs(t[2] * R[1][1] - t[1] * R[2][1]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[0], b.axis[1]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -668,7 +727,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.x * absR[0][1] + eb.y * absR[0][0];
 		float tProj = fabs(t[2] * R[1][2] - t[1] * R[2][2]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[0], b.axis[2]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -678,7 +742,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.y * absR[1][2] + eb.z * absR[1][1];
 		float tProj = fabs(t[0] * R[2][0] - t[2] * R[0][0]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[1], b.axis[0]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -688,7 +757,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.x * absR[1][2] + eb.z * absR[1][0];
 		float tProj = fabs(t[0] * R[2][1] - t[2] * R[0][1]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[1], b.axis[1]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -698,7 +772,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.x * absR[1][1] + eb.y * absR[1][0];
 		float tProj = fabs(t[0] * R[2][2] - t[2] * R[0][2]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[1], b.axis[2]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -708,7 +787,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.y * absR[2][2] + eb.z * absR[2][1];
 		float tProj = fabs(t[1] * R[0][0] - t[0] * R[1][0]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[2], b.axis[0]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -718,7 +802,12 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.x * absR[2][2] + eb.z * absR[2][0];
 		float tProj = fabs(t[1] * R[0][1] - t[0] * R[1][1]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[2], b.axis[1]);
 		UpdateMinAxis(axis, overlap);
 	}
@@ -728,13 +817,19 @@ ContactResult CollisionSystem::CollisionBoxToBox(Collider* colliderA, Collider* 
 		float rb = eb.x * absR[2][1] + eb.y * absR[2][0];
 		float tProj = fabs(t[1] * R[0][2] - t[0] * R[1][2]);
 		float overlap = ra + rb - tProj;
-		if (overlap < 0) return result; //分離軸あり
+
+		if (overlap < 0)
+		{
+			return result; //分離軸あり
+		}
+
 		XMVECTOR axis = XMVector3Cross(a.axis[2], b.axis[2]);
 		UpdateMinAxis(axis, overlap);
 	}
 
 	//最小軸の向きを調整
 	XMVECTOR centerDiff = XMVectorSubtract(b.center, a.center);
+
 	if (XMVectorGetX(XMVector3Dot(centerDiff, minAxis)) < 0)
 	{
 		minAxis = XMVectorNegate(minAxis);
@@ -831,8 +926,12 @@ ContactResult CollisionSystem::CollisionCapsuleToCapsule(
 	);
 
 	//衝突検知
-	float radiusSum = segA.radius + segB.radius;			//半径の和
-	if (!(distSq <= radiusSum * radiusSum)) return result;	//衝突なし
+	float radiusSum = segA.radius + segB.radius; //半径の和
+
+	if (!(distSq <= radiusSum * radiusSum))
+	{
+		return result; //衝突なし
+	}
 
 	//衝突時パラメータの計算
 	XMVECTOR point;		//衝突点
@@ -844,6 +943,7 @@ ContactResult CollisionSystem::CollisionCapsuleToCapsule(
 
 	//法線ベクトルの計算
 	float dist = sqrtf(distSq); //最短距離
+
 	if (dist < epsilon)
 	{//最短距離がほぼ0の場合の処理
 		//中心点の差ベクトルを正規化して法線ベクトルとする
@@ -894,8 +994,9 @@ ContactResult CollisionSystem::CollisionBoxToSphere(
 	float sphereRadius;		//球の半径
 
 	//OBB情報の取得
-	XMStoreFloat3(&boxCenter, obb.center);	//OBBの中心点取得
-	boxHalfSizes = obb.halfSizes;			//OBBの各軸方向の半分のサイズ取得
+	XMStoreFloat3(&boxCenter, obb.center); //OBBの中心点取得
+	boxHalfSizes = obb.halfSizes;		   //OBBの各軸方向の半分のサイズ取得
+
 	for (int i = 0; i < 3; ++i)				//OBBの各軸の方向ベクトル取得
 	{
 		boxAxis[i] = obb.axis[i];
@@ -930,7 +1031,10 @@ ContactResult CollisionSystem::CollisionBoxToSphere(
 	float radiusSq = sphereRadius * sphereRadius; //球の半径の二乗
 
 	//衝突検知
-	if (distSq > radiusSq) return result; //衝突なし
+	if (distSq > radiusSq)
+	{
+		return result; //衝突なし
+	}
 
 	//衝突時パラメータの計算
 	XMVECTOR point;		//衝突点
@@ -1076,8 +1180,12 @@ ContactResult CollisionSystem::CollisionSphereToCapsule(
 		closestPoint				//カプセルセグメント上の最短点
 	);
 
-	float radiusSum = radius + cupSeg.radius;				//半径の和
-	if (!(distSq <= radiusSum * radiusSum)) return result;	//衝突なし
+	float radiusSum = radius + cupSeg.radius; //半径の和
+
+	if (!(distSq <= radiusSum * radiusSum))
+	{
+		return result; //衝突なし
+	}
 
 	//衝突時パラメータの計算
 	const float epsilon = 0.0001f;	//微小値
@@ -1148,11 +1256,11 @@ ContactResult CollisionSystem::CollisionBoxToCapsuleCCD(Collider* box, Collider*
 	{
 		float alpha = static_cast<float>(i) / static_cast<float>(steps);	//補間パラメータ
 
-		OBB obb = CreateOBB(box, alpha); ;							//補間後のOBB作成
-		CapsuleSegment seg = CreateCapsuleSegment(capsule, alpha);	//補間後のカプセルセグメント作成
+		OBB obb = CreateOBB(box, alpha);
+		;														   //補間後のOBB作成
+		CapsuleSegment seg = CreateCapsuleSegment(capsule, alpha); //補間後のカプセルセグメント作成
 
-
-		ContactResult result = CollisonOBBtoCapsule(obb, seg);	//OBB対カプセルの衝突判定
+		ContactResult result = CollisonOBBtoCapsule(obb, seg); //OBB対カプセルの衝突判定
 
 		if (result.isCollided)
 		{
@@ -1160,21 +1268,34 @@ ContactResult CollisionSystem::CollisionBoxToCapsuleCCD(Collider* box, Collider*
 			hit = result;
 			break;
 		}
+
 		alphaPrev = alpha;
 	}
 
-	if (alphaHit < 0.0f) return {};
+	if (alphaHit < 0.0f)
+	{
+		return {};
+	}
 
 	// 2) ちょい精度上げたいなら二分探索でTOIを詰める（任意）
 	float lo = alphaPrev, hi = alphaHit;
+
 	for (int k = 0; k < 6; k++)
 	{
 		float mid = (lo + hi) * 0.5f;
-		ContactResult tmp = CollisonOBBtoCapsule(CreateOBB(box, mid),
-			CreateCapsuleSegment(capsule, mid));
-		if (tmp.isCollided) { hi = mid; hit = tmp; }
-		else lo = mid;
+		ContactResult tmp = CollisonOBBtoCapsule(CreateOBB(box, mid), CreateCapsuleSegment(capsule, mid));
+
+		if (tmp.isCollided)
+		{
+			hi = mid;
+			hit = tmp;
+		}
+		else
+		{
+			lo = mid;
+		}
 	}
+
 	alphaHit = hi;
 
 	// 3) ヒット後に法線方向へ進んだ量を depth に反映
@@ -1232,7 +1353,8 @@ ContactResult CollisionSystem::CollisonOBBtoCapsule(const OBB& obb, const Capsul
 	//カプセルセグメント上をサンプリングしてOBBとの最短距離を計算
 	for (int i = 0; i < sampleCount; ++i)
 	{
-		float t = 0.0f;	//パラメータt
+		float t = 0.0f; //パラメータt
+
 		if (sampleCount > 1)
 		{//パラメータtを計算
 			t = static_cast<float>(i) / static_cast<float>(sampleCount - 1); //パラメータt
@@ -1283,7 +1405,10 @@ ContactResult CollisionSystem::CollisonOBBtoCapsule(const OBB& obb, const Capsul
 		}
 	}
 
-	if (minDistSq > radius * radius) return result; //衝突なし
+	if (minDistSq > radius * radius)
+	{
+		return result; //衝突なし
+	}
 
 	//衝突時パラメータの計算
 	XMVECTOR point;		//衝突点
@@ -1424,7 +1549,10 @@ ContactResult CollisionSystem::CollisionSpheresSegments(const SphereSegment& seg
 	);
 
 	//衝突検知
-	if (!(dist <= radiusSum)) return result;
+	if (!(dist <= radiusSum))
+	{
+		return result;
+	}
 
 	//衝突時パラメータの計算
 	const float epsilon = 0.0001f;	//微小値
@@ -1470,8 +1598,10 @@ ContactResult CollisionSystem::CollisionSpheresSegments(const SphereSegment& seg
 
 //セグメント間の最小距離の二乗を取得
 float CollisionSystem::GetMinDistanceSquaredSegmentToSegment(
-	const DirectX::FXMVECTOR& p0, const DirectX::FXMVECTOR& p1,	//セグメントPの端点
-	const DirectX::FXMVECTOR& q0, const DirectX::FXMVECTOR& q1,	//セグメントQの端点
+	const DirectX::FXMVECTOR& p0,
+	const DirectX::FXMVECTOR& p1,	//セグメントPの端点
+	const DirectX::FXMVECTOR& q0,
+	const DirectX::FXMVECTOR& q1,	//セグメントQの端点
 	DirectX::XMVECTOR& outP,									//セグメントP上の最短点
 	DirectX::XMVECTOR& outQ										//セグメントQ上の最短点
 )
@@ -1518,7 +1648,11 @@ float CollisionSystem::GetMinDistanceSquaredSegmentToSegment(
 }
 
 //点とセグメント間の最小距離の二乗を取得
-float CollisionSystem::GetMinDistanceSquaredPointToSegment(const DirectX::FXMVECTOR& point, const DirectX::FXMVECTOR& segA, const DirectX::FXMVECTOR& segB, DirectX::XMVECTOR& outClosest)
+float CollisionSystem::GetMinDistanceSquaredPointToSegment(
+	const DirectX::FXMVECTOR& point,
+	const DirectX::FXMVECTOR& segA,
+	const DirectX::FXMVECTOR& segB,
+	DirectX::XMVECTOR& outClosest)
 {
 	XMVECTOR segDir = XMVectorSubtract(segB, segA);		//セグメントの方向ベクトル
 	XMVECTOR toPoint = XMVectorSubtract(point, segA);	//セグメントの端点Aから点へのベクトル
@@ -1527,6 +1661,7 @@ float CollisionSystem::GetMinDistanceSquaredPointToSegment(const DirectX::FXMVEC
 
 	//セグメントの長さが極端に短い場合の処理
 	const float epsilon = 0.0001f; //ゼロ除算防止用の微小値
+
 	if (segLengthSquared < epsilon)
 	{//セグメントの長さがほぼゼロの場合、端点Aを最短点とする
 		outClosest = segA;
@@ -1548,7 +1683,10 @@ float CollisionSystem::GetMinDistanceSquaredPointToSegment(const DirectX::FXMVEC
 }
 
 //点とOBB間の最小距離の二乗を取得
-float CollisionSystem::GetMinDistanceSquaredPointToOBB(const DirectX::FXMVECTOR& point, const OBB& obb, DirectX::XMVECTOR& outClosest)
+float CollisionSystem::GetMinDistanceSquaredPointToOBB(
+	const DirectX::FXMVECTOR& point,
+	const OBB& obb,
+	DirectX::XMVECTOR& outClosest)
 {
 	XMVECTOR d = XMVectorSubtract(point, obb.center); //点からOBBの中心へのベクトル
 
@@ -1597,6 +1735,7 @@ bool CollisionSystem::PairExistsinList(const CollisionPair& pair, const std::vec
 			return true;
 		}
 	}
+
 	return false;
 }
 
@@ -1704,7 +1843,10 @@ void CollisionSystem::UpdateRaycastCollisionState(RaycastSegment& ray)
 
 	for (auto& p : ray.prevHitInfos)
 	{
-		if(p.opponent) prevSet.insert(p.opponent);
+		if (p.opponent)
+		{
+			prevSet.insert(p.opponent);
+		}
 	}
 
 	std::unordered_set<Collider*> currSet;
@@ -1712,7 +1854,11 @@ void CollisionSystem::UpdateRaycastCollisionState(RaycastSegment& ray)
 
 	for (auto& p : ray.currHitInfos)
 	{
-		if (!p.opponent) continue;
+		if (!p.opponent)
+		{
+			continue;
+		}
+
 		currSet.insert(p.opponent);
 
 		p.state = (prevSet.find(p.opponent) != prevSet.end())
@@ -1722,7 +1868,11 @@ void CollisionSystem::UpdateRaycastCollisionState(RaycastSegment& ray)
 
 	for (auto& p : ray.prevHitInfos)
 	{
-		if (!p.opponent) continue;
+		if (!p.opponent)
+		{
+			continue;
+		}
+
 		if (currSet.find(p.opponent) == currSet.end())
 		{
 			RaycastHitInfo exitInfo = p;
@@ -1748,7 +1898,10 @@ bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, 
 	);
 	float rayLength = XMVectorGetX(XMVector3Length(rayDirection));	//レイの長さ
 
-	if (rayLength < EPSILON) return false; //レイの長さが極端に短い場合、衝突しない
+	if (rayLength < EPSILON)
+	{
+		return false; //レイの長さが極端に短い場合、衝突しない
+	}
 
 	XMVECTOR directionNorm = XMVectorScale(	//正規化されたレイの方向ベクトル
 		rayDirection,
@@ -1759,8 +1912,9 @@ bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, 
 	XMVECTOR relativeOrigin = XMVectorSubtract(rayOrigin, obb.center); 
 
 	//レイの始点からOBBの中心へのベクトル
-	float originLocal[3];		//レイの始点のOBBローカル座標系での位置
-	float directionLocal[3];	//レイの方向ベクトルのOBBローカル座標系での成分
+	float originLocal[3];	 //レイの始点のOBBローカル座標系での位置
+	float directionLocal[3]; //レイの方向ベクトルのOBBローカル座標系での成分
+
 	for(int i = 0; i < 3; i++)
 	{
 		originLocal[i] = XMVectorGetX(XMVector3Dot(relativeOrigin, obb.axis[i]));
@@ -1783,7 +1937,10 @@ bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, 
 		if (fabs(direction) < EPSILON)
 		{
 			//レイがスラブに平行な場合、始点がスラブの範囲内にあるかチェック
-			if(origin < -halfSize || origin > halfSize) return false;
+			if (origin < -halfSize || origin > halfSize)
+			{
+				return false;
+			}
 		}
 		else
 		{
@@ -1791,16 +1948,34 @@ bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, 
 			float t1 = (-halfSize - origin) * invD;	//スラブの負の面との交点パラメータ
 			float t2 = (halfSize - origin) * invD;	//スラブの正の面との交点パラメータ
 
-			if (t1 > t2) std::swap(t1, t2);	//交点パラメータの入れ替え
-			if (t1 > tEnter) tEnter = t1;	//入り口パラメータの更新
-			if (t2 < tExit) tExit = t2;		//出口パラメータの更新
+			if (t1 > t2)
+			{
+				std::swap(t1, t2); //交点パラメータの入れ替え
+			}
 
-			if (tEnter > tExit) return false;	//入り口パラメータが出口パラメータを超えた場合、衝突しない
+			if (t1 > tEnter)
+			{
+				tEnter = t1; //入り口パラメータの更新
+			}
+
+			if (t2 < tExit)
+			{
+				tExit = t2; //出口パラメータの更新
+			}
+
+			if (tEnter > tExit)
+			{
+				return false; //入り口パラメータが出口パラメータを超えた場合、衝突しない
+			}
 		}
 	}
 
-	float tHit = (tEnter >= 0.0f) ? tEnter : tExit;		//衝突パラメータ
-	if (tHit < 0.0f || tHit > rayLength) return false;	//衝突パラメータがレイの範囲外の場合、衝突しない
+	float tHit = (tEnter >= 0.0f) ? tEnter : tExit; //衝突パラメータ
+
+	if (tHit < 0.0f || tHit > rayLength)
+	{
+		return false; //衝突パラメータがレイの範囲外の場合、衝突しない
+	}
 
 	//衝突情報の設定
 	//衝突点の計算
@@ -1813,7 +1988,8 @@ bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, 
 	);
 
 	//法線の計算
-	float hitNormalLocal[3] = { 0.0f, 0.0f, 0.0f }; //衝突面の法線ベクトル(OBBローカル座標系)
+	float hitNormalLocal[3] = {0.0f, 0.0f, 0.0f}; //衝突面の法線ベクトル(OBBローカル座標系)
+
 	for(int i = 0; i < 3; i++)
 	{
 		hitNormalLocal[i] = originLocal[i] + directionLocal[i] * tHit;	//衝突点のOBBローカル座標系での位置
@@ -1823,9 +1999,17 @@ bool CollisionSystem::RaycastBox(const RaycastSegment& ray, Collider* collider, 
 	float dy = half[1] - fabsf(hitNormalLocal[1]);	//Y軸方向の衝突面までの距離
 	float dz = half[2] - fabsf(hitNormalLocal[2]);	//Z軸方向の衝突面までの距離
 
-	int axis = 0;													 //最も近い衝突面の軸インデックス
-	if (dy < dx) axis = 1;											//Y軸方向の衝突面が最も近い場合
-	if ((axis == 1 && dz < dy) || (axis == 0 && dz < dx)) axis = 2;	//Z軸方向の衝突面が最も近い場合
+	int axis = 0; //最も近い衝突面の軸インデックス
+
+	if (dy < dx)
+	{
+		axis = 1; //Y軸方向の衝突面が最も近い場合
+	}
+
+	if ((axis == 1 && dz < dy) || (axis == 0 && dz < dx))
+	{
+		axis = 2; //Z軸方向の衝突面が最も近い場合
+	}
 
 	float sign = (hitNormalLocal[axis] >= 0.0f) ? 1.0f : -1.0f; //法線の向き
 
@@ -1846,11 +2030,13 @@ bool CollisionSystem::RaycastSphere(const RaycastSegment& ray, Collider* collide
 	//レイの始点と方向ベクトル取得
 	XMVECTOR rayOrigin = XMLoadFloat3(&ray.startPoint);				//レイの始点ベクトル
 	XMVECTOR rayDirection = XMVectorSubtract(						//レイの方向ベクトル
-		XMLoadFloat3(&ray.endPoint),
-		rayOrigin
-	);
-	float rayLength = XMVectorGetX(XMVector3Length(rayDirection));	//レイの長さ
-	if (rayLength <= 1e-6f) return false; //レイの長さが極端に短い場合、衝突しない
+		XMLoadFloat3(&ray.endPoint), rayOrigin);
+	float rayLength = XMVectorGetX(XMVector3Length(rayDirection)); //レイの長さ
+
+	if (rayLength <= 1e-6f)
+	{
+		return false; //レイの長さが極端に短い場合、衝突しない
+	}
 
 	XMVECTOR directionNorm = XMVectorScale(	//正規化されたレイの方向ベクトル
 		rayDirection,
@@ -1874,12 +2060,14 @@ bool CollisionSystem::RaycastSphere(const RaycastSegment& ray, Collider* collide
 	}
 
 	float disc = b * b - c;
+
 	if (disc < 0.0f)
 	{//判別式が負の場合、衝突しない
 		return false;
 	}
 
 	float t = -b - sqrtf(disc);
+
 	if (t < 0.0f)
 	{//レイの始点が球の内部にある場合
 		t = 0.0f;
@@ -1925,7 +2113,11 @@ bool CollisionSystem::RaycastCapsule(const RaycastSegment& ray, Collider* collid
 	XMVECTOR rayEnd = XMLoadFloat3(&ray.endPoint);					//レイの終点ベクトル
 	XMVECTOR rayDirection = XMVectorSubtract(rayEnd, rayOrigin);	//レイの方向ベクトル
 	float rayLength = XMVectorGetX(XMVector3Length(rayDirection));	//レイの長さ
-	if (rayLength < EPSILON) return false; //レイの長さが極端に短い場合、衝突しない
+
+	if (rayLength < EPSILON)
+	{
+		return false; //レイの長さが極端に短い場合、衝突しない
+	}
 
 	//カプセルコライダー情報取得
 	auto capsule = collider->GetCurrentCapsuleCollider();
@@ -1939,7 +2131,11 @@ bool CollisionSystem::RaycastCapsule(const RaycastSegment& ray, Collider* collid
 	);
 
 	float radius = capsule.radius; //カプセルの半径
-	if (distSq > radius * radius) return false; //衝突なし
+
+	if (distSq > radius * radius)
+	{
+		return false; //衝突なし
+	}
 
 	//衝突情報の設定
 	//衝突点の計算
@@ -1951,6 +2147,7 @@ bool CollisionSystem::RaycastCapsule(const RaycastSegment& ray, Collider* collid
 	float lenSq = XMVectorGetX(XMVector3LengthSq(diff));	//最短距離の二乗
 
 	XMVECTOR hitNormal;
+
 	if(lenSq > EPSILON * EPSILON)
 	{//最短距離がほぼ0でない場合
 		hitNormal = XMVector3Normalize(diff); //法線ベクトルの計算

@@ -8,11 +8,10 @@
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Actor/ActorHandle.h"
 #include "Engine/Core/GUID/Guid.h"
-#include "Engine/Scene/StructuralMutationResult.h"
 
 //-----------------------------------------------------------------------------
 // Actor class
-// This class represents all entities in the game world. 
+// This class represents all entities in the game world.
 // It contains components that define its behavior and properties,.
 // This can have a hierarchical relationship with other actors (parent-child).
 //-----------------------------------------------------------------------------
@@ -35,7 +34,10 @@ public:
 		bool isActive;
 		TagId tag;
 		std::string name;
-		InitDesc(bool isActive = true, TagId tag = TAG_NONE, std::string name = "Actor"
+		InitDesc(
+			bool isActive = true,
+			TagId tag = TAG_NONE,
+			std::string name = "Actor"
 		) : isActive(isActive), tag(tag), name(name) {}
 	};
 
@@ -57,7 +59,7 @@ public:
 	void Update(float deltaTime);		// Update
 	void LateUpdate(float deltaTime);	// Late update
 
-	void Destroy(StructuralMutationResult* result = nullptr);
+	bool Destroy();
 	bool IsDestroyed() const;	// Check if actor is destroyed
 
 	// Setters
@@ -103,38 +105,39 @@ public:
 	// Add a pre-created component instance to the container.
 	// Used by ComponentRegistry::AddToActor, where the concrete type is only
 	// known at runtime (created via a Factory function returning Component*).
-	Component* AddComponent(std::unique_ptr<Component> component, StructuralMutationResult* result = nullptr);
+	Component* AddComponent(std::unique_ptr<Component> component);
 
 	// Check if the container has a component of type T
 	template<class T>
-	bool HasComponent() const 
+	bool HasComponent() const
 	{
 		static_assert(std::is_base_of_v<Component, T>, "HasComponent<T>: T must derive from Component");
 
 		bool result = false;
 
 		auto it = m_components.find(GetComponentTypeId<T>());
-		 if (it != m_components.end() && !it->second.instances.empty()) 
-		 {
-			 for (const auto& instance : it->second.instances)
-			 {
-				 if (static_cast<T*>(instance.get()))
-				 {
-					 result = true;
-				 }
-			 }
-		 }
 
-		 for(auto& pending : m_pendingComponents) 
-		 {
-			 if (pending.typeId == GetComponentTypeId<T>()) 
-			 {
-				 if (static_cast<T*>(pending.instance.get())) 
-				 {
-					 result = true;
-				 }
-			 }
-		 }
+		if (it != m_components.end() && !it->second.instances.empty())
+		{
+			for (const auto& instance : it->second.instances)
+			{
+				if (static_cast<T*>(instance.get()))
+				{
+					result = true;
+				}
+			}
+		}
+
+		for (auto& pending : m_pendingComponents)
+		{
+			if (pending.typeId == GetComponentTypeId<T>())
+			{
+				if (static_cast<T*>(pending.instance.get()))
+				{
+					result = true;
+				}
+			}
+		}
 
 		return result;
 	}
@@ -199,49 +202,63 @@ public:
 
 	// Remove a component of type T from the container by class type
 	template<class T>
-	void RemoveComponentByClass(StructuralMutationResult* result = nullptr)
+	bool RemoveComponentByClass()
 	{
 		static_assert(std::is_base_of_v<Component, T>, "RemoveComponentByClass<T>: T must derive from Component");
+		bool succeeded = true;
 		using Policy = ComponentPolicy<T>;
 		Policy policy;
+
 		if(policy.cardinality == ComponentCardinality::UniqueRequired)
 		{
-			static_assert(policy.cardinality != ComponentCardinality::UniqueRequired, "RemoveComponentByClass<T>: Components of this type cannot be removed");
-			return;
+			static_assert(policy.cardinality != ComponentCardinality::UniqueRequired,
+				"RemoveComponentByClass<T>: Components of this type cannot be removed");
+			return false;
 		}
-		
+
 		auto typeId = GetComponentTypeId<T>();
 		auto bucket = m_components.find(typeId);
+
 		if (bucket != m_components.end() && !bucket->second.instances.empty())
 		{
 			for (const auto& instance : bucket->second.instances)
 			{
 				if (auto casted = static_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
 				{
-					casted->MarkForDestruction(result);
+					if (!casted->MarkForDestruction())
+					{
+						succeeded = false;
+					}
 				}
 			}
 		}
+
 		for (auto& pending : m_pendingComponents)
 		{
 			if (pending.typeId == typeId)
 			{
 				if (auto casted = static_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 				{
-					casted->MarkForDestruction(result);
+					if (!casted->MarkForDestruction())
+					{
+						succeeded = false;
+					}
 				}
 			}
 		}
+
+		return succeeded;
 	}
 
 	// Get a component of type T from the container by class type
 	template<class T>
 	T* GetComponentByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
-		
+
 		// Exact type match search
 		auto typeId = GetComponentTypeId<T>();
 		auto it = m_components.find(typeId);
+
 		if (it != m_components.end() && !it->second.instances.empty())
 		{
 			for (const auto& instance : it->second.instances)
@@ -252,6 +269,7 @@ public:
 				}
 			}
 		}
+
 		for (auto& pending : m_pendingComponents)
 		{
 			if (pending.typeId == typeId)
@@ -266,7 +284,11 @@ public:
 		// Inheritance search
 		for (auto& [id, bucket] : m_components)
 		{
-			if (id == typeId) continue;
+			if (id == typeId)
+			{
+				continue;
+			}
+
 			for(const auto& instance : bucket.instances)
 			{
 				if (auto casted = dynamic_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
@@ -275,9 +297,14 @@ public:
 				}
 			}
 		}
+
 		for(auto& pending : m_pendingComponents)
 		{
-			if (pending.typeId == typeId) continue;
+			if (pending.typeId == typeId)
+			{
+				continue;
+			}
+
 			if (auto casted = dynamic_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 			{
 				return casted;
@@ -297,10 +324,11 @@ public:
 	template<class T>
 	std::vector<T*> GetComponentsByClass(){
 		static_assert(std::is_base_of_v<Component, T>, "GetComponent<T>: T must derive from Component");
-		
+
 		// Exact type match search
 		auto it = m_components.find(GetComponentTypeId<T>());
 		std::vector<T*> result;
+
 		if(it != m_components.end() && !it->second.instances.empty())
 		{
 			for (const auto& instance : it->second.instances)
@@ -311,6 +339,7 @@ public:
 				}
 			}
 		}
+
 		for(auto& pending : m_pendingComponents)
 		{
 			 if (pending.typeId == GetComponentTypeId<T>())
@@ -325,7 +354,11 @@ public:
 		// Inheritance search
 		for (auto& [id, bucket] : m_components)
 		{
-			if (id == GetComponentTypeId<T>()) continue;
+			if (id == GetComponentTypeId<T>())
+			{
+				continue;
+			}
+
 			for(const auto& instance : bucket.instances)
 			{
 				if (auto casted = dynamic_cast<T*>(instance.get()); casted && !casted->IsDestroyed())
@@ -334,14 +367,20 @@ public:
 				}
 			}
 		}
+
 		for(auto& pending : m_pendingComponents)
 		{
-			if (pending.typeId == GetComponentTypeId<T>()) continue;
+			if (pending.typeId == GetComponentTypeId<T>())
+			{
+				continue;
+			}
+
 			if (auto casted = dynamic_cast<T*>(pending.instance.get()); casted && !casted->IsDestroyed())
 			{
 				result.push_back(casted);
 			}
 		}
+
 		return result;
 	}
 
@@ -349,6 +388,7 @@ public:
 	std::vector<std::type_index> GetComponentsTypeIds() const
 	{
 		std::vector<std::type_index> result;
+
 		for(auto& [typeId, bucket] : m_components)
 		{
 			if (!bucket.instances.empty())
@@ -356,6 +396,7 @@ public:
 				result.push_back(typeId);
 			}
 		}
+
 		for(auto& pending : m_pendingComponents)
 		{
 			if (std::find(result.begin(), result.end(), pending.typeId) == result.end())
@@ -363,6 +404,7 @@ public:
 				result.push_back(pending.typeId);
 			}
 		}
+
 		return result;
 	}
 
@@ -370,10 +412,15 @@ public:
 	{
 		std::vector<Component*> result;
 		result.reserve(m_componentPtrs.size() + m_pendingComponents.size());
+
 		for (Component* component : m_componentPtrs)
 		{
-			if (component && !component->IsDestroyed()) result.push_back(component);
+			if (component && !component->IsDestroyed())
+			{
+				result.push_back(component);
+			}
 		}
+
 		for (auto& pending : m_pendingComponents)
 		{
 			if (pending.instance && !pending.instance->IsDestroyed())
@@ -381,6 +428,7 @@ public:
 				result.push_back(pending.instance.get());
 			}
 		}
+
 		return result;
 	}
 
@@ -393,7 +441,7 @@ public:
 	size_t CountComponentFamily(ComponentFamily family) const;
 
 	// Add a child actor
-	Actor* AddChild(std::unique_ptr<Actor> child, StructuralMutationResult* result = nullptr);
+	Actor* AddChild(std::unique_ptr<Actor> child);
 
 	void AttachComponents();	// Attach all components (call OnAttach)
 
@@ -444,7 +492,7 @@ private:
 
 private:	// The APIs which should sohuld be published to limited scope
 	// Hide default constructor and initialization from public, enforce usage of Init function and ActorFactory for creation
-	Actor() = default;			
+	Actor() = default;
 	void Init(const InitDesc& desc)
 	{
 		m_isActive = desc.isActive;

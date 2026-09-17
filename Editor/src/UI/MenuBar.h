@@ -33,15 +33,26 @@ public:
 
 	static bool DispatchCreateActorImprint(const Callbacks& callbacks)
 	{
-		if (!callbacks.canModifyActorImprints || !callbacks.onCreateActorImprint) return false;
+		if (!callbacks.canModifyActorImprints || !callbacks.onCreateActorImprint)
+		{
+			return false;
+		}
+
 		callbacks.onCreateActorImprint();
 		return true;
 	}
-	static bool DispatchSaveShortcut(const Callbacks& callbacks,
-		bool controlDown, bool savePressed, bool textInputActive)
+	static bool DispatchSaveShortcut(
+		const Callbacks& callbacks,
+		bool controlDown,
+		bool savePressed,
+		bool textInputActive)
 	{
 		if (!controlDown || !savePressed || textInputActive ||
-			!callbacks.canSave || !callbacks.onSaveDocument) return false;
+			!callbacks.canSave || !callbacks.onSaveDocument)
+		{
+			return false;
+		}
+
 		callbacks.onSaveDocument();
 		return true;
 	}

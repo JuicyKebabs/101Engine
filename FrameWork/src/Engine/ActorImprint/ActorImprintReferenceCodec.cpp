@@ -1,4 +1,5 @@
 #include "ActorImprintReferenceCodec.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "nlohmann/json.hpp"
 #include <utility>
 
@@ -7,77 +8,161 @@ ActorImprintReferenceCodec::ActorImprintReferenceCodec(ActorGuids actorGuids, Ac
 {
 	for (const auto& [id, guid] : m_actorGuids)
 	{
-		if (id == 0 || !guid.IsValid() || !m_localIds.emplace(guid, id).second) m_valid = false;
+		if (id == 0 || !guid.IsValid() || !m_localIds.emplace(guid, id).second)
+		{
+			m_valid = false;
+		}
 	}
 }
 
-ActorReferenceCodecResult ActorImprintReferenceCodec::Serialize(const ActorReference& reference,
-	const ActorReferenceSaveContext& context, nlohmann::json& outJson) const
+bool ActorImprintReferenceCodec::Serialize(
+	const ActorReference& reference,
+	const ActorReferenceSaveContext& context,
+	nlohmann::json& outJson) const
 {
-	if (!m_valid) return ActorReferenceCodecResult::InvalidGuid;
+	if (!m_valid)
+	{
+		DBG("Actor reference: InvalidGuid.");
+		return false;
+	}
+
 	if (!reference.HasValue())
 	{
 		outJson = nullptr;
-		return ActorReferenceCodecResult::Success;
+		return true;
 	}
+
 	const auto local = m_localIds.find(reference.GetGuid());
 	const auto result = context.Validate(reference.GetGuid());
-	if (result != ActorReferenceCodecResult::Success) return result;
+
+	if (!result)
+	{
+		return result;
+	}
+
 	if (local != m_localIds.end())
 	{
 		outJson = { { "type", "ActorReference" }, { "scope", "local" }, { "localObjectId", local->second } };
-		return ActorReferenceCodecResult::Success;
+		return true;
 	}
-	if (m_mode != ActorImprintReferenceMode::Instance) return ActorReferenceCodecResult::ActorNotFound;
+
+	if (m_mode != ActorImprintReferenceMode::Instance)
+	{
+		DBG("Actor reference: ActorNotFound.");
+		return false;
+	}
+
 	outJson = { { "type", "ActorReference" }, { "scope", "scene" },
 		{ "actorGuid", reference.GetGuid().ToString() } };
-	return ActorReferenceCodecResult::Success;
+	return true;
 }
 
-ActorReferenceCodecResult ActorImprintReferenceCodec::Deserialize(const nlohmann::json& json,
+bool ActorImprintReferenceCodec::Deserialize(
+	const nlohmann::json& json,
 	ActorReference& outReference) const
 {
-	if (!m_valid) return ActorReferenceCodecResult::InvalidGuid;
+	if (!m_valid)
+	{
+		DBG("Actor reference: InvalidGuid.");
+		return false;
+	}
+
 	if (json.is_null())
 	{
 		outReference.Clear();
-		return ActorReferenceCodecResult::Success;
+		return true;
 	}
+
 	if (!json.is_object() || json.size() != 3 || !json.contains("type") ||
 		!json["type"].is_string() || json["type"] != "ActorReference" ||
 		!json.contains("scope") || !json["scope"].is_string())
-		return ActorReferenceCodecResult::InvalidJsonType;
+	{
+		DBG("Actor reference: InvalidJsonType.");
+		return false;
+	}
+
 	ActorReference reference;
+
 	if (json["scope"] == "local")
 	{
-		if (!json.contains("localObjectId")) return ActorReferenceCodecResult::InvalidJsonType;
+		if (!json.contains("localObjectId"))
+		{
+			DBG("Actor reference: InvalidJsonType.");
+			return false;
+		}
+
 		const auto& value = json["localObjectId"];
+
 		if (!value.is_number_integer() || (!value.is_number_unsigned() && value.get<std::int64_t>() <= 0))
-			return ActorReferenceCodecResult::InvalidJsonType;
+		{
+			DBG("Actor reference: InvalidJsonType.");
+			return false;
+		}
+
 		const LocalObjectId id = value.get<LocalObjectId>();
 		const auto actor = m_actorGuids.find(id);
-		if (id == 0 || actor == m_actorGuids.end()) return ActorReferenceCodecResult::ActorNotFound;
-		if (!reference.SetGuid(actor->second)) return ActorReferenceCodecResult::InvalidGuid;
+
+		if (id == 0 || actor == m_actorGuids.end())
+		{
+			DBG("Actor reference: ActorNotFound.");
+			return false;
+		}
+
+		if (!reference.SetGuid(actor->second))
+		{
+			DBG("Actor reference: InvalidGuid.");
+			return false;
+		}
 	}
 	else if (json["scope"] == "scene")
 	{
 		if (m_mode != ActorImprintReferenceMode::Instance || !json.contains("actorGuid") ||
-			!json["actorGuid"].is_string()) return ActorReferenceCodecResult::InvalidJsonType;
+			!json["actorGuid"].is_string())
+		{
+			DBG("Actor reference: InvalidJsonType.");
+			return false;
+		}
+
 		Guid guid;
 		const std::string text = json["actorGuid"].get<std::string>();
+
 		if (text.find('\0') != std::string::npos || !Guid::TryParse(text, guid))
-			return ActorReferenceCodecResult::InvalidGuid;
-		if (m_localIds.contains(guid)) return ActorReferenceCodecResult::InvalidJsonType;
-		if (!reference.SetGuid(guid)) return ActorReferenceCodecResult::InvalidGuid;
+		{
+			DBG("Actor reference: InvalidGuid.");
+			return false;
+		}
+
+		if (m_localIds.contains(guid))
+		{
+			DBG("Actor reference: InvalidJsonType.");
+			return false;
+		}
+
+		if (!reference.SetGuid(guid))
+		{
+			DBG("Actor reference: InvalidGuid.");
+			return false;
+		}
 	}
-	else return ActorReferenceCodecResult::InvalidJsonType;
+	else
+	{
+		DBG("Actor reference: InvalidJsonType.");
+		return false;
+	}
+
 	outReference = reference;
-	return ActorReferenceCodecResult::Success;
+	return true;
 }
 
-ActorReferenceCodecResult ActorImprintReferenceCodec::Resolve(ActorReference& reference,
+bool ActorImprintReferenceCodec::Resolve(
+	ActorReference& reference,
 	const ActorReferenceRestoreContext& context) const
 {
-	if (!m_valid) return ActorReferenceCodecResult::InvalidGuid;
+	if (!m_valid)
+	{
+		DBG("Actor reference: InvalidGuid.");
+		return false;
+	}
+
 	return GuidActorReferenceCodec().Resolve(reference, context);
 }

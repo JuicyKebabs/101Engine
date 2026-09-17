@@ -27,18 +27,58 @@ public:
 		m_isInitialized = true;
 	}
 
-	uint32_t AllocateCbvSrvUav() { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_cbvSrvUavHeap.AllocateDescriptor(); }
-	uint32_t AllocateRtv() { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_rtvHeap.AllocateDescriptor(); }
-	uint32_t AllocateDsv() { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_dsvHeap.AllocateDescriptor(); }
+	uint32_t AllocateCbvSrvUav()
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_cbvSrvUavHeap.AllocateDescriptor();
+	}
+	uint32_t AllocateRtv()
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_rtvHeap.AllocateDescriptor();
+	}
+	uint32_t AllocateDsv()
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_dsvHeap.AllocateDescriptor();
+	}
 
-	DescriptorHeap& GetCbvSrvUavHeap() { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_cbvSrvUavHeap; }
-	DescriptorHeap& GetRtvHeap() { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_rtvHeap; }
-	DescriptorHeap& GetDsvHeap() { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_dsvHeap; }
+	DescriptorHeap& GetCbvSrvUavHeap()
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_cbvSrvUavHeap;
+	}
+	DescriptorHeap& GetRtvHeap()
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_rtvHeap;
+	}
+	DescriptorHeap& GetDsvHeap()
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_dsvHeap;
+	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE GetCbvSrvUavCpuHandle(uint32_t index) const { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_cbvSrvUavHeap.GetCpuHandle(index); }
-	D3D12_CPU_DESCRIPTOR_HANDLE GetRtvCpuHandle(uint32_t index) const { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_rtvHeap.GetCpuHandle(index); }
-	D3D12_CPU_DESCRIPTOR_HANDLE GetDsvCpuHandle(uint32_t index) const { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_dsvHeap.GetCpuHandle(index); }
-	D3D12_GPU_DESCRIPTOR_HANDLE GetCbvSrvUavGpuHandle(uint32_t index) const { assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized."); return m_cbvSrvUavHeap.GetGpuHandle(index); }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCbvSrvUavCpuHandle(uint32_t index) const
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_cbvSrvUavHeap.GetCpuHandle(index);
+	}
+	D3D12_CPU_DESCRIPTOR_HANDLE GetRtvCpuHandle(uint32_t index) const
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_rtvHeap.GetCpuHandle(index);
+	}
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDsvCpuHandle(uint32_t index) const
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_dsvHeap.GetCpuHandle(index);
+	}
+	D3D12_GPU_DESCRIPTOR_HANDLE GetCbvSrvUavGpuHandle(uint32_t index) const
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_cbvSrvUavHeap.GetGpuHandle(index);
+	}
 
 private:
 	ID3D12Device* m_pDevice = nullptr;

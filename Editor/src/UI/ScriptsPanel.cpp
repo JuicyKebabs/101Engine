@@ -36,10 +36,15 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 
 			// Open button
 			std::string openId = "Open##" + script.name;
+
 			if (ImGui::SmallButton(openId.c_str()))
 			{
-				if (callbacks.onOpen) callbacks.onOpen(script.name);
+				if (callbacks.onOpen)
+				{
+					callbacks.onOpen(script.name);
+				}
 			}
+
 			ImGui::SameLine();
 
 			// Delete button
@@ -48,6 +53,7 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 			{
 				EditorUI::DisabledScope disableDelete(!callbacks.canDelete);
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+
 				if (ImGui::SmallButton(deleteId.c_str()))
 				{
 					if (callbacks.canDelete)
@@ -74,16 +80,20 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 										break;
 									}
 								}
-								if (m_inUseByScene) break;
+
+								if (m_inUseByScene)
+								{
+									break;
+								}
 							}
 						}
 					}
 				}
+
 				ImGui::PopStyleColor();
 			}
 		}
 	}
-
 
 	// Popup for delete confirmation
 	if (m_showDeleteConfirm)
@@ -115,9 +125,14 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 		// Delete button(Red)
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+
 		if (ImGui::Button("Delete", ImVec2(120, 0)))
 		{
-			if (callbacks.onDelete) callbacks.onDelete(m_pendingDeleteName);
+			if (callbacks.onDelete)
+			{
+				callbacks.onDelete(m_pendingDeleteName);
+			}
+
 			ImGui::CloseCurrentPopup();
 		}
 
@@ -146,7 +161,10 @@ std::vector<ScriptsPanel::ScriptEntry> ScriptsPanel::ScanScripts()
 	std::string gameCodeDir = PathManager::Resolve("Game/GameCode");
 
 	// Check if GameCode directory exists
-	if (!fs::exists(gameCodeDir)) return entries;
+	if (!fs::exists(gameCodeDir))
+	{
+		return entries;
+	}
 
 	// Exclude certain scripts from being displayed in the panel (e.g. sample scripts)
 	static const std::vector<std::string> kExcluded = {"SampleScene"};
@@ -154,13 +172,17 @@ std::vector<ScriptsPanel::ScriptEntry> ScriptsPanel::ScanScripts()
 	for (const auto& entry : fs::directory_iterator(gameCodeDir))
 	{
 		// Skip if not a header file
-		if (entry.path().extension() != ".h") continue;
+		if (entry.path().extension() != ".h")
+		{
+			continue;
+		}
 
 		// Get name without extension
 		std::string name = entry.path().stem().string();
 
 		// Apply exclusion filter
 		bool execlude = false;
+
 		for (const auto& ex : kExcluded)
 		{
 			if (name == ex)
@@ -169,7 +191,11 @@ std::vector<ScriptsPanel::ScriptEntry> ScriptsPanel::ScanScripts()
 				break;
 			}
 		}
-		if (execlude) continue;
+
+		if (execlude)
+		{
+			continue;
+		}
 
 		// Check if the script is registered in ComponentRegistry
 		bool isBehavior = ComponentRegistry::Get().Has(name);

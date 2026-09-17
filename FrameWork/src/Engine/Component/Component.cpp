@@ -4,15 +4,16 @@
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Component/ComponentReflection.h"
 
-void Component::MarkForDestruction(StructuralMutationResult* result)
+bool Component::MarkForDestruction()
 {
 	if (m_pOwner && m_pOwner->GetOwner())
 	{
-		m_pOwner->GetOwner()->RemoveActorComponent(m_pOwner, this, result);
-		return;
+		return m_pOwner->GetOwner()->RemoveActorComponent(m_pOwner, this);
 	}
+
 	m_destroyed = true;
-	StructuralMutationResult{}.Report(result);
+
+	return true;
 }
 
 EngineContext* Component::GetEngineContext() const
@@ -20,11 +21,13 @@ EngineContext* Component::GetEngineContext() const
 	if (m_pOwner)
 	{
 		SceneBase* ownerScene = m_pOwner->GetOwner();
+
 		if (ownerScene)
 		{
 			return ownerScene->GetEngineContext();
 		}
 	}
+
 	return nullptr;
 }
 

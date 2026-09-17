@@ -68,6 +68,7 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 
 	// Check if the scene has a main camera before attempting to save
 	bool hasMainCamera = false;
+
 	for (auto& actor : scene->GetAllActors())
 	{
 		// Check if the actor is valid and not destroyed before checking for the main camera
@@ -99,6 +100,7 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 
 	// Directional light
 	const auto& dl = scene->GetDirectionalLight();
+
 	if (!std::isfinite(dl.direction.x) || !std::isfinite(dl.direction.y) ||
 		!std::isfinite(dl.direction.z) || !std::isfinite(dl.color.x) ||
 		!std::isfinite(dl.color.y) || !std::isfinite(dl.color.z) ||
@@ -107,6 +109,7 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 		DBG("SceneWriter: Scene serialization failed - Directional light contains a non-finite value.");
 		return false;
 	}
+
 	j["directional_light"] = {
 		{"direction", { dl.direction.x, dl.direction.y, dl.direction.z }},
 		{"color",     { dl.color.x, dl.color.y, dl.color.z }},
@@ -115,12 +118,22 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 
 	j["actors"] = json::array();
 	std::vector<Actor*> ordinaryActors;
+
 	for (Actor* actor : scene->GetAllActors())
 	{
-		if (!actor || actor->IsDestroyed()) continue;
-		if (scene->GetImprintInstances().FindMember(actor->GetHandle())) continue;
+		if (!actor || actor->IsDestroyed())
+		{
+			continue;
+		}
+
+		if (scene->GetImprintInstances().FindMember(actor->GetHandle()))
+		{
+			continue;
+		}
+
 		ordinaryActors.push_back(actor);
 	}
+
 	std::sort(ordinaryActors.begin(), ordinaryActors.end(), [](const Actor* left, const Actor* right)
 	{
 		return left->GetGuid().ToString() < right->GetGuid().ToString();
@@ -130,6 +143,7 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 	{
 		// Serialize the actor and add it to the JSON array
 		json actorJson;
+
 		if (!ActorSerializer::SerializeActorRecord(actor, scene, actorJson))
 		{
 			DBG("SceneWriter: Failed to serialize an actor.");
@@ -142,11 +156,13 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 	j["actorImprintInstances"] = json::array();
 	std::vector<ActorHandle> instanceRoots;
 	instanceRoots.reserve(scene->GetImprintInstances().GetInstances().size());
+
 	for (const auto& [root, record] : scene->GetImprintInstances().GetInstances())
 	{
 		if (!forReload)
 		{
 			const EngineContext* context = scene->GetEngineContext();
+
 			if (!context || !context->pActorImprintSystem ||
 				context->pActorImprintSystem->IsMissing(record.imprint))
 			{
@@ -154,30 +170,42 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 				return false;
 			}
 		}
+
 		instanceRoots.push_back(root);
 	}
+
 	std::sort(instanceRoots.begin(), instanceRoots.end(), [scene](ActorHandle left, ActorHandle right)
 	{
 		const Actor* leftActor = scene->ResolveActor(left);
 		const Actor* rightActor = scene->ResolveActor(right);
+
 		if (!leftActor || !rightActor)
 		{
-			if (leftActor != rightActor) return leftActor != nullptr;
-			if (left.index != right.index) return left.index < right.index;
+			if (leftActor != rightActor)
+			{
+				return leftActor != nullptr;
+			}
+
+			if (left.index != right.index)
+			{
+				return left.index < right.index;
+			}
+
 			return left.generation < right.generation;
 		}
+
 		return leftActor->GetGuid().ToString() < rightActor->GetGuid().ToString();
 	});
+
 	for (ActorHandle root : instanceRoots)
 	{
 		json instanceJson;
-		ActorImprintInstanceSerializationError instanceError;
-		if (!ActorImprintInstanceSerializer::Serialize(*scene, root, instanceJson, &instanceError))
+
+		if (!ActorImprintInstanceSerializer::Serialize(*scene, root, instanceJson))
 		{
-			DBG("SceneWriter: Failed to serialize an ActorImprint Instance at '%s': %s",
-				instanceError.path.c_str(), instanceError.message.c_str());
 			return false;
 		}
+
 		j["actorImprintInstances"].push_back(std::move(instanceJson));
 	}
 

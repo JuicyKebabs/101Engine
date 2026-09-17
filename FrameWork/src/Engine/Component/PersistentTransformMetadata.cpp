@@ -18,7 +18,6 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::Transform(std::string
 	return PersistentMetadata::Finish(builder);
 }
 
-
 std::unique_ptr<TypeMetadata> PersistentComponentMetadata::RectTransform(std::string stableTypeName)
 {
 	TypeMetadataBuilder<::RectTransform> builder(std::move(stableTypeName));
@@ -32,8 +31,12 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::RectTransform(std::st
 		.SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("anchoredPosition", &::RectTransform::GetAnchoredPosition, &::RectTransform::SetAnchoredPosition)
 		.Validate(ValueValidation::Finite2);
-	builder.Property("pivot", &::RectTransform::GetPivot, &::RectTransform::SetPivot).Validate(ValueValidation::UnitCoordinate2);
+	builder.Property("pivot", &::RectTransform::GetPivot, &::RectTransform::SetPivot)
+		.Validate(ValueValidation::UnitCoordinate2);
 	builder.Property("size", &::RectTransform::GetSize, &::RectTransform::SetSizeDelta)
-		.Validate([](const Vector2& value) { return ValueValidation::Finite2(value) && value.x >= 0.0f && value.y >= 0.0f; });
+		.Validate([](const Vector2& value)
+	{
+		return ValueValidation::Finite2(value) && value.x >= 0.0f && value.y >= 0.0f;
+	});
 	return PersistentMetadata::Finish(builder);
 }

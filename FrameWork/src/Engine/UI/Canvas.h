@@ -10,7 +10,6 @@
 
 class SceneBase;
 
-
 // Enumration of mode for rendering space of UI elements in a Canvas
 enum class CanvasRenderMode
 {
@@ -59,8 +58,12 @@ public:
 	// Setters
 	void SetVisible(bool flag) { m_isVisible = flag; }
 	void SetSortOrder(UINT order) 
-	{ 
-		if (m_sortOrder == order) return;
+	{
+		if (m_sortOrder == order)
+		{
+			return;
+		}
+
 		m_sortOrder = order; 
 		InvalidateAllUIRendererProxies(); 
 	}
@@ -126,17 +129,14 @@ private:
 	CanvasScaleMode m_scaleMode = CanvasScaleMode::ScaleWithScreenSize;
 
 	// Reference size for layout calculations in this Canvas
-	Vector2 m_referenceSize{ 1920.0f, 1080.0f };
-
+	Vector2 m_referenceSize{1920.0f, 1080.0f};
 
 	float m_matchWidthOrHeight = 0.5f;
-	
+
 	UINT m_sortOrder = 0;
 	bool m_isVisible = true;
 
-	
-
-private:
+  private:
 	// Overrides
 	void OnStartOverride() override {};
 	void PreUpdateOverride(float deltaTime) override {};
@@ -149,7 +149,10 @@ private:
 
 		for (auto* ui : registeredUI)
 		{
-			if (ui) ui->OnCanvasDestroyed();
+			if (ui)
+			{
+				ui->OnCanvasDestroyed();
+			}
 		}
 	};
 
@@ -157,7 +160,10 @@ private:
 	{
 		for (auto* ui : m_uiList)
 		{
-			if (ui) ui->InvalidateRenderProxy();
+			if (ui)
+			{
+				ui->InvalidateRenderProxy();
+			}
 		}
 	}
 
@@ -170,7 +176,10 @@ public:
 		const bool authoredChanged = m_authoredRenderMode != mode;
 		const bool effectiveChanged = m_effectiveRenderMode != mode;
 
-		if (!authoredChanged && !effectiveChanged) return;
+		if (!authoredChanged && !effectiveChanged)
+		{
+			return;
+		}
 
 		m_authoredRenderMode = mode;
 		m_effectiveRenderMode = mode;
@@ -183,7 +192,10 @@ private:
 	// This must not overwrite the Canvas's authored setting.
 	void SetInheritedRenderMode(CanvasRenderMode mode)
 	{
-		if (m_effectiveRenderMode == mode) return;
+		if (m_effectiveRenderMode == mode)
+		{
+			return;
+		}
 
 		m_effectiveRenderMode = mode;
 		InvalidateAllUIRendererProxies();
@@ -193,7 +205,10 @@ private:
 	// from an ancestor Canvas hierarchy.
 	void RestoreAuthoredRenderMode()
 	{
-		if (m_effectiveRenderMode == m_authoredRenderMode) return;
+		if (m_effectiveRenderMode == m_authoredRenderMode)
+		{
+			return;
+		}
 
 		m_effectiveRenderMode = m_authoredRenderMode;
 		InvalidateAllUIRendererProxies();
@@ -203,7 +218,10 @@ public:
 	// Set the reference size for layout calculations in this Canvas.
 	void SetReferenceSize(const Vector2& size)
 	{
-		if (m_referenceSize == size) return;
+		if (m_referenceSize == size)
+		{
+			return;
+		}
 
 		m_referenceSize = size;
 		InvalidateAllUIRendererProxies();
@@ -212,7 +230,10 @@ public:
 	// Set the scaling mode for Screen-Space UI elements in this Canvas.
 	void SetScaleMode(CanvasScaleMode mode)
 	{
-		if (m_scaleMode == mode) return;
+		if (m_scaleMode == mode)
+		{
+			return;
+		}
 
 		m_scaleMode = mode;
 		InvalidateAllUIRendererProxies();
@@ -222,7 +243,10 @@ public:
 	// scaling Screen-Space UI elements in this Canvas.
 	void SetMatchWidthOrHeight(float match)
 	{
-		if (m_matchWidthOrHeight == match) return;
+		if (m_matchWidthOrHeight == match)
+		{
+			return;
+		}
 
 		m_matchWidthOrHeight = match;
 		InvalidateAllUIRendererProxies();

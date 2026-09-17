@@ -27,6 +27,7 @@ bool ActorSerializer::SerializeActorRecord(Actor* actor, const SceneBase* scene,
 
 	// Serialize the actor's GUID and check if it's valid
 	const Guid& actorGuid = actor->GetGuid();
+
 	if (!actorGuid.IsValid())
 	{
 		DBG("ActorSerializer::SerializeActorRecord: Actor '%s' has an invalid Guid.", actor->GetName().c_str());
@@ -37,6 +38,7 @@ bool ActorSerializer::SerializeActorRecord(Actor* actor, const SceneBase* scene,
 
 	// Serialize the parent actor's GUID if it exists
 	const ActorHandle parentHandle = actor->GetParentHandle();
+
 	if (parentHandle.IsNull())
 	{
 		j["parentId"] = nullptr; // No parent
@@ -44,16 +46,21 @@ bool ActorSerializer::SerializeActorRecord(Actor* actor, const SceneBase* scene,
 	else
 	{
 		Actor* parent = scene->ResolveActor(parentHandle);
+
 		if (!parent)
 		{
-			DBG("ActorSerializer::SerializeActorRecord: Parent of Actor '%s' cannot be resolved.", actor->GetName().c_str());
+			DBG("ActorSerializer::SerializeActorRecord: Parent of Actor '%s' cannot be resolved.",
+				actor->GetName().c_str());
 			return false;
 		}
+
 		if (!parent->GetGuid().IsValid())
 		{
-			DBG("ActorSerializer::SerializeActorRecord: Parent of Actor '%s' has an invalid Guid.", actor->GetName().c_str());
+			DBG("ActorSerializer::SerializeActorRecord: Parent of Actor '%s' has an invalid Guid.",
+				actor->GetName().c_str());
 			return false;
 		}
+
 		j["parentId"] = parent->GetGuid().ToString();
 	}
 
@@ -67,7 +74,10 @@ bool ActorSerializer::SerializeActorRecord(Actor* actor, const SceneBase* scene,
 
 	for (Component* component : actor->GetAllComponents())
 	{
-		if (!component || component->IsDestroyed()) continue;
+		if (!component || component->IsDestroyed())
+		{
+			continue;
+		}
 
 		json componentJson;
 

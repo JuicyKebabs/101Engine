@@ -22,7 +22,6 @@
 #include <windows.h>
 #include <memory>
 
-
 // キー列挙
 typedef enum Keyboard_Keys_tag
 {
@@ -203,7 +202,6 @@ typedef enum Keyboard_Keys_tag
     KK_PA1                = 0xfd,
     KK_OEMCLEAR           = 0xfe,
 } Keyboard_Keys;
-
 
 // キーボード状態構造体
 typedef struct Keyboard_State_tag
@@ -394,7 +392,6 @@ typedef struct Keyboard_State_tag
     bool Reserved26 : 1;
 } Keyboard_State;
 
-
 // キーボードモジュールの初期化
 void Keyboard_Initialize(void);
 
@@ -415,8 +412,6 @@ void Keyboard_Reset(void);
 
 // キーボード制御のためのウォンどうメッセージプロシージャフック関数
 void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam);
-
-
 
 //トリガー用
 bool Keyboard_IsKeyDownTrigger(Keyboard_Keys key);
@@ -441,6 +436,5 @@ void    keycopy();
 //     }
 // }
 //
-
 
 #endif // HAL_YOUHEI_KEYBOARD_H

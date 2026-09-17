@@ -14,18 +14,21 @@
 bool SkyRenderer::SetAsActiveSkyRenderer()
 {
 	auto owner = GetOwner();
+
 	if (!owner)
 	{
 		return false;
 	}
 
 	auto scene = owner->GetOwner();
+
 	if (!scene)
 	{
 		return false;
 	}
 
 	auto renderSystem = scene->GetRenderSystem();
+
 	if (!renderSystem)
 	{
 		return false;
@@ -49,21 +52,33 @@ bool SkyRenderer::SetSkyTextureAsset(const Guid& texture)
 
 void SkyRenderer::SetFollowMode(FollowMode mode)
 {
-	if (m_followMode == mode) return;
+	if (m_followMode == mode)
+	{
+		return;
+	}
+
 	m_followMode = mode;
 	InvalidateFollowCache();
 }
 
 bool SkyRenderer::SetFollowActor(Actor* actor)
 {
-	if (!m_followActor.Set(actor)) return false;
+	if (!m_followActor.Set(actor))
+	{
+		return false;
+	}
+
 	InvalidateFollowCache();
 	return true;
 }
 
 bool SkyRenderer::SetFollowActor(const Guid& guid)
 {
-	if (!m_followActor.SetGuid(guid)) return false;
+	if (!m_followActor.SetGuid(guid))
+	{
+		return false;
+	}
+
 	InvalidateFollowCache();
 	return true;
 }
@@ -77,6 +92,7 @@ void SkyRenderer::SetFollowActorReference(const ActorReference& actor)
 void SkyRenderer::OnAttachOverride()
 {
 	EngineContext* context = GetEngineContext();
+
 	if (!context || !context->pMeshManager)
 	{
 		return;
@@ -85,16 +101,22 @@ void SkyRenderer::OnAttachOverride()
 	MeshManager* meshManager = context->pMeshManager;
 	const MeshHandle sphereMesh = meshManager->LoadDefaultMesh(DefaultMesh::Sphere);
 	MeshGPU* meshGPU = meshManager->GetMeshGPU(sphereMesh);
-	if (sphereMesh == InvalidMeshHandle || !meshGPU) return;
+
+	if (sphereMesh == InvalidMeshHandle || !meshGPU)
+	{
+		return;
+	}
 
 	m_template.meshDesc.meshHandle = sphereMesh;
 	m_template.meshDesc.boundsCenter = meshGPU->GetBoundsCenter();
 	m_template.meshDesc.boundsRadius = meshGPU->GetBoundsRadius();
+
 	if (m_template.meshDesc.boundsRadius > 0.0f &&
 		std::isfinite(m_template.meshDesc.boundsRadius))
 	{
 		m_sphereScale = 100.0f / m_template.meshDesc.boundsRadius;
 	}
+
 	m_template.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_SKY;
 	m_template.materialDesc.psoKey.depth = DepthMode::Disable;
 	m_template.materialDesc.psoKey.cull = CullMode::None;
@@ -114,7 +136,11 @@ void SkyRenderer::OnDetachOverride()
 	Actor* owner = GetOwner();
 	SceneBase* scene = owner ? owner->GetOwner() : nullptr;
 	RenderSystem* renderSystem = scene ? scene->GetRenderSystem() : nullptr;
-	if (renderSystem) renderSystem->ClearActiveSkyRenderer(this);
+
+	if (renderSystem)
+	{
+		renderSystem->ClearActiveSkyRenderer(this);
+	}
 }
 
 void SkyRenderer::OnDestroyOverride()
@@ -122,7 +148,11 @@ void SkyRenderer::OnDestroyOverride()
 	Actor* owner = GetOwner();
 	SceneBase* scene = owner ? owner->GetOwner() : nullptr;
 	RenderSystem* renderSystem = scene ? scene->GetRenderSystem() : nullptr;
-	if (renderSystem) renderSystem->ClearActiveSkyRenderer(this);
+
+	if (renderSystem)
+	{
+		renderSystem->ClearActiveSkyRenderer(this);
+	}
 }
 
 const MeshRendererProxy& SkyRenderer::GetRenderProxy()
@@ -132,6 +162,7 @@ const MeshRendererProxy& SkyRenderer::GetRenderProxy()
 		RebuildRenderProxy();
 		m_isProxyDirty = false;
 	}
+
 	return m_proxy;
 }
 
@@ -141,7 +172,9 @@ bool SkyRenderer::IsConfigured() const
 		m_template.materialDesc.textureHandle != InvalidTextureHandle;
 }
 
-AssetPrepareResult SkyRenderer::PrepareSkyRendererState(PreparedTextureAssetState& outPreparedState, const Guid& textureId) const
+AssetPrepareResult SkyRenderer::PrepareSkyRendererState(
+	PreparedTextureAssetState& outPreparedState,
+	const Guid& textureId) const
 {
 	if (!textureId.IsValid())
 	{
@@ -150,12 +183,14 @@ AssetPrepareResult SkyRenderer::PrepareSkyRendererState(PreparedTextureAssetStat
 	}
 
 	const EngineContext* context = GetEngineContext();
+
 	if (!context || !context->pAssetManager || !context->pTextureManager)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(textureId);
+
 	if (!assetEntry)
 	{
 		return AssetPrepareResult::MissingAsset;
@@ -167,6 +202,7 @@ AssetPrepareResult SkyRenderer::PrepareSkyRendererState(PreparedTextureAssetStat
 	}
 
 	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(textureId);
+
 	if (textureHandle == InvalidTextureHandle)
 	{
 		return AssetPrepareResult::Failed;
@@ -187,7 +223,11 @@ void SkyRenderer::CommitSkyTextureState(PreparedTextureAssetState&& state)
 
 Guid SkyRenderer::GetSkyTextureAssetId() const
 {
-	if (m_skyTextureId.IsValid()) return m_skyTextureId;
+	if (m_skyTextureId.IsValid())
+	{
+		return m_skyTextureId;
+	}
+
 	return m_pendingSkyTextureId.value_or(Guid{});
 }
 
@@ -203,7 +243,12 @@ bool SkyRenderer::SetPendingSkyTextureAssetReference(const AssetReference<Textur
 	m_skyTextureId = {};
 	m_pendingSkyTextureId.reset();
 	m_template.materialDesc.textureHandle = InvalidTextureHandle;
-	if (value.HasValue()) m_pendingSkyTextureId = value.GetGuid();
+
+	if (value.HasValue())
+	{
+		m_pendingSkyTextureId = value.GetGuid();
+	}
+
 	m_isProxyDirty = true;
 	return true;
 }
@@ -211,6 +256,7 @@ bool SkyRenderer::SetPendingSkyTextureAssetReference(const AssetReference<Textur
 bool SkyRenderer::TrySetSkyTextureAssetReference(const AssetReference<TextureAsset>& value)
 {
 	Actor* owner = GetOwner();
+
 	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
 	{
 		return SetPendingSkyTextureAssetReference(value);
@@ -218,7 +264,12 @@ bool SkyRenderer::TrySetSkyTextureAssetReference(const AssetReference<TextureAss
 
 	PreparedTextureAssetState prepared;
 	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
-	if (PrepareSkyRendererState(prepared, assetId) != AssetPrepareResult::Ready) return false;
+
+	if (PrepareSkyRendererState(prepared, assetId) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
 	CommitSkyTextureState(std::move(prepared));
 	return true;
 }
@@ -226,20 +277,33 @@ bool SkyRenderer::TrySetSkyTextureAssetReference(const AssetReference<TextureAss
 bool SkyRenderer::ResolveReferences(SceneBase& scene)
 {
 	Actor* owner = GetOwner();
-	if (!owner || owner->GetOwner() != &scene) return false;
+
+	if (!owner || owner->GetOwner() != &scene)
+	{
+		return false;
+	}
 
 	if (m_pendingSkyTextureId.has_value())
 	{
 		PreparedTextureAssetState prepared;
 		const AssetPrepareResult result = PrepareSkyRendererState(prepared, *m_pendingSkyTextureId);
+
 		if (result != AssetPrepareResult::MissingAsset)
 		{
-			if (result != AssetPrepareResult::Ready) return false;
+			if (result != AssetPrepareResult::Ready)
+			{
+				return false;
+			}
+
 			CommitSkyTextureState(std::move(prepared));
 		}
 	}
 
-	if (m_followActor.HasValue() && !m_followActor.Resolve(scene)) return false;
+	if (m_followActor.HasValue() && !m_followActor.Resolve(scene))
+	{
+		return false;
+	}
+
 	InvalidateFollowCache();
 	return true;
 }
@@ -268,16 +332,21 @@ Transform* SkyRenderer::ResolveFollowTransform(Actor*& outActor)
 			const Camera* camera = scene->GetCameraSystem()->GetMainCamera();
 			outActor = camera ? camera->GetOwner() : nullptr;
 		}
+
 		break;
 	case FollowMode::Actor:
-		if (scene) outActor = m_followActor.Resolve(*scene);
+		if (scene)
+		{
+			outActor = m_followActor.Resolve(*scene);
+		}
+
 		break;
 	default:
 		break;
 	}
 
-	Transform* transform = outActor && !outActor->IsDestroyed()
-		? outActor->GetComponentByClass<Transform>() : nullptr;
+	Transform* transform = outActor && !outActor->IsDestroyed() ? outActor->GetComponentByClass<Transform>() : nullptr;
+
 	if (m_followMode != FollowMode::Owner && !transform)
 	{
 		m_followMode = FollowMode::Owner;
@@ -285,6 +354,7 @@ Transform* SkyRenderer::ResolveFollowTransform(Actor*& outActor)
 		outActor = owner;
 		transform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
 	}
+
 	return transform;
 }
 
@@ -293,8 +363,8 @@ void SkyRenderer::RefreshFollowState()
 	Actor* actor = nullptr;
 	Transform* transform = ResolveFollowTransform(actor);
 	const ActorHandle handle = actor ? actor->GetHandle() : ActorHandle::Null();
-	const uint64_t generation = transform
-		? transform->GetWorldGeneration() : static_cast<uint64_t>(-1);
+	const uint64_t generation = transform ? transform->GetWorldGeneration() : static_cast<uint64_t>(-1);
+
 	if (handle != m_cachedFollowActorHandle ||
 		generation != m_cachedFollowTransformGeneration)
 	{
@@ -307,6 +377,7 @@ void SkyRenderer::RefreshFollowState()
 void SkyRenderer::RebuildRenderProxy()
 {
 	auto owner = GetOwner();
+
 	if (!owner)
 	{
 		DBG("SkyRenderer::RebuildRenderProxy: Owner actor is null.");

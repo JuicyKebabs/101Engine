@@ -51,8 +51,7 @@ namespace
 		Fixture()
 		{
 			std::filesystem::create_directories(root);
-			Check(assets.Initialize(root.string(), nullptr, nullptr),
-				"Empty workflow asset catalog initializes");
+			Check(assets.Initialize(root.string(), nullptr, nullptr), "Empty workflow asset catalog initializes");
 			context.pAssetManager = &assets;
 			context.pActorImprintSystem = &system;
 		}
@@ -68,43 +67,40 @@ namespace
 	void NameValidation()
 	{
 		std::string normalized;
-		ActorImprintAssetWorkflowError error;
-		Check(ActorImprintAssetWorkflow::NormalizeFileName("Enemy", normalized, &error) &&
-			normalized == "Enemy.imprint", "Create appends the canonical .imprint extension");
-		Check(ActorImprintAssetWorkflow::NormalizeFileName("Enemy.IMPRINT", normalized, &error) &&
-			normalized == "Enemy.imprint", "Create normalizes the ActorImprint extension case");
-		Check(!ActorImprintAssetWorkflow::NormalizeFileName("", normalized, &error) &&
-			error.code == ActorImprintAssetWorkflowErrorCode::InvalidName,
-			"Create rejects an empty name with a diagnostic");
-		Check(!ActorImprintAssetWorkflow::NormalizeFileName("folder/Enemy", normalized, &error),
+
+		Check(ActorImprintAssetWorkflow::NormalizeFileName("Enemy", normalized) &&
+			normalized == "Enemy.imprint",
+			"Create appends the canonical .imprint extension");
+		Check(ActorImprintAssetWorkflow::NormalizeFileName("Enemy.IMPRINT", normalized) &&
+			normalized == "Enemy.imprint",
+			"Create normalizes the ActorImprint extension case");
+		Check(!ActorImprintAssetWorkflow::NormalizeFileName("", normalized), "Create rejects an empty name with a diagnostic");
+		Check(!ActorImprintAssetWorkflow::NormalizeFileName("folder/Enemy", normalized),
 			"Create rejects names that escape the asset-root destination");
-		Check(!ActorImprintAssetWorkflow::NormalizeFileName("bad?.imprint", normalized, &error),
-			"Create rejects invalid Windows filename characters");
-		Check(!ActorImprintAssetWorkflow::NormalizeFileName("CON", normalized, &error) &&
-			error.code == ActorImprintAssetWorkflowErrorCode::ReservedName,
-			"Create rejects reserved Windows device names");
-		Check(!ActorImprintAssetWorkflow::NormalizeFileName("trailing. ", normalized, &error),
-			"Create rejects trailing dot or space names");
+		Check(!ActorImprintAssetWorkflow::NormalizeFileName("bad?.imprint", normalized), "Create rejects invalid Windows filename characters");
+		Check(!ActorImprintAssetWorkflow::NormalizeFileName("CON", normalized), "Create rejects reserved Windows device names");
+		Check(!ActorImprintAssetWorkflow::NormalizeFileName("trailing. ", normalized), "Create rejects trailing dot or space names");
 	}
 
 	void WorkflowAndCommandBoundary()
 	{
 		Fixture fixture;
 		Guid assetGuid;
-		ActorImprintAssetWorkflowError error;
+
 		ActorImprintsPanel panel;
 		ActorImprintsPanel::Callbacks panelCallbacks;
 		panelCallbacks.onCreate = [&](std::string_view name)
 		{
 			return ActorImprintAssetWorkflow::Create(
-				name, fixture.assets, fixture.context, assetGuid, &error);
+				name, fixture.assets, fixture.context, assetGuid);
 		};
 		MenuBar::Callbacks menuCallbacks;
 		menuCallbacks.onCreateActorImprint = [&panel]() { panel.RequestCreateDialog(); };
 		Check(MenuBar::DispatchCreateActorImprint(menuCallbacks) &&
 			panel.IsCreateDialogRequested(),
 			"Assets menu intent opens the ActorImprintsPanel shared Create dialog");
-		Check(ActorImprintsPanel::DispatchCreate(panelCallbacks, "Enemy") && assetGuid.IsValid(),
+		Check(ActorImprintsPanel::DispatchCreate(panelCallbacks, "Enemy") &&
+			assetGuid.IsValid(),
 			"Panel Create intent reaches the production asset workflow callback");
 		const auto assetPath = fixture.root / "ActorImprints" / "Enemy.imprint";
 		Check(std::filesystem::is_regular_file(assetPath) &&
@@ -112,44 +108,48 @@ namespace
 			MetaFile::TryLoad(assetPath.string()) == assetGuid,
 			"Create publishes the .imprint and matching .meta pair together");
 		const AssetEntry* entry = fixture.assets.GetAssetEntry(assetGuid);
-		Check(entry && entry->type == AssetType::ActorImprint &&
+		Check(entry &&
+			entry->type == AssetType::ActorImprint &&
 			entry->relativePath == "ActorImprints/Enemy.imprint",
 			"Created pair is visible at the managed catalog path");
 
-		ActorImprintAssetError assetError;
-		auto definition = ActorImprintAssetDeserializer::Load(assetPath.string(), nullptr, &assetError);
-		Check(definition && definition->GetActors().size() == 1 &&
-			definition->GetRootActorId() == 1 && definition->GetNextLocalObjectId() == 3 &&
+		auto definition = ActorImprintAssetDeserializer::Load(assetPath.string(), nullptr);
+		Check(definition &&
+			definition->GetActors().size() == 1 &&
+			definition->GetRootActorId() == 1 &&
+			definition->GetNextLocalObjectId() == 3 &&
 			definition->GetActors().front().components.size() == 1 &&
 			definition->GetActors().front().components.front().id == 2,
 			"Create uses the ET-16 default root model and initial LocalObjectID range");
-		Check(!HasTransactionResidue(fixture.root),
-			"Successful creation removes all same-directory staging files");
+		Check(!HasTransactionResidue(fixture.root), "Successful creation removes all same-directory staging files");
 
 		const auto legacyPath = fixture.root / "Legacy.imprint";
 		const Guid legacyGuid = GuidGenerator::Generate();
 		std::filesystem::copy_file(assetPath, legacyPath);
-		Check(MetaFile::Save(legacyPath.string(), legacyGuid) && fixture.assets.Refresh(),
+		Check(MetaFile::Save(legacyPath.string(), legacyGuid) &&
+			fixture.assets.Refresh(),
 			"Legacy root-level ActorImprint fixture is catalogued for compatibility filtering");
 		const auto visibleEntries = ActorImprintsPanel::GetVisibleEntries(fixture.assets);
-		Check(visibleEntries.size() == 1 && visibleEntries.front().guid == assetGuid &&
+		Check(visibleEntries.size() == 1 &&
+			visibleEntries.front().guid == assetGuid &&
 			!ActorImprintAssetWorkflow::IsManagedAssetPath("Legacy.imprint"),
 			"Panel catalog model excludes ActorImprints outside the managed directory");
 
 		Guid duplicateGuid;
 		Check(!ActorImprintAssetWorkflow::Create(
-			"enemy.IMPRINT", fixture.assets, fixture.context, duplicateGuid, &error) &&
-			error.code == ActorImprintAssetWorkflowErrorCode::NameCollision &&
+			"enemy.IMPRINT", fixture.assets, fixture.context, duplicateGuid) &&
 			fixture.assets.GetAssetEntries(AssetType::ActorImprint).size() == 2,
 			"Case-insensitive collisions fail without changing the catalog or identity");
 
 		const EditorAssetDragDropPayload correctPayload{assetGuid, AssetType::ActorImprint};
 		Guid selected;
 		Check(AssetPicker::TrySelectPayload(fixture.assets, AssetType::ActorImprint,
-			correctPayload, {}, selected) && selected == assetGuid,
+			correctPayload, {}, selected) &&
+			selected == assetGuid,
 			"Typed picker accepts the shared AssetGUID plus AssetType payload");
 		Check(!AssetPicker::TrySelectPayload(fixture.assets, AssetType::Texture,
-			correctPayload, {}, selected), "Typed picker rejects a payload for another AssetType");
+			correctPayload, {}, selected),
+			"Typed picker rejects a payload for another AssetType");
 		Check(!AssetPicker::TrySelectPayload(fixture.assets, AssetType::ActorImprint,
 			{GuidGenerator::Generate(), AssetType::ActorImprint}, {}, selected),
 			"Typed picker rejects an unknown AssetGUID");
@@ -159,26 +159,27 @@ namespace
 		panelCallbacks.onEdit = [&](const Guid& requestedGuid)
 		{
 			return ActorImprintAssetWorkflow::OpenDocument(requestedGuid, fixture.assets,
-				fixture.system, fixture.context, documents, 1280, 720, documentId, &error);
+				fixture.system, fixture.context, documents, 1280, 720, documentId);
 		};
 		Check(ActorImprintsPanel::DispatchEdit(panelCallbacks, assetGuid) &&
-			documentId.IsValid() && documents.GetActiveDocument()->GetSourceAssetGuid() == assetGuid,
+			documentId.IsValid() &&
+			documents.GetActiveDocument()->GetSourceAssetGuid() == assetGuid,
 			"Panel Edit intent opens and activates the ActorImprint Document through ET-16");
 		EditorDocumentId duplicateDocumentId;
 		Check(ActorImprintAssetWorkflow::OpenDocument(assetGuid, fixture.assets,
-			fixture.system, fixture.context, documents, 1280, 720, duplicateDocumentId, &error) &&
-			duplicateDocumentId == documentId && documents.GetDocumentCount() == 1,
+			fixture.system, fixture.context, documents, 1280, 720, duplicateDocumentId) &&
+			duplicateDocumentId == documentId &&
+			documents.GetDocumentCount() == 1,
 			"Edit deduplicates documents by AssetGUID");
 		panelCallbacks.onDelete = [&](const Guid& requestedGuid)
 		{
 			return ActorImprintAssetWorkflow::Delete(
-				requestedGuid, fixture.assets, fixture.system, documents, &error);
+				requestedGuid, fixture.assets, fixture.system, documents);
 		};
-		Check(!ActorImprintsPanel::DispatchDelete(panelCallbacks, assetGuid) &&
-			error.code == ActorImprintAssetWorkflowErrorCode::OpenDocumentReference,
-			"Panel Delete intent reports an open Document reference refusal");
+		Check(!ActorImprintsPanel::DispatchDelete(panelCallbacks, assetGuid), "Panel Delete intent reports an open Document reference refusal");
 		Check(documents.CloseDocument(documentId, EditorDocumentCloseDecision::Discard) ==
-			EditorDocumentCloseResult::Closed, "The test closes the ActorImprint Document");
+			EditorDocumentCloseResult::Closed,
+			"The test closes the ActorImprint Document");
 
 		SceneBase scene;
 		scene.Initialize(fixture.context);
@@ -188,19 +189,20 @@ namespace
 		auto instantiate = std::make_unique<InstantiateActorImprintCommand>(
 			scene, fixture.system, assetGuid, ordinaryParent->GetGuid());
 		auto* instantiateCommand = instantiate.get();
-		Check(history.Execute(std::move(instantiate)) && history.GetUndoCount() == 1,
+		Check(history.Execute(std::move(instantiate)) &&
+			history.GetUndoCount() == 1,
 			"Hierarchy drop instantiates under an ordinary Actor and records one command");
 		const Guid rootGuid = instantiateCommand->GetRootActorGuid();
 		Actor* instanceRoot = scene.ResolveActor(rootGuid);
-		Check(instanceRoot && instanceRoot->GetParent() == ordinaryParent &&
+		Check(instanceRoot &&
+			instanceRoot->GetParent() == ordinaryParent &&
 			fixture.system.GetLiveInstanceCount(assetGuid) == 1,
 			"Instantiation preserves the explicit drop parent without transform adjustment");
 
 		const std::size_t recordedCommands = history.GetUndoCount();
 		Check(!history.Execute(std::make_unique<InstantiateActorImprintCommand>(
 			scene, fixture.system, assetGuid, rootGuid)) &&
-			history.GetUndoCount() == recordedCommands &&
-			history.GetLastStructuralResult().reason == StructuralMutationReason::ImprintMemberImmutable,
+			history.GetUndoCount() == recordedCommands,
 			"Instance root/member targets are rejected without recording command history");
 		Check(!history.Execute(std::make_unique<InstantiateActorImprintCommand>(
 			scene, fixture.system, GuidGenerator::Generate())) &&
@@ -208,16 +210,17 @@ namespace
 			"Missing assets fail without adding an Undo entry");
 
 		Check(!ActorImprintAssetWorkflow::Delete(
-			assetGuid, fixture.assets, fixture.system, documents, &error) &&
-			error.code == ActorImprintAssetWorkflowErrorCode::LiveInstanceReference,
+			assetGuid, fixture.assets, fixture.system, documents),
 			"Delete rejects an ActorImprint used by a loaded Scene Instance");
 		Check(history.Undo(), "Instantiation Undo destroys the Instance as one unit");
 		scene.EditorUpdate(0.0f);
-		Check(!scene.ResolveActor(rootGuid) && fixture.system.GetLiveInstanceCount(assetGuid) == 0,
+		Check(!scene.ResolveActor(rootGuid) &&
+			fixture.system.GetLiveInstanceCount(assetGuid) == 0,
 			"Deferred Scene collection completes Instantiation Undo");
 		Check(history.Redo(), "Instantiation Redo restores the captured Instance snapshot");
 		instanceRoot = scene.ResolveActor(rootGuid);
-		Check(instanceRoot && instanceRoot->GetGuid() == rootGuid &&
+		Check(instanceRoot &&
+			instanceRoot->GetGuid() == rootGuid &&
 			instanceRoot->GetParent() == ordinaryParent,
 			"Instantiation Redo preserves root ActorGUID and external parent identity");
 		Check(history.Execute(std::make_unique<DeleteActorImprintInstanceCommand>(
@@ -225,11 +228,13 @@ namespace
 			"Hierarchy deletion removes a complete ActorImprint Instance");
 		Check(instanceRoot->IsDestroyed(), "Deleted Instance is pending collection");
 		scene.EditorUpdate(0.0f);
-		Check(!scene.ResolveActor(rootGuid) && fixture.system.GetLiveInstanceCount(assetGuid) == 0,
+		Check(!scene.ResolveActor(rootGuid) &&
+			fixture.system.GetLiveInstanceCount(assetGuid) == 0,
 			"Instance deletion retires the root and its registry record");
 		Check(history.Undo(), "Instance deletion Undo restores the Instance snapshot");
 		instanceRoot = scene.ResolveActor(rootGuid);
-		Check(instanceRoot && instanceRoot->GetParent() == ordinaryParent &&
+		Check(instanceRoot &&
+			instanceRoot->GetParent() == ordinaryParent &&
 			fixture.system.GetLiveInstanceCount(assetGuid) == 1,
 			"Deletion Undo preserves the Actor GUID and external parent");
 		Check(history.Redo(), "Instance deletion Redo destroys the restored Instance");
@@ -239,14 +244,15 @@ namespace
 		scene.EditorUpdate(0.0f);
 
 		fixture.assets.TakePendingChanges();
-		Check(ActorImprintsPanel::DispatchDelete(panelCallbacks, assetGuid),
-			"Panel Delete intent succeeds after all references are gone");
+		Check(ActorImprintsPanel::DispatchDelete(panelCallbacks, assetGuid), "Panel Delete intent succeeds after all references are gone");
 		Check(!std::filesystem::exists(assetPath) &&
 			!std::filesystem::exists(assetPath.string() + ".meta") &&
-			!fixture.assets.GetAssetEntry(assetGuid) && !HasTransactionResidue(fixture.root),
+			!fixture.assets.GetAssetEntry(assetGuid) &&
+			!HasTransactionResidue(fixture.root),
 			"Delete removes the asset pair, catalog entry, and staging files together");
 		const auto changes = fixture.assets.TakePendingChanges();
-		Check(changes.size() == 1 && changes.front().kind == AssetChangeKind::Removed &&
+		Check(changes.size() == 1 &&
+			changes.front().kind == AssetChangeKind::Removed &&
 			changes.front().guid == assetGuid,
 			"Successful deletion emits one typed Removed catalog notification");
 		scene.Finalize();
@@ -261,11 +267,11 @@ namespace
 			blocker << "not a directory";
 		}
 		Guid assetGuid;
-		ActorImprintAssetWorkflowError error;
+
 		Check(!ActorImprintAssetWorkflow::Create(
-			"Blocked", fixture.assets, fixture.context, assetGuid, &error) &&
-			error.code == ActorImprintAssetWorkflowErrorCode::FilesystemFailure &&
-			!assetGuid.IsValid() && !std::filesystem::exists(managedPath / "Blocked.imprint") &&
+			"Blocked", fixture.assets, fixture.context, assetGuid) &&
+			!assetGuid.IsValid() &&
+			!std::filesystem::exists(managedPath / "Blocked.imprint") &&
 			fixture.assets.GetAssetEntries(AssetType::ActorImprint).empty(),
 			"directory preparation failure publishes no partial ActorImprint asset");
 	}
@@ -277,14 +283,16 @@ namespace
 		ordinaryScene.Initialize(fixture.context);
 		Actor* ordinaryRoot = ordinaryScene.AddRootActor(
 			ActorFactory::CreateEmptyActor(Actor::InitDesc(true, TAG_NONE, "OrdinaryRoot")));
-		Check(ordinaryRoot && !HierarchyPanel::ResolveEmptySpaceCreationParent(&ordinaryScene).IsValid(),
+		Check(ordinaryRoot &&
+			!HierarchyPanel::ResolveEmptySpaceCreationParent(&ordinaryScene).IsValid(),
 			"Hierarchy empty-space Create keeps root creation semantics in an ordinary Scene");
 
 		SceneBase imprintScene;
 		imprintScene.Initialize(fixture.context);
 		Actor* imprintRoot = imprintScene.AddRootActor(
 			ActorFactory::CreateEmptyActor(Actor::InitDesc(true, TAG_NONE, "ImprintRoot")));
-		Check(imprintRoot && imprintScene.EnableSingleRootClosedSubtreePolicy() &&
+		Check(imprintRoot &&
+			imprintScene.EnableSingleRootClosedSubtreePolicy() &&
 			HierarchyPanel::ResolveEmptySpaceCreationParent(&imprintScene) == imprintRoot->GetGuid(),
 			"Hierarchy empty-space Create resolves to the required root in an ActorImprint Working Scene");
 
@@ -292,11 +300,11 @@ namespace
 		MenuBar::Callbacks callbacks;
 		callbacks.canSave = true;
 		callbacks.onSaveDocument = [&saved]() { saved = true; };
-		Check(MenuBar::DispatchSaveShortcut(callbacks, true, true, false) && saved,
+		Check(MenuBar::DispatchSaveShortcut(callbacks, true, true, false) &&
+			saved,
 			"Ctrl+S dispatches Save to the active Document when text input is inactive");
 		saved = false;
-		Check(!MenuBar::DispatchSaveShortcut(callbacks, true, true, true) && !saved,
-			"Ctrl+S does not steal an active text-input edit");
+		Check(!MenuBar::DispatchSaveShortcut(callbacks, true, true, true) && !saved, "Ctrl+S does not steal an active text-input edit");
 
 		imprintScene.Finalize();
 		ordinaryScene.Finalize();

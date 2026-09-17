@@ -41,24 +41,33 @@ namespace
 		SceneBase scene;
 		scene.Initialize(context);
 		const auto imprint = system.Load(assetGuid);
-		ActorImprintMaterializationError error;
-		Actor* root = system.Instantiate(scene, imprint, {}, &error);
-		if (!root) std::cerr << error.message << '\n';
+
+		Actor* root = system.Instantiate(scene, imprint, {});
+		if (!root) std::cerr << "Operation failed\n";
 		Check(root && root->GetOwner() == &scene && scene.GetActorPool().Count() == 1, "Pilot publishes one complete Actor");
 		if (root)
 		{
 			const auto handle = root->GetHandle();
 			const auto& registry = scene.GetImprintInstances();
-			Check(registry.FindMember(handle) && registry.FindMember(handle)->objectId == 10 &&
-				registry.ResolveActor(handle, 10) == root && registry.ResolveComponent(handle, 11), "Pilot Registry resolves provenance and objects");
+			Check(registry.FindMember(handle) &&
+				registry.FindMember(handle)->objectId == 10 &&
+				registry.ResolveActor(handle, 10) == root &&
+				registry.ResolveComponent(handle, 11),
+				"Pilot Registry resolves provenance and objects");
 			Check(registry.FindInstance(handle)->assetGuid == assetGuid, "Pilot Registry retains asset provenance");
 			Check(!system.Unload(imprint) && !system.Clear(), "Live Instance pins its definition");
 			ActorImprintRestoreInput invalid;
 			invalid.actorGuids.emplace(10, root->GetGuid());
-			Check(!system.RestoreInstance(scene, imprint, invalid, &error) && scene.GetActorPool().Count() == 1 &&
-				registry.GetInstances().size() == 1 && scene.ResolveActor(handle) == root, "Failed restore leaves Scene and Registry unchanged");
+			Check(!system.RestoreInstance(scene, imprint, invalid) &&
+				scene.GetActorPool().Count() == 1 &&
+				registry.GetInstances().size() == 1 &&
+				scene.ResolveActor(handle) == root,
+				"Failed restore leaves Scene and Registry unchanged");
 			scene.Finalize();
-			Check(registry.GetInstances().empty() && !registry.FindMember(handle) && !scene.ResolveActor(handle), "Teardown clears Registry after Actor collection");
+			Check(registry.GetInstances().empty() &&
+				!registry.FindMember(handle) &&
+				!scene.ResolveActor(handle),
+				"Teardown clears Registry after Actor collection");
 			Check(system.Unload(imprint), "Teardown releases definition pin");
 		}
 		if (fs::absolute(path).parent_path() == fs::absolute(fs::temp_directory_path())) fs::remove_all(path);
@@ -105,9 +114,9 @@ namespace
 			context.pAssetManager = &assets;
 			context.pActorImprintSystem = &system;
 			scene.Initialize(context);
-			ActorImprintLoadError error;
-			imprint = system.Load(assetGuid, &error);
-			if (imprint.IsNull()) std::cerr << error.message << " " << error.assetError.path << " " << error.assetError.message << '\n';
+
+			imprint = system.Load(assetGuid);
+			if (imprint.IsNull()) std::cerr << "Operation failed\n";
 			Check(!imprint.IsNull(), "Test definition loads");
 		}
 		~Fixture()
@@ -132,7 +141,8 @@ namespace
 		~MaterializationProbe() override { --live; }
 		bool ResolveReferences(SceneBase& scene) override
 		{
-			Check(&scene != destination && destination->GetImprintInstances().GetInstances().size() < 3,
+			Check(&scene != destination &&
+				destination->GetImprintInstances().GetInstances().size() < 3,
 				"Reference validation runs on an unpublished Scene");
 			if (throwResolve) throw std::runtime_error("Injected reference exception");
 			if (failResolve) return false;
@@ -148,7 +158,9 @@ namespace
 			Actor* actor = GetOwner();
 			SceneBase* scene = actor->GetOwner();
 			const auto* member = scene->GetImprintInstances().FindMember(actor->GetHandle());
-			Check(scene == destination && member && scene->GetImprintInstances().ResolveComponent(member->root,
+			Check(scene == destination &&
+				member &&
+				scene->GetImprintInstances().ResolveComponent(member->root,
 				scene->GetImprintInstances().FindComponentId(member->root, this)) == this,
 				"Attach observes final Scene and complete Registry");
 			Check(target.Resolve(*scene) == scene->ResolveActor(resolvedHandle), "Handle resolved before commit survives ownership transfer");
@@ -205,32 +217,49 @@ namespace
 		Actor* first = fixture.system.Instantiate(fixture.scene, fixture.imprint, parent->GetHandle());
 		AssetReference<ActorImprint> reference; reference.SetGuid(fixture.assetGuid);
 		Actor* second = fixture.system.Instantiate(fixture.scene, reference);
-		Check(first && second && first->GetParent() == parent && second->GetParent() == nullptr, "Two Instances accept ordinary parent and Scene root");
+		Check(first &&
+			second &&
+			first->GetParent() == parent &&
+			second->GetParent() == nullptr,
+			"Two Instances accept ordinary parent and Scene root");
 		if (!first || !second) return;
 		const auto& registry = fixture.scene.GetImprintInstances();
 		Actor* child = registry.ResolveActor(first->GetHandle(), 20);
 		Actor* otherChild = registry.ResolveActor(second->GetHandle(), 20);
-		Check(child && otherChild && child->GetParent() == first && otherChild->GetParent() == second &&
-			child->GetGuid() != otherChild->GetGuid() && first->GetGuid() != second->GetGuid(), "Each Instance owns its complete hierarchy and new GUIDs");
+		Check(child &&
+			otherChild &&
+			child->GetParent() == first &&
+			otherChild->GetParent() == second &&
+			child->GetGuid() != otherChild->GetGuid() &&
+			first->GetGuid() != second->GetGuid(),
+			"Each Instance owns its complete hierarchy and new GUIDs");
 		auto* probe = static_cast<MaterializationProbe*>(registry.ResolveComponent(first->GetHandle(), 12));
 		auto* other = static_cast<MaterializationProbe*>(registry.ResolveComponent(second->GetHandle(), 12));
-		Check(probe && other && probe != other && probe->target.Resolve(fixture.scene) == child && other->target.Resolve(fixture.scene) == otherChild,
+		Check(probe &&
+			other &&
+			probe != other &&
+			probe->target.Resolve(fixture.scene) == child &&
+			other->target.Resolve(fixture.scene) == otherChild,
 			"Local references stay within each independently owned Instance");
 		if (probe && other) { probe->weight = 99; Check(other->weight == 12, "Component state is not shared"); }
 		auto* camera = static_cast<Camera*>(registry.ResolveComponent(first->GetHandle(), 14));
 		Check(camera && camera->GetTargetActorReference().Resolve(fixture.scene) == child, "Built-in Camera uses its existing reference resolver");
-		Check(registry.FindMember(child->GetHandle())->root == first->GetHandle() && registry.FindComponentId(first->GetHandle(), probe) == 12,
+		Check(registry.FindMember(child->GetHandle())->root == first->GetHandle() &&
+			registry.FindComponentId(first->GetHandle(), probe) == 12,
 			"Member and Component identity can be found in both directions");
 		ActorImprintRestoreInput restore;
 		restore.actorGuids = { { 10, GuidGenerator::Generate() }, { 20, GuidGenerator::Generate() } };
 		restore.sourceDefinitionRevision = fixture.system.Resolve(fixture.imprint)->GetRevision();
 		restore.rootActorGuid = restore.actorGuids.at(10);
 		Actor* restored = fixture.system.RestoreInstance(fixture.scene, fixture.imprint, restore);
-		Check(restored && restored->GetGuid() == restore.actorGuids.at(10) &&
-			registry.ResolveActor(restored->GetHandle(), 20)->GetGuid() == restore.actorGuids.at(20), "Restore uses supplied GUIDs exactly");
+		Check(restored &&
+			restored->GetGuid() == restore.actorGuids.at(10) &&
+			registry.ResolveActor(restored->GetHandle(), 20)->GetGuid() == restore.actorGuids.at(20),
+			"Restore uses supplied GUIDs exactly");
 		const auto before = fixture.scene.GetAllActors();
 		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, first->GetHandle()) &&
-			!fixture.system.Instantiate(fixture.scene, fixture.imprint, child->GetHandle()) && fixture.scene.GetAllActors() == before,
+			!fixture.system.Instantiate(fixture.scene, fixture.imprint, child->GetHandle()) &&
+			fixture.scene.GetAllActors() == before,
 			"Instance root and member are rejected as external parents");
 		MaterializationProbe::testReentry = false;
 	}
@@ -245,25 +274,31 @@ namespace
 		const auto before = fixture.scene.GetAllActors();
 		const auto initialAttached = MaterializationProbe::attached;
 		const auto initialDestroyed = MaterializationProbe::destroyed;
-		ActorImprintMaterializationError error;
+
 		for (bool* failure : { &MaterializationProbe::failFactory, &MaterializationProbe::failProperty,
 			&MaterializationProbe::failResolve, &MaterializationProbe::throwResolve })
 		{
 			*failure = true;
-			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, parent->GetHandle(), &error) && !error.message.empty(),
+			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, parent->GetHandle()),
 				"Injected construction/property/reference/exception failure rejects the whole Instance");
 			*failure = false;
-			Check(fixture.scene.GetAllActors() == before && parent->GetDirectChildren().empty() &&
-				fixture.scene.ResolveActor(parent->GetGuid()) == parent && fixture.scene.GetImprintInstances().GetInstances().empty(),
+			Check(fixture.scene.GetAllActors() == before &&
+				parent->GetDirectChildren().empty() &&
+				fixture.scene.ResolveActor(parent->GetGuid()) == parent &&
+				fixture.scene.GetImprintInstances().GetInstances().empty(),
 				"Failure preserves ActorPool, GUID map, hierarchy and Registry");
-			Check(MaterializationProbe::live == 0 && MaterializationProbe::attached == initialAttached &&
-				MaterializationProbe::destroyed == initialDestroyed, "Unpublished failure destroys objects without lifecycle callbacks");
+			Check(MaterializationProbe::live == 0 &&
+				MaterializationProbe::attached == initialAttached &&
+				MaterializationProbe::destroyed == initialDestroyed,
+				"Unpublished failure destroys objects without lifecycle callbacks");
 		}
 		Actor* root = fixture.system.Instantiate(fixture.scene, fixture.imprint);
-		Check(root && root->GetHandle().index == holeHandle.index && root->GetHandle().generation == holeHandle.generation + 1,
+		Check(root &&
+			root->GetHandle().index == holeHandle.index &&
+			root->GetHandle().generation == holeHandle.generation + 1,
 			"Failed transactions consume neither a free Actor slot nor its generation");
-		Check(!fixture.system.Instantiate(fixture.scene, ActorImprintHandle{}, {}, &error), "Stale/null Imprint handle is rejected");
-		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, { 123456, 3 }, &error), "Invalid external parent is rejected");
+		Check(!fixture.system.Instantiate(fixture.scene, ActorImprintHandle{}, {}), "Stale/null Imprint handle is rejected");
+		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, { 123456, 3 }), "Invalid external parent is rejected");
 	}
 	void UIAndDepth()
 	{
@@ -272,7 +307,8 @@ namespace
 		source["nextLocalObjectId"] = 13;
 		{
 			Fixture fixture(source);
-			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) && fixture.scene.GetAllActors().empty(),
+			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) &&
+				fixture.scene.GetAllActors().empty(),
 				"Screen-space Canvas cannot silently replace a definition-owned Transform");
 		}
 		source["actors"][0]["components"][0]["type"] = "RectTransform";
@@ -287,7 +323,8 @@ namespace
 			auto parentOwned = ActorFactory::CreateEmptyActor({});
 			parentOwned->AddComponent(std::make_unique<Canvas>());
 			Actor* parent = fixture.scene.AddRootActor(std::move(parentOwned));
-			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, parent->GetHandle()) && parent->GetDirectChildren().empty(),
+			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint, parent->GetHandle()) &&
+				parent->GetDirectChildren().empty(),
 				"External Canvas incompatibility leaves the existing parent unchanged");
 		}
 		auto badReference = Sample();
@@ -296,7 +333,8 @@ namespace
 		badReference["nextLocalObjectId"] = 13;
 		{
 			Fixture fixture(badReference);
-			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) && fixture.scene.GetAllActors().empty(),
+			Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) &&
+				fixture.scene.GetAllActors().empty(),
 				"Existing UIImage resolver rejects an Actor without the required Canvas");
 		}
 		constexpr int count = 2048;
@@ -312,7 +350,8 @@ namespace
 		source["nextLocalObjectId"] = 10 + count * 2;
 		Fixture deep(source);
 		Actor* root = deep.system.Instantiate(deep.scene, deep.imprint);
-		Check(root && deep.scene.GetActorPool().Count() == count &&
+		Check(root &&
+			deep.scene.GetActorPool().Count() == count &&
 			deep.scene.GetImprintInstances().ResolveActor(root->GetHandle(), 10 + (count - 1) * 2),
 			"Deep reversed hierarchy materializes through the production entry point");
 		deep.scene.Finalize();
@@ -326,11 +365,13 @@ namespace
 		source["actors"][0]["components"].push_back({ { "localObjectId", 12 }, { "type", "SpriteRenderer" }, { "properties", sprite } });
 		source["nextLocalObjectId"] = 13;
 		Fixture fixture(source, textureGuid);
-		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) && fixture.scene.GetActorPool().Count() == 0,
+		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) &&
+			fixture.scene.GetActorPool().Count() == 0,
 			"Unresolvable runtime AssetReference rejects the entire candidate before attach");
 		std::filesystem::remove(fixture.path / "texture.png");
 		Check(fixture.assets.Refresh(), "Catalog observes removed referenced asset");
-		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) && fixture.scene.GetImprintInstances().GetInstances().empty(),
+		Check(!fixture.system.Instantiate(fixture.scene, fixture.imprint) &&
+			fixture.scene.GetImprintInstances().GetInstances().empty(),
 			"Cached definition revalidates AssetReferences against the current catalog");
 		Fixture simple(Sample());
 		{
@@ -352,26 +393,36 @@ namespace
 		const auto& registry = fixture.scene.GetImprintInstances();
 		Actor* child = registry.ResolveActor(rootHandle, 20);
 		const auto childHandle = child->GetHandle();
-		StructuralMutationResult result;
-		child->Destroy(&result);
-		Check(result.reason == StructuralMutationReason::InstanceDestroyRequired && !child->IsDestroyed() &&
-			fixture.scene.CanDestroy(child) == result, "ET-11 pilot rejects individual member deletion with the query's reason");
-		Check(!root->AddComponent(std::make_unique<Canvas>(), &result) &&
-			result.reason == StructuralMutationReason::ImprintMemberImmutable, "ET-11 pilot routes Component addition through Scene policy");
+		bool result = false;
+		result = child->Destroy();
+		Check(!result &&
+			!child->IsDestroyed() &&
+			fixture.scene.CanDestroy(child) == false,
+			"ET-11 pilot rejects individual member deletion consistently with the query");
+		Check(!root->AddComponent(std::make_unique<Canvas>()), "ET-11 pilot routes Component addition through Scene policy");
 		Component* probe = registry.ResolveComponent(rootHandle, 12);
-		probe->MarkForDestruction(&result);
-		Check(result.reason == StructuralMutationReason::ImprintMemberImmutable && !probe->IsDestroyed(),
-			"ET-11 pilot routes direct Component destruction through Scene policy");
-		Check(!fixture.scene.ReparentActor(child, nullptr, &result) && fixture.scene.CanReparent(child, nullptr) == result,
+		result = probe->MarkForDestruction();
+		Check(!result && !probe->IsDestroyed(), "ET-11 pilot routes direct Component destruction through Scene policy");
+		Check(!fixture.scene.ReparentActor(child, nullptr) &&
+			fixture.scene.CanReparent(child, nullptr) == false,
 			"ET-11 pilot rejects member reparent without changing hierarchy");
-		root->Destroy(&result);
-		Check(static_cast<bool>(result) && root->IsDestroyed() && child->IsDestroyed() && registry.FindInstance(rootHandle)->destroying,
+		result = root->Destroy();
+		Check(static_cast<bool>(result) &&
+			root->IsDestroyed() &&
+			child->IsDestroyed() &&
+			registry.FindInstance(rootHandle)->destroying,
 			"ET-11 pilot root destruction marks the complete Instance");
-		Check(registry.FindMember(rootHandle) && registry.FindMember(childHandle) && !registry.ResolveComponent(rootHandle, 12) &&
-			fixture.scene.ResolveActor(root->GetGuid()) == root, "ET-11 pilot keeps Actor membership and GUIDs until GC, invalidates Components immediately");
+		Check(registry.FindMember(rootHandle) &&
+			registry.FindMember(childHandle) &&
+			!registry.ResolveComponent(rootHandle, 12) &&
+			fixture.scene.ResolveActor(root->GetGuid()) == root,
+			"ET-11 pilot keeps Actor membership and GUIDs until GC, invalidates Components immediately");
 		fixture.scene.EditorUpdate(0);
-		Check(!registry.FindMember(childHandle) && registry.GetInstances().empty() && fixture.scene.GetActorPool().Count() == 0 &&
-			fixture.system.Unload(fixture.imprint), "ET-11 pilot GC removes membership and releases definition pins");
+		Check(!registry.FindMember(childHandle) &&
+			registry.GetInstances().empty() &&
+			fixture.scene.GetActorPool().Count() == 0 &&
+			fixture.system.Unload(fixture.imprint),
+			"ET-11 pilot GC removes membership and releases definition pins");
 	}
 }
 

@@ -1,11 +1,16 @@
 #include "PropertyMetadata.h"
+#include "Engine/Core/Debug/Debug.h"
 
 const EnumEntry* EnumMetadata::FindByName(std::string_view serializedName) const
 {
 	for (const EnumEntry& entry : m_entries)
 	{
-		if (entry.serializedName == serializedName) return &entry;
+		if (entry.serializedName == serializedName)
+		{
+			return &entry;
+		}
 	}
+
 	return nullptr;
 }
 
@@ -13,8 +18,12 @@ const EnumEntry* EnumMetadata::FindByValue(std::int64_t value) const
 {
 	for (const EnumEntry& entry : m_entries)
 	{
-		if (entry.value == value) return &entry;
+		if (entry.value == value)
+		{
+			return &entry;
+		}
 	}
+
 	return nullptr;
 }
 
@@ -27,14 +36,21 @@ bool PropertyMetadata::Read(
 	{
 		return false;
 	}
+
 	if (objectType != m_objectType || !m_read)
 	{
 		return false;
 	}
 
 	PropertyValue candidate;
-	if (!m_read(object, candidate)) return false;
+
+	if (!m_read(object, candidate))
+	{
+		return false;
+	}
+
 	const bool isEnum = m_logicalType == PropertyLogicalType::Enum;
+
 	if (isEnum && !IsRegisteredEnumValue(candidate))
 	{
 		return false;
@@ -53,20 +69,27 @@ bool PropertyMetadata::Write(
 	{
 		return false;
 	}
+
 	if (objectType != m_objectType || !m_write)
 	{
 		return false;
 	}
+
 	if (!ValidateValue(value))
 	{
 		return false;
 	}
+
 	return m_write(object, value);
 }
 
 bool PropertyMetadata::ValidateValue(const PropertyValue& value) const
 {
-	if (!m_valueValidator || !m_valueValidator(value)) return false;
+	if (!m_valueValidator || !m_valueValidator(value))
+	{
+		return false;
+	}
+
 	return m_logicalType != PropertyLogicalType::Enum || IsRegisteredEnumValue(value);
 }
 
@@ -74,9 +97,8 @@ bool PropertyMetadata::IsValid() const
 {
 	const bool hasIdentity = !m_serializedName.empty()
 		&& m_logicalType != PropertyLogicalType::Invalid;
-	const bool hasValidAccessors = m_valueValidator
-		&& m_read
-		&& m_write;
+	const bool hasValidAccessors = m_valueValidator && m_read && m_write;
+
 	if (!hasIdentity || !hasValidAccessors)
 	{
 		return false;
@@ -90,6 +112,7 @@ bool PropertyMetadata::IsValid() const
 		const bool hasNoAssetType = m_assetType == AssetType::Unknown;
 		return hasMatchingEnumType && hasSerializationFormat && hasNoAssetType;
 	}
+
 	if (m_logicalType == PropertyLogicalType::AssetReference)
 	{
 		return !m_enumMetadata && m_assetType != AssetType::Unknown;
@@ -108,11 +131,13 @@ bool PropertyMetadata::IsRegisteredEnumValue(const PropertyValue& value) const
 
 const PropertyMetadata* TypeMetadata::FindProperty(std::string_view serializedName) const
 {
-	const auto path = PropertyPath::FromMembers({ std::string(serializedName) });
+	const auto path = PropertyPath::FromMembers({std::string(serializedName)});
+
 	if (!path)
 	{
 		return nullptr;
 	}
+
 	return FindPropertyByPath(*path);
 }
 
@@ -120,125 +145,79 @@ const PropertyMetadata* TypeMetadata::FindPropertyByPath(const PropertyPath& pat
 {
 	for (const PropertyMetadata& property : m_properties)
 	{
-		if (property.GetPath() == path) return &property;
+		if (property.GetPath() == path)
+		{
+			return &property;
+		}
 	}
+
 	return nullptr;
 }
 
-bool TypeMetadata::Validate(
-	std::type_index objectType,
-	const void* object,
-	ReflectionError* outError) const
+bool TypeMetadata::Validate(std::type_index objectType, const void* object) const
 {
 	if (!object || objectType != m_type)
 	{
-		if (outError)
-		{
-			*outError = {
-				ReflectionErrorCode::InvalidObject,
-				std::nullopt,
-				"Object type does not match its reflection metadata." };
-		}
+		DBG("Object type does not match its reflection metadata.");
 		return false;
 	}
 
-	if (!m_validator) return true;
-
-	const std::optional<ReflectionError> error = m_validator(objectType, object);
-	if (!error) return true;
-
-	if (outError) *outError = *error;
-	return false;
+	return !m_validator || m_validator(objectType, object);
 }
 
 bool TypeMetadata::TryWriteProperty(
 	std::type_index objectType,
 	void* object,
 	const PropertyMetadata& property,
-	const PropertyValue& value,
-	ReflectionError* outError) const
+	const PropertyValue& value) const
 {
-	const PropertyMetadata* registeredProperty = FindPropertyByPath(property.GetPath());
-	if (registeredProperty != &property)
+	if (FindPropertyByPath(property.GetPath()) != &property)
 	{
-		if (outError)
-		{
-			*outError = {
-				ReflectionErrorCode::InvalidMetadata,
-				property.GetPath(),
-				"Property does not belong to this type metadata." };
-		}
+		DBG("Property does not belong to this type metadata.");
 		return false;
 	}
 
 	PropertyValue before;
+
 	if (!property.Read(objectType, object, before))
 	{
-		if (outError)
-		{
-			*outError = {
-				ReflectionErrorCode::PropertyReadFailed,
-				property.GetPath(),
-				"Failed to capture the property value before editing." };
-		}
+		DBG("Failed to capture the property value before editing.");
 		return false;
 	}
 
 	if (!property.Write(objectType, object, value))
 	{
-		const bool restored = property.Write(objectType, object, before);
-		if (outError)
+		DBG("Property rejected the edited value.");
+
+		if (!property.Write(objectType, object, before))
 		{
-			ReflectionErrorCode code = ReflectionErrorCode::InvalidPropertyValue;
-			std::string message = "Property rejected the edited value.";
-			if (!restored)
-			{
-				code = ReflectionErrorCode::RollbackFailed;
-				message = "Property rejected the edited value and could not be restored.";
-			}
-			*outError = {
-				code,
-				property.GetPath(),
-				std::move(message) };
+			DBG("Property edit rollback failed.");
 		}
+
 		return false;
 	}
 
-	ReflectionError validationError;
-	if (Validate(objectType, object, &validationError)) return true;
-
-	const bool restored = property.Write(objectType, object, before);
-	if (!restored)
+	if (Validate(objectType, object))
 	{
-		if (outError)
-		{
-			*outError = {
-				ReflectionErrorCode::RollbackFailed,
-				property.GetPath(),
-				"Property edit failed validation and could not be restored." };
-		}
-		return false;
+		return true;
 	}
 
-	if (outError) *outError = std::move(validationError);
+	if (!property.Write(objectType, object, before))
+	{
+		DBG("Property edit rollback failed.");
+	}
+
 	return false;
 }
 
 bool TypeMetadata::CopySerializableState(
 	std::type_index objectType,
 	const void* source,
-	void* destination,
-	ReflectionError* outError) const
+	void* destination) const
 {
 	if (!source || !destination || objectType != m_type)
 	{
-		if (outError)
-		{
-			*outError = {
-				ReflectionErrorCode::InvalidObject,
-				std::nullopt,
-				"Source or destination does not match its reflection metadata." };
-		}
+		DBG("Source or destination does not match its reflection metadata.");
 		return false;
 	}
 
@@ -248,28 +227,26 @@ bool TypeMetadata::CopySerializableState(
 		PropertyValue sourceValue;
 		PropertyValue destinationValue;
 	};
-
 	std::vector<StateEntry> entries;
+
 	for (const PropertyMetadata& property : m_properties)
 	{
-		if (!property.GetSerializationMetadata()) continue;
+		if (!property.GetSerializationMetadata())
+		{
+			continue;
+		}
 
 		StateEntry entry;
 		entry.property = &property;
 		const bool sourceRead = property.Read(objectType, source, entry.sourceValue);
-		const bool destinationRead = property.Read(
-			objectType, destination, entry.destinationValue);
+		const bool destinationRead = property.Read(objectType, destination, entry.destinationValue);
+
 		if (!sourceRead || !destinationRead)
 		{
-			if (outError)
-			{
-				*outError = {
-					ReflectionErrorCode::PropertyReadFailed,
-					property.GetPath(),
-					"Failed to capture reflected component state." };
-			}
+			DBG("Failed to capture reflected component state.");
 			return false;
 		}
+
 		entries.push_back(std::move(entry));
 	}
 
@@ -279,50 +256,39 @@ bool TypeMetadata::CopySerializableState(
 		bool restored = true;
 		while (appliedCount > 0)
 		{
-			--appliedCount;
-			const StateEntry& entry = entries[appliedCount];
+			const StateEntry& entry = entries[--appliedCount];
+
 			if (!entry.property->Write(objectType, destination, entry.destinationValue))
 			{
 				restored = false;
 			}
 		}
-		return restored;
+
+		if (!restored)
+		{
+			DBG("Reflected component state rollback failed.");
+		}
 	};
 
 	for (const StateEntry& entry : entries)
 	{
 		++appliedCount;
-		if (entry.property->Write(objectType, destination, entry.sourceValue)) continue;
 
-		const bool restored = rollback();
-		if (outError)
+		if (entry.property->Write(objectType, destination, entry.sourceValue))
 		{
-			ReflectionErrorCode code = ReflectionErrorCode::PropertyWriteFailed;
-			if (!restored) code = ReflectionErrorCode::RollbackFailed;
-			*outError = {
-				code,
-				entry.property->GetPath(),
-				"Failed to copy reflected component state." };
+			continue;
 		}
+
+		DBG("Failed to copy reflected component state.");
+		rollback();
 		return false;
 	}
 
-	ReflectionError validationError;
-	if (Validate(objectType, destination, &validationError)) return true;
-
-	const bool restored = rollback();
-	if (!restored)
+	if (Validate(objectType, destination))
 	{
-		if (outError)
-		{
-			*outError = {
-				ReflectionErrorCode::RollbackFailed,
-				validationError.path,
-				"Copied state failed validation and could not be restored." };
-		}
-		return false;
+		return true;
 	}
 
-	if (outError) *outError = std::move(validationError);
+	rollback();
 	return false;
 }

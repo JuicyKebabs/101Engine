@@ -34,17 +34,26 @@ void UIRenderer::OnDetachOverride()
 {
 	// Unregister from the render system of the scene
 	auto owner = GetOwner();
-	if (owner) {
+
+	if (owner)
+	{
 		auto scene = owner->GetOwner();
+
 		if (scene) {
 			if (auto rs = scene->GetRenderSystem())
+			{
 				rs->Unregister(this);
+			}
 		}
 	}
 
 	// Unregister from the canvas
 	Canvas* governingCanvas = GetGoverningCanvas();
-	if(governingCanvas) governingCanvas->UnregisterUIRenderer(this);
+
+	if (governingCanvas)
+	{
+		governingCanvas->UnregisterUIRenderer(this);
+	}
 }
 
 void UIRenderer::OnDestroyOverride()
@@ -68,13 +77,17 @@ void UIRenderer::RebuildRenderProxy()
 	if (m_isProxyDirty)
 	{
 		auto owner = GetOwner();
-		if (owner) {
+
+		if (owner)
+		{
 			auto transform = owner->GetComponentByClass<RectTransform>();
+
 			if (transform) {
 				m_renderProxy.common.position = transform->GetWorldPosition();
 				m_renderProxy.common.worldMatrix = transform->GetWorldMatrix();
 			}
 		}
+
 		m_renderProxy.common.color = m_color;
 		m_renderProxy.common.visible = m_isVisible;
 		m_renderProxy.common.renderSpace = GetRenderSpace();
@@ -90,35 +103,45 @@ void UIRenderer::InitialRegistration()
 {
 	Canvas* governingCanvas = GetGoverningCanvas();
 
-	if (!governingCanvas) return;
+	if (!governingCanvas)
+	{
+		return;
+	}
 
 	// Register with the render system of the scene
 	auto owner = GetOwner();
+
 	if (owner)
 	{
 		auto scene = owner->GetOwner();
+
 		if (scene)
 		{
 			auto renderSystem = scene->GetRenderSystem();
+
 			if (renderSystem)
 			{
 				renderSystem->Register(this);
 			}
 			else
 			{
-				DBG("UIRenderer component '%s' failed to register with render system. Render system not found in scene.", GetName().c_str());
+				DBG("UIRenderer component '%s' failed to register with render system. "
+					"Render system not found in scene.",
+					GetName().c_str());
 				return;
 			}
 		}
 		else
 		{
-			DBG("UIRenderer component '%s' has no scene. Please add it to a scene to function properly.", GetName().c_str());
+			DBG("UIRenderer component '%s' has no scene. Please add it to a scene to function properly.",
+				GetName().c_str());
 			return;
 		}
 	}
 	else
 	{
-		DBG("UIRenderer component '%s' has no owning actor. Please attach it to an actor to function properly.", GetName().c_str());
+		DBG("UIRenderer component '%s' has no owning actor. Please attach it to an actor to function properly.",
+			GetName().c_str());
 		return;
 	}
 
@@ -135,11 +158,17 @@ void UIRenderer::SetGoverningCanvas(Canvas* canvas)
 		return;
 	}
 
-	if (previousCanvas && IsAttached()) previousCanvas->UnregisterUIRenderer(this);
+	if (previousCanvas && IsAttached())
+	{
+		previousCanvas->UnregisterUIRenderer(this);
+	}
 
 	RendererComponent::SetGoverningCanvas(canvas);
 
-	if (!IsAttached()) return;
+	if (!IsAttached())
+	{
+		return;
+	}
 
 	if (canvas)
 	{
@@ -162,18 +191,26 @@ void UIRenderer::SetGoverningCanvas(Canvas* canvas)
 	}
 }
 
-
 bool UIRenderer::ResolveReferences(SceneBase& scene)
 {
-	if (!m_pendingCanvasActorId.has_value()) return true;
+	if (!m_pendingCanvasActorId.has_value())
+	{
+		return true;
+	}
 
 	Actor* canvasActor = scene.ResolveActor(*m_pendingCanvasActorId);
 
-	if (!canvasActor) return false;
+	if (!canvasActor)
+	{
+		return false;
+	}
 
 	Canvas* canvas = canvasActor->GetComponentByClass<Canvas>();
 
-	if (!canvas) return false;
+	if (!canvas)
+	{
+		return false;
+	}
 
 	SetGoverningCanvas(canvas);
 	m_pendingCanvasActorId.reset();
@@ -185,12 +222,18 @@ bool UIRenderer::ResolveReferences(SceneBase& scene)
 bool UIRenderer::GetCanvasActorReference(ActorReference& value) const
 {
 	value.Clear();
+
 	if (Canvas* canvas = GetCanvas())
 	{
 		Actor* actor = canvas->GetOwner();
 		return actor && value.Set(actor);
 	}
-	if (m_pendingCanvasActorId) return value.SetGuid(*m_pendingCanvasActorId);
+
+	if (m_pendingCanvasActorId)
+	{
+		return value.SetGuid(*m_pendingCanvasActorId);
+	}
+
 	return true;
 }
 
@@ -198,7 +241,11 @@ void UIRenderer::SetCanvasActorReference(const ActorReference& value)
 {
 	SetCanvas(nullptr);
 	m_pendingCanvasActorId.reset();
-	if (value.HasValue()) m_pendingCanvasActorId = value.GetGuid();
+
+	if (value.HasValue())
+	{
+		m_pendingCanvasActorId = value.GetGuid();
+	}
 }
 
 void UIRenderer::ApplyBlendModeToRenderTemplates()

@@ -6,7 +6,11 @@
 bool CanvasEditContext::OpenFromActor(Actor* actor)
 {
 	Canvas* canvas = FindClosestCanvas(actor);
-	if(!canvas) return false;
+
+	if (!canvas)
+	{
+		return false;
+	}
 
 	Actor* canvasActor = canvas->GetOwner();
 
@@ -29,13 +33,20 @@ void CanvasEditContext::Clear()
 
 Canvas* CanvasEditContext::FindClosestCanvas(Actor* actor)
 {
-	if (!actor || actor->IsDestroyed()) return nullptr;
+	if (!actor || actor->IsDestroyed())
+	{
+		return nullptr;
+	}
 
 	// Traverse up the actor hierarchy to find the closest Canvas component
 	for (Actor* current = actor; current; current = current->GetParent())
 	{
 		Canvas* canvas = current->GetComponentByClass<Canvas>();
-		if (canvas) return canvas;
+
+		if (canvas)
+		{
+			return canvas;
+		}
 	}
 
 	return nullptr;

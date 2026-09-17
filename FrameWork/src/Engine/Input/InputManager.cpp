@@ -9,6 +9,7 @@ InputManager& InputManager::GetInstance()
 	{
 		m_instance.reset(new InputManager());
 	}
+
 	return *m_instance;
 }
 
@@ -80,7 +81,6 @@ void InputManager::StopAllControllerVibrations()
 {
 	m_controller.StopAllVibrations();
 }
-
 
 //トリガー情報更新
 void InputManager::UpdateTriggerKeyInfo()

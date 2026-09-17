@@ -40,7 +40,15 @@ public:
 
 	void Initialize(ID3D12Device* pDevice, DescriptorHeap::Type type, UINT numDescriptors);
 
-	uint32_t AllocateDescriptor() { return m_nextFreeIndex < m_numDescriptors ? m_nextFreeIndex++ : UINT32_MAX; }
+	uint32_t AllocateDescriptor()
+	{
+		if (m_nextFreeIndex >= m_numDescriptors)
+		{
+			return UINT32_MAX;
+		}
+
+		return m_nextFreeIndex++;
+	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCpuHandle(uint32_t index) const{
 		assert(index < m_numDescriptors && "Descriptor index out of bounds");
@@ -52,6 +60,7 @@ public:
 			assert(false && "RTV and DSV heaps are not shader visible, cannot get GPU handle");
 			return CD3DX12_GPU_DESCRIPTOR_HANDLE();
 		}
+
 		assert(index < m_numDescriptors && "Descriptor index out of bounds");
 		return CD3DX12_GPU_DESCRIPTOR_HANDLE(m_heap->GetGPUDescriptorHandleForHeapStart(), index, m_descriptorSize);
 	}

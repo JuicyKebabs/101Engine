@@ -25,11 +25,13 @@ constexpr TagId TAG_NONE = 0;
 constexpr TagId CalcTagId(std::string_view str)
 {
 	TagId hash = 2166136261u; // FNV offset basis
+
 	for (char c : str)
 	{
 		hash ^= static_cast<TagId>(c);
 		hash *= 16777619u; // FNV prime
 	}
+
 	return hash;
 }
 
@@ -46,8 +48,10 @@ public:
 	bool IsReserved(TagId id) const;
 	static bool NormalizeUserTagName(std::string_view input, std::string& output, std::string* outError = nullptr);
 	static bool NamesEqualCaseInsensitive(std::string_view left, std::string_view right);
-	static bool ValidateUserTagSet(const std::vector<std::string>& input,
-		std::vector<std::string>& normalized, std::string* outError = nullptr);
+	static bool ValidateUserTagSet(
+		const std::vector<std::string>& input,
+		std::vector<std::string>& normalized,
+		std::string* outError = nullptr);
 
 	// Get the TagId for a given tag name. (Auto-registers if not found)
 	TagId GetId(std::string_view tagName);

@@ -19,10 +19,8 @@
 
 static_assert(sizeof(Keyboard_State) == 256 / 8, "キーボード状態構造体のサイズ不一致");
 
-
 static Keyboard_State gState = {};
 static Keyboard_State gStateOld = {};
-
 
 void keycopy()
 {
@@ -32,32 +30,33 @@ void keycopy()
 
 static void keyDown(int key)
 {
-    if (key < 0 || key > 0xfe) { return;  }
+    if (key < 0 || key > 0xfe)
+    {
+        return;
+    }
 
     unsigned int* p = (unsigned int*)&gState;
     unsigned int bf = 1u << (key & 0x1f);
  
     p[(key >> 5)] |= bf;
-
 }
-
 
 static void keyUp(int key)
 {
-    if (key < 0 || key > 0xfe) { return; }
+    if (key < 0 || key > 0xfe)
+    {
+        return;
+    }
 
     unsigned int* p = (unsigned int*)&gState;
     unsigned int bf = 1u << (key & 0x1f);
     p[(key >> 5)] &= ~bf;
-
 }
-
 
 void Keyboard_Initialize(void)
 {
     Keyboard_Reset();
 }
-
 
 bool Keyboard_IsKeyDown(Keyboard_Keys key, const Keyboard_State* pState)
 {
@@ -67,6 +66,7 @@ bool Keyboard_IsKeyDown(Keyboard_Keys key, const Keyboard_State* pState)
         unsigned int bf = 1u << (key & 0x1f);
         return (p[(key >> 5)] & bf) != 0;
     }
+
     return false;
 }
 
@@ -81,12 +81,10 @@ bool Keyboard_IsKeyDownTrigger(Keyboard_Keys key)
         unsigned int bf = 1u << (key & 0x1f);
 
         return ((p[(key >> 5)] & bf) ^ (p2[(key >> 5)] & bf)) & (p[(key >> 5)] & bf);
-
     }
+
     return false;
 }
-
-
 
 bool Keyboard_IsKeyUp(Keyboard_Keys key, const Keyboard_State* pState)
 {
@@ -96,22 +94,19 @@ bool Keyboard_IsKeyUp(Keyboard_Keys key, const Keyboard_State* pState)
         unsigned int bf = 1u << (key & 0x1f);
         return (p[(key >> 5)] & bf) == 0;
     }
+
     return false;
 }
-
 
 bool Keyboard_IsKeyDown(Keyboard_Keys key)
 {
     return Keyboard_IsKeyDown(key, &gState);
-
 }
-
 
 bool Keyboard_IsKeyUp(Keyboard_Keys key)
 {
     return Keyboard_IsKeyUp(key, &gState);
 }
-
 
 // キーボードの現在の状態を取得する
 const Keyboard_State* Keyboard_GetState(void)
@@ -123,13 +118,11 @@ const Keyboard_State* Keyboard_GetStateOld(void)
     return &gStateOld;
 }
 
-
 void Keyboard_Reset(void)
 {
     ZeroMemory(&gState, sizeof(Keyboard_State));
     ZeroMemory(&gStateOld, sizeof(Keyboard_State));
 }
-
 
 // キーボード制御のためのウォンどうメッセージプロシージャフック関数
 void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
@@ -160,12 +153,14 @@ void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
     {
     case VK_SHIFT:
         vk = (int)MapVirtualKey(((unsigned int)lParam & 0x00ff0000) >> 16u, MAPVK_VSC_TO_VK_EX);
+
         if (!down)
         {
             // 左シフトと右シフトの両方が同時に押された場合にクリアされるようにするための回避策
             keyUp(VK_LSHIFT);
             keyUp(VK_RSHIFT);
         }
+
         break;
 
     case VK_CONTROL:
@@ -185,6 +180,4 @@ void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
     {
         keyUp(vk);
     }
-
-
 }

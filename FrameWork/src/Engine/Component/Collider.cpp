@@ -12,10 +12,12 @@ void Collider::OnStartOverride()
 	m_layerMask = MakeLayerMask(m_layer);
 
 	auto owner = GetOwner();
+
 	if (owner)
 	{
 		m_ownerTag = owner->GetTag();
 		auto ownerScene = owner->GetOwner();
+
 		if (ownerScene)
 		{
 			ownerScene->GetCollisionSystem()->Register(this);
@@ -99,7 +101,7 @@ void Collider::UpdateAABB()
 
 void Collider::SetPreviousState()
 {
-		m_previousBoxCollider = m_currentBoxCollider;			// Save previous box collider
+	m_previousBoxCollider = m_currentBoxCollider;			// Save previous box collider
 	m_previousSphereCollider = m_currentSphereCollider;		// Save previous sphere collider
 	m_previousCapsuleCollider = m_currentCapsuleCollider;	// Save previous capsule collider
 	m_previousAABB = m_currentAABB;							// Save previous AABB
@@ -109,10 +111,15 @@ void Collider::SetPreviousState()
 void Collider::ChackIfTransformChanged()
 {
 	auto owner = GetOwner();
-	if (owner) {
+
+	if (owner)
+	{
 		auto transform = owner->GetComponentByClass<Transform>();
-		if (transform) {
+
+		if (transform)
+		{
 			uint64_t currentGeneration = transform->GetWorldGeneration();
+
 			if (m_transformGeneration != currentGeneration) {
 				m_transformGeneration = currentGeneration;
 				m_isDirty = true;
@@ -125,15 +132,21 @@ void Collider::RefreshWorldTransform()
 {
 	ChackIfTransformChanged();
 
-	if (!m_isDirty) return;
+	if (!m_isDirty)
+	{
+		return;
+	}
 
 	auto owner = GetOwner();
+
 	if (!owner)
 	{
 		DBG("Collider : Owner actor is null.");
 		return;
 	}
+
 	auto ownerTransform = owner->GetComponentByClass<Transform>();
+
 	if (!ownerTransform)
 	{
 		DBG("Collider : Owner transform form is null.");
@@ -315,7 +328,11 @@ void Collider::MakeSweptAABB()
 
 bool Collider::SetAuthoredLocalRotation(Quaternion rotation)
 {
-	if (!ValueValidation::NormalizeRotation(rotation)) return false;
+	if (!ValueValidation::NormalizeRotation(rotation))
+	{
+		return false;
+	}
+
 	SetLocalRotation(rotation);
 	return true;
 }

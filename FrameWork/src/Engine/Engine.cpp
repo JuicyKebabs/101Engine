@@ -334,6 +334,7 @@ void Engine::EndFrame()
 
 	// Present the frame (sync interval = 1 for VSync)
 	const HRESULT hr = m_swapChain.Present(1, 0);
+
 	if (FAILED(hr))
 	{
 		assert(false && "Failed to present swap chain");
@@ -396,7 +397,10 @@ bool Engine::ResizeOutput(UINT width, UINT height)
 
 bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 {
-	if (width == 0 || height == 0) return false;	// Invalid size, return false
+	if (width == 0 || height == 0)
+	{
+		return false; // Invalid size, return false
+	}
 
 	// Get the render targets (color, depth, and selection mask)
 	auto* sceneColor = GetBuiltinRenderTarget(BuiltinRenderTarget::SceneColor);
@@ -439,6 +443,7 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 
 	// Resize the render targets
 	const bool colorResult = sceneColor->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
+
 	if (!colorResult)
 	{
 		assert(false && "SceneColor resize failed");
@@ -446,6 +451,7 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 	}
 
 	const bool depthResult = sceneDepth->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
+
 	if (!depthResult)
 	{
 		assert(false && "SceneDepth resize failed after SceneColor resize");
@@ -453,6 +459,7 @@ bool Engine::ResizeSceneRenderTargets(UINT width, UINT height)
 	}
 
 	const bool selectionMaskResult = selectionMask->Resize(m_pDevice.Get(), &m_descriptorHeapAllocator, width, height);
+
 	if (!selectionMaskResult)
 	{
 		assert(false && "SelectionMask resize failed after SceneColor and SceneDepth resize");

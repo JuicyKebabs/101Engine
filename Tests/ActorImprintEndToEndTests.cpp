@@ -103,8 +103,7 @@ namespace
 		Fixture()
 		{
 			std::filesystem::create_directories(root);
-			Check(assets.Initialize(root.string(), nullptr, nullptr),
-				"E2E asset catalog initializes");
+			Check(assets.Initialize(root.string(), nullptr, nullptr), "E2E asset catalog initializes");
 			context.pAssetManager = &assets;
 			context.pActorImprintSystem = &system;
 		}
@@ -189,9 +188,9 @@ namespace
 	{
 		Fixture fixture;
 		Guid assetGuid;
-		ActorImprintAssetWorkflowError workflowError;
+
 		Check(ActorImprintAssetWorkflow::Create(
-			"EndToEnd", fixture.assets, fixture.context, assetGuid, &workflowError),
+			"EndToEnd", fixture.assets, fixture.context, assetGuid),
 			"E2E Create publishes the new ActorImprint");
 		fixture.assets.TakePendingChanges();
 
@@ -199,7 +198,8 @@ namespace
 		EditorDocumentId imprintDocumentId;
 		Check(ActorImprintAssetWorkflow::OpenDocument(assetGuid, fixture.assets,
 			fixture.system, fixture.context, documents, 1280, 720,
-			imprintDocumentId, &workflowError), "E2E Edit opens the new definition");
+			imprintDocumentId),
+			"E2E Edit opens the new definition");
 		auto* imprintDocument = static_cast<ActorImprintEditorDocument*>(
 			documents.GetActiveDocument());
 		SceneBase* editingScene = imprintDocument ? imprintDocument->GetWorkingScene() : nullptr;
@@ -213,14 +213,12 @@ namespace
 		auto createChild = std::make_unique<CreateActorCommand>(editingScene,
 			Actor::InitDesc(true, TAG_NONE, "Child"), editingRoot->GetGuid());
 		auto* createChildCommand = createChild.get();
-		Check(imprintDocument->ExecuteCommand(std::move(createChild)),
-			"E2E authoring adds a child through Document history");
+		Check(imprintDocument->ExecuteCommand(std::move(createChild)), "E2E authoring adds a child through Document history");
 		const Guid childGuid = createChildCommand->GetActorGuid();
 		auto createGrandchild = std::make_unique<CreateActorCommand>(editingScene,
 			Actor::InitDesc(true, TAG_NONE, "Grandchild"), childGuid);
 		auto* createGrandchildCommand = createGrandchild.get();
-		Check(imprintDocument->ExecuteCommand(std::move(createGrandchild)),
-			"E2E authoring adds a deeper hierarchy level");
+		Check(imprintDocument->ExecuteCommand(std::move(createGrandchild)), "E2E authoring adds a deeper hierarchy level");
 		const Guid grandchildGuid = createGrandchildCommand->GetActorGuid();
 		Check(imprintDocument->ExecuteCommand(std::make_unique<AddComponentCommand>(
 			editingScene, editingRoot->GetGuid(), ProbeTypeName)) &&
@@ -239,7 +237,8 @@ namespace
 			editingRoot->GetGuid(), typeid(EndToEndProbe), 0, *targetPath};
 		const ComponentPropertyIdentity imprintIdentity{
 			editingRoot->GetGuid(), typeid(EndToEndProbe), 0, *imprintPath};
-		Check(firstProbe && secondProbe &&
+		Check(firstProbe &&
+			secondProbe &&
 			imprintDocument->ExecuteCommand(std::make_unique<ComponentPropertyEditCommand>(
 				editingScene, targetIdentity, PropertyValue(ActorReference{}),
 				PropertyValue(internalReference))) &&
@@ -265,7 +264,8 @@ namespace
 		Check(ProcessSingleImprintChange(documents, fixture, ActorImprintReloadStatus::Reloaded),
 			"E2E safe-point reload publishes the first authored revision");
 		Check(documents.CloseDocument(imprintDocumentId, EditorDocumentCloseDecision::Discard) ==
-			EditorDocumentCloseResult::Closed, "E2E closes the clean editing Document");
+			EditorDocumentCloseResult::Closed,
+			"E2E closes the clean editing Document");
 
 		const std::filesystem::path scenePath = fixture.root / "EndToEnd.scene";
 		auto firstSceneOwner = std::make_unique<SceneBase>();
@@ -282,7 +282,7 @@ namespace
 		if (!firstInstantiate->Execute())
 		{
 			std::cerr << "First instantiate diagnostic: "
-				<< firstInstantiate->GetErrorMessage() << '\n';
+				<< firstInstantiate->GetRootActorGuid().ToString() << '\n';
 			Check(false, "Editor workflow instantiates the first Instance through command history");
 			return;
 		}
@@ -294,7 +294,7 @@ namespace
 		if (!secondInstantiate->Execute())
 		{
 			std::cerr << "Second instantiate diagnostic: "
-				<< secondInstantiate->GetErrorMessage() << '\n';
+				<< secondInstantiate->GetRootActorGuid().ToString() << '\n';
 			Check(false, "Editor workflow instantiates an independent second Instance");
 			return;
 		}
@@ -311,7 +311,9 @@ namespace
 		ActorReference crossInstanceReference;
 		if (secondGrandchild) crossInstanceReference.SetGuid(secondGrandchild->GetGuid());
 		const auto weightPath = PropertyPath::FromMembers({"weight"});
-		Check(firstProbe && firstGrandchild && secondGrandchild &&
+		Check(firstProbe &&
+			firstGrandchild &&
+			secondGrandchild &&
 			firstSceneDocument->ExecuteCommand(std::make_unique<ComponentPropertyEditCommand>(
 				firstScene, ComponentPropertyIdentity{firstRootGuid, typeid(EndToEndProbe), 0, *weightPath},
 				PropertyValue(1.0f), PropertyValue(7.0f))) &&
@@ -341,7 +343,8 @@ namespace
 		Actor* runtimeRoot = fixture.system.Instantiate(
 			*secondSceneOwner, runtimeReference, runtimeParent->GetHandle());
 		const Guid runtimeRootGuid = runtimeRoot ? runtimeRoot->GetGuid() : Guid{};
-		Check(runtimeRoot && ResolveProbe(*secondSceneOwner, runtimeRootGuid,
+		Check(runtimeRoot &&
+			ResolveProbe(*secondSceneOwner, runtimeRootGuid,
 			definitionIds.firstProbe),
 			"Game/runtime API instantiates from AssetReference<ActorImprint>");
 		auto secondSceneDocumentOwner = std::make_unique<SceneEditorDocument>(
@@ -359,14 +362,17 @@ namespace
 			restartContext.pActorImprintSystem = &restartSystem;
 			SceneLoadResult restarted = SceneLoader::LoadCandidate(scenePath.string(), restartContext);
 			json restartedSave;
-			Check(restarted && VerifyTwoInstanceScene(*restarted.scene, sceneIds, definitionIds,
+			Check(restarted &&
+				VerifyTwoInstanceScene(*restarted.scene, sceneIds, definitionIds,
 				assetGuid, "Root", 1.0f),
 				"Process-restart Scene Load restores hierarchy, identities, overrides, and references");
-			Check(restarted && SceneWriter::SerializeScene(restarted.scene.get(), restartedSave) &&
+			Check(restarted &&
+				SceneWriter::SerializeScene(restarted.scene.get(), restartedSave) &&
 				restartedSave.dump(4) == savedScene.dump(4),
 				"The E2E Scene golden is deterministic across Save-Load-Save");
 			const auto roundTripPath = fixture.root / "EndToEnd-RoundTrip.scene";
-			Check(restarted && SceneWriter::SaveScene(roundTripPath.string(), restarted.scene.get()) &&
+			Check(restarted &&
+				SceneWriter::SaveScene(roundTripPath.string(), restarted.scene.get()) &&
 				ReadText(roundTripPath) == firstSavedSceneBytes,
 				"Two persisted Scene saves are byte-identical on the Windows filesystem");
 			if (restarted.scene) restarted.scene->Finalize();
@@ -375,7 +381,8 @@ namespace
 
 		Check(ActorImprintAssetWorkflow::OpenDocument(assetGuid, fixture.assets,
 			fixture.system, fixture.context, documents, 1280, 720,
-			imprintDocumentId, &workflowError), "Reload stage reopens the definition Document");
+			imprintDocumentId),
+			"Reload stage reopens the definition Document");
 		imprintDocument = static_cast<ActorImprintEditorDocument*>(documents.GetActiveDocument());
 		editingScene = imprintDocument->GetWorkingScene();
 		editingRoot = editingScene->GetRootActors().front();
@@ -383,7 +390,8 @@ namespace
 			imprintDocument->GetEditingContext()->GetObjectMap().FindComponent(definitionIds.firstProbe));
 		Check(imprintDocument->ExecuteCommand(std::make_unique<RenameActorCommand>(
 			editingScene, editingRoot->GetGuid(), "ReloadedRoot")) &&
-			firstProbe && imprintDocument->ExecuteCommand(
+			firstProbe &&
+			imprintDocument->ExecuteCommand(
 				std::make_unique<ComponentPropertyEditCommand>(editingScene,
 					ComponentPropertyIdentity{editingRoot->GetGuid(), typeid(EndToEndProbe), 0, *weightPath},
 					PropertyValue(1.0f), PropertyValue(2.0f))) &&
@@ -404,26 +412,32 @@ namespace
 		ActorImprintReloadResult reload = documents.ReloadActorImprint(
 			fixture.system, reloadChanges.front());
 		Check(reload.status == ActorImprintReloadStatus::Reloaded &&
-			reload.previousRevision == previousRevision && reload.currentRevision != previousRevision &&
+			reload.previousRevision == previousRevision &&
+			reload.currentRevision != previousRevision &&
 			reload.affectedSceneIndices.size() == 2,
 			"Reload atomically migrates every loaded Scene to the new DefinitionRevision");
 		firstScene = firstSceneDocument->GetWorkingScene();
 		SceneBase* secondScene = secondSceneDocument->GetWorkingScene();
-		Check(firstScene != firstSceneBeforeReload && secondScene != secondSceneBeforeReload &&
+		Check(firstScene != firstSceneBeforeReload &&
+			secondScene != secondSceneBeforeReload &&
 			VerifyTwoInstanceScene(*firstScene, sceneIds, definitionIds, assetGuid,
 				"ReloadedRoot", 2.0f),
 			"Reload keeps overridden values and GUIDs while adopting new defaults");
 		Actor* migratedRuntimeRoot = secondScene->ResolveActor(runtimeRootGuid);
 		auto* migratedRuntimeProbe = ResolveProbe(
 			*secondScene, runtimeRootGuid, definitionIds.firstProbe);
-		Check(migratedRuntimeRoot && migratedRuntimeRoot->GetName() == "ReloadedRoot" &&
-			migratedRuntimeProbe && migratedRuntimeProbe->weight == 2.0f,
+		Check(migratedRuntimeRoot &&
+			migratedRuntimeRoot->GetName() == "ReloadedRoot" &&
+			migratedRuntimeProbe &&
+			migratedRuntimeProbe->weight == 2.0f,
 			"A second loaded Scene adopts the same new defaults");
-		Check(!firstSceneDocument->GetCommandHistory().CanUndo() && !firstSceneDocument->Undo(),
+		Check(!firstSceneDocument->GetCommandHistory().CanUndo() &&
+			!firstSceneDocument->Undo(),
 			"Successful Scene replacement clears stale Undo history at the reload boundary");
 		reload.FinalizeRetiredScenes();
 		Check(documents.CloseDocument(imprintDocumentId, EditorDocumentCloseDecision::Discard) ==
-			EditorDocumentCloseResult::Closed, "Reload stage closes the saved definition Document");
+			EditorDocumentCloseResult::Closed,
+			"Reload stage closes the saved definition Document");
 
 		Actor* migratedParent = firstScene->ResolveActor(sceneIds.parent);
 		Check(firstSceneDocument->ExecuteCommand(std::make_unique<RenameActorCommand>(
@@ -454,7 +468,6 @@ namespace
 		ActorImprintReloadResult rejected = documents.ReloadActorImprint(
 			fixture.system, *brokenChange);
 		Check(rejected.status == ActorImprintReloadStatus::Failed &&
-			rejected.error.code == ActorImprintReloadErrorCode::CandidateAssetFailed &&
 			firstSceneDocument->GetWorkingScene() == firstBeforeFailure &&
 			secondSceneDocument->GetWorkingScene() == secondBeforeFailure &&
 			fixture.system.Resolve(fixture.system.FindHandle(assetGuid)) == definitionBeforeFailure &&
@@ -480,7 +493,8 @@ namespace
 			const bool serialized = SceneWriter::SerializeScene(&performanceScene, performanceSave);
 			const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
 				std::chrono::steady_clock::now() - start).count();
-			Check(instantiated && serialized &&
+			Check(instantiated &&
+				serialized &&
 				performanceScene.GetImprintInstances().GetInstances().size() == instanceCount,
 				"Representative scale run instantiates and serializes 64 three-Actor Instances");
 			std::cout << "[OBSERVATION] 64 Instance materializations plus Scene serialization: "
@@ -489,14 +503,12 @@ namespace
 		}
 
 		Check(!ActorImprintAssetWorkflow::Delete(assetGuid, fixture.assets,
-			fixture.system, documents, &workflowError) &&
-			workflowError.code == ActorImprintAssetWorkflowErrorCode::LiveInstanceReference,
+			fixture.system, documents),
 			"Final Delete remains blocked while either loaded Scene owns an Instance");
 		documents.Clear();
-		Check(fixture.system.GetLiveInstanceCount(assetGuid) == 0,
-			"Closing all Scene Documents releases every definition pin");
+		Check(fixture.system.GetLiveInstanceCount(assetGuid) == 0, "Closing all Scene Documents releases every definition pin");
 		Check(ActorImprintAssetWorkflow::Delete(assetGuid, fixture.assets,
-			fixture.system, documents, &workflowError) &&
+			fixture.system, documents) &&
 			!fixture.assets.GetAssetEntry(assetGuid) &&
 			!std::filesystem::exists(imprintAssetPath) &&
 			!std::filesystem::exists(imprintAssetPath.string() + ".meta"),

@@ -177,7 +177,7 @@ private:
     void ExitPlayMode();                            // Switch back to Edit mode
     void ApplyPendingModeTransition();              // Apply a deferred Play/Edit mode transition
 	void RefreshAssetCatalog(float deltaTime);
-	bool ProcessActorImprintAssetChanges(const Guid* requiredAsset = nullptr, std::string* outError = nullptr);
+	bool ProcessActorImprintAssetChanges(const Guid* requiredAsset = nullptr);
 	bool SaveEditorDocument(EditorDocumentId id);
 	bool HasActiveEditTransaction() const;
 

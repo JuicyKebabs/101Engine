@@ -25,10 +25,9 @@ public:
 
 	std::size_t GetUndoCount() const { return m_undoStack.size(); }
 	std::size_t GetRedoCount() const { return m_redoStack.size(); }
-	const StructuralMutationResult& GetLastStructuralResult() const { return m_lastStructuralResult; }
 
 private:
 	std::vector<std::unique_ptr<IEditorCommand>> m_undoStack;
 	std::vector<std::unique_ptr<IEditorCommand>> m_redoStack;
-	StructuralMutationResult m_lastStructuralResult;
+
 };

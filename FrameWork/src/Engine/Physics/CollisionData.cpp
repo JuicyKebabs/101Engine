@@ -81,11 +81,13 @@ LayerMask MakeLayerMask(CollisionLayer layer)
 //複数のコリジョンレイヤーからレイヤーマスクを作成する関数
 LayerMask MakeMask(std::initializer_list<CollisionLayer> layers)
 {
-	LayerMask mask = 0;	//レイヤーマスク
+	LayerMask mask = 0; //レイヤーマスク
+
 	for (auto layer : layers)
 	{
-		mask |= LayerToBit(layer);	//ビットマスクを合成
+		mask |= LayerToBit(layer); //ビットマスクを合成
 	}
+
 	return mask;	//レイヤーマスクを返す
 }
 
@@ -105,12 +107,18 @@ DirectX::XMFLOAT3 GetPushOutVector(
 	for (auto& info : infos)
 	{
 		//衝突終了は無視
-		if (info.state == COLLISION_STATE::COLLISION_EXIT) continue;
+		if (info.state == COLLISION_STATE::COLLISION_EXIT)
+		{
+			continue;
+		}
 
 		TagId opponentTag = info.opponent->GetTag();	//衝突相手のタグ取得
 
 		//衝突相手のタグがリストに含まれているか確認
-		if (std::find(tagList.begin(), tagList.end(), opponentTag) == tagList.end()) continue;
+		if (std::find(tagList.begin(), tagList.end(), opponentTag) == tagList.end())
+		{
+			continue;
+		}
 
 		cands.push_back(&info);	//候補リストに追加
 	}
@@ -142,14 +150,18 @@ DirectX::XMFLOAT3 GetPushOutVector(
 			};
 
 			float depth = LengthXMF3(mtv);
+
 			if (depth < epsilon)
+			{
 				continue;
+			}
 
 			// 押し出し方向だけ取り出す
 			XMFLOAT3 dir = Normalize(mtv);   // 単位ベクトル
 
-			float resolved = (std::max)(0.0f, Dot(total, dir));	//既に押し出された分
+			float resolved = (std::max)(0.0f, Dot(total, dir)); //既に押し出された分
 			float remain = depth - resolved;					//残りの押し出し分
+
 			if (remain > epsilon)
 			{//押し出しが発生する場合
 				//押し出しベクトルの加算
@@ -160,7 +172,10 @@ DirectX::XMFLOAT3 GetPushOutVector(
 			}
 		}
 
-		if (!any) break;	//押し出しが発生しなかったら終了
+		if (!any)
+		{
+			break; //押し出しが発生しなかったら終了
+		}
 	}
 
 	return total;	//押し出しベクトルを返す

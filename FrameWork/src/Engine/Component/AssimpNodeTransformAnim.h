@@ -70,12 +70,14 @@ static void BuildNodeTree(const aiScene* scene, NodeAnimationAsset& out)
 			}
 
 			// Process child nodes
-			out.nodes[index].children.reserve(node->mNumChildren);	// Reserve space for children
+			out.nodes[index].children.reserve(node->mNumChildren); // Reserve space for children
+
 			for (unsigned i = 0; i < node->mNumChildren; ++i)
 			{
 				int childIndex = rec(node->mChildren[i], index);	// Recursively process child
 				out.nodes[index].children.push_back(childIndex);	// Add child index to current node
 			}
+
 			return index;
 		};
 
@@ -85,7 +87,10 @@ static void BuildNodeTree(const aiScene* scene, NodeAnimationAsset& out)
 // Function to build animation clip 0 from aiScene
 static void BuildClip0(const aiScene* scene, NodeAnimationAsset& out)
 {
-	if (scene->mNumAnimations == 0) return;	// No animations to process
+	if (scene->mNumAnimations == 0)
+	{
+		return; // No animations to process
+	}
 
 	// Process the first animation
 	const aiAnimation* anim = scene->mAnimations[0];					// Get the first animation
@@ -116,16 +121,24 @@ static int FindKeyIndex(const std::vector<aiVectorKey>& keys, double t)
 {
 	// Handle edge cases
 	// If there are no keys, return -1
-	if(keys.empty()) return -1;
+	if (keys.empty())
+	{
+		return -1;
+	}
 
 	// If time is before the first key, return the first index
-	if(t < keys[0].mTime) return 0;
+	if (t < keys[0].mTime)
+	{
+		return 0;
+	}
 
 	// Iterate through keys to find the correct index
 	for(int i = 0; i < static_cast<int>(keys.size()) - 1; ++i)
 	{
-		if(t < keys[i + 1].mTime)
+		if (t < keys[i + 1].mTime)
+		{
 			return i;
+		}
 	}
 
 	// If time exceeds all key times, return the last valid index
@@ -137,16 +150,24 @@ static int FindKeyIndex(const std::vector<aiQuatKey>& keys, double t)
 {
 	// Handle edge cases
 	// If there are no keys, return -1
-	if(keys.empty()) return -1;
+	if (keys.empty())
+	{
+		return -1;
+	}
 
 	// If time is before the first key, return the first index
-	if(t < keys[0].mTime) return 0;
+	if (t < keys[0].mTime)
+	{
+		return 0;
+	}
 
 	// Iterate through keys to find the correct index
 	for(int i = 0; i < static_cast<int>(keys.size()) - 1; ++i)
 	{
-		if(t < keys[i + 1].mTime)
+		if (t < keys[i + 1].mTime)
+		{
 			return i;
+		}
 	}
 
 	// If time exceeds all key times, return the last valid index
@@ -167,8 +188,15 @@ static aiVector3D LerpVec3(const aiVector3D& a, const aiVector3D& b, float f)
 static aiVector3D EvaluatePosition(const Channel& channel, double t)
 {
 	// Handle edge cases
-	if(channel.positionKeys.empty()) return aiVector3D(0.0f, 0.0f, 0.0f);			// Default position if no keys
-	if (channel.positionKeys.size() == 1) return channel.positionKeys[0].mValue;	// Single key
+	if (channel.positionKeys.empty())
+	{
+		return aiVector3D(0.0f, 0.0f, 0.0f); // Default position if no keys
+	}
+
+	if (channel.positionKeys.size() == 1)
+	{
+		return channel.positionKeys[0].mValue; // Single key
+	}
 
 	// Find surrounding keys and interpolate
 	int i = FindKeyIndex(channel.positionKeys, t);							// Find key index
@@ -183,8 +211,15 @@ static aiVector3D EvaluatePosition(const Channel& channel, double t)
 static aiQuaternion EvaluateRotation(const Channel& channel, double t)
 {
 	// Handle edge cases
-	if(channel.rotationKeys.empty()) return aiQuaternion();							// Default rotation if no keys
-	if (channel.rotationKeys.size() == 1) return channel.rotationKeys[0].mValue;	// Single key
+	if (channel.rotationKeys.empty())
+	{
+		return aiQuaternion(); // Default rotation if no keys
+	}
+
+	if (channel.rotationKeys.size() == 1)
+	{
+		return channel.rotationKeys[0].mValue; // Single key
+	}
 
 	// Find surrounding keys and interpolate
 	int i = FindKeyIndex(channel.rotationKeys, t);							// Find key index
@@ -204,8 +239,15 @@ static aiQuaternion EvaluateRotation(const Channel& channel, double t)
 static aiVector3D EvaluateScaling(const Channel& channel, double t)
 {
 	// Handle edge cases
-	if(channel.scalingKeys.empty()) return aiVector3D(1.0f, 1.0f, 1.0f);		// Default scaling if no keys
-	if (channel.scalingKeys.size() == 1) return channel.scalingKeys[0].mValue;	// Single key
+	if (channel.scalingKeys.empty())
+	{
+		return aiVector3D(1.0f, 1.0f, 1.0f); // Default scaling if no keys
+	}
+
+	if (channel.scalingKeys.size() == 1)
+	{
+		return channel.scalingKeys[0].mValue; // Single key
+	}
 
 	// Find surrounding keys and interpolate
 	int i = FindKeyIndex(channel.scalingKeys, t);								// Find key index
@@ -221,7 +263,11 @@ static aiMatrix4x4 EvaluateLocalTransform(double t, const Node& node, const Node
 {
 	// Find channel for the node
 	auto it = asset.clip0.channels.find(node.name);
-	if (it == asset.clip0.channels.end()) return node.baseLocalTransform;
+
+	if (it == asset.clip0.channels.end())
+	{
+		return node.baseLocalTransform;
+	}
 
 	// Evaluate transformation components
 	const Channel& channel = it->second;
@@ -238,8 +284,11 @@ struct NodeAnimator
 	double time = 0.0;							// Current time
 	std::vector<aiMatrix4x4> globalTransforms;	// Global transformation matrices
 
-	NodeAnimator() { 
-		asset = new NodeAnimationAsset(); time = 0.0; };
+	NodeAnimator()
+	{
+		asset = new NodeAnimationAsset();
+		time = 0.0;
+	};
 
 	// Bind the animator to an asset
 	void Bind(const NodeAnimationAsset* a)
@@ -252,13 +301,20 @@ struct NodeAnimator
 	// Update the animator by delta time
 	void Update(double dt)
 	{
-		if (!asset) return;	// No asset bound
+		if (!asset)
+		{
+			return; // No asset bound
+		}
 
 		// Update time
 		time += dt;
 		double duration = asset->clip0.duration;
 		auto ticksPerSecond = asset->clip0.ticksPerSecond;
-		if (duration <= 0.0) return;
+
+		if (duration <= 0.0)
+		{
+			return;
+		}
 
 		// Wrap time within duration
 		double timeInTicks = std::fmod(time * ticksPerSecond, duration);

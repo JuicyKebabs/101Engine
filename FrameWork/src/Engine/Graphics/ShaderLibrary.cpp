@@ -22,16 +22,23 @@ ShaderLibrary::ShaderLibrary()
 }
 
 // Get vertex shader
-Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetVS(VS_FILE_ID fieldID, VS_ENTRY_ID entryID, uint64_t stageDefines, uint64_t commonDefines)
+Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetVS(
+	VS_FILE_ID fieldID,
+	VS_ENTRY_ID entryID,
+	uint64_t stageDefines,
+	uint64_t commonDefines)
 {
 	// Validate vsId
 	const size_t fileIndex = static_cast<size_t>(fieldID);
+
 	if (fileIndex >= sizeof(VS_FILE_TABLE) / sizeof(VS_FILE_TABLE[0]))
 	{
 		OutputDebugStringA("[ShaderLibrary] Invalid VS_FILE_ID\n");
 		return {};
 	}
+
 	const size_t entryIndex = static_cast<size_t>(entryID);
+
 	if(entryIndex >= sizeof(VS_ENTRY_TABLE) / sizeof(VS_ENTRY_TABLE[0]))
 	{
 		OutputDebugStringA("[ShaderLibrary] Invalid VS_ID\n");
@@ -49,16 +56,23 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetVS(VS_FILE_ID fieldID, VS_ENT
 }
 
 // Get pixel shader
-Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetPS(PS_FILE_ID fieldID, PS_ENTRY_ID entryID, uint64_t stageDefines, uint64_t commonDefines)
+Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetPS(
+	PS_FILE_ID fieldID,
+	PS_ENTRY_ID entryID,
+	uint64_t stageDefines,
+	uint64_t commonDefines)
 {
 	// Validate psId
 	const size_t fileIndex = static_cast<size_t>(fieldID);
+
 	if (fileIndex >= sizeof(PS_FILE_TABLE) / sizeof(PS_FILE_TABLE[0]))
 	{
 		OutputDebugStringA("[ShaderLibrary] Invalid PS_FILE_ID\n");
 		return {};
 	}
+
 	const size_t entryIndex = static_cast<size_t>(entryID);
+
 	if (entryIndex >= sizeof(PS_ENTRY_TABLE) / sizeof(PS_ENTRY_TABLE[0]))
 	{
 		OutputDebugStringA("[ShaderLibrary] Invalid PS_ID\n");
@@ -82,7 +96,11 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetPS(PS_FILE_ID fieldID, PS_ENT
 }
 
 // Get or compile shader
-Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(SHADER_STAGE stage, const ShaderDesc& desc, uint64_t stageDefines, uint64_t commonDefines)
+Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(
+	SHADER_STAGE stage,
+	const ShaderDesc& desc,
+	uint64_t stageDefines,
+	uint64_t commonDefines)
 {
 	std::wstring resolvedFilePath = ResolveShaderPath(desc.filePath);
 
@@ -98,6 +116,7 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(SHADER_STAGE 
 
 	// Check if shader is already cached
 	auto it = m_shaderCache.find(key);
+
 	if (it != m_shaderCache.end())
 	{// Return cached shader
 		return it->second;
@@ -115,12 +134,16 @@ Microsoft::WRL::ComPtr<ID3DBlob> ShaderLibrary::GetOrCompileShader(SHADER_STAGE 
 		OutputDebugStringW(msg);
 		return {};
 	}
+
 	// Cache the compiled shader
 	m_shaderCache.emplace(key, shaderBlob);
 	return shaderBlob;
 }
 
-std::vector<D3D_SHADER_MACRO> ShaderLibrary::BuildMacros(SHADER_STAGE stage, uint64_t stageDefines, uint64_t commonDefines)
+std::vector<D3D_SHADER_MACRO> ShaderLibrary::BuildMacros(
+	SHADER_STAGE stage,
+	uint64_t stageDefines,
+	uint64_t commonDefines)
 {
 	std::vector<D3D_SHADER_MACRO> macros;
 
@@ -145,7 +168,11 @@ std::vector<D3D_SHADER_MACRO> ShaderLibrary::BuildMacros(SHADER_STAGE stage, uin
 }
 
 // Append macros based on defines and macro definition tables
-void ShaderLibrary::AppendMacros(std::vector<D3D_SHADER_MACRO>& out, uint64_t defines, const MacroDefinition* table, size_t count)
+void ShaderLibrary::AppendMacros(
+	std::vector<D3D_SHADER_MACRO>& out,
+	uint64_t defines,
+	const MacroDefinition* table,
+	size_t count)
 {
 	for (size_t i = 0; i < count; ++i)
 	{
@@ -158,7 +185,11 @@ void ShaderLibrary::AppendMacros(std::vector<D3D_SHADER_MACRO>& out, uint64_t de
 
 static std::wstring MultiByteToWide(const std::string& str)
 {
-	if (str.empty()) return std::wstring();
+	if (str.empty())
+	{
+		return std::wstring();
+	}
+
 	int len = MultiByteToWideChar(CP_ACP, 0, str.c_str(), (int)str.size(), nullptr, 0);
 	std::wstring result(len, 0);
 	MultiByteToWideChar(CP_ACP, 0, str.c_str(), (int)str.size(), result.data(), len);
@@ -167,7 +198,11 @@ static std::wstring MultiByteToWide(const std::string& str)
 
 static std::string WideToMultiByte(const std::wstring& wstr)
 {
-	if (wstr.empty()) return std::string();
+	if (wstr.empty())
+	{
+		return std::string();
+	}
+
 	int len = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), (int)wstr.size(), nullptr, 0, nullptr, nullptr);
 	std::string result(len, 0);
 	WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), (int)wstr.size(), result.data(), len, nullptr, nullptr);

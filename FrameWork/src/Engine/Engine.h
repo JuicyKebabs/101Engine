@@ -99,9 +99,18 @@ public:
 	ID3D12Device* GetDevice() { return m_pDevice.Get(); }												// Get device
 	ID3D12GraphicsCommandList* GetCommandList() { return m_pCurrentCommandList; }						// Get command list
 	UINT GetCurrentBufferIndex() const { return m_swapChain.GetCurrentBackBufferIndex(); }				// Get frame buffer index
-	DescriptorHeapAllocator* GetDescriptorHeapAllocator() { return &m_descriptorHeapAllocator; }			// Get descriptor heap allocator
-	GpuTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target) { return m_builtinRenderTargets[static_cast<size_t>(target)].get(); }	// Get built-in render target by enum
-	UINT GetFrameBufferWidth() const { return m_frameBufferWidth; }										// Get frame buffer width
+	DescriptorHeapAllocator* GetDescriptorHeapAllocator()
+	{
+		return &m_descriptorHeapAllocator;
+	} // Get descriptor heap allocator
+	GpuTexture* GetBuiltinRenderTarget(BuiltinRenderTarget target)
+	{
+		return m_builtinRenderTargets[static_cast<size_t>(target)].get();
+	} // Get built-in render target by enum
+	UINT GetFrameBufferWidth() const
+	{
+		return m_frameBufferWidth;
+	} // Get frame buffer width
 	UINT GetFrameBufferHeight() const { return m_frameBufferHeight; }									// Get frame buffer height
 
 	// Resize the scene render targets (color and depth) to the specified width and height
@@ -122,8 +131,7 @@ private:	// DirectX12 related
 	D3D12_VIEWPORT m_viewport{};	// Viewport
 	D3D12_RECT m_scissorRect{};		// Scissor rectangle
 
-
-private:	// Rendering related
+  private:								// Rendering related
 	UINT m_frameBufferWidth = 0;		// Frame buffer width
 	UINT m_frameBufferHeight = 0;		// Frame buffer height
 

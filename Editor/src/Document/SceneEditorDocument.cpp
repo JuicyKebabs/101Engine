@@ -26,8 +26,16 @@ SceneEditorDocument::~SceneEditorDocument()
 
 bool SceneEditorDocument::Save()
 {
-	if (!m_scene || m_filePath.empty()) return false;
-	if (!SceneWriter::SaveScene(m_filePath, m_scene.get())) return false;
+	if (!m_scene || m_filePath.empty())
+	{
+		return false;
+	}
+
+	if (!SceneWriter::SaveScene(m_filePath, m_scene.get()))
+	{
+		return false;
+	}
+
 	MarkClean();
 	return true;
 }
@@ -48,14 +56,28 @@ void SceneEditorDocument::ReplaceScene(
 	m_sourceAssetGuid = sourceAssetGuid;
 	UpdateDisplayName();
 
-	if (markDirty) MarkDirty();
-	else MarkClean();
-	if (previous) previous->Finalize();
+	if (markDirty)
+	{
+		MarkDirty();
+	}
+	else
+	{
+		MarkClean();
+	}
+
+	if (previous)
+	{
+		previous->Finalize();
+	}
 }
 
 bool SceneEditorDocument::UpdateAssetPath(const Guid& expectedGuid, std::string filePath)
 {
-	if (!expectedGuid.IsValid() || m_sourceAssetGuid != expectedGuid || filePath.empty()) return false;
+	if (!expectedGuid.IsValid() || m_sourceAssetGuid != expectedGuid || filePath.empty())
+	{
+		return false;
+	}
+
 	m_filePath = std::move(filePath);
 	UpdateDisplayName();
 	return true;
@@ -66,7 +88,12 @@ void SceneEditorDocument::ReleaseScene()
 	ClearCommandHistory();
 	GetSelection().Clear();
 	GetViewportContext().ResetSceneTargets();
-	if (m_scene) m_scene->Finalize();
+
+	if (m_scene)
+	{
+		m_scene->Finalize();
+	}
+
 	m_scene.reset();
 }
 
@@ -79,5 +106,9 @@ void SceneEditorDocument::UpdateDisplayName()
 	}
 
 	m_displayName = std::filesystem::path(m_filePath).filename().string();
-	if (m_displayName.empty()) m_displayName = m_filePath;
+
+	if (m_displayName.empty())
+	{
+		m_displayName = m_filePath;
+	}
 }

@@ -10,6 +10,7 @@
 bool UIImage::SetTextureAsset(const Guid& assetId)
 {
 	PreparedTextureAssetState prepared;
+
 	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;
@@ -30,22 +31,26 @@ UIImage::AssetPrepareResult UIImage::PrepareTextureAssetState(
 	}
 
 	const EngineContext* context = GetEngineContext();
+
 	if (!context || !context->pAssetManager || !context->pTextureManager)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
+
 	if (!assetEntry)
 	{
 		return AssetPrepareResult::MissingAsset;
 	}
+
 	if (assetEntry->type != AssetType::Texture)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
+
 	if (textureHandle == InvalidTextureHandle)
 	{
 		return AssetPrepareResult::Failed;
@@ -73,7 +78,6 @@ void UIImage::CommitTextureAssetState(PreparedTextureAssetState&& state)
 	m_isProxyDirty = true;
 }
 
-
 bool UIImage::ResolveReferences(SceneBase& scene)
 {
 	Canvas* resolvedCanvas = GetGoverningCanvas();
@@ -85,11 +89,17 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 	{
 		Actor* canvasActor = scene.ResolveActor(*m_pendingCanvasActorId);
 
-		if (!canvasActor) return false;
-	
+		if (!canvasActor)
+		{
+			return false;
+		}
+
 		resolvedCanvas = canvasActor->GetComponentByClass<Canvas>();
-		
-		if (!resolvedCanvas) return false;
+
+		if (!resolvedCanvas)
+		{
+			return false;
+		}
 	}
 
 	// Resolve the texture asset if a pending texture asset ID is set
@@ -97,10 +107,17 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 	{
 		Actor* owner = GetOwner();
 
-		if (!owner || owner->GetOwner() != &scene) return false;
+		if (!owner || owner->GetOwner() != &scene)
+		{
+			return false;
+		}
 
 		textureResult = PrepareTextureAssetState(*m_pendingTextureAssetId, preparedTexture);
-		if (textureResult == AssetPrepareResult::Failed) return false;
+
+		if (textureResult == AssetPrepareResult::Failed)
+		{
+			return false;
+		}
 	}
 
 	if (m_pendingTextureAssetId.has_value() && textureResult == AssetPrepareResult::Ready)
@@ -132,7 +149,12 @@ bool UIImage::SetPendingTextureAssetReference(const AssetReference<TextureAsset>
 	m_renderTemplate.clear();
 	m_textureAssetId = {};
 	m_pendingTextureAssetId.reset();
-	if (value.HasValue()) m_pendingTextureAssetId = value.GetGuid();
+
+	if (value.HasValue())
+	{
+		m_pendingTextureAssetId = value.GetGuid();
+	}
+
 	m_isProxyDirty = true;
 	return true;
 }
@@ -149,6 +171,7 @@ bool UIImage::TrySetTextureAssetReference(const AssetReference<TextureAsset>& va
 
 	PreparedTextureAssetState prepared;
 	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+
 	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;

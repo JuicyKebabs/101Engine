@@ -10,10 +10,17 @@ bool ActorReference::Set(Actor* actor)
 		return true;
 	}
 
-	if (actor->IsDestroyed()) return false;
+	if (actor->IsDestroyed())
+	{
+		return false;
+	}
 
 	const Guid& actorId = actor->GetGuid();
-	if (!actorId.IsValid()) return false;
+
+	if (!actorId.IsValid())
+	{
+		return false;
+	}
 
 	m_actorId = actorId;
 	m_cachedHandle = actor->GetHandle();
@@ -23,7 +30,10 @@ bool ActorReference::Set(Actor* actor)
 
 bool ActorReference::SetGuid(const Guid& actorId)
 {
-	if (!actorId.IsValid()) return false;
+	if (!actorId.IsValid())
+	{
+		return false;
+	}
 
 	m_actorId = actorId;
 
@@ -41,7 +51,10 @@ void ActorReference::Clear()
 
 Actor* ActorReference::Resolve(SceneBase& scene) const
 {
-	if (!m_actorId.IsValid()) return nullptr;
+	if (!m_actorId.IsValid())
+	{
+		return nullptr;
+	}
 
 	// Try the cached runtime handle first
 	if (!m_cachedHandle.IsNull())

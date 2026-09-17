@@ -34,7 +34,11 @@ std::unique_ptr<Actor> ActorFactory::RestoreActor(
 {
 	// Check if the provided Guid is valid before restoring the actor
 	assert(guid.IsValid() && "RestoreActor: Guid must be valid");
-	if (!guid.IsValid()) return nullptr;
+
+	if (!guid.IsValid())
+	{
+		return nullptr;
+	}
 
 	// Create actor with existing Guid
 	return CreateActorInternal(type, desc, guid);
@@ -85,7 +89,11 @@ std::unique_ptr<Actor> ActorFactory::RestoreEmptyActor(
 {
 	// Check if the provided Guid is valid before restoring the actor
 	assert(guid.IsValid() && "RestoreEmptyActor: Guid must be valid");
-	if (!guid.IsValid()) return nullptr;
+
+	if (!guid.IsValid())
+	{
+		return nullptr;
+	}
 
 	// Restore an empty actor with the provided Guid
 	return CreateEmptyActorInternal(desc, guid);
@@ -97,7 +105,10 @@ std::unique_ptr<Actor> ActorFactory::RestoreActorShell(
 {
 	assert(guid.IsValid() && "RestoreActorShell: Guid must be valid");
 
-	if (!guid.IsValid()) return nullptr;
+	if (!guid.IsValid())
+	{
+		return nullptr;
+	}
 
 	auto actor = std::unique_ptr<Actor>(new Actor());
 

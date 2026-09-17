@@ -30,6 +30,7 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
     // Generate .h
     {
         std::ofstream header(headerPath);
+
         if (!header.is_open())
         {
             DBG("BehaviorTemplateGenerator: Failed to create %s", headerPath.c_str());
@@ -53,6 +54,7 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
     // Generate .cpp
     {
         std::ofstream source(sourcePath);
+
         if (!source.is_open())
         {
             DBG("BehaviorTemplateGenerator: Failed to create %s", sourcePath.c_str());

@@ -64,22 +64,46 @@ public:
 	AssetReference<TextureAsset> GetTextureAssetReference() const;
 	bool TrySetTextureAssetReference(const AssetReference<TextureAsset>& value);
 	Guid GetTextureAssetId() const {
-		if (m_textureAssetId.IsValid()) return m_textureAssetId;
+		if (m_textureAssetId.IsValid())
+		{
+			return m_textureAssetId;
+		}
+
 		return m_pendingTextureAssetId.value_or(Guid{});
 	}
 
 	// Setters
-	void SetUVScale(const Vector2& uvScale) { m_uvScale = uvScale; m_isProxyDirty = true; }
-	void SetUVOffset(const Vector2& uvOffset) { m_uvOffset = uvOffset; m_isProxyDirty = true; }
-	void SetPivot(const Vector2& pivot) { m_pivot = pivot; m_isProxyDirty = true; }
+	void SetUVScale(const Vector2& uvScale)
+	{
+		m_uvScale = uvScale;
+		m_isProxyDirty = true;
+	}
+	void SetUVOffset(const Vector2& uvOffset)
+	{
+		m_uvOffset = uvOffset;
+		m_isProxyDirty = true;
+	}
+	void SetPivot(const Vector2& pivot)
+	{
+		m_pivot = pivot;
+		m_isProxyDirty = true;
+	}
 	void SetBillboardType(BillboardType type) 
 	{
 		m_billboardType = type;
 		m_template.billboardType = type;
 		m_isProxyDirty = true;
 	}
-	void SetFlipX(bool flip) { m_flipX = flip; m_isProxyDirty = true; }
-	void SetFlipY(bool flip) { m_flipY = flip; m_isProxyDirty = true; }
+	void SetFlipX(bool flip)
+	{
+		m_flipX = flip;
+		m_isProxyDirty = true;
+	}
+	void SetFlipY(bool flip)
+	{
+		m_flipY = flip;
+		m_isProxyDirty = true;
+	}
 
 	// Getters
 	const SpriteRenderTemplate& GetRenderTemplate() const { return m_template; }

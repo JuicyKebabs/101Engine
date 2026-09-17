@@ -14,6 +14,7 @@
 bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 {
 	PreparedMeshAssetState prepared;
+
 	if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;
@@ -26,6 +27,7 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 bool MeshRenderer::SetTextureOverrideAsset(const Guid& assetId)
 {
 	PreparedTextureOverrideState prepared;
+
 	if (PrepareTextureOverrideState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;
@@ -46,28 +48,33 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(
 	}
 
 	const EngineContext* context = GetEngineContext();
+
 	if (!context || !context->pAssetManager || !context->pMeshManager)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
+
 	if (!assetEntry)
 	{
 		return AssetPrepareResult::MissingAsset;
 	}
+
 	if (assetEntry->type != AssetType::Mesh)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const MeshHandle meshHandle = context->pAssetManager->GetMeshHandle(assetId);
+
 	if (meshHandle == InvalidMeshHandle)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const MeshGPU* meshGPU = context->pMeshManager->GetMeshGPU(meshHandle);
+
 	if (!meshGPU)
 	{
 		return AssetPrepareResult::Failed;
@@ -100,7 +107,10 @@ void MeshRenderer::CommitMeshAssetState(PreparedMeshAssetState&& state)
 
 Guid MeshRenderer::GetAssetId() const
 {
-	if (m_meshAssetId.IsValid()) return m_meshAssetId;
+	if (m_meshAssetId.IsValid())
+	{
+		return m_meshAssetId;
+	}
 
 	return m_pendingMeshAssetId.value_or(Guid{});
 }
@@ -108,13 +118,25 @@ Guid MeshRenderer::GetAssetId() const
 void MeshRenderer::OnAttachOverride()
 {
 	auto* owner = GetOwner();
-	if (!owner) return;
+
+	if (!owner)
+	{
+		return;
+	}
 
 	auto* scene = owner->GetOwner();
-	if (!scene) return;
+
+	if (!scene)
+	{
+		return;
+	}
 
 	auto* renderSystem = scene->GetRenderSystem();
-	if (!renderSystem) return;
+
+	if (!renderSystem)
+	{
+		return;
+	}
 
 	renderSystem->Register(this);
 }
@@ -138,13 +160,25 @@ void MeshRenderer::LateUpdateOverride(float deltaTime)
 void MeshRenderer::OnDetachOverride()
 {
 	auto* owner = GetOwner();
-	if (!owner) return;
+
+	if (!owner)
+	{
+		return;
+	}
 
 	auto* scene = owner->GetOwner();
-	if (!scene) return;
+
+	if (!scene)
+	{
+		return;
+	}
 
 	auto* renderSystem = scene->GetRenderSystem();
-	if (!renderSystem) return;
+
+	if (!renderSystem)
+	{
+		return;
+	}
 
 	renderSystem->Unregister(this);
 }
@@ -166,18 +200,26 @@ const MeshRendererProxy& MeshRenderer::GetRenderProxy()
 	if (m_isProxyDirty)
 	{
 		RebuildRenderProxy();
-		if (transform) m_transformGeneration = transform->GetWorldGeneration();
+
+		if (transform)
+		{
+			m_transformGeneration = transform->GetWorldGeneration();
+		}
+
 		m_isProxyDirty = false;
 	}
+
 	return m_proxy;
 }
 
 void MeshRenderer::RebuildRenderProxy()
 {
 	auto owner = GetOwner();
-	if (owner) 
+
+	if (owner)
 	{
 		auto transform = owner->GetComponentByClass<Transform>();
+
 		if (transform) 
 		{
 			m_proxy.common.position = transform->GetWorldPosition();
@@ -189,49 +231,70 @@ void MeshRenderer::RebuildRenderProxy()
 			m_proxy.common.visible = m_isVisible;
 		}
 	}
+
 	m_proxy.textureOverrideHandle = m_textureOverrideHandle;
 }
 
-
 bool MeshRenderer::ResolveReferences(SceneBase& scene)
 {
-	if (!m_pendingMeshAssetId && !m_pendingTextureOverrideAssetId) return true;
+	if (!m_pendingMeshAssetId && !m_pendingTextureOverrideAssetId)
+	{
+		return true;
+	}
 
 	// Check if the owner actor is valid and belongs to the given scene
 	Actor* owner = GetOwner();
-	if (!owner || owner->GetOwner() != &scene) return false;
+
+	if (!owner || owner->GetOwner() != &scene)
+	{
+		return false;
+	}
 
 	PreparedMeshAssetState preparedMesh;
 	AssetPrepareResult meshResult = AssetPrepareResult::Ready;
+
 	if (m_pendingMeshAssetId)
 	{
 		meshResult = PrepareMeshAssetState(*m_pendingMeshAssetId, preparedMesh);
-		if (meshResult == AssetPrepareResult::Failed) return false;
+
+		if (meshResult == AssetPrepareResult::Failed)
+		{
+			return false;
+		}
 	}
 
 	PreparedTextureOverrideState preparedTexture;
 	AssetPrepareResult textureResult = AssetPrepareResult::Ready;
+
 	if (m_pendingTextureOverrideAssetId)
 	{
-		textureResult = PrepareTextureOverrideState(
-			*m_pendingTextureOverrideAssetId, preparedTexture);
-		if (textureResult == AssetPrepareResult::Failed) return false;
+		textureResult = PrepareTextureOverrideState(*m_pendingTextureOverrideAssetId, preparedTexture);
+
+		if (textureResult == AssetPrepareResult::Failed)
+		{
+			return false;
+		}
 	}
 
 	if (m_pendingMeshAssetId && meshResult == AssetPrepareResult::Ready)
 	{
 		CommitMeshAssetState(std::move(preparedMesh));
 	}
+
 	if (m_pendingTextureOverrideAssetId && textureResult == AssetPrepareResult::Ready)
 	{
 		CommitTextureOverrideState(std::move(preparedTexture));
 	}
+
 	return true;
 }
 
 Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 {
-	if (!transform) return Matrix4x4::Identity();
+	if (!transform)
+	{
+		return Matrix4x4::Identity();
+	}
 
 	RectTransform* rectTransform = dynamic_cast<RectTransform*>(transform);
 
@@ -285,7 +348,12 @@ bool MeshRenderer::SetPendingMeshAssetReference(const AssetReference<MeshAsset>&
 	m_templates.clear();
 	m_meshAssetId = {};
 	m_pendingMeshAssetId.reset();
-	if (value.HasValue()) m_pendingMeshAssetId = value.GetGuid();
+
+	if (value.HasValue())
+	{
+		m_pendingMeshAssetId = value.GetGuid();
+	}
+
 	m_isProxyDirty = true;
 	return true;
 }
@@ -302,6 +370,7 @@ bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& val
 
 	PreparedMeshAssetState prepared;
 	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+
 	if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;
@@ -322,17 +391,30 @@ AssetPrepareResult MeshRenderer::PrepareTextureOverrideState(
 	}
 
 	const EngineContext* context = GetEngineContext();
+
 	if (!context || !context->pAssetManager || !context->pTextureManager)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-	if (!assetEntry) return AssetPrepareResult::MissingAsset;
-	if (assetEntry->type != AssetType::Texture) return AssetPrepareResult::Failed;
+
+	if (!assetEntry)
+	{
+		return AssetPrepareResult::MissingAsset;
+	}
+
+	if (assetEntry->type != AssetType::Texture)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
 	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
-	if (textureHandle == InvalidTextureHandle) return AssetPrepareResult::Failed;
+
+	if (textureHandle == InvalidTextureHandle)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
 	outState.assetId = assetId;
 	outState.textureHandle = textureHandle;
@@ -349,7 +431,11 @@ void MeshRenderer::CommitTextureOverrideState(PreparedTextureOverrideState&& sta
 
 Guid MeshRenderer::GetTextureOverrideAssetId() const
 {
-	if (m_textureOverrideAssetId.IsValid()) return m_textureOverrideAssetId;
+	if (m_textureOverrideAssetId.IsValid())
+	{
+		return m_textureOverrideAssetId;
+	}
+
 	return m_pendingTextureOverrideAssetId.value_or(Guid{});
 }
 
@@ -367,7 +453,12 @@ bool MeshRenderer::SetPendingTextureOverrideAssetReference(
 	m_textureOverrideAssetId = {};
 	m_textureOverrideHandle = InvalidTextureHandle;
 	m_pendingTextureOverrideAssetId.reset();
-	if (value.HasValue()) m_pendingTextureOverrideAssetId = value.GetGuid();
+
+	if (value.HasValue())
+	{
+		m_pendingTextureOverrideAssetId = value.GetGuid();
+	}
+
 	m_isProxyDirty = true;
 	return true;
 }
@@ -376,6 +467,7 @@ bool MeshRenderer::TrySetTextureOverrideAssetReference(
 	const AssetReference<TextureAsset>& value)
 {
 	Actor* owner = GetOwner();
+
 	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
 	{
 		return SetPendingTextureOverrideAssetReference(value);
@@ -383,6 +475,7 @@ bool MeshRenderer::TrySetTextureOverrideAssetReference(
 
 	PreparedTextureOverrideState prepared;
 	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+
 	if (PrepareTextureOverrideState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;

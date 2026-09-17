@@ -58,7 +58,8 @@ bool TransformSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 
 		if (!transform)
 		{
-			DBG("TransformSubtreeSnapshot::Capture: Actor '%s' has no Transform-family component.", actor->GetName().c_str());
+			DBG("TransformSubtreeSnapshot::Capture: Actor '%s' has no Transform-family component.",
+				actor->GetName().c_str());
 			return false;
 		}
 
@@ -79,7 +80,8 @@ bool TransformSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 			// Validate the child actor and its relationship to the parent actor(this actor)
 			if (!child || child->GetParentHandle() != actor->GetHandle())
 			{
-				DBG("TransformSubtreeSnapshot::Capture: Invalid child relationship on Actor '%s'.", actor->GetName().c_str());
+				DBG("TransformSubtreeSnapshot::Capture: Invalid child relationship on Actor '%s'.",
+					actor->GetName().c_str());
 				return false;
 			}
 
@@ -98,7 +100,10 @@ bool TransformSubtreeSnapshot::Capture(Actor* rootActor, SceneBase* scene)
 
 bool TransformSubtreeSnapshot::Restore(SceneBase* scene) const
 {
-	if (!scene || !IsValid()) return false;
+	if (!scene || !IsValid())
+	{
+		return false;
+	}
 
 	// Temporary struct to hold pending replacements of Transform-family components
 	struct PendingReplacement
@@ -128,12 +133,17 @@ bool TransformSubtreeSnapshot::Restore(SceneBase* scene) const
 
 		if (!actor->GetComponentByClass<Transform>())
 		{
-			DBG("TransformSubtreeSnapshot::Restore: Actor '%s' has no Transform-family component.", actor->GetName().c_str());
+			DBG("TransformSubtreeSnapshot::Restore: Actor '%s' has no Transform-family component.",
+				actor->GetName().c_str());
 			return false;
 		}
 
 		// Create a new Transform-family component based on the captured snapshot
-		if (!scene->CanReplaceTransform(actor, record.transform.sourceKind)) return false;
+		if (!scene->CanReplaceTransform(actor, record.transform.sourceKind))
+		{
+			return false;
+		}
+
 		std::unique_ptr<Transform> transform =
 			TransformConversion::Create(
 				record.transform.sourceKind,
@@ -142,7 +152,8 @@ bool TransformSubtreeSnapshot::Restore(SceneBase* scene) const
 
 		if (!transform)
 		{
-			DBG("TransformSubtreeSnapshot::Restore: Failed to reconstruct Transform for Actor '%s'.", actor->GetName().c_str());
+			DBG("TransformSubtreeSnapshot::Restore: Failed to reconstruct Transform for Actor '%s'.",
+				actor->GetName().c_str());
 			return false;
 		}
 
@@ -160,7 +171,8 @@ bool TransformSubtreeSnapshot::Restore(SceneBase* scene) const
 	{
 		if (!replacement.actor->ReplaceTransformComponent(std::move(replacement.transform)))
 		{
-			DBG("TransformSubtreeSnapshot::Restore: Failed to replace Transform on Actor '%s'.", replacement.actor->GetName().c_str());
+			DBG("TransformSubtreeSnapshot::Restore: Failed to replace Transform on Actor '%s'.",
+				replacement.actor->GetName().c_str());
 			return false;
 		}
 	}

@@ -1,8 +1,9 @@
 #include "ActorReferenceCodec.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/Actor.h"
 #include "nlohmann/json.hpp"
 
-ActorReferenceCodecResult GuidActorReferenceCodec::Serialize(
+bool GuidActorReferenceCodec::Serialize(
 	const ActorReference& reference,
 	const ActorReferenceSaveContext& context,
 	nlohmann::json& outJson) const
@@ -10,62 +11,78 @@ ActorReferenceCodecResult GuidActorReferenceCodec::Serialize(
 	if (!reference.HasValue())
 	{// If the reference is empty, serialize it as null.
 		outJson = nullptr;
-		return ActorReferenceCodecResult::Success;
+		return true;
 	}
 
 	// Check if the Guid of given reference exists in the context scene
-	const ActorReferenceCodecResult result = context.Validate(reference.GetGuid());
-	if (result != ActorReferenceCodecResult::Success)
+	const bool result = context.Validate(reference.GetGuid());
+
+	if (!result)
 	{
 		return result;
 	}
 
 	outJson = reference.GetGuid().ToString();
-	return ActorReferenceCodecResult::Success;
+	return true;
 }
 
-ActorReferenceCodecResult GuidActorReferenceCodec::Deserialize(
+bool GuidActorReferenceCodec::Deserialize(
 	const nlohmann::json& json,
 	ActorReference& outReference) const
 {
 	if (json.is_null())
 	{// Return an empty ActorReference if the JSON is null.
 		outReference.Clear();
-		return ActorReferenceCodecResult::Success;
+		return true;
 	}
 
-	if (!json.is_string()) return ActorReferenceCodecResult::InvalidJsonType;
+	if (!json.is_string())
+	{
+		DBG("Actor reference: InvalidJsonType.");
+		return false;
+	}
 
 	Guid guid;
 
 	// Parse the string from JSON to Guid.
 	if (!Guid::TryParse(json.get<std::string>(), guid))
 	{
-		return ActorReferenceCodecResult::InvalidGuid;
+		DBG("Actor reference: InvalidGuid.");
+		return false;
 	}
 
 	// Do not set the outREference brfore validating the guid,
 	ActorReference result;
-	if (!result.SetGuid(guid)) return ActorReferenceCodecResult::InvalidGuid;
+
+	if (!result.SetGuid(guid))
+	{
+		DBG("Actor reference: InvalidGuid.");
+		return false;
+	}
 
 	outReference = result;
-	return ActorReferenceCodecResult::Success;
+	return true;
 }
 
-ActorReferenceCodecResult GuidActorReferenceCodec::Resolve(
+bool GuidActorReferenceCodec::Resolve(
 	ActorReference& reference,
 	const ActorReferenceRestoreContext& context) const
 {
 	// Not neccessary to resolve an empty ActorReference, so return success.
-	if (!reference.HasValue()) return ActorReferenceCodecResult::Success;
+	if (!reference.HasValue())
+	{
+		return true;
+	}
 
 	Actor* actor = nullptr;
 
 	// Check if the Actor which has given Guid exists in the context scene and set the ActorReference to it.
-	const ActorReferenceCodecResult result = context.FindActor(reference.GetGuid(), actor);
-	if (result != ActorReferenceCodecResult::Success) return result;
+	const bool result = context.FindActor(reference.GetGuid(), actor);
 
-	return actor && reference.Set(actor)
-		? ActorReferenceCodecResult::Success
-		: ActorReferenceCodecResult::ActorNotFound;
+	if (!result)
+	{
+		return result;
+	}
+
+	return actor && reference.Set(actor);
 }

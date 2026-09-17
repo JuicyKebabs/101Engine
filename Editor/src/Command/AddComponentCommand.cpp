@@ -17,13 +17,19 @@ AddComponentCommand::AddComponentCommand(
 bool AddComponentCommand::Execute()
 {
 	// Apply only once
-	if (m_isApplied) return false;
+	if (m_isApplied)
+	{
+		return false;
+	}
 
 	if (m_hasExecuted)
 	{// In case of Redo
-		Component* restored = m_componentSnapshot.Restore(m_scene, &m_structuralResult);
+		Component* restored = m_componentSnapshot.Restore(m_scene);
 
-		if (!restored) return false;
+		if (!restored)
+		{
+			return false;
+		}
 
 		m_isApplied = true;
 		return true;
@@ -31,18 +37,32 @@ bool AddComponentCommand::Execute()
 
 	// Resolve actor from scene by its GUID for the first execution
 	Actor* actor = ResolveActor();
-	if (!actor) return false;
+
+	if (!actor)
+	{
+		return false;
+	}
 
 	auto& registry = ComponentRegistry::Get();
 	const auto typeId = registry.GetTypeId(m_componentName);
 
-	if (!typeId) return false;
-	if (!m_scene->CanAddComponent(actor, *typeId).Report(&m_structuralResult)) return false;
+	if (!typeId)
+	{
+		return false;
+	}
+
+	if (!m_scene->CanAddComponent(actor, *typeId))
+	{
+		return false;
+	}
 
 	std::unique_ptr<Component> component = nullptr;
 
 	// Check if it's allowed to add given component type
-	if (!registry.CanAddToActor(m_componentName, actor)) return false;
+	if (!registry.CanAddToActor(m_componentName, actor))
+	{
+		return false;
+	}
 
 	// Set the occurrence index of the component to be added
 	// at the end of the vector which stores same type components in the actor
@@ -51,11 +71,17 @@ bool AddComponentCommand::Execute()
 	// Create a new component instance from the registry
 	component.reset(registry.Create(m_componentName));
 
-	if (!component) return false;
+	if (!component)
+	{
+		return false;
+	}
 
-	Component* added = m_scene->AddActorComponentImmediate(actor, std::move(component), m_occurrenceIndex, &m_structuralResult);
+	Component* added = m_scene->AddActorComponentImmediate(actor, std::move(component), m_occurrenceIndex);
 
-	if (!added) return false;
+	if (!added)
+	{
+		return false;
+	}
 
 	m_hasExecuted = true;
 	m_isApplied = true;
@@ -66,21 +92,38 @@ bool AddComponentCommand::Execute()
 bool AddComponentCommand::Undo()
 {
 	// Undo only if the command has been executed and applied
-	if (!m_hasExecuted || !m_isApplied) return false;
+	if (!m_hasExecuted || !m_isApplied)
+	{
+		return false;
+	}
 
 	// Resolve actor from scene by its GUID
 	Actor* actor = ResolveActor();
-	if (!actor) return false;
+
+	if (!actor)
+	{
+		return false;
+	}
 
 	// Resolve component from actor by its name
 	Component* component = ResolveComponent(actor);
-	if (!component) return false;
+
+	if (!component)
+	{
+		return false;
+	}
 
 	// Capture the component state before removing it
-	if (!m_componentSnapshot.Capture(actor, component)) return false;
+	if (!m_componentSnapshot.Capture(actor, component))
+	{
+		return false;
+	}
 
 	// Remove the component from the actor immediately
-	if (!m_scene->RemoveActorComponentImmediate(actor, component, &m_structuralResult)) return false;
+	if (!m_scene->RemoveActorComponentImmediate(actor, component))
+	{
+		return false;
+	}
 
 	m_isApplied = false;
 	return true;
@@ -88,7 +131,10 @@ bool AddComponentCommand::Undo()
 
 Actor* AddComponentCommand::ResolveActor() const
 {
-	if (!m_scene || !m_actorGuid.IsValid()) return nullptr;
+	if (!m_scene || !m_actorGuid.IsValid())
+	{
+		return nullptr;
+	}
 
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
 
@@ -104,15 +150,20 @@ Actor* AddComponentCommand::ResolveActor() const
 
 Component* AddComponentCommand::ResolveComponent(Actor* actor) const
 {
-	if (!actor) return nullptr;
+	if (!actor)
+	{
+		return nullptr;
+	}
 
 	const auto typeId = ComponentRegistry::Get().GetTypeId(m_componentName);
 
-	if (!typeId) return nullptr;
+	if (!typeId)
+	{
+		return nullptr;
+	}
 
 	return actor->GetComponentByExactType(
 		*typeId,
 		m_occurrenceIndex
 	);
 }
-

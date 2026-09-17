@@ -7,7 +7,10 @@
 
 void RectTransform::UpdateGeometry()
 {
-	if (!m_isDirty) return;
+	if (!m_isDirty)
+	{
+		return;
+	}
 
 	// Get the parent Transform and its RectTransform specialization, if available
 	Actor* owner = GetOwner();
@@ -103,10 +106,16 @@ Vector2 RectTransform::ResolveLayoutReferenceSize(
 		: nullptr;
 
 	// If parent has a Canvas, use its layout reference size
-	if (parentCanvas) return parentCanvas->GetLayoutReferenceSize();
+	if (parentCanvas)
+	{
+		return parentCanvas->GetLayoutReferenceSize();
+	}
 
 	// If parent has a RectTransform with no Canvas, use its size
-	if (parentRectTransform) return parentRectTransform->GetSize();
+	if (parentRectTransform)
+	{
+		return parentRectTransform->GetSize();
+	}
 
 	Canvas* ownerCanvas = owner
 		? owner->GetComponentByClass<Canvas>()
@@ -115,7 +124,10 @@ Vector2 RectTransform::ResolveLayoutReferenceSize(
 	// If the parent has neither a Canvas nor a RectTransform,
 	// use the owner's Canvas layout reference size when this
 	// RectTransform belongs to a Canvas Actor.
-	if (ownerCanvas) return ownerCanvas->GetLayoutReferenceSize();
+	if (ownerCanvas)
+	{
+		return ownerCanvas->GetLayoutReferenceSize();
+	}
 
 	// If no Canvas is found, use the viewport size of the scene as a fallback
 	SceneBase* scene = owner ? owner->GetOwner() : nullptr;
@@ -160,7 +172,10 @@ bool RectTransform::IsRootScreenSpaceCanvas(Actor* owner) const
 	for (Actor* ancestor = owner->GetParent(); ancestor; ancestor = ancestor->GetParent())
 	{
 		// If any ancestor has a canvas, then this is not a root screen-space canvas
-		if (ancestor->GetComponentByClass<Canvas>()) return false;
+		if (ancestor->GetComponentByClass<Canvas>())
+		{
+			return false;
+		}
 	}
 
 	return true;

@@ -44,13 +44,10 @@ public:
 	}
 	void Select(const Guid& assetGuid) { m_selectedAssetGuid = assetGuid; }
 	const Guid& GetSelectedAssetGuid() const { return m_selectedAssetGuid; }
-	void SetDiagnostic(std::string diagnostic) { m_diagnostic = std::move(diagnostic); }
-	const std::string& GetDiagnostic() const { return m_diagnostic; }
 
 private:
 	Guid m_selectedAssetGuid;
 	Guid m_pendingDeleteGuid;
-	std::string m_diagnostic;
 	bool m_openCreatePopup = false;
 	bool m_openDeletePopup = false;
 	char m_name[256]{};

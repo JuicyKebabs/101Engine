@@ -47,7 +47,8 @@ struct EditorDocumentInfo
 class EditorDocumentManager
 {
 public:
-	EditorDocumentId AddDocument(std::unique_ptr<IEditorDocument> document,
+	EditorDocumentId AddDocument(
+		std::unique_ptr<IEditorDocument> document,
 		bool activate = true);
 	bool ActivateDocument(EditorDocumentId id);
 	bool ActivateDocument(IEditorDocument* document);
@@ -63,12 +64,14 @@ public:
 	std::size_t GetDocumentCount() const { return m_documents.size(); }
 	bool SaveDocument(EditorDocumentId id);
 
-	EditorDocumentCloseResult CloseDocument(EditorDocumentId id,
+	EditorDocumentCloseResult CloseDocument(
+		EditorDocumentId id,
 		EditorDocumentCloseDecision decision);
 	void Clear();
 	void ReleaseWorkingScenesForRuntimeReload();
 	ActorImprintReloadResult ReloadActorImprint(
-		ActorImprintSystem& system, const AssetChange& change);
+		ActorImprintSystem& system,
+		const AssetChange& change);
 
 	void ReconcileSceneReplacements(std::span<const std::size_t> replacedIndices);
 

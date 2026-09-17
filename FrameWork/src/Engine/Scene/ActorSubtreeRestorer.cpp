@@ -50,6 +50,7 @@ namespace
 
 		// Parse the actor's GUID from the "actorId" field
 		Guid actorId;
+
 		if (!Guid::TryParse(
 			actorJson["actorId"].get<std::string>(),
 			actorId))
@@ -75,6 +76,7 @@ namespace
 		else if (actorJson["parentId"].is_string())
 		{
 			Guid parentId;
+
 			if (!Guid::TryParse(
 				actorJson["parentId"].get<std::string>(),
 				parentId))
@@ -109,8 +111,15 @@ namespace
 		SceneBase* scene
 	)
 	{
-		if (records.empty()) return false;
-		if (!scene) return false;
+		if (records.empty())
+		{
+			return false;
+		}
+
+		if (!scene)
+		{
+			return false;
+		}
 
 		if (records.front().actorId != rootActorId)
 		{
@@ -133,7 +142,8 @@ namespace
 			// Check if the actor ID already exists in the scene
 			if (scene->ResolveActor(record.actorId))
 			{
-				DBG("ActorSubtreeRestorer: Actor Guid already exists in the Scene: %s", record.actorId.ToString().c_str());
+				DBG("ActorSubtreeRestorer: Actor Guid already exists in the Scene: %s",
+					record.actorId.ToString().c_str());
 				return false;
 			}
 		}
@@ -151,7 +161,11 @@ namespace
 
 			// Get parent of root existing in the scene, out side of this snapshot restoration
 			Actor* externalParent = scene->ResolveActor(rootRecord.parentId);
-			if (!scene->CanAddChildActor(externalParent)) return false;
+
+			if (!scene->CanAddChildActor(externalParent))
+			{
+				return false;
+			}
 
 			// Check if the external parent is valid
 			if (!externalParent || externalParent->IsDestroyed())
@@ -179,7 +193,8 @@ namespace
 			// Check if the parent of the actor has already been processed (i.e., appears earlier in the records)
 			if (earlierActorIds.find(record.parentId) == earlierActorIds.end())
 			{
-				DBG("ActorSubtreeRestorer: Parent of Actor '%s' does not appear before the child.", record.actorId.ToString().c_str());
+				DBG("ActorSubtreeRestorer: Parent of Actor '%s' does not appear before the child.",
+					record.actorId.ToString().c_str());
 				return false;
 			}
 
@@ -243,6 +258,7 @@ Actor* ActorSubtreeRestorer::Restore(
 				DBG("ActorSubtreeRestorer::Restore: Failed to parse actor record.");
 				return rollback();
 			}
+
 			pendingRecords.push_back(std::move(record));
 		}
 
@@ -264,7 +280,8 @@ Actor* ActorSubtreeRestorer::Restore(
 
 			if (!record.detachedActor)
 			{
-				DBG("ActorSubtreeRestorer::Restore: Failed to deserialize Actor '%s'.", record.actorId.ToString().c_str());
+				DBG("ActorSubtreeRestorer::Restore: Failed to deserialize Actor '%s'.",
+					record.actorId.ToString().c_str());
 				return nullptr;
 			}
 		}
@@ -290,21 +307,26 @@ Actor* ActorSubtreeRestorer::Restore(
 		// Restore hierarchy relationships after every Actor can be resolved by Guid.
 		for (auto& record : pendingRecords)
 		{
-			if (!record.hasParent) continue;
+			if (!record.hasParent)
+			{
+				continue;
+			}
 
 			// Get the parent actor from the scene
 			Actor* parent = scene->ResolveActor(record.parentId);
 
 			if (!parent)
-			{// If the parent cannot be resolved, rollback all previously registered actors and return nullptr
-				DBG("ActorSubtreeRestorer::Restore: Failed to resolve parent of Actor '%s'.", record.actorId.ToString().c_str());
+			{ // If the parent cannot be resolved, rollback all previously registered actors and return nullptr
+				DBG("ActorSubtreeRestorer::Restore: Failed to resolve parent of Actor '%s'.",
+					record.actorId.ToString().c_str());
 				return rollback();
 			}
 
 			// Restore the parent-child relationship in the scene
 			if (!scene->RestoreParentRelationship(record.registeredActor, parent))
-			{// If restoration fails, rollback all previously registered actors and return nullptr
-				DBG("ActorSubtreeRestorer::Restore: Failed to restore parent of Actor '%s'.", record.actorId.ToString().c_str());
+			{ // If restoration fails, rollback all previously registered actors and return nullptr
+				DBG("ActorSubtreeRestorer::Restore: Failed to restore parent of Actor '%s'.",
+					record.actorId.ToString().c_str());
 				return rollback();
 			}
 		}
@@ -316,7 +338,10 @@ Actor* ActorSubtreeRestorer::Restore(
 			// Resolve component references for the registered actor
 			for (Component* component : record.registeredActor->GetAllComponents())
 			{
-				if (!component || component->IsDestroyed()) continue;
+				if (!component || component->IsDestroyed())
+				{
+					continue;
+				}
 
 				// Resolve references
 				if (!component->ResolveReferences(*scene))
@@ -324,11 +349,10 @@ Actor* ActorSubtreeRestorer::Restore(
 					const std::type_index typeId(typeid(*component));
 					const std::string typeName = ComponentRegistry::Get().GetNameByTypeIndex(typeId);
 
+					const char* componentTypeName = typeName.empty() ? typeId.name() : typeName.c_str();
 					DBG(
 						"ActorSubtreeRestorer::Restore: Failed to resolve component '%s' on Actor '%s'.",
-						typeName.empty()
-						? typeId.name()
-						: typeName.c_str(),
+						componentTypeName,
 						record.registeredActor->GetName().c_str()
 					);
 
@@ -360,7 +384,10 @@ Actor* ActorSubtreeRestorer::Restore(
 		// Attach only after the restored hierarchy and its UI constraints are final.
 		for (auto& record : pendingRecords)
 		{
-			if (record.registeredActor) record.registeredActor->AttachComponents();
+			if (record.registeredActor)
+			{
+				record.registeredActor->AttachComponents();
+			}
 		}
 
 		return restoredRoot;

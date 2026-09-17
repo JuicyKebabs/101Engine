@@ -1,4 +1,5 @@
 #include "ActorImprintInstanceRecordCodec.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "ActorImprintPropertyOverrides.h"
 #include <algorithm>
 #include <initializer_list>
@@ -7,53 +8,53 @@
 namespace
 {
 	using json = nlohmann::json;
-	using ErrorCode = ActorImprintInstanceRecordErrorCode;
-
-	bool Fail(ActorImprintInstanceRecordError* error, ErrorCode code,
-		std::string path, std::string message, LocalObjectId target = InvalidLocalObjectId)
-	{
-		if (error) *error = { code, target, std::move(path), std::move(message) };
-		return false;
-	}
 
 	bool Contains(std::initializer_list<const char*> fields, const std::string& field)
 	{
 		return std::find(fields.begin(), fields.end(), field) != fields.end();
 	}
 
-	std::string AppendPath(const std::string& base, const std::string& member)
-	{
-		return (json::json_pointer(base) / member).to_string();
-	}
-
-	bool ValidateFields(const json& object,
+	bool ValidateFields(
+		const json& object,
 		std::initializer_list<const char*> required,
-		std::initializer_list<const char*> optional,
-		const std::string& path,
-		ActorImprintInstanceRecordError* error,
-		LocalObjectId target = InvalidLocalObjectId)
+		std::initializer_list<const char*> optional)
 	{
 		if (!object.is_object())
-			return Fail(error, ErrorCode::InvalidSchema, path, "Expected an object.", target);
+		{
+			DBG("Expected an object.");
+			return false;
+		}
+
 		for (auto member = object.begin(); member != object.end(); ++member)
 		{
 			if (!Contains(required, member.key()) && !Contains(optional, member.key()))
-				return Fail(error, ErrorCode::InvalidSchema, AppendPath(path, member.key()),
-					"Unknown field: " + member.key(), target);
+			{
+				DBG("Unknown field: %s", member.key().c_str());
+				return false;
+			}
 		}
+
 		for (const char* field : required)
 		{
 			if (!object.contains(field))
-				return Fail(error, ErrorCode::InvalidSchema, AppendPath(path, field),
-					"Required field is missing.", target);
+			{
+				DBG("Required field is missing.");
+				return false;
+			}
 		}
+
 		return true;
 	}
 
 	bool ReadLocalObjectId(const json& source, LocalObjectId& outId)
 	{
-		if (!source.is_number_integer()) return false;
+		if (!source.is_number_integer())
+		{
+			return false;
+		}
+
 		LocalObjectId id = InvalidLocalObjectId;
+
 		if (source.is_number_unsigned())
 		{
 			id = source.get<LocalObjectId>();
@@ -61,110 +62,172 @@ namespace
 		else
 		{
 			const auto signedId = source.get<std::int64_t>();
-			if (signedId <= 0) return false;
+
+			if (signedId <= 0)
+			{
+				return false;
+			}
+
 			id = static_cast<LocalObjectId>(signedId);
 		}
-		if (id == InvalidLocalObjectId) return false;
+
+		if (id == InvalidLocalObjectId)
+		{
+			return false;
+		}
+
 		outId = id;
 		return true;
 	}
 
 	bool ReadGuid(const json& source, Guid& outGuid)
 	{
-		if (!source.is_string()) return false;
+		if (!source.is_string())
+		{
+			return false;
+		}
+
 		const std::string text = source.get<std::string>();
 		return text.find('\0') == std::string::npos && Guid::TryParse(text, outGuid) && outGuid.IsValid();
 	}
 
-	bool NormalizeProperties(ActorImprintPropertyOverrideTarget& target,
-		const std::string& path, ActorImprintInstanceRecordError* error)
+	bool NormalizeProperties(ActorImprintPropertyOverrideTarget& target)
 	{
-		ActorImprintPropertyOverrideError structuralError;
-		if (!ActorImprintPropertyOverrides::ValidateStructure(target, &structuralError))
-			return Fail(error, ErrorCode::InvalidPropertyOverride,
-				structuralError.path.empty() ? path : AppendPath(path, structuralError.path),
-				structuralError.message, target.targetLocalObjectId);
+		if (!ActorImprintPropertyOverrides::ValidateStructure(target))
+		{
+			return false;
+		}
+
 		std::sort(target.properties.begin(), target.properties.end(), [](const auto& left, const auto& right)
 		{
 			return left.path.ToString() < right.path.ToString();
 		});
+
 		for (std::size_t i = 0; i < target.properties.size(); ++i)
 		{
 			const auto& property = target.properties[i];
 			const auto reparsed = PropertyPath::FromString(property.path.ToString());
+
 			if (!reparsed || *reparsed != property.path)
-				return Fail(error, ErrorCode::InvalidPropertyOverride, path,
-					"Override path is not a normalized JSON Pointer.", target.targetLocalObjectId);
+			{
+				DBG("Override path is not a normalized JSON Pointer.");
+				return false;
+			}
 		}
+
 		return true;
 	}
 
-	bool NormalizeRecord(ActorImprintSerializedInstanceRecord& record,
-		ActorImprintInstanceRecordError* error)
+	bool NormalizeRecord(ActorImprintSerializedInstanceRecord& record)
 	{
 		if (!record.assetGuid.IsValid())
-			return Fail(error, ErrorCode::InvalidAssetGuid, "/assetGuid", "Expected a nonzero ActorImprint Asset GUID.");
+		{
+			DBG("Expected a nonzero ActorImprint Asset GUID.");
+			return false;
+		}
+
 		if (!record.sourceDefinitionRevision.IsValid())
-			return Fail(error, ErrorCode::InvalidDefinitionRevision, "/sourceDefinitionRevision",
-				"Expected a nonzero DefinitionRevision.");
+		{
+			DBG("Expected a nonzero DefinitionRevision.");
+			return false;
+		}
+
 		if (!record.rootActorGuid.IsValid())
-			return Fail(error, ErrorCode::InvalidRootActorGuid, "/rootActorGuid", "Expected a nonzero root Actor GUID.");
+		{
+			DBG("Expected a nonzero root Actor GUID.");
+			return false;
+		}
+
 		if (record.externalParentActorGuid && !record.externalParentActorGuid->IsValid())
-			return Fail(error, ErrorCode::InvalidExternalParentActorGuid, "/externalParentActorGuid",
-				"External parent GUID must be nonzero when present.");
+		{
+			DBG("External parent GUID must be nonzero when present.");
+			return false;
+		}
+
 		if (record.actorGuids.empty())
-			return Fail(error, ErrorCode::InvalidActorGuidMapping, "/actorGuids",
-				"Actor GUID mapping must contain the Instance root.");
+		{
+			DBG("Actor GUID mapping must contain the Instance root.");
+			return false;
+		}
 
 		std::unordered_set<LocalObjectId> localIds;
 		std::unordered_set<Guid> guids;
 		bool containsRootGuid = false;
+
 		for (std::size_t i = 0; i < record.actorGuids.size(); ++i)
 		{
 			const auto& entry = record.actorGuids[i];
-			const std::string path = "/actorGuids/" + std::to_string(i);
+
 			if (entry.localObjectId == InvalidLocalObjectId)
-				return Fail(error, ErrorCode::InvalidActorGuidMapping, path + "/localObjectId",
-					"Actor LocalObjectID must be nonzero.");
+			{
+				DBG("Actor LocalObjectID must be nonzero.");
+				return false;
+			}
+
 			if (!entry.actorGuid.IsValid())
-				return Fail(error, ErrorCode::InvalidActorGuidMapping, path + "/actorGuid",
-					"Actor GUID must be nonzero.");
+			{
+				DBG("Actor GUID must be nonzero.");
+				return false;
+			}
+
 			if (!localIds.insert(entry.localObjectId).second)
-				return Fail(error, ErrorCode::InvalidActorGuidMapping, path + "/localObjectId",
-					"Actor LocalObjectID is duplicated.");
+			{
+				DBG("Actor LocalObjectID is duplicated.");
+				return false;
+			}
+
 			if (!guids.insert(entry.actorGuid).second)
-				return Fail(error, ErrorCode::InvalidActorGuidMapping, path + "/actorGuid",
-					"Actor GUID is duplicated.");
+			{
+				DBG("Actor GUID is duplicated.");
+				return false;
+			}
+
 			containsRootGuid = containsRootGuid || entry.actorGuid == record.rootActorGuid;
 		}
+
 		if (!containsRootGuid)
-			return Fail(error, ErrorCode::InvalidRootActorGuid, "/rootActorGuid",
-				"Root Actor GUID is absent from the Actor GUID mapping.");
+		{
+			DBG("Root Actor GUID is absent from the Actor GUID mapping.");
+			return false;
+		}
+
 		std::sort(record.actorGuids.begin(), record.actorGuids.end(), [](const auto& left, const auto& right)
 		{
 			return left.localObjectId < right.localObjectId;
 		});
 
 		std::unordered_set<LocalObjectId> targets;
+
 		for (std::size_t i = 0; i < record.propertyOverrides.size(); ++i)
 		{
 			auto& target = record.propertyOverrides[i];
-			const std::string path = "/propertyOverrides/" + std::to_string(i) + "/properties";
+
 			if (target.targetLocalObjectId == InvalidLocalObjectId)
-				return Fail(error, ErrorCode::InvalidPropertyOverride,
-					"/propertyOverrides/" + std::to_string(i) + "/targetLocalObjectId",
-					"Override target LocalObjectID must be nonzero.");
+			{
+				DBG("Override target LocalObjectID must be nonzero.");
+				return false;
+			}
+
 			if (!targets.insert(target.targetLocalObjectId).second)
-				return Fail(error, ErrorCode::InvalidPropertyOverride,
-					"/propertyOverrides/" + std::to_string(i) + "/targetLocalObjectId",
-					"Override target LocalObjectID is duplicated.", target.targetLocalObjectId);
-			if (!NormalizeProperties(target, path, error)) return false;
+			{
+				DBG("Override target LocalObjectID is duplicated.");
+				return false;
+			}
+
+			if (!NormalizeProperties(target))
+			{
+				return false;
+			}
 		}
-		record.propertyOverrides.erase(
-			std::remove_if(record.propertyOverrides.begin(), record.propertyOverrides.end(),
-				[](const auto& target) { return target.properties.empty(); }),
+
+		record.propertyOverrides.erase(std::remove_if(record.propertyOverrides.begin(), record.propertyOverrides.end(),
+										   [](const auto& target)
+		{
+			return target.properties.empty();
+		}),
 			record.propertyOverrides.end());
-		std::sort(record.propertyOverrides.begin(), record.propertyOverrides.end(), [](const auto& left, const auto& right)
+		std::sort(record.propertyOverrides.begin(), record.propertyOverrides.end(),
+			[](const auto& left, const auto& right)
 		{
 			return left.targetLocalObjectId < right.targetLocalObjectId;
 		});
@@ -172,127 +235,201 @@ namespace
 	}
 }
 
-bool ActorImprintInstanceRecordReader::Read(const nlohmann::json& source,
-	ActorImprintSerializedInstanceRecord& outRecord, ActorImprintInstanceRecordError* outError)
+bool ActorImprintInstanceRecordReader::Read(
+	const nlohmann::json& source,
+	ActorImprintSerializedInstanceRecord& outRecord)
 {
-	if (outError) *outError = {};
 	try
 	{
 		if (!ValidateFields(source,
-			{ "assetGuid", "sourceDefinitionRevision", "rootActorGuid", "externalParentActorGuid", "actorGuids" },
-			{ "propertyOverrides" }, "", outError)) return false;
+				{"assetGuid", "sourceDefinitionRevision", "rootActorGuid", "externalParentActorGuid", "actorGuids"},
+				{"propertyOverrides"}))
+		{
+			return false;
+		}
 
 		ActorImprintSerializedInstanceRecord record;
+
 		if (!ReadGuid(source["assetGuid"], record.assetGuid))
-			return Fail(outError, ErrorCode::InvalidAssetGuid, "/assetGuid", "Expected a nonzero ActorImprint Asset GUID string.");
+		{
+			DBG("Expected a nonzero ActorImprint Asset GUID string.");
+			return false;
+		}
+
 		if (!source["sourceDefinitionRevision"].is_string() ||
-			!DefinitionRevision::TryParse(source["sourceDefinitionRevision"].get<std::string>(), record.sourceDefinitionRevision))
-			return Fail(outError, ErrorCode::InvalidDefinitionRevision, "/sourceDefinitionRevision",
-				"Expected a nonzero DefinitionRevision string.");
+			!DefinitionRevision::TryParse(
+				source["sourceDefinitionRevision"].get<std::string>(), record.sourceDefinitionRevision))
+		{
+			DBG("Expected a nonzero DefinitionRevision string.");
+			return false;
+		}
+
 		if (!ReadGuid(source["rootActorGuid"], record.rootActorGuid))
-			return Fail(outError, ErrorCode::InvalidRootActorGuid, "/rootActorGuid", "Expected a nonzero root Actor GUID string.");
+		{
+			DBG("Expected a nonzero root Actor GUID string.");
+			return false;
+		}
 
 		const json& parent = source["externalParentActorGuid"];
+
 		if (!parent.is_null())
 		{
 			Guid parentGuid;
+
 			if (!ReadGuid(parent, parentGuid))
-				return Fail(outError, ErrorCode::InvalidExternalParentActorGuid, "/externalParentActorGuid",
-					"Expected null or a nonzero external parent Actor GUID string.");
+			{
+				DBG("Expected null or a nonzero external parent Actor GUID string.");
+				return false;
+			}
+
 			record.externalParentActorGuid = parentGuid;
 		}
 
 		const json& actorGuids = source["actorGuids"];
+
 		if (!actorGuids.is_array())
-			return Fail(outError, ErrorCode::InvalidActorGuidMapping, "/actorGuids", "Expected an Actor GUID mapping array.");
+		{
+			DBG("Expected an Actor GUID mapping array.");
+			return false;
+		}
+
 		for (std::size_t i = 0; i < actorGuids.size(); ++i)
 		{
-			const std::string path = "/actorGuids/" + std::to_string(i);
 			const json& sourceEntry = actorGuids[i];
-			if (!ValidateFields(sourceEntry, { "localObjectId", "actorGuid" }, {}, path, outError)) return false;
+
+			if (!ValidateFields(sourceEntry, {"localObjectId", "actorGuid"}, {}))
+			{
+				return false;
+			}
+
 			ActorImprintActorGuidEntry entry;
+
 			if (!ReadLocalObjectId(sourceEntry["localObjectId"], entry.localObjectId))
-				return Fail(outError, ErrorCode::InvalidActorGuidMapping, path + "/localObjectId",
-					"Expected a nonzero uint64 Actor LocalObjectID.");
+			{
+				DBG("Expected a nonzero uint64 Actor LocalObjectID.");
+				return false;
+			}
+
 			if (!ReadGuid(sourceEntry["actorGuid"], entry.actorGuid))
-				return Fail(outError, ErrorCode::InvalidActorGuidMapping, path + "/actorGuid",
-					"Expected a nonzero Actor GUID string.");
+			{
+				DBG("Expected a nonzero Actor GUID string.");
+				return false;
+			}
+
 			record.actorGuids.push_back(entry);
 		}
 
 		if (const auto overrides = source.find("propertyOverrides"); overrides != source.end())
 		{
 			if (!overrides->is_array())
-				return Fail(outError, ErrorCode::InvalidPropertyOverride, "/propertyOverrides",
-					"Expected a Property Override array.");
+			{
+				DBG("Expected a Property Override array.");
+				return false;
+			}
+
 			for (std::size_t i = 0; i < overrides->size(); ++i)
 			{
-				const std::string targetPath = "/propertyOverrides/" + std::to_string(i);
 				const json& sourceTarget = (*overrides)[i];
-				if (!ValidateFields(sourceTarget, { "targetLocalObjectId", "properties" }, {}, targetPath, outError)) return false;
+
+				if (!ValidateFields(sourceTarget, {"targetLocalObjectId", "properties"}, {}))
+				{
+					return false;
+				}
+
 				ActorImprintPropertyOverrideTarget target;
+
 				if (!ReadLocalObjectId(sourceTarget["targetLocalObjectId"], target.targetLocalObjectId))
-					return Fail(outError, ErrorCode::InvalidPropertyOverride, targetPath + "/targetLocalObjectId",
-						"Expected a nonzero uint64 target LocalObjectID.");
+				{
+					DBG("Expected a nonzero uint64 target LocalObjectID.");
+					return false;
+				}
+
 				const json& properties = sourceTarget["properties"];
+
 				if (!properties.is_object())
-					return Fail(outError, ErrorCode::InvalidPropertyOverride, targetPath + "/properties",
-						"Expected a Property Override object.", target.targetLocalObjectId);
+				{
+					DBG("Expected a Property Override object.");
+					return false;
+				}
+
 				for (auto property = properties.begin(); property != properties.end(); ++property)
 				{
 					const auto path = PropertyPath::FromString(property.key());
+
 					if (!path)
-						return Fail(outError, ErrorCode::InvalidPropertyOverride,
-							AppendPath(targetPath + "/properties", property.key()),
-							"Override key must be a valid nonempty JSON Pointer.", target.targetLocalObjectId);
+					{
+						DBG("Override key must be a valid nonempty JSON Pointer.");
+						return false;
+					}
+
 					target.properties.emplace_back(*path, property.value());
 				}
+
 				record.propertyOverrides.push_back(std::move(target));
 			}
 		}
 
-		if (!NormalizeRecord(record, outError)) return false;
+		if (!NormalizeRecord(record))
+		{
+			return false;
+		}
+
 		outRecord = std::move(record);
 		return true;
 	}
 	catch (const std::exception& exception)
 	{
-		return Fail(outError, ErrorCode::InvalidSchema, "", exception.what());
+		DBG("%s", exception.what());
+		return false;
 	}
 }
 
-bool ActorImprintInstanceRecordWriter::Write(const ActorImprintSerializedInstanceRecord& source,
-	nlohmann::json& outJson, ActorImprintInstanceRecordError* outError)
+bool ActorImprintInstanceRecordWriter::Write(
+	const ActorImprintSerializedInstanceRecord& source,
+	nlohmann::json& outJson)
 {
-	if (outError) *outError = {};
 	try
 	{
 		ActorImprintSerializedInstanceRecord record = source;
-		if (!NormalizeRecord(record, outError)) return false;
+
+		if (!NormalizeRecord(record))
+		{
+			return false;
+		}
 
 		json actorGuids = json::array();
+
 		for (const auto& entry : record.actorGuids)
-			actorGuids.push_back({ { "localObjectId", entry.localObjectId }, { "actorGuid", entry.actorGuid.ToString() } });
+		{
+			actorGuids.push_back({{"localObjectId", entry.localObjectId}, {"actorGuid", entry.actorGuid.ToString()}});
+		}
 
 		json result = {
-			{ "assetGuid", record.assetGuid.ToString() },
-			{ "sourceDefinitionRevision", record.sourceDefinitionRevision.ToString() },
-			{ "rootActorGuid", record.rootActorGuid.ToString() },
-			{ "externalParentActorGuid", record.externalParentActorGuid
-				? json(record.externalParentActorGuid->ToString()) : json(nullptr) },
-			{ "actorGuids", std::move(actorGuids) },
+			{"assetGuid", record.assetGuid.ToString()},
+			{"sourceDefinitionRevision", record.sourceDefinitionRevision.ToString()},
+			{"rootActorGuid", record.rootActorGuid.ToString()},
+			{"externalParentActorGuid",
+				record.externalParentActorGuid ? json(record.externalParentActorGuid->ToString()) : json(nullptr)},
+			{"actorGuids", std::move(actorGuids)},
 		};
+
 		if (!record.propertyOverrides.empty())
 		{
 			json overrides = json::array();
+
 			for (const auto& target : record.propertyOverrides)
 			{
 				json properties = json::object();
+
 				for (const auto& property : target.properties)
+				{
 					properties[property.path.ToString()] = property.value;
-				overrides.push_back({ { "targetLocalObjectId", target.targetLocalObjectId },
-					{ "properties", std::move(properties) } });
+				}
+
+				overrides.push_back(
+					{{"targetLocalObjectId", target.targetLocalObjectId}, {"properties", std::move(properties)}});
 			}
+
 			result["propertyOverrides"] = std::move(overrides);
 		}
 
@@ -301,6 +438,7 @@ bool ActorImprintInstanceRecordWriter::Write(const ActorImprintSerializedInstanc
 	}
 	catch (const std::exception& exception)
 	{
-		return Fail(outError, ErrorCode::InvalidSchema, "", exception.what());
+		DBG("%s", exception.what());
+		return false;
 	}
 }

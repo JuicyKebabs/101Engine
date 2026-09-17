@@ -1,4 +1,5 @@
 #include "Actor.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "ActorPool.h"
 #include "Engine/Engine.h"
 #include "Engine/Graphics/Renderer.h"
@@ -18,15 +19,19 @@ Actor::~Actor()
 // Post-update (for late update)
 void Actor::PreUpdate(float deltaTime)
 {
-	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked()) return;
+	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked())
+	{
+		return;
+	}
+
 	AttachPendingComponents();
 
 	// Post-update all components
-	for (const auto& component : m_componentPtrs) 
+	for (const auto& component : m_componentPtrs)
 	{
 		// If the component has not been started, call OnStart and mark it as started
-		if (!component->IsStarted()) { 
-			component->OnStart(); 
+		if (!component->IsStarted()) {
+			component->OnStart();
 		}
 
 		// Call PostUpdate for each component
@@ -37,47 +42,60 @@ void Actor::PreUpdate(float deltaTime)
 // Update
 void Actor::Update(float deltaTime)
 {
-	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked()) return;
+	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked())
+	{
+		return;
+	}
+
 	// Update all components
-	for (const auto& component : m_componentPtrs) { component->Update(deltaTime); }
+	for (const auto& component : m_componentPtrs)
+	{
+		component->Update(deltaTime);
+	}
 }
 
 // Late update
 void Actor::LateUpdate(float deltaTime)
 {
-	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked()) return;
+	if (m_pOwner && m_pOwner->IsStructuralMutationBlocked())
+	{
+		return;
+	}
+
 	// Late update all components
 	std::vector<Component*> destroyedComponents;
-	for (const auto& component : m_componentPtrs) 
+
+	for (const auto& component : m_componentPtrs)
 	{
-		if (component->IsDestroyed()) 
+		if (component->IsDestroyed())
 		{
 			destroyedComponents.push_back(component);
 			continue;
 		}
+
 		component->LateUpdate(deltaTime);
 	}
 
 	// Remove components marked for destruction
-	for (auto& destroyed : destroyedComponents) 
+	for (auto& destroyed : destroyedComponents)
 	{
 		RemoveDestroyedComponents(destroyed);
 	}
 }
 
 // Mark as actor as destroyed
-void Actor::Destroy(StructuralMutationResult* result)
+bool Actor::Destroy()
 {
 	if (m_pOwner)
 	{
 		// SceneBase owns hierarchy policy and keeps Actor/ActorPool state in sync.
-		m_pOwner->RemoveActor(this, /*cascadeToChildren=*/true, result);
-		return;
+		return m_pOwner->RemoveActor(this, /*cascadeToChildren=*/true);
 	}
 
 	// An unregistered actor has no pool to notify.
 	m_destroyed = true;
-	StructuralMutationResult{}.Report(result);
+
+	return true;
 }
 
 // Check if actor is destroyed
@@ -97,6 +115,7 @@ void Actor::OnDestroy()
 		component->OnDetach();
 		component->OnDestroy();
 	}
+
 	for (auto& pending : m_pendingComponents)
 	{
 		pending.instance->OnDetach();
@@ -104,10 +123,17 @@ void Actor::OnDestroy()
 	}
 }
 
-Component* Actor::AddComponent(std::unique_ptr<Component> component, StructuralMutationResult* result)
+Component* Actor::AddComponent(std::unique_ptr<Component> component)
 {
-	if (m_pOwner) return m_pOwner->AddActorComponent(this, std::move(component), result);
-	if (!component) return nullptr;
+	if (m_pOwner)
+	{
+		return m_pOwner->AddActorComponent(this, std::move(component));
+	}
+
+	if (!component)
+	{
+		return nullptr;
+	}
 
 	const std::type_index typeId = std::type_index(typeid(*component));
 
@@ -126,7 +152,10 @@ Component* Actor::AddComponentInternal(
 	std::type_index typeId
 )
 {
-	if (!component) return nullptr;
+	if (!component)
+	{
+		return nullptr;
+	}
 
 	// Check if it is allowed to add this component type based on its cardinality and family constraints
 	if (!CanAddComponentLocal(typeId))
@@ -156,7 +185,10 @@ Component* Actor::AddComponentInternal(
 
 Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, std::size_t occurrenceIndex)
 {
-	if (!component) return nullptr;
+	if (!component)
+	{
+		return nullptr;
+	}
 
 	const std::type_index typeId = typeid(*component);
 
@@ -171,7 +203,10 @@ Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, st
 	// the valid range of existing components of the same type
 	const std::size_t componentCount = GetComponentsByExactType(typeId).size();
 
-	if (occurrenceIndex > componentCount) return nullptr;
+	if (occurrenceIndex > componentCount)
+	{
+		return nullptr;
+	}
 
 	// Normalize storage of pending components before adding the new component
 	AttachPendingComponents();
@@ -199,7 +234,10 @@ Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, st
 			nextComponent
 		);
 
-		if (pointerIt == m_componentPtrs.end()) return nullptr;
+		if (pointerIt == m_componentPtrs.end())
+		{
+			return nullptr;
+		}
 	}
 
 	// Add component to the appropriate position in the type based instances vector
@@ -251,7 +289,10 @@ bool Actor::RemoveComponentImmediate(Component* component)
 	// Get bucket of components of the same type
 	auto bucketIt = m_components.find(typeId);
 
-	if (bucketIt == m_components.end()) return false;
+	if (bucketIt == m_components.end())
+	{
+		return false;
+	}
 
 	// Get the instances vector of the same type
 	auto& instances = bucketIt->second.instances;
@@ -265,7 +306,10 @@ bool Actor::RemoveComponentImmediate(Component* component)
 		}
 	);
 
-	if (instanceIt == instances.end()) return false;
+	if (instanceIt == instances.end())
+	{
+		return false;
+	}
 
 	// Get given component from the iteration vector (m_componentPtrs)
 	auto pointerIt = std::find(
@@ -273,7 +317,10 @@ bool Actor::RemoveComponentImmediate(Component* component)
 		component
 	);
 
-	if (pointerIt == m_componentPtrs.end()) return false;
+	if (pointerIt == m_componentPtrs.end())
+	{
+		return false;
+	}
 
 	// Detach the component from scene systems before destroying its instance.
 	component->OnDetach();
@@ -282,7 +329,7 @@ bool Actor::RemoveComponentImmediate(Component* component)
 	// Remove the component from both the iteration vector and the instances vector
 	m_componentPtrs.erase(pointerIt);
 	instances.erase(instanceIt);
-	
+
 	// Remove the bucket if there are no more instances of this component type
 	if (instances.empty())
 	{
@@ -294,12 +341,16 @@ bool Actor::RemoveComponentImmediate(Component* component)
 
 void Actor::SetParentHandle(ActorHandle parentHandle)
 {
-	if (m_parentHandle == parentHandle) return;
+	if (m_parentHandle == parentHandle)
+	{
+		return;
+	}
 
 	// Detach from current parent, if any.
 	if (!m_parentHandle.IsNull() && m_pOwner)
 	{
 		Actor* oldParent = m_pOwner->ResolveActor(m_parentHandle);
+
 		if (oldParent)
 		{
 			auto& siblings = oldParent->m_childHandles;
@@ -315,6 +366,7 @@ void Actor::SetParentHandle(ActorHandle parentHandle)
 	if (!m_parentHandle.IsNull() && m_pOwner)
 	{
 		Actor* newParent = m_pOwner->ResolveActor(m_parentHandle);
+
 		if (newParent)
 		{
 			newParent->m_childHandles.push_back(m_handle);
@@ -324,7 +376,11 @@ void Actor::SetParentHandle(ActorHandle parentHandle)
 
 Actor* Actor::GetParent() const
 {
-	if (m_parentHandle.IsNull() || !m_pOwner) return nullptr;
+	if (m_parentHandle.IsNull() || !m_pOwner)
+	{
+		return nullptr;
+	}
+
 	return m_pOwner->ResolveActor(m_parentHandle);
 }
 
@@ -332,7 +388,11 @@ Actor* Actor::GetParent() const
 std::vector<Actor*> Actor::GetDirectChildren() const
 {
 	std::vector<Actor*> result;
-	if (!m_pOwner) return result;
+
+	if (!m_pOwner)
+	{
+		return result;
+	}
 
 	for (const auto& handle : m_childHandles)
 	{
@@ -341,17 +401,21 @@ std::vector<Actor*> Actor::GetDirectChildren() const
 			result.push_back(child);
 		}
 	}
+
 	return result;
 }
 
 // Check if the actor has a component by name
 bool Actor::HasComponentByName(const std::string& name) const
 {
-	if (name.empty()) return false;
-
-	for (const auto& typeId : GetComponentsTypeIds()) 
+	if (name.empty())
 	{
-		if(ComponentRegistry::Get().GetNameByTypeIndex(typeId) == name) 
+		return false;
+	}
+
+	for (const auto& typeId : GetComponentsTypeIds())
+	{
+		if(ComponentRegistry::Get().GetNameByTypeIndex(typeId) == name)
 		{
 			return true;
 		}
@@ -362,14 +426,22 @@ bool Actor::HasComponentByName(const std::string& name) const
 
 bool Actor::CanAddComponent(std::type_index typeId) const
 {
-	if (m_pOwner) return static_cast<bool>(m_pOwner->CanAddComponent(this, typeId));
+	if (m_pOwner)
+	{
+		return static_cast<bool>(m_pOwner->CanAddComponent(this, typeId));
+	}
+
 	return CanAddComponentLocal(typeId);
 }
 
 bool Actor::CanAddComponentLocal(std::type_index typeId) const
 {
 	const auto policy = ComponentRegistry::Get().GetPolicy(typeId);
-	if (!policy) return false;
+
+	if (!policy)
+	{
+		return false;
+	}
 
 	// Components which are not Multiple cannot be added
 	// when the same concrete type already exists.
@@ -392,12 +464,18 @@ bool Actor::HasExactComponent(std::type_index typeId) const
 	auto it = m_components.find(typeId);
 
 	// Serach in the main component container
-	if (it != m_components.end() && !it->second.instances.empty()) return true;
-	
+	if (it != m_components.end() && !it->second.instances.empty())
+	{
+		return true;
+	}
+
 	// Search in the pending components list
 	for (const auto& pending : m_pendingComponents)
 	{
-		if (pending.typeId == typeId) return true;
+		if (pending.typeId == typeId)
+		{
+			return true;
+		}
 	}
 
 	return false;
@@ -410,7 +488,10 @@ bool Actor::HasComponentFamily(ComponentFamily family) const
 
 size_t Actor::CountComponentFamily(ComponentFamily family) const
 {
-	if (family == ComponentFamily::None) return 0;
+	if (family == ComponentFamily::None)
+	{
+		return 0;
+	}
 
 	size_t count = 0;
 
@@ -461,7 +542,11 @@ std::vector<Actor*> Actor::GetChildren() const
 void Actor::FlushTransform()
 {
 	auto pTransform = GetComponentByClass<Transform>();
-	if (pTransform) pTransform->UpdateGeometry();
+
+	if (pTransform)
+	{
+		pTransform->UpdateGeometry();
+	}
 
 	for (Actor* child : GetDirectChildren())
 	{
@@ -473,7 +558,11 @@ void Actor::FlushTransform()
 void Actor::FlushColliderTransforms()
 {
 	auto colliders = GetComponentsByClass<Collider>();
-	for (auto& collider : colliders) collider->Flush();
+
+	for (auto& collider : colliders)
+	{
+		collider->Flush();
+	}
 
 	for (Actor* child : GetDirectChildren())
 	{
@@ -485,24 +574,37 @@ void Actor::FlushColliderTransforms()
 void Actor::PrepareComponentsForAttach()
 {
 	m_componentPtrs.reserve(m_componentPtrs.size() + m_pendingComponents.size());
+
 	for (auto& pending : m_pendingComponents)
 	{
 		Component* component = pending.instance.get();
 		m_components[pending.typeId].instances.push_back(std::move(pending.instance));
 		m_componentPtrs.push_back(component);
 	}
+
 	m_pendingComponents.clear();
 }
 
 void Actor::AttachPendingComponents()
 {
-	if (!m_pOwner) return;
-	if (m_pOwner->m_unpublishedCandidate) return;
+	if (!m_pOwner)
+	{
+		return;
+	}
+
+	if (m_pOwner->m_unpublishedCandidate)
+	{
+		return;
+	}
+
 	const std::size_t firstAttached = m_componentPtrs.size();
 	PrepareComponentsForAttach();
 	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
+
 	for (std::size_t i = firstAttached; i < m_componentPtrs.size(); ++i)
+	{
 		m_componentPtrs[i]->OnAttach();
+	}
 }
 // Remove components marked for destruction
 void Actor::RemoveDestroyedComponents(Component* component)
@@ -513,54 +615,78 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	component->OnDestroy();
 
 	auto mapIt = m_components.find(std::type_index(typeid(*component)));
-	if (mapIt != m_components.end()) 
+
+	if (mapIt != m_components.end())
 	{
 		auto& instances = mapIt->second.instances;
-		auto instance = std::find_if(instances.begin(), instances.end(), [component](const std::unique_ptr<Component>& instance) {
+		auto instance =
+			std::find_if(instances.begin(), instances.end(), [component](const std::unique_ptr<Component>& instance)
+		{
 			return instance.get() == component;
-			});
-		if (instance != instances.end()) 
+		});
+
+		if (instance != instances.end())
 		{
 			instances.erase(instance);
 		}
 	}
 
 	auto ptrIt = std::find(m_componentPtrs.begin(), m_componentPtrs.end(), component);
-	if (ptrIt != m_componentPtrs.end()) 
+
+	if (ptrIt != m_componentPtrs.end())
 	{
 		m_componentPtrs.erase(ptrIt);
 	}
+
 	if (affectsUIHierarchy && m_pOwner && !IsDestroyed())
+	{
 		m_pOwner->ApplyUIHierarchyConstraints(this, m_pOwner->FindClosestCanvas(GetParent()));
+	}
 }
 
-Actor* Actor::AddChild(std::unique_ptr<Actor> child, StructuralMutationResult* result)
+Actor* Actor::AddChild(std::unique_ptr<Actor> child)
 {
 	if (!m_pOwner || !child)
 	{
-		StructuralMutationResult{ StructuralMutationReason::InvalidActor }.Report(result);
+		DBG("Structural operation rejected: InvalidActor.");
 		return nullptr;
 	}
-	return m_pOwner->AddChildActor(std::move(child), m_handle, result);
+
+	return m_pOwner->AddChildActor(std::move(child), m_handle);
 }
 
 void Actor::AttachComponents()
 {
-	if (!m_pOwner) return;
-	if (m_pOwner->m_unpublishedCandidate) return;
+	if (!m_pOwner)
+	{
+		return;
+	}
+
+	if (m_pOwner->m_unpublishedCandidate)
+	{
+		return;
+	}
+
 	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
 
 	AttachPendingComponents();
 
 	for (Component* component : m_componentPtrs)
 	{
-		if (component) component->OnAttach();
+		if (component)
+		{
+			component->OnAttach();
+		}
 	}
 }
 
 bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 {
-	if (!transform) return false;
+	if (!transform)
+	{
+		return false;
+	}
+
 	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
 
 	transform->SetOwner(this);
@@ -572,7 +698,11 @@ bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 	// Serch for pending transform component
 	for (auto& pending : m_pendingComponents)
 	{
-		if (pending.typeId != transformType && pending.typeId != rectTransformType) continue;
+		if (pending.typeId != transformType && pending.typeId != rectTransformType)
+		{
+			continue;
+		}
+
 		pending.instance = std::move(transform);
 		pending.typeId = newType;
 		return true;
@@ -582,7 +712,11 @@ bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 	for (const std::type_index typeId : { transformType, rectTransformType })
 	{
 		auto bucketIt = m_components.find(typeId);
-		if (bucketIt == m_components.end() || bucketIt->second.instances.empty()) continue;
+
+		if (bucketIt == m_components.end() || bucketIt->second.instances.empty())
+		{
+			continue;
+		}
 
 		// Get the first instance of the transform component (there should be only one)
 		auto& instances = bucketIt->second.instances;
@@ -600,7 +734,12 @@ bool Actor::ReplaceTransformComponent(std::unique_ptr<Transform> transform)
 		{// In case of the replacing to the same type
 			// Just replace the existing transform with the new one
 			instances.front() = std::move(transform);
-			if (pointerIt != m_componentPtrs.end()) *pointerIt = newTransformPtr;
+
+			if (pointerIt != m_componentPtrs.end())
+			{
+				*pointerIt = newTransformPtr;
+			}
+
 			newTransformPtr->OnAttach();
 
 			return true;

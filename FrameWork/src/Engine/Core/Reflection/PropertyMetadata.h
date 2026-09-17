@@ -57,27 +57,6 @@ enum class PropertyRequirement
 	Optional,	// Not necessary to be present in the serialized data,
 };
 
-enum class ReflectionErrorCode
-{
-	None,
-	InvalidObject,
-	InvalidMetadata,
-	SchemaMismatch,
-	MissingProperty,
-	InvalidPropertyValue,
-	PropertyReadFailed,
-	PropertyWriteFailed,
-	TypeInvariantViolation,
-	RollbackFailed,
-};
-
-struct ReflectionError
-{
-	ReflectionErrorCode code = ReflectionErrorCode::None;
-	std::optional<PropertyPath> path;
-	std::string message;
-};
-
 enum class NumericUnit
 {
 	None,
@@ -110,7 +89,7 @@ struct SerializationMetadata
 	std::optional<EnumSerializationFormat> enumFormat;
 };
 
-// Stores the runtime value of an enum property. 
+// Stores the runtime value of an enum property.
 // This is used to represent enum values in a type-erased way,
 struct EnumPropertyValue
 {
@@ -186,17 +165,23 @@ public:
 		return *this;
 	}
 
-	// Builds the EnumMetadata instance. 
+	// Builds the EnumMetadata instance.
 	// Returns std::nullopt if the metadata is invalid (e.g., empty or duplicate names and duplicate values).
 	std::optional<EnumMetadata> Build() const
 	{
-		if (m_entries.empty()) return std::nullopt;
+		if (m_entries.empty())
+		{
+			return std::nullopt;
+		}
 
 		for (std::size_t i = 0; i < m_entries.size(); ++i)
 		{
 			const EnumEntry& entry = m_entries[i];
 
-			if (entry.serializedName.empty()) return std::nullopt;	// No name is detected
+			if (entry.serializedName.empty())
+			{
+				return std::nullopt; // No name is detected
+			}
 
 			for (std::size_t j = 0; j < i; ++j)
 			{
@@ -231,7 +216,7 @@ public:
 	// around callbacks that use the concrete object and value types.
 	using ReadCallback = std::function<bool(const void*, PropertyValue&)>;	// Only way to read the property value from the object
 	using WriteCallback = std::function<bool(void*, const PropertyValue&)>;	// Only way to write the property value to the object
-	
+
 	using ValueValidator = std::function<bool(const PropertyValue&)>;
 
 	const std::string& GetSerializedName() const { return m_serializedName; }
@@ -252,16 +237,23 @@ public:
 	}
 	AssetType GetAssetType() const { return m_assetType; }
 
-	// Read and Write the property value from/to the given object with registered callbacks. 
+	// Read and Write the property value from/to the given object with registered callbacks.
 	// The object type and property value type must match the registered types in the metadata.
 	bool Read(std::type_index objectType, const void* object, PropertyValue& outValue) const;
 	bool ValidateValue(const PropertyValue& value) const;
 	bool Write(std::type_index objectType, void* object, const PropertyValue& value) const;
 
 private:
-	PropertyMetadata(std::string name, PropertyPath path, PropertyLogicalType logicalType,
-		std::type_index objectType, std::type_index valueType, AssetType assetType,
-		ValueValidator validator, ReadCallback read, WriteCallback write)
+	PropertyMetadata(
+		std::string name,
+		PropertyPath path,
+		PropertyLogicalType logicalType,
+		std::type_index objectType,
+		std::type_index valueType,
+		AssetType assetType,
+		ValueValidator validator,
+		ReadCallback read,
+		WriteCallback write)
 		: m_serializedName(std::move(name)), m_path(std::move(path)), m_logicalType(logicalType),
 		  m_objectType(objectType), m_valueType(valueType), m_assetType(assetType),
 		  m_valueValidator(std::move(validator)), m_read(std::move(read)), m_write(std::move(write))
@@ -296,7 +288,7 @@ private:
 class TypeMetadata
 {
 public:
-	using ValidationCallback = std::function<std::optional<ReflectionError>(
+	using ValidationCallback = std::function<bool(
 		std::type_index, const void*)>;
 
 	std::type_index GetType() const { return m_type; }
@@ -306,19 +298,16 @@ public:
 	const PropertyMetadata* FindPropertyByPath(const PropertyPath& path) const;
 	bool Validate(
 		std::type_index objectType,
-		const void* object,
-		ReflectionError* outError = nullptr) const;
+		const void* object) const;
 	bool TryWriteProperty(
 		std::type_index objectType,
 		void* object,
 		const PropertyMetadata& property,
-		const PropertyValue& value,
-		ReflectionError* outError = nullptr) const;
+		const PropertyValue& value) const;
 	bool CopySerializableState(
 		std::type_index objectType,
 		const void* source,
-		void* destination,
-		ReflectionError* outError = nullptr) const;
+		void* destination) const;
 
 private:
 	TypeMetadata(
@@ -355,22 +344,64 @@ namespace PropertyMetadataDetail
 	{
 		using T = CleanType<ValueType>;
 
-		// Explicit the unmatched types T at the time of compilation, 
+		// Explicit the unmatched types T at the time of compilation,
 		// so that avoid compile errors when the unmatched types are used in the code.
-		if constexpr (std::is_same_v<T, bool>) return PropertyLogicalType::Bool;
-		else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) return PropertyLogicalType::SignedInteger;
-		else if constexpr (std::is_integral_v<T> && std::is_unsigned_v<T>) return PropertyLogicalType::UnsignedInteger;
-		else if constexpr (std::is_same_v<T, float>) return PropertyLogicalType::Float;
-		else if constexpr (std::is_same_v<T, double>) return PropertyLogicalType::Double;
-		else if constexpr (std::is_same_v<T, std::string>) return PropertyLogicalType::String;
-		else if constexpr (std::is_same_v<T, Vector2>) return PropertyLogicalType::Vector2;
-		else if constexpr (std::is_same_v<T, Vector3>) return PropertyLogicalType::Vector3;
-		else if constexpr (std::is_same_v<T, Vector4>) return PropertyLogicalType::Vector4;
-		else if constexpr (std::is_same_v<T, Quaternion>) return PropertyLogicalType::Quaternion;
-		else if constexpr (std::is_enum_v<T>) return PropertyLogicalType::Enum;
-		else if constexpr (std::is_same_v<T, ActorReference>) return PropertyLogicalType::ActorReference;
-		else if constexpr (IsAssetReferenceV<T>) return PropertyLogicalType::AssetReference;
-		else return PropertyLogicalType::Invalid;
+		if constexpr (std::is_same_v<T, bool>)
+		{
+			return PropertyLogicalType::Bool;
+		}
+		else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
+		{
+			return PropertyLogicalType::SignedInteger;
+		}
+		else if constexpr (std::is_integral_v<T> && std::is_unsigned_v<T>)
+		{
+			return PropertyLogicalType::UnsignedInteger;
+		}
+		else if constexpr (std::is_same_v<T, float>)
+		{
+			return PropertyLogicalType::Float;
+		}
+		else if constexpr (std::is_same_v<T, double>)
+		{
+			return PropertyLogicalType::Double;
+		}
+		else if constexpr (std::is_same_v<T, std::string>)
+		{
+			return PropertyLogicalType::String;
+		}
+		else if constexpr (std::is_same_v<T, Vector2>)
+		{
+			return PropertyLogicalType::Vector2;
+		}
+		else if constexpr (std::is_same_v<T, Vector3>)
+		{
+			return PropertyLogicalType::Vector3;
+		}
+		else if constexpr (std::is_same_v<T, Vector4>)
+		{
+			return PropertyLogicalType::Vector4;
+		}
+		else if constexpr (std::is_same_v<T, Quaternion>)
+		{
+			return PropertyLogicalType::Quaternion;
+		}
+		else if constexpr (std::is_enum_v<T>)
+		{
+			return PropertyLogicalType::Enum;
+		}
+		else if constexpr (std::is_same_v<T, ActorReference>)
+		{
+			return PropertyLogicalType::ActorReference;
+		}
+		else if constexpr (IsAssetReferenceV<T>)
+		{
+			return PropertyLogicalType::AssetReference;
+		}
+		else
+		{
+			return PropertyLogicalType::Invalid;
+		}
 	}
 
 	// Receive a ValueType and deduce the AssetType for it.
@@ -379,11 +410,17 @@ namespace PropertyMetadataDetail
 	{
 		using T = CleanType<ValueType>;
 
-		if constexpr (IsAssetReferenceV<T>) return T::GetExpectedType();	// Avoid unsupported types T at the time of compilation
-		else return AssetType::Unknown;
+		if constexpr (IsAssetReferenceV<T>)
+		{
+			return T::GetExpectedType(); // Avoid unsupported types T at the time of compilation
+		}
+		else
+		{
+			return AssetType::Unknown;
+		}
 	}
-	
-	// Convert a concrete value (given by source) to a PropertyValue. 
+
+	// Convert a concrete value (given by source) to a PropertyValue.
 	template<class ValueType>
 	bool ToPropertyValue(const ValueType& source, PropertyValue& outValue)
 	{
@@ -430,8 +467,8 @@ namespace PropertyMetadataDetail
 			return false;
 		}
 	}
-	
-	// Convert a PropertyValue to a concrete value (given by outValue). 
+
+	// Convert a PropertyValue to a concrete value (given by outValue).
 	template<class ValueType>
 	bool FromPropertyValue(const PropertyValue& source, ValueType& outValue)
 	{
@@ -449,7 +486,12 @@ namespace PropertyMetadataDetail
 			std::is_same_v<T, ActorReference>)
 		{
 			const T* value = std::get_if<T>(&source); // Conversion from PropertyValue to T, if the type matches.
-			if (!value) return false;
+
+			if (!value)
+			{
+				return false;
+			}
+
 			outValue = *value;
 			return true;
 		}
@@ -470,6 +512,7 @@ namespace PropertyMetadataDetail
 			{
 				return false;
 			}
+
 			outValue = static_cast<T>(*value);
 			return true;
 		}
@@ -478,14 +521,23 @@ namespace PropertyMetadataDetail
 			const std::uint64_t* value = std::get_if<std::uint64_t>(&source);
 
 			// Check the null and valid range of the uint64_t value
-			if (!value || *value > static_cast<std::uint64_t>(std::numeric_limits<T>::max())) return false;
+			if (!value || *value > static_cast<std::uint64_t>(std::numeric_limits<T>::max()))
+			{
+				return false;
+			}
+
 			outValue = static_cast<T>(*value);
 			return true;
 		}
 		else if constexpr (std::is_enum_v<T>)
-		{// Enums from EnumPropertyValue (runtime int64_t representation)
+		{ // Enums from EnumPropertyValue (runtime int64_t representation)
 			const EnumPropertyValue* value = std::get_if<EnumPropertyValue>(&source);
-			if (!value) return false;
+
+			if (!value)
+			{
+				return false;
+			}
+
 			outValue = static_cast<T>(value->value);
 			return true;
 		}
@@ -506,51 +558,76 @@ public:
 
 	template<class Value> using ReadFunction = std::function<bool(const ObjectType&, Value&)>;
 	template<class Value> using WriteFunction = std::function<bool(ObjectType&, const Value&)>;
-	using Validator = std::function<std::optional<ReflectionError>(const ObjectType&)>;
+	using Validator = std::function<bool(const ObjectType&)>;
 
 	template<class Value>
 	class PropertyConfiguration
 	{
 	public:
-		PropertyConfiguration(TypeMetadataBuilder& owner, std::size_t index)
-			: m_owner(owner), m_index(index < owner.m_properties.size() ? index : std::numeric_limits<std::size_t>::max()) {}
+	  PropertyConfiguration(TypeMetadataBuilder& owner, std::size_t index)
+		  : m_owner(owner), m_index(index < owner.m_properties.size() ? index : std::numeric_limits<std::size_t>::max())
+	  {
+	  }
 
 		PropertyConfiguration& Validate(std::function<bool(const Value&)> validator)
 		{
 			if (auto* p = Get())
+			{
 				p->m_valueValidator = [validator = std::move(validator)](const PropertyValue& value)
 				{
 					Value converted{};
-					return validator && PropertyMetadataDetail::FromPropertyValue(value, converted) && validator(converted);
+					return validator && PropertyMetadataDetail::FromPropertyValue(value, converted) &&
+						   validator(converted);
 				};
+			}
+
 			return *this;
 		}
 		PropertyConfiguration& Serialization(std::optional<SerializationMetadata> facet)
 		{
-			if (auto* p = Get()) p->m_serialization = std::move(facet);
+			if (auto* p = Get())
+			{
+				p->m_serialization = std::move(facet);
+			}
+
 			return *this;
 		}
 		PropertyConfiguration& Inspector(std::optional<InspectorMetadata> facet)
 		{
-			if (auto* p = Get()) p->m_inspector = std::move(facet);
+			if (auto* p = Get())
+			{
+				p->m_inspector = std::move(facet);
+			}
+
 			return *this;
 		}
 		PropertyConfiguration& Optional()
 		{
 			if (auto* p = Get(); p && p->m_serialization)
+			{
 				p->m_serialization->requirement = PropertyRequirement::Optional;
+			}
+
 			return *this;
 		}
 		PropertyConfiguration& SerializedAs(EnumSerializationFormat format)
 		{
-			if (auto* p = Get(); p && p->m_serialization) p->m_serialization->enumFormat = format;
+			if (auto* p = Get(); p && p->m_serialization)
+			{
+				p->m_serialization->enumFormat = format;
+			}
+
 			return *this;
 		}
 		// Explicit enum metadata is useful for custom callback registrations and schema validation.
 		// Ordinary enum properties use EnumReflection<Value>::Get().
 		PropertyConfiguration& Enum(std::optional<EnumMetadata> metadata)
 		{
-			if (auto* p = Get()) p->m_enumMetadata = std::move(metadata);
+			if (auto* p = Get())
+			{
+				p->m_enumMetadata = std::move(metadata);
+			}
+
 			return *this;
 		}
 	private:
@@ -565,40 +642,92 @@ public:
 	template<class Value>
 	auto Property(std::string name, Value ObjectType::* member)
 	{
-		if (!member) return Accessor<Value>(std::move(name), {}, {});
+		if (!member)
+		{
+			return Accessor<Value>(std::move(name), {}, {});
+		}
+
 		return Accessor<Value>(std::move(name),
-			[member](const ObjectType& object, Value& value) { value = object.*member; return true; },
-			[member](ObjectType& object, const Value& value) { object.*member = value; return true; });
+			[member](const ObjectType& object, Value& value)
+		{
+			value = object.*member;
+			return true;
+		}, [member](ObjectType& object, const Value& value)
+		{
+			object.*member = value;
+			return true;
+		});
 	}
 
 	template<class Getter, class Setter>
 	auto Property(std::string name, Getter getter, Setter setter)
 	{
 		using Value = PropertyMetadataDetail::CleanType<std::invoke_result_t<Getter, const ObjectType&>>;
+
 		if constexpr (std::is_pointer_v<Getter> || std::is_member_pointer_v<Getter>)
-			if (!getter) return Accessor<Value>(std::move(name), {}, {});
-		if constexpr (std::is_pointer_v<Setter> || std::is_member_pointer_v<Setter>)
-			if (!setter) return Accessor<Value>(std::move(name), {}, {});
-		return Accessor<Value>(std::move(name),
-			[getter](const ObjectType& object, Value& value) { value = std::invoke(getter, object); return true; },
-			[setter](ObjectType& object, const Value& value)
+		{
+			if (!getter)
 			{
-				using Result = std::invoke_result_t<Setter, ObjectType&, const Value&>;
-				static_assert(std::is_same_v<Result, bool> || std::is_void_v<Result>, "A property setter returns bool or void.");
-				if constexpr (std::is_same_v<Result, bool>) return std::invoke(setter, object, value);
-				else { std::invoke(setter, object, value); return true; }
-			});
+				return Accessor<Value>(std::move(name), {}, {});
+			}
+		}
+
+		if constexpr (std::is_pointer_v<Setter> || std::is_member_pointer_v<Setter>)
+		{
+			if (!setter)
+			{
+				return Accessor<Value>(std::move(name), {}, {});
+			}
+		}
+
+		return Accessor<Value>(std::move(name),
+			[getter](const ObjectType& object, Value& value)
+		{
+			value = std::invoke(getter, object);
+			return true;
+		}, [setter](ObjectType& object, const Value& value)
+		{
+			using Result = std::invoke_result_t<Setter, ObjectType&, const Value&>;
+			static_assert(
+				std::is_same_v<Result, bool> || std::is_void_v<Result>, "A property setter returns bool or void.");
+
+			if constexpr (std::is_same_v<Result, bool>)
+			{
+				return std::invoke(setter, object, value);
+			}
+			else
+			{
+				std::invoke(setter, object, value);
+				return true;
+			}
+		});
 	}
 
 	// Select one field in a Component-owned aggregate without recursively reflecting the aggregate.
 	template<class Getter, class Setter, class Aggregate, class Value>
 	auto Property(std::string name, Getter getter, Setter setter, Value Aggregate::* member)
 	{
-		if (!member) return Accessor<Value>(std::move(name), {}, {});
+		if (!member)
+		{
+			return Accessor<Value>(std::move(name), {}, {});
+		}
+
 		if constexpr (std::is_pointer_v<Getter> || std::is_member_pointer_v<Getter>)
-			if (!getter) return Accessor<Value>(std::move(name), {}, {});
+		{
+			if (!getter)
+			{
+				return Accessor<Value>(std::move(name), {}, {});
+			}
+		}
+
 		if constexpr (std::is_pointer_v<Setter> || std::is_member_pointer_v<Setter>)
-			if (!setter) return Accessor<Value>(std::move(name), {}, {});
+		{
+			if (!setter)
+			{
+				return Accessor<Value>(std::move(name), {}, {});
+			}
+		}
+
 		return Property(std::move(name),
 			[getter, member](const ObjectType& object) { return std::invoke(getter, object).*member; },
 			[getter, setter, member](ObjectType& object, const Value& value)
@@ -633,30 +762,45 @@ public:
 	// Build the TypeMetadata instance.
 	std::optional<TypeMetadata> Build() const
 	{
-		if (m_stableTypeName.empty() || !m_registrationValid) return std::nullopt;
+		if (m_stableTypeName.empty() || !m_registrationValid)
+		{
+			return std::nullopt;
+		}
 
 		for (std::size_t i = 0; i < m_properties.size(); ++i)
 		{
 			const PropertyMetadata& property = m_properties[i];
-			if (!property.IsValid()) return std::nullopt;
+
+			if (!property.IsValid())
+			{
+				return std::nullopt;
+			}
 
 			for (std::size_t j = 0; j < i; ++j)
 			{
 				const PropertyPath& other = m_properties[j].GetPath();
+
 				if (other == property.GetPath() ||
 					IsAncestor(other, property.GetPath()) ||
-					IsAncestor(property.GetPath(), other)) return std::nullopt;
+					IsAncestor(property.GetPath(), other))
+				{
+					return std::nullopt;
+				}
 			}
 
 			for (const PropertyPath& objectPath : m_objectPaths)
 			{
-				if (objectPath == property.GetPath()) return std::nullopt;
+				if (objectPath == property.GetPath())
+				{
+					return std::nullopt;
+				}
 			}
 		}
 
 		for (const PropertyPath& objectPath : m_objectPaths)
 		{
 			bool hasLeaf = false;
+
 			for (const PropertyMetadata& property : m_properties)
 			{
 				if (IsAncestor(objectPath, property.GetPath()))
@@ -665,7 +809,11 @@ public:
 					break;
 				}
 			}
-			if (!hasLeaf) return std::nullopt;
+
+			if (!hasLeaf)
+			{
+				return std::nullopt;
+			}
 		}
 
 		return TypeMetadata(
@@ -673,18 +821,20 @@ public:
 			m_stableTypeName,
 			m_properties,
 			[m_validator = m_validator](std::type_index objectType, const void* object)
-				-> std::optional<ReflectionError>
+				-> bool
+		{
+			if (!m_validator)
 			{
-				if (!m_validator) return std::nullopt;
-				if (!object || objectType != std::type_index(typeid(ObjectType)))
-				{
-					return ReflectionError{
-						ReflectionErrorCode::InvalidObject,
-						std::nullopt,
-						"Object type does not match its reflection metadata." };
-				}
-				return m_validator(*static_cast<const ObjectType*>(object));
-			});
+				return true;
+			}
+
+			if (!object || objectType != std::type_index(typeid(ObjectType)))
+			{
+				return false;
+			}
+
+			return m_validator(*static_cast<const ObjectType*>(object));
+		});
 	}
 
 	class ObjectScope
@@ -724,8 +874,15 @@ public:
 		void Relocate(std::size_t index, std::string name)
 		{
 			const auto path = PropertyPath::FromMembers(ChildPath(std::move(name)));
-			if (!path) m_owner.m_registrationValid = false;
-			else if (index < m_owner.m_properties.size()) m_owner.m_properties[index].m_path = *path;
+
+			if (!path)
+			{
+				m_owner.m_registrationValid = false;
+			}
+			else if (index < m_owner.m_properties.size())
+			{
+				m_owner.m_properties[index].m_path = *path;
+			}
 		}
 		TypeMetadataBuilder& m_owner;
 		std::vector<std::string> m_path;
@@ -737,30 +894,50 @@ private:
 	void AddAccessorAtPath(std::vector<std::string> members, ReadFunction<Value> read, WriteFunction<Value> write)
 	{
 		const auto path = PropertyPath::FromMembers(members);
-		if (!path) { m_registrationValid = false; return; }
+
+		if (!path)
+		{
+			m_registrationValid = false;
+			return;
+		}
+
 		PropertyMetadata::ReadCallback erasedRead;
 		PropertyMetadata::WriteCallback erasedWrite;
+
 		if (read)
+		{
 			erasedRead = [read = std::move(read)](const void* object, PropertyValue& out)
 			{
 				Value value{};
-				return read(*static_cast<const ObjectType*>(object), value) && PropertyMetadataDetail::ToPropertyValue(value, out);
+				return read(*static_cast<const ObjectType*>(object), value) &&
+					   PropertyMetadataDetail::ToPropertyValue(value, out);
 			};
+		}
+
 		if (write)
+		{
 			erasedWrite = [write = std::move(write)](void* object, const PropertyValue& value)
 			{
 				Value converted{};
-				return PropertyMetadataDetail::FromPropertyValue(value, converted) && write(*static_cast<ObjectType*>(object), converted);
+				return PropertyMetadataDetail::FromPropertyValue(value, converted) &&
+					   write(*static_cast<ObjectType*>(object), converted);
 			};
+		}
+
 		PropertyMetadata property(members.back(), *path, PropertyMetadataDetail::DeducedLogicalType<Value>(),
 			typeid(ObjectType), typeid(Value), PropertyMetadataDetail::DeducedAssetType<Value>(),
-			[](const PropertyValue& value) { Value converted{}; return PropertyMetadataDetail::FromPropertyValue(value, converted); },
-			std::move(erasedRead), std::move(erasedWrite));
+			[](const PropertyValue& value)
+		{
+			Value converted{};
+			return PropertyMetadataDetail::FromPropertyValue(value, converted);
+		}, std::move(erasedRead), std::move(erasedWrite));
+
 		if constexpr (std::is_enum_v<Value>)
 		{
 			property.m_enumMetadata = EnumReflection<Value>::Get();
 			property.m_serialization->enumFormat = EnumSerializationFormat::Name;
 		}
+
 		m_properties.push_back(std::move(property));
 	}
 
@@ -768,11 +945,13 @@ private:
 	void AddObject(std::vector<std::string> pathMembers, Callback callback)
 	{
 		const auto path = PropertyPath::FromMembers(pathMembers);
+
 		if (!path)
 		{
 			m_registrationValid = false;
 			return;
 		}
+
 		for (const PropertyPath& existing : m_objectPaths)
 		{
 			if (existing == *path)

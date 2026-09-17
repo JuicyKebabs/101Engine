@@ -124,7 +124,6 @@ void EditorTheme::ApplyStyle()
 	colors[ImGuiCol_DockingEmptyBg] = Color(0.075f, 0.08f, 0.09f, 1.0f);
 	colors[ImGuiCol_TextSelectedBg] = Color(0.34f, 0.52f, 0.70f, 0.35f);
 
-
 	colors[ImGuiCol_DragDropTarget] = accentHovered;
 
 	colors[ImGuiCol_NavCursor] = accentHovered;

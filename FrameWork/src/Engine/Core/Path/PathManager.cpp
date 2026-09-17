@@ -27,12 +27,14 @@ bool PathManager::Initialize(const std::string& exepath)
 		}
 
 		// In case of reaching the root directory without finding project.101 file
-		fs::path parent = dir.parent_path();	// Get parent directory
+		fs::path parent = dir.parent_path(); // Get parent directory
+
 		if (parent == dir)
 		{
 			DBG("Error: project.101 not found.");
 			return false;
 		}
+
 		dir = parent;	// Move up to the parent directory
 	}
 }
@@ -44,6 +46,7 @@ std::string PathManager::Resolve(const std::string& relativePath)
 		DBG("Error: PathManager is not initialized.");
 		return relativePath;
 	}
+
 	return (fs::path(s_projectRoot) / relativePath).string();
 }
 
@@ -51,7 +54,11 @@ std::wstring PathManager::ResolveW(const std::string& relativePath)
 {
 	std::string resolved = Resolve(relativePath);
 
-	if (resolved.empty()) return std::wstring();
+	if (resolved.empty())
+	{
+		return std::wstring();
+	}
+
 	int len = MultiByteToWideChar(CP_ACP, 0, resolved.c_str(), (int)resolved.size(), nullptr, 0);
 	std::wstring result(len, 0);
 	MultiByteToWideChar(CP_ACP, 0, resolved.c_str(), (int)resolved.size(), result.data(), len);
@@ -65,6 +72,7 @@ std::string PathManager::GetProjectRoot()
 		DBG("Error: PathManager is not initialized.");
 		return "";
 	}
+
 	return s_projectRoot;
 }
 

@@ -35,6 +35,7 @@ IndexBuffer::IndexBuffer(ID3D12Device* pDevice, size_t size, const void* pInitDa
 		//CD3DX12_RANGE readRange(0, 0); //読み取り範囲(書き込みのみなので0サイズ)
 		//マッピング
 		result = m_buffer->Map(0, nullptr, &pMappedData);
+
 		if (FAILED(result))
 		{
 			m_IsValid = false;

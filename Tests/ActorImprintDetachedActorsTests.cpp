@@ -24,14 +24,17 @@ namespace
 		Check(definition != nullptr, "Pilot: immutable definition loads through ET-08");
 		if (!definition) return;
 		SceneBase destination;
-		ActorImprintDetail::DetachedActorsError error;
-		auto actors = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error);
+
+		auto actors = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr);
 		Check(actors && actors->size() == 1, "Pilot: definition creates the complete detached Actor candidate");
 		if (!actors) return;
 		const Actor& actor = *actors->front();
-		Check(actor.GetGuid().IsValid() && actor.GetOwner() == nullptr && actor.GetHandle().IsNull(),
+		Check(actor.GetGuid().IsValid() &&
+			actor.GetOwner() == nullptr &&
+			actor.GetHandle().IsNull(),
 			"Pilot: candidate gets a new GUID but no Scene ownership or Handle");
-		Check(actors->front()->GetComponentByClass<Transform>() && destination.GetAllActors().empty(),
+		Check(actors->front()->GetComponentByClass<Transform>() &&
+			destination.GetAllActors().empty(),
 			"Pilot: real Component exists without publishing anything to the destination");
 	}
 
@@ -103,31 +106,41 @@ namespace
 		Check(definition != nullptr, "Referenced multi-Component definition is valid");
 		if (!definition) return;
 		SceneBase destination;
-		ActorImprintDetail::DetachedActorsError error;
-		auto first = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error);
-		auto second = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error);
+
+		auto first = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr);
+		auto second = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr);
 		Check(first && second && first->size() == 2 && second->size() == 2, "Two complete detached candidate sets can coexist");
 		if (!first || !second) return;
-		Check((*first)[0]->GetGuid() != (*second)[0]->GetGuid() && (*first)[1]->GetGuid() != (*second)[1]->GetGuid(),
+		Check((*first)[0]->GetGuid() != (*second)[0]->GetGuid() &&
+			(*first)[1]->GetGuid() != (*second)[1]->GetGuid(),
 			"Each creation gets distinct Actor GUIDs");
 		auto* probe = static_cast<CandidateProbe*>((*first)[0]->GetComponentByExactType(typeid(CandidateProbe), 0));
 		auto* otherProbe = static_cast<CandidateProbe*>((*second)[0]->GetComponentByExactType(typeid(CandidateProbe), 0));
-		Check(probe && otherProbe && probe != otherProbe && probe->weight == 12.0f,
+		Check(probe &&
+			otherProbe &&
+			probe != otherProbe &&
+			probe->weight == 12.0f,
 			"Components use definition identity order and own separate state");
 		if (!probe || !otherProbe) return;
-		Check(probe->target.GetGuid() == (*first)[1]->GetGuid() && otherProbe->target.GetGuid() == (*second)[1]->GetGuid(),
+		Check(probe->target.GetGuid() == (*first)[1]->GetGuid() &&
+			otherProbe->target.GetGuid() == (*second)[1]->GetGuid(),
 			"Internal references translate into the corresponding candidate's forward Actor GUID");
 		probe->weight = 999.0f;
 		(*first)[0]->SetName("Changed candidate");
-		Check(otherProbe->weight == 12.0f && (*second)[0]->GetName() == "Root" &&
+		Check(otherProbe->weight == 12.0f &&
+			(*second)[0]->GetName() == "Root" &&
 			definition->GetActors()[0].components[1].properties["weight"] == 12.0,
 			"Candidate mutations affect neither another candidate nor immutable defaults");
 		ActorImprintReferenceCodec::ActorGuids saved;
 		for (const auto& record : definition->GetActors()) saved.emplace(record.id, GuidGenerator::Generate());
-		auto restored = ActorImprintDetail::CreateDetachedActors(*definition, destination, &saved, error);
-		Check(restored && (*restored)[0]->GetGuid() == saved.at(10) && (*restored)[1]->GetGuid() == saved.at(20),
+		auto restored = ActorImprintDetail::CreateDetachedActors(*definition, destination, &saved);
+		Check(restored &&
+			(*restored)[0]->GetGuid() == saved.at(10) &&
+			(*restored)[1]->GetGuid() == saved.at(20),
 			"Restore preserves every supplied Actor GUID");
-		Check(destination.GetAllActors().empty() && CandidateProbe::attached == 0 && (*first)[1]->GetParentHandle().IsNull(),
+		Check(destination.GetAllActors().empty() &&
+			CandidateProbe::attached == 0 &&
+			(*first)[1]->GetParentHandle().IsNull(),
 			"Candidate creation performs no Scene publication, hierarchy connection or attach");
 	}
 
@@ -148,33 +161,32 @@ namespace
 		invalid.push_back({ { 10, Guid{} }, { 20, valid.at(20) } });
 		invalid.push_back({ { 10, valid.at(10) }, { 20, valid.at(10) } });
 		invalid.push_back({ { 10, existingGuid }, { 20, valid.at(20) } });
-		ActorImprintDetail::DetachedActorsError error;
+
 		CandidateProbe::constructed = 0;
 		for (const auto& mapping : invalid)
 		{
-			Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, &mapping, error) && !error.message.empty(),
+			Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, &mapping),
 				"Missing/extra/component/zero/duplicate/conflicting GUID mappings fail");
 		}
 		Check(CandidateProbe::constructed == 0, "Invalid identity input is rejected before any Component factory executes");
 		CandidateProbe::rejectValue = true;
-		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error) &&
-			error.objectId == 12 && error.path == "/properties/weight", "Property failure identifies the Component LocalObjectID and path");
+		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr), "Invalid property rejects the complete candidate");
 		CandidateProbe::rejectValue = false;
 		CandidateProbe::rejectFactory = true;
-		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error) &&
-			error.objectId == 12 && error.path == "/type", "Factory failure returns no partial candidate");
+		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr), "Factory failure returns no partial candidate");
 		CandidateProbe::rejectFactory = false;
 		CandidateProbe::throwFactory = true;
-		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error) &&
-			error.objectId == 12 && error.message == "Injected factory failure", "Factory exception keeps diagnostic identity and discards the candidate");
+		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr), "Factory exception discards the candidate");
 		CandidateProbe::throwFactory = false;
 		ComponentRegistry::Get().UnregisterAllGameComponents();
-		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error) && error.objectId == 12,
+		Check(!ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr),
 			"Missing Component registration cannot be used through an old definition");
 		RegisterProbe();
 		Check(CandidateProbe::live == 0 && CandidateProbe::attached == 0, "Failed preparation destroys all candidates without attach");
-		Check(destination.GetAllActors() == initialActors && destination.ResolveActor(existingGuid) == existing &&
-			destination.ResolveActor(existingHandle) == existing && existing->GetParentHandle().IsNull(),
+		Check(destination.GetAllActors() == initialActors &&
+			destination.ResolveActor(existingGuid) == existing &&
+			destination.ResolveActor(existingHandle) == existing &&
+			existing->GetParentHandle().IsNull(),
 			"Every failure preserves existing Scene actors, GUID mapping, handles and hierarchy");
 		destination.Finalize();
 	}
@@ -200,9 +212,11 @@ namespace
 		Check(definition != nullptr, "Deep reversed input forms a valid definition");
 		if (!definition) return;
 		SceneBase destination;
-		ActorImprintDetail::DetachedActorsError error;
-		auto actors = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr, error);
-		Check(actors && actors->size() == count && destination.GetAllActors().empty(),
+
+		auto actors = ActorImprintDetail::CreateDetachedActors(*definition, destination, nullptr);
+		Check(actors &&
+			actors->size() == count &&
+			destination.GetAllActors().empty(),
 			"Deep definition creates detached candidates iteratively without a second runtime hierarchy");
 	}
 }

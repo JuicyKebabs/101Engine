@@ -11,7 +11,11 @@ std::vector<uint32_t> RendererComponent::BuildCanvasSortPath() const
 	std::vector<uint32_t> sortPath;
 
 	Canvas* canvas = GetGoverningCanvas();
-	if (!canvas) return sortPath; // No governing canvas, return empty path
+
+	if (!canvas)
+	{
+		return sortPath; // No governing canvas, return empty path
+	}
 
 	// Traverse up the actor hierarchy to collect sort orders from all ancestor canvases
 	for (Actor* current = canvas->GetOwner(); current != nullptr; current = current->GetParent())
@@ -35,7 +39,10 @@ std::vector<uint32_t> RendererComponent::BuildCanvasSortPath() const
 
 bool RendererComponent::IsVisible() const
 {
-	if (!m_isVisible) return false;
+	if (!m_isVisible)
+	{
+		return false;
+	}
 
 	// If the governing canvas is set, check its visibility in the hierarchy
 	return !m_pGoverningCanvas || m_pGoverningCanvas->IsHierarchyVisible();
@@ -61,10 +68,15 @@ RenderSpace RendererComponent::GetRenderSpace() const
 void RendererComponent::CheckIfTransformChanged()
 {
 	auto owner = GetOwner();
-	if (owner) {
+
+	if (owner)
+	{
 		auto transform = owner->GetComponentByClass<Transform>();
-		if (transform) {
+
+		if (transform)
+		{
 			uint64_t currentGeneration = transform->GetWorldGeneration();
+
 			if (m_transformGeneration != currentGeneration) {
 				m_transformGeneration = currentGeneration;
 				m_isProxyDirty = true;

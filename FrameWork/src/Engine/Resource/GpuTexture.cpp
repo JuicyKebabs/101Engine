@@ -1,15 +1,21 @@
 #include "Engine/Resource/GpuTexture.h"
 
-void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allocator, const GpuTexture::ParamDesc& desc)
+void GpuTexture::Initialize(
+	ID3D12Device* pDevice,
+	DescriptorHeapAllocator* allocator,
+	const GpuTexture::ParamDesc& desc)
 {
 	assert(pDevice);
 	assert(allocator);
 	assert(!m_isInitialized);
 	assert(desc.width > 0 && desc.height > 0);
-	assert(!(desc.useDSV && desc.useUAV) &&"GpuTexture: DSV and UAV cannot be used together");
-	assert(!(desc.initialState == ResourceState::RenderTarget && !desc.useRTV) && "GpuTexture: InitialState::RenderTarget requires useRTV=true");
-	assert(!(desc.initialState == ResourceState::DepthWrite && !desc.useDSV) && "GpuTexture: InitialState::DepthWrite requires useDSV=true");
-	assert(!(desc.initialState == ResourceState::UnorderedAccess && !desc.useUAV) && "GpuTexture: InitialState::UnorderedAccess requires useUAV=true");
+	assert(!(desc.useDSV && desc.useUAV) && "GpuTexture: DSV and UAV cannot be used together");
+	assert(!(desc.initialState == ResourceState::RenderTarget && !desc.useRTV) &&
+		   "GpuTexture: InitialState::RenderTarget requires useRTV=true");
+	assert(!(desc.initialState == ResourceState::DepthWrite && !desc.useDSV) &&
+		   "GpuTexture: InitialState::DepthWrite requires useDSV=true");
+	assert(!(desc.initialState == ResourceState::UnorderedAccess && !desc.useUAV) &&
+		   "GpuTexture: InitialState::UnorderedAccess requires useUAV=true");
 
 	// Create the GPU resource based on the provided description
 	ComPtr<ID3D12Resource> newResource;
@@ -23,7 +29,10 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 
 	assert(created);
 
-	if (!created) return;
+	if (!created)
+	{
+		return;
+	}
 
 	// Apply the description to the GpuTexture instance
 	m_desc = desc;
@@ -43,7 +52,11 @@ void GpuTexture::Initialize(ID3D12Device* pDevice, DescriptorHeapAllocator* allo
 
 void GpuTexture::TransitionToState(ID3D12GraphicsCommandList* cmdList, ResourceState newState)
 {
-	if (m_currentState == newState) return;
+	if (m_currentState == newState)
+	{
+		return;
+	}
+
 	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			m_pResource.Get(),						// Current render target resource
 			ConvertToD3D12State(m_currentState),	// Current resource state
@@ -74,7 +87,10 @@ bool GpuTexture::CreateResource(
 	ComPtr<ID3D12Resource>& outResource,
 	ColorFormat& outColorFormat) const
 {
-	if (!device || desc.width == 0 || desc.height == 0) return false;
+	if (!device || desc.width == 0 || desc.height == 0)
+	{
+		return false;
+	}
 
 	//------------------------------
 	// 1. Resource Format Selection
@@ -117,7 +133,10 @@ bool GpuTexture::CreateResource(
 	}
 
 	// DXGIFormat was not set correctly, return false
-	if (resourceFormat == DXGI_FORMAT_UNKNOWN) return false;
+	if (resourceFormat == DXGI_FORMAT_UNKNOWN)
+	{
+		return false;
+	}
 
 	//------------------------------
 	// 2. Resource State Conversion
@@ -158,13 +177,22 @@ bool GpuTexture::CreateResource(
 		);
 
 	// Allow render target usage
-	if (desc.useRTV) resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	if (desc.useRTV)
+	{
+		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	}
 
 	// Allow depth stencil usage
-	if (desc.useDSV) resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	if (desc.useDSV)
+	{
+		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	}
 
 	// Allow unordered access usage
-	if (desc.useUAV) resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	if (desc.useUAV)
+	{
+		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	}
 
 	//------------------------
 	// 4. Create the Resource
@@ -182,7 +210,10 @@ bool GpuTexture::CreateResource(
 			IID_PPV_ARGS(newResource.GetAddressOf())
 		);
 
-	if (FAILED(result)) return false;
+	if (FAILED(result))
+	{
+		return false;
+	}
 
 	outResource = std::move(newResource);
 	return true;

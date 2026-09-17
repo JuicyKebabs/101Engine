@@ -31,11 +31,12 @@ public:
 	static constexpr UINT BufferCount = 2; // Number of frame buffers for double buffering
 
 	bool Initialize(
-		ID3D12Device* pDevice, 
-		ID3D12CommandQueue* pCommandQueue, 
+		ID3D12Device* pDevice,
+		ID3D12CommandQueue* pCommandQueue,
 		DescriptorHeapAllocator* pDescriptorHeapAllocator,
-		HWND hwnd, 
-		UINT width, UINT height
+		HWND hwnd,
+		UINT width,
+		UINT height
 	);
 
 	// Present the swap chain to display the rendered image

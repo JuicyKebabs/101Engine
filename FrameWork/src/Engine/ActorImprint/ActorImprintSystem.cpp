@@ -1,57 +1,69 @@
 #include "ActorImprintSystem.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Resource/AssetManager.h"
 #include "Engine/Resource/AssetManagerAssetReferenceContext.h"
 
-ActorImprintHandle ActorImprintSystem::Load(const Guid& assetGuid, ActorImprintLoadError* outError)
+ActorImprintHandle ActorImprintSystem::Load(const Guid& assetGuid)
 {
-	if (outError) *outError = {};
+	// Find the handle for the assetGuid if it is already loaded
+	// to avoid reloading the same asset multiple times.
 	const auto existing = FindHandle(assetGuid);
+
 	// A reload Scene candidate may use every definition already retained by the
 	// supplied live Scenes, including another Asset currently marked Missing.
-	if (m_buildingReloadCandidate && !existing.IsNull() && Resolve(existing)) return existing;
+	if (m_buildingReloadCandidate && !existing.IsNull() && Resolve(existing))
+	{
+		return existing;
+	}
+
 	if (m_materializing || m_reloading)
 	{
-		if (outError) *outError = { ActorImprintLoadErrorCode::TransactionInProgress, {}, {},
-			"ActorImprint load is unavailable during a materialization or reload transaction." };
+		DBG("ActorImprint load is unavailable during a materialization or reload transaction.");
 		return {};
 	}
+
 	if (!existing.IsNull() && IsMissing(existing))
 	{
-		if (outError) *outError = { ActorImprintLoadErrorCode::Missing, {}, {},
-			"ActorImprint asset is missing or awaiting a validated same-GUID restore." };
+		DBG("ActorImprint asset is missing or awaiting a validated same-GUID restore.");
 		return {};
 	}
+
 	AssetManagerAssetReferenceContext context(m_assets);
 	const auto validation = context.Validate(assetGuid, AssetType::ActorImprint);
-	if (validation != AssetReferenceCodecResult::Success)
+
+	if (!validation)
 	{
-		if (outError) *outError = { ActorImprintLoadErrorCode::InvalidReference, validation, {},
-			"ActorImprint asset reference did not resolve in the catalog." };
+		DBG("ActorImprint asset reference did not resolve in the catalog.");
 		return {};
 	}
+
 	if (!existing.IsNull())
 	{
 		return existing;
 	}
 
-	ActorImprintAssetError error;
-	auto candidate = ActorImprintAssetDeserializer::Load(m_assets.GetAssetPath(assetGuid), &context, &error);
+	auto candidate = ActorImprintAssetDeserializer::Load(m_assets.GetAssetPath(assetGuid), &context);
+
 	if (!candidate)
 	{
-		if (outError) *outError = { ActorImprintLoadErrorCode::InvalidAsset, validation, std::move(error),
-			"ActorImprint candidate load failed; the pool was not changed." };
-		return {};
-	}
-	if (m_freeIndices.empty() && m_slots.size() >= UINT32_MAX)
-	{
-		if (outError) *outError = { ActorImprintLoadErrorCode::PoolExhausted, validation, {}, "ActorImprint slot capacity exhausted." };
+		DBG("ActorImprint candidate load failed; the pool was not changed.");
 		return {};
 	}
 
-	// All parsing/validation finishes before publishing either the Slot or map.
+	if (m_freeIndices.empty() && m_slots.size() >= UINT32_MAX)
+	{
+		DBG("ActorImprint slot capacity exhausted.");
+		return {};
+	}
+
 	const bool reuse = !m_freeIndices.empty();
 	const auto index = reuse ? m_freeIndices.back() : static_cast<std::uint32_t>(m_slots.size());
-	if (!reuse) m_slots.emplace_back();
+
+	if (!reuse)
+	{
+		m_slots.emplace_back();
+	}
+
 	Slot& slot = m_slots[index];
 	const ActorImprintHandle handle{ index, slot.generation };
 	try
@@ -60,13 +72,23 @@ ActorImprintHandle ActorImprintSystem::Load(const Guid& assetGuid, ActorImprintL
 	}
 	catch (...)
 	{
-		if (!reuse) m_slots.pop_back();
+		if (!reuse)
+		{
+			m_slots.pop_back();
+		}
+
 		throw;
 	}
-	if (reuse) m_freeIndices.pop_back();
+
+	if (reuse)
+	{
+		m_freeIndices.pop_back();
+	}
+
 	slot.assetGuid = assetGuid;
 	slot.definition = std::move(candidate);
 	slot.missing = false;
+
 	return handle;
 }
 
@@ -78,17 +100,33 @@ ActorImprintHandle ActorImprintSystem::FindHandle(const Guid& assetGuid) const
 
 const ActorImprint* ActorImprintSystem::Resolve(ActorImprintHandle handle) const
 {
-	if (handle.index >= m_slots.size()) return nullptr;
+	if (handle.index >= m_slots.size())
+	{
+		return nullptr;
+	}
+
 	const Slot& slot = m_slots[handle.index];
-	if (slot.generation != handle.generation || !slot.definition) return nullptr;
+
+	if (slot.generation != handle.generation || !slot.definition)
+	{
+		return nullptr;
+	}
+
 	return slot.definition.get();
 }
 
 const ActorImprint* ActorImprintSystem::ResolveForSceneCandidate(ActorImprintHandle handle) const
 {
-	if (!Resolve(handle)) return nullptr;
+	if (!Resolve(handle))
+	{
+		return nullptr;
+	}
+
 	if (m_buildingReloadCandidate && handle == m_reloadHandle && m_reloadDefinition)
+	{
 		return m_reloadDefinition;
+	}
+
 	return m_slots[handle.index].definition.get();
 }
 
@@ -99,13 +137,26 @@ Guid ActorImprintSystem::GetAssetGuid(ActorImprintHandle handle) const
 
 ActorImprintAvailability ActorImprintSystem::GetAvailability(ActorImprintHandle handle) const
 {
-	if (handle.index >= m_slots.size()) return ActorImprintAvailability::Invalid;
-	const Slot& slot = m_slots[handle.index];
-	if (slot.generation != handle.generation || !slot.definition)
+	if (handle.index >= m_slots.size())
+	{
 		return ActorImprintAvailability::Invalid;
+	}
+
+	const Slot& slot = m_slots[handle.index];
+
+	if (slot.generation != handle.generation || !slot.definition)
+	{
+		return ActorImprintAvailability::Invalid;
+	}
+
 	const AssetEntry* entry = m_assets.GetAssetEntry(slot.assetGuid);
-	return slot.missing || !entry || entry->type != AssetType::ActorImprint
-		? ActorImprintAvailability::Missing : ActorImprintAvailability::Available;
+
+	if (slot.missing || !entry || entry->type != AssetType::ActorImprint)
+	{
+		return ActorImprintAvailability::Missing;
+	}
+
+	return ActorImprintAvailability::Available;
 }
 
 std::size_t ActorImprintSystem::GetLiveInstanceCount(const Guid& assetGuid) const
@@ -116,31 +167,63 @@ std::size_t ActorImprintSystem::GetLiveInstanceCount(const Guid& assetGuid) cons
 
 bool ActorImprintSystem::Unload(ActorImprintHandle handle)
 {
-	if (m_materializing || m_reloading || !Resolve(handle) || m_slots[handle.index].instances != 0) return false;
+	if (m_materializing || m_reloading || !Resolve(handle) || m_slots[handle.index].instances != 0)
+	{
+		return false;
+	}
+
 	Slot& slot = m_slots[handle.index];
 	// Retire exhausted generations permanently rather than aliasing a stale handle.
-	if (slot.generation != UINT32_MAX) m_freeIndices.push_back(handle.index);
+	if (slot.generation != UINT32_MAX)
+	{
+		m_freeIndices.push_back(handle.index);
+	}
+
 	m_handles.erase(slot.assetGuid);
 	slot.definition.reset();
 	slot.assetGuid = {};
 	slot.missing = false;
-	if (slot.generation != UINT32_MAX) ++slot.generation;
+
+	if (slot.generation != UINT32_MAX)
+	{
+		++slot.generation;
+	}
+
 	return true;
 }
 
 bool ActorImprintSystem::Clear()
 {
-	if (m_materializing || m_reloading) return false;
-	for (const auto& slot : m_slots) if (slot.instances != 0) return false;
+	if (m_materializing || m_reloading)
+	{
+		return false;
+	}
+
+	for (const auto& slot : m_slots)
+	{
+		if (slot.instances != 0)
+		{
+			return false;
+		}
+	}
+
 	for (std::size_t i = 0; i < m_slots.size(); ++i)
 	{
-		if (m_slots[i].definition) Unload({ static_cast<std::uint32_t>(i), m_slots[i].generation });
+		if (m_slots[i].definition)
+		{
+			Unload({ static_cast<std::uint32_t>(i), m_slots[i].generation });
+		}
 	}
+
 	return true;
 }
 
 void ActorImprintSystem::ReleaseInstance(ActorImprintHandle handle)
 {
-	if (!Resolve(handle) || m_slots[handle.index].instances == 0) std::terminate();
-	--m_slots[handle.index].instances;
+	if (!Resolve(handle) || m_slots[handle.index].instances == 0)
+	{
+		std::terminate();
+	}
+
+	m_slots[handle.index].instances--;
 }

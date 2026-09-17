@@ -11,7 +11,11 @@
 Vector2 Canvas::GetLayoutReferenceSize() const
 {
 	Actor* owner = GetOwner();
-	if (!owner) return m_referenceSize;
+
+	if (!owner)
+	{
+		return m_referenceSize;
+	}
 
 	// World-Space Canvas always uses its authored logical size.
 	if (m_effectiveRenderMode == CanvasRenderMode::WorldSpace)
@@ -50,7 +54,11 @@ Vector2 Canvas::GetLayoutReferenceSize() const
 bool Canvas::IsRootCanvas() const
 {
 	Actor* owner = GetOwner();
-	if (!owner) return false;
+
+	if (!owner)
+	{
+		return false;
+	}
 
 	// Traverse the hierarchy of parent actors to check if any ancestor has a Canvas component
 	for (Actor* ancestor = owner->GetParent(); ancestor; ancestor = ancestor->GetParent())
@@ -70,7 +78,11 @@ bool Canvas::IsHierarchyVisible() const
 	for (Actor* actor = GetOwner(); actor; actor = actor->GetParent())
 	{
 		Canvas* canvas = actor->GetComponentByClass<Canvas>();
-		if (canvas && !canvas->IsVisible()) return false;
+
+		if (canvas && !canvas->IsVisible())
+		{
+			return false;
+		}
 	}
 
 	return true;
@@ -79,7 +91,11 @@ bool Canvas::IsHierarchyVisible() const
 Matrix4x4 Canvas::GetContentWorldMatrix() const
 {
 	Actor* owner = GetOwner();
-	if (!owner) return Matrix4x4::Identity();
+
+	if (!owner)
+	{
+		return Matrix4x4::Identity();
+	}
 
 	Transform* transform = owner->GetComponentByClass<Transform>();
 
@@ -90,16 +106,25 @@ Matrix4x4 Canvas::GetContentWorldMatrix() const
 
 bool Canvas::ContainsCanvas(const Canvas* canvas) const
 {
-	if (!canvas) return false;
+	if (!canvas)
+	{
+		return false;
+	}
 
 	Actor* rootActor = GetOwner();
 	Actor* current = canvas->GetOwner();
 
-	if (!rootActor || !current) return false;
+	if (!rootActor || !current)
+	{
+		return false;
+	}
 
 	for (; current; current = current->GetParent())
 	{
-		if (current == rootActor) return true;
+		if (current == rootActor)
+		{
+			return true;
+		}
 	}
 
 	return false;
@@ -112,18 +137,33 @@ bool Canvas::ContainsRenderer(const RendererComponent* renderer) const
 
 float Canvas::GetScaleFactor() const
 {
-	if (m_effectiveRenderMode != CanvasRenderMode::ScreenSpace) return 1.0f;
-	if (m_scaleMode == CanvasScaleMode::ConstantPixelSize) return 1.0f;
+	if (m_effectiveRenderMode != CanvasRenderMode::ScreenSpace)
+	{
+		return 1.0f;
+	}
+
+	if (m_scaleMode == CanvasScaleMode::ConstantPixelSize)
+	{
+		return 1.0f;
+	}
 
 	Actor* owner = GetOwner();
-	if (!owner) return 1.0f;
+
+	if (!owner)
+	{
+		return 1.0f;
+	}
 
 	Vector2 displaySize = Vector2::One();
 
 	if (IsRootCanvas())
 	{
 		SceneBase* scene = owner->GetOwner();
-		if (!scene) return 1.0f;
+
+		if (!scene)
+		{
+			return 1.0f;
+		}
 
 		displaySize = scene->GetViewportSize();
 	}
@@ -132,7 +172,10 @@ float Canvas::GetScaleFactor() const
 		RectTransform* rectTransform =
 			owner->GetComponentByClass<RectTransform>();
 
-		if (!rectTransform) return 1.0f;
+		if (!rectTransform)
+		{
+			return 1.0f;
+		}
 
 		displaySize = rectTransform->GetSize();
 	}

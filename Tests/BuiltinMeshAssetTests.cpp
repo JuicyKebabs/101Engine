@@ -77,12 +77,13 @@ namespace
 				byGuid->type == AssetType::Mesh && byGuid->relativePath == builtin.path &&
 				assets.GetAssetPath(builtin.guid).empty() &&
 				referenceContext.Validate(builtin.guid, AssetType::Mesh) ==
-					AssetReferenceCodecResult::Success;
+					true;
 		}
 		Check(catalogValid, "Built-in meshes use the normal catalog and asset-reference lookup paths");
 
 		const auto initialChanges = assets.TakePendingChanges();
-		Check(initialChanges.size() == 1 && initialChanges.front().relativePath == "project.obj",
+		Check(initialChanges.size() == 1 &&
+			initialChanges.front().relativePath == "project.obj",
 			"Built-in meshes do not emit file change notifications");
 		Check(assets.Refresh() && assets.TakePendingChanges().empty(),
 			"Unchanged refresh does not emit built-in mesh changes");
@@ -123,4 +124,3 @@ int main()
 	TestBuiltinGuidCollision();
 	return g_failures ? 1 : 0;
 }
-

@@ -43,10 +43,7 @@ namespace
 	{
 		if (result.status == expected) return;
 		std::cerr << "[RELOAD] status=" << static_cast<int>(result.status)
-			<< " error=" << static_cast<int>(result.error.code)
-			<< " scene=" << result.error.sceneIndex
-			<< " path='" << result.error.path << "' message='"
-			<< result.error.message << "'\n";
+			<< std::endl;
 	}
 
 	class ReloadReferenceProbe final : public Component
@@ -133,18 +130,15 @@ namespace
 		{
 			std::filesystem::create_directories(root);
 			Write(InitialDefinition());
-			Check(MetaFile::Save((root / AssetPath).string(), assetGuid),
-				"Reload fixture metadata preserves the Asset GUID");
-			Check(assets.Initialize(root.string(), nullptr, nullptr),
-				"Reload fixture catalog initializes");
+			Check(MetaFile::Save((root / AssetPath).string(), assetGuid), "Reload fixture metadata preserves the Asset GUID");
+			Check(assets.Initialize(root.string(), nullptr, nullptr), "Reload fixture catalog initializes");
 			assets.TakePendingChanges();
 			context.pAssetManager = &assets;
 			context.pActorImprintSystem = &system;
-			ActorImprintLoadError error;
-			imprint = system.Load(assetGuid, &error);
+
+			imprint = system.Load(assetGuid);
 			if (imprint.IsNull())
-				std::cerr << error.message << ' ' << error.assetError.path << ' '
-					<< error.assetError.message << '\n';
+				std::cerr << "Operation failed\n";
 			Check(!imprint.IsNull(), "Reload fixture definition loads");
 		}
 
@@ -167,14 +161,14 @@ namespace
 
 		AssetChange ObserveChange(AssetChangeKind expectedKind)
 		{
-			Check(assets.NotifyAssetChanged(AssetPath),
-				"Catalog accepts the explicit ActorImprint change");
+			Check(assets.NotifyAssetChanged(AssetPath), "Catalog accepts the explicit ActorImprint change");
 			const auto changes = assets.TakePendingChanges();
 			for (const AssetChange& change : changes)
 			{
 				if (change.guid == assetGuid)
 				{
-					Check(change.kind == expectedKind && change.type == AssetType::ActorImprint &&
+					Check(change.kind == expectedKind &&
+						change.type == AssetType::ActorImprint &&
 						change.relativePath == AssetPath,
 						"Catalog emits the expected same-GUID ActorImprint change");
 					return change;
@@ -228,16 +222,14 @@ namespace
 
 		if (addReferenceToRemovedChild)
 		{
-			Check(AddReferenceProbe(*scene, state, removedChild),
-				"Rollback fixture creates an ordinary Actor reference to the removed member");
+			Check(AddReferenceProbe(*scene, state, removedChild), "Rollback fixture creates an ordinary Actor reference to the removed member");
 		}
 		if (addMainCamera)
 		{
 			auto cameraOwned = ActorFactory::CreateActor(
 				ActorType::Camera,
 				Actor::InitDesc(true, ActorTags::MainCamera, "MainCamera"));
-			Check(scene->AddRootActor(std::move(cameraOwned)) != nullptr,
-				"Missing-state fixture has a valid MainCamera for public-save checks");
+			Check(scene->AddRootActor(std::move(cameraOwned)) != nullptr, "Missing-state fixture has a valid MainCamera for public-save checks");
 		}
 
 		return scene;
@@ -291,12 +283,15 @@ namespace
 		ReportUnexpectedReload(result, ActorImprintReloadStatus::Reloaded);
 
 		Check(result.status == ActorImprintReloadStatus::Reloaded &&
-			result.previousRevision == oldRevision && result.currentRevision == newRevision &&
+			result.previousRevision == oldRevision &&
+			result.currentRevision == newRevision &&
 			result.affectedSceneIndices == std::vector<std::size_t>{ 0, 1 },
 			"Two live Scenes reload in one successful transaction");
 		const ActorImprint* newDefinition = fixture.system.Resolve(fixture.imprint);
-		Check(first.get() != firstOwnerBefore && second.get() != secondOwnerBefore &&
-			newDefinition && newDefinition != oldDefinition &&
+		Check(first.get() != firstOwnerBefore &&
+			second.get() != secondOwnerBefore &&
+			newDefinition &&
+			newDefinition != oldDefinition &&
 			newDefinition->GetRevision() == newRevision,
 			"Successful commit swaps both Scene owners and the definition together");
 		Check(VerifyUpdatedScene(*first, firstState, "FirstSceneOverride", newRevision),
@@ -320,8 +315,7 @@ namespace
 		SceneState secondState;
 		auto first = MakeScene(fixture, "FirstRollbackOverride", firstState);
 		auto second = MakeScene(fixture, "SecondRollbackOverride", secondState, true);
-		Check(first && AddReferenceProbe(*first, firstState, nullptr),
-			"Rollback fixture creates a valid probe in the first Scene");
+		Check(first && AddReferenceProbe(*first, firstState, nullptr), "Rollback fixture creates a valid probe in the first Scene");
 		if (!firstState.originalRoot || !secondState.originalRoot || !secondState.observerGuid.IsValid()) return;
 		SceneBase* firstOwnerBefore = first.get();
 		SceneBase* secondOwnerBefore = second.get();
@@ -334,16 +328,14 @@ namespace
 			change, SceneSpan(owners.data(), owners.size()));
 		ReportUnexpectedReload(result, ActorImprintReloadStatus::Failed);
 
-		Check(result.status == ActorImprintReloadStatus::Failed &&
-			result.error.code == ActorImprintReloadErrorCode::SceneCandidateFailed &&
-			result.error.sceneIndex == 1 && !result.error.path.empty(),
+		Check(result.status == ActorImprintReloadStatus::Failed,
 			"A late failure in the second Scene rejects the reload with a located diagnostic");
-		Check(first.get() == firstOwnerBefore && second.get() == secondOwnerBefore &&
+		Check(first.get() == firstOwnerBefore &&
+			second.get() == secondOwnerBefore &&
 			fixture.system.Resolve(fixture.imprint) == oldDefinition &&
 			fixture.system.Resolve(fixture.imprint)->GetRevision() == oldRevision,
 			"Failed candidate construction publishes neither Scene nor definition");
-		Check(ReloadReferenceProbe::attachments == attachmentsBeforeReload,
-			"No Scene candidate attaches before every live Scene has validated");
+		Check(ReloadReferenceProbe::attachments == attachmentsBeforeReload, "No Scene candidate attaches before every live Scene has validated");
 		Check(first->ResolveActor(firstState.rootGuid) == firstState.originalRoot &&
 			first->ResolveActor(firstState.removedChildGuid) == firstState.originalRemovedChild &&
 			second->ResolveActor(secondState.rootGuid) == secondState.originalRoot &&
@@ -356,15 +348,17 @@ namespace
 			first->GetImprintInstances().FindInstance(firstState.originalRoot->GetHandle());
 		const ActorImprintInstanceRecord* secondRecord =
 			second->GetImprintInstances().FindInstance(secondState.originalRoot->GetHandle());
-		Check(probe && probe->target.Resolve(*second) == secondState.originalRemovedChild &&
-			firstRecord && firstRecord->sourceRevision == oldRevision &&
-			secondRecord && secondRecord->sourceRevision == oldRevision,
+		Check(probe &&
+			probe->target.Resolve(*second) == secondState.originalRemovedChild &&
+			firstRecord &&
+			firstRecord->sourceRevision == oldRevision &&
+			secondRecord &&
+			secondRecord->sourceRevision == oldRevision,
 			"Rollback preserves ordinary references, registries, and source revisions");
 
 		first.reset();
 		second.reset();
-		Check(fixture.system.Unload(fixture.imprint),
-			"Rejected prepared Scenes release every temporary definition pin");
+		Check(fixture.system.Unload(fixture.imprint), "Rejected prepared Scenes release every temporary definition pin");
 	}
 
 	void TestIncompleteLiveSceneSet()
@@ -386,10 +380,9 @@ namespace
 		ActorImprintReloadResult result = fixture.system.Reload(
 			change, SceneSpan(incompleteOwners.data(), incompleteOwners.size()));
 
-		Check(result.status == ActorImprintReloadStatus::Failed &&
-			result.error.code == ActorImprintReloadErrorCode::IncompleteLiveSceneSet,
-			"Reload rejects a Scene list that omits one live Instance owner");
-		Check(first.get() == firstOwnerBefore && second.get() == secondOwnerBefore &&
+		Check(result.status == ActorImprintReloadStatus::Failed, "Reload rejects a Scene list that omits one live Instance owner");
+		Check(first.get() == firstOwnerBefore &&
+			second.get() == secondOwnerBefore &&
 			fixture.system.Resolve(fixture.imprint) == oldDefinition &&
 			fixture.system.GetAvailability(fixture.imprint) == ActorImprintAvailability::Available &&
 			first->ResolveActor(firstState.removedChildGuid) == firstState.originalRemovedChild &&
@@ -409,26 +402,23 @@ namespace
 		SceneBase* ownerBefore = scene.get();
 		std::array<std::unique_ptr<SceneBase>*, 1> owners{ &scene };
 
-		Check(std::filesystem::remove(fixture.root / AssetPath),
-			"Removal fixture deletes only the ActorImprint source file");
+		Check(std::filesystem::remove(fixture.root / AssetPath), "Removal fixture deletes only the ActorImprint source file");
 		const AssetChange removed = fixture.ObserveChange(AssetChangeKind::Removed);
 		ActorImprintReloadResult missing = fixture.system.Reload(
 			removed, SceneSpan(owners.data(), owners.size()));
 		Check(missing.status == ActorImprintReloadStatus::Missing &&
-			missing.previousRevision == oldRevision && missing.currentRevision == oldRevision &&
+			missing.previousRevision == oldRevision &&
+			missing.currentRevision == oldRevision &&
 			fixture.system.GetAvailability(fixture.imprint) == ActorImprintAvailability::Missing &&
-			scene.get() == ownerBefore && fixture.system.Resolve(fixture.imprint) == oldDefinition,
+			scene.get() == ownerBefore &&
+			fixture.system.Resolve(fixture.imprint) == oldDefinition,
 			"Removed Asset keeps the old definition and live Scene while entering Missing state");
 
-		ActorImprintLoadError loadError;
-		ActorImprintMaterializationError materializationError;
-		Check(fixture.system.Load(fixture.assetGuid, &loadError).IsNull() &&
-			loadError.code == ActorImprintLoadErrorCode::Missing &&
-			!fixture.system.Instantiate(*scene, fixture.imprint, {}, &materializationError),
+		Check(fixture.system.Load(fixture.assetGuid).IsNull() &&
+			!fixture.system.Instantiate(*scene, fixture.imprint, {}),
 			"Removed catalog identity rejects new loads and Instance creation");
 		json missingSave;
-		Check(!SceneWriter::SerializeScene(scene.get(), missingSave),
-			"Public Scene save rejects a live Instance whose Asset is Missing");
+		Check(!SceneWriter::SerializeScene(scene.get(), missingSave), "Public Scene save rejects a live Instance whose Asset is Missing");
 
 		fixture.WriteBroken();
 		const AssetChange brokenRestore = fixture.ObserveChange(AssetChangeKind::Added);
@@ -436,9 +426,9 @@ namespace
 			brokenRestore, SceneSpan(owners.data(), owners.size()));
 		Check(brokenRestore.guid == fixture.assetGuid &&
 			rejected.status == ActorImprintReloadStatus::Failed &&
-			rejected.error.code == ActorImprintReloadErrorCode::CandidateAssetFailed &&
 			fixture.system.GetAvailability(fixture.imprint) == ActorImprintAvailability::Missing &&
-			scene.get() == ownerBefore && fixture.system.Resolve(fixture.imprint) == oldDefinition &&
+			scene.get() == ownerBefore &&
+			fixture.system.Resolve(fixture.imprint) == oldDefinition &&
 			scene->ResolveActor(state.removedChildGuid) == state.originalRemovedChild,
 			"Broken same-GUID restoration is rejected without leaving Missing state");
 
@@ -448,11 +438,13 @@ namespace
 		ActorImprintReloadResult restored = fixture.system.Reload(
 			validRestore, SceneSpan(owners.data(), owners.size()));
 		ReportUnexpectedReload(restored, ActorImprintReloadStatus::Reloaded);
-		Check(validRestore.guid == fixture.assetGuid && scene &&
+		Check(validRestore.guid == fixture.assetGuid &&
+			scene &&
 			MetaFile::TryLoad((fixture.root / AssetPath).string()) == fixture.assetGuid &&
 			restored.status == ActorImprintReloadStatus::Reloaded &&
 			fixture.system.GetAvailability(fixture.imprint) == ActorImprintAvailability::Available &&
-			scene.get() != ownerBefore && VerifyUpdatedScene(
+			scene.get() != ownerBefore &&
+			VerifyUpdatedScene(
 				*scene, state, "MissingAssetOverride", restoredRevision),
 			"Validated same-GUID restoration leaves Missing and atomically reloads the live Scene");
 		restored.FinalizeRetiredScenes();
@@ -470,18 +462,18 @@ namespace
 		std::array<std::unique_ptr<SceneBase>*, 1> owners{ &scene };
 
 		json validSave;
-		Check(SceneWriter::SerializeScene(scene.get(), validSave),
-			"Queue regression Scene is publicly saveable before the Asset disappears");
+		Check(SceneWriter::SerializeScene(scene.get(), validSave), "Queue regression Scene is publicly saveable before the Asset disappears");
 		Check(std::filesystem::remove(fixture.root / AssetPath) &&
 			fixture.assets.NotifyAssetChanged(AssetPath),
 			"Queue regression records Removed without consuming it");
 		fixture.WriteBroken();
-		Check(fixture.assets.NotifyAssetChanged(AssetPath),
-			"Queue regression records same-GUID Added over broken JSON");
+		Check(fixture.assets.NotifyAssetChanged(AssetPath), "Queue regression records same-GUID Added over broken JSON");
 		const auto changes = fixture.assets.TakePendingChanges();
-		Check(changes.size() == 2 && changes[0].kind == AssetChangeKind::Removed &&
+		Check(changes.size() == 2 &&
+			changes[0].kind == AssetChangeKind::Removed &&
 			changes[1].kind == AssetChangeKind::Added &&
-			changes[0].guid == fixture.assetGuid && changes[1].guid == fixture.assetGuid &&
+			changes[0].guid == fixture.assetGuid &&
+			changes[1].guid == fixture.assetGuid &&
 			fixture.assets.GetAssetEntry(fixture.assetGuid) != nullptr,
 			"Pending queue preserves Removed-Added while the final catalog contains the same GUID");
 		if (changes.size() != 2) return;
@@ -489,24 +481,20 @@ namespace
 		ActorImprintReloadResult removedResult = fixture.system.Reload(
 			changes[0], SceneSpan(owners.data(), owners.size()));
 		Check(removedResult.status == ActorImprintReloadStatus::Failed &&
-			removedResult.error.code == ActorImprintReloadErrorCode::CandidateAssetFailed &&
 			fixture.system.GetAvailability(fixture.imprint) == ActorImprintAvailability::Missing,
 			"Deferred Removed latches Missing even though final catalog lookup reaches broken JSON");
 		ActorImprintReloadResult addedResult = fixture.system.Reload(
 			changes[1], SceneSpan(owners.data(), owners.size()));
 		Check(addedResult.status == ActorImprintReloadStatus::Failed &&
-			addedResult.error.code == ActorImprintReloadErrorCode::CandidateAssetFailed &&
 			fixture.system.GetAvailability(fixture.imprint) == ActorImprintAvailability::Missing &&
-			fixture.system.Resolve(fixture.imprint) == oldDefinition && scene.get() == ownerBefore &&
+			fixture.system.Resolve(fixture.imprint) == oldDefinition &&
+			scene.get() == ownerBefore &&
 			scene->ResolveActor(state.rootGuid) == state.originalRoot,
 			"Broken Added retry keeps Missing, the old definition, and the live Scene intact");
 
-		ActorImprintLoadError loadError;
-		ActorImprintMaterializationError materializationError;
 		json rejectedSave;
-		Check(fixture.system.Load(fixture.assetGuid, &loadError).IsNull() &&
-			loadError.code == ActorImprintLoadErrorCode::Missing &&
-			!fixture.system.Instantiate(*scene, fixture.imprint, {}, &materializationError) &&
+		Check(fixture.system.Load(fixture.assetGuid).IsNull() &&
+			!fixture.system.Instantiate(*scene, fixture.imprint, {}) &&
 			!SceneWriter::SerializeScene(scene.get(), rejectedSave),
 			"Latched Missing rejects Load, Instantiate, and public Scene save after both failures");
 	}
@@ -530,13 +518,16 @@ namespace
 			change, SceneSpan(owners.data(), owners.size()));
 
 		Check(result.status == ActorImprintReloadStatus::NoChange &&
-			result.previousRevision == revision && result.currentRevision == revision &&
+			result.previousRevision == revision &&
+			result.currentRevision == revision &&
 			result.affectedSceneIndices.empty(),
 			"A validated candidate with the same DefinitionRevision is a no-op");
-		Check(scene.get() == ownerBefore && fixture.system.Resolve(fixture.imprint) == oldDefinition &&
+		Check(scene.get() == ownerBefore &&
+			fixture.system.Resolve(fixture.imprint) == oldDefinition &&
 			scene->ResolveActor(state.rootGuid) == state.originalRoot &&
 			scene->ResolveActor(state.removedChildGuid) == state.originalRemovedChild &&
-			state.originalRoot->GetName() == "NoOpOverride" && state.originalRoot->IsActive(),
+			state.originalRoot->GetName() == "NoOpOverride" &&
+			state.originalRoot->IsActive(),
 			"Same-revision no-op preserves Scene identity, Actor identity, and the published definition");
 	}
 }

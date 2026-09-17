@@ -27,6 +27,7 @@ ConstantBuffer::ConstantBuffer(ID3D12Device* pDevice, size_t size)
 
 	//マッピング
 	result = m_pBuffer->Map(0, nullptr, &m_pMappedPtr);
+
 	if (FAILED(result))
 	{
 		return;

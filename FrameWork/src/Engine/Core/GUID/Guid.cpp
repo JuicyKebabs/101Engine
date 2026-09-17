@@ -6,7 +6,11 @@ std::string Guid::ToString() const
 	wchar_t buffer[64] = {};
 
 	const int wideLength = StringFromGUID2(value, buffer, 64);
-	if (wideLength <= 1) return {};
+
+	if (wideLength <= 1)
+	{
+		return {};
+	}
 
 	// Calculate the length of the content without the null terminator
 	const int contentLength = wideLength - 1;
@@ -22,7 +26,10 @@ std::string Guid::ToString() const
 		nullptr
 	);
 
-	if (utf8Length <= 0) return {};
+	if (utf8Length <= 0)
+	{
+		return {};
+	}
 
 	// Create a string with the required size to hold the UTF-8 representation
 	std::string result(static_cast<size_t>(utf8Length), '\0');
@@ -54,7 +61,10 @@ Guid Guid::FromString(const std::string& str)
 
 bool Guid::TryParse(const std::string& str, Guid& outGuid)
 {
-	if (str.empty()) return false;
+	if (str.empty())
+	{
+		return false;
+	}
 
 	// Convert the UTF-8 string to a wide string
 	const int wideLength = MultiByteToWideChar(
@@ -66,7 +76,10 @@ bool Guid::TryParse(const std::string& str, Guid& outGuid)
 		0
 	);
 
-	if (wideLength <= 0) return false;
+	if (wideLength <= 0)
+	{
+		return false;
+	}
 
 	// Create a wide string with the required size to hold the wide representation
 	std::wstring wideString(

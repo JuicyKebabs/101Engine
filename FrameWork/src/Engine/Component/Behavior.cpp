@@ -3,15 +3,23 @@
 
 bool Behavior::ChangeScene(const std::string& sceneName)
 {
-	SceneManager* sceneManager = GetOwner() && GetOwner()->GetOwner()
-		? GetOwner()->GetOwner()->GetSceneManager() : nullptr;
+	if (!GetOwner() || !GetOwner()->GetOwner())
+	{
+		return false;
+	}
+
+	SceneManager* sceneManager = GetOwner()->GetOwner()->GetSceneManager();
 	return sceneManager && sceneManager->ReserveChangeScene(sceneName);
 }
 
 bool Behavior::ChangeScene(const Guid& sceneAssetGuid)
 {
-	SceneManager* sceneManager = GetOwner() && GetOwner()->GetOwner()
-		? GetOwner()->GetOwner()->GetSceneManager() : nullptr;
+	if (!GetOwner() || !GetOwner()->GetOwner())
+	{
+		return false;
+	}
+
+	SceneManager* sceneManager = GetOwner()->GetOwner()->GetSceneManager();
 	return sceneManager && sceneManager->ReserveChangeScene(sceneAssetGuid);
 }
 

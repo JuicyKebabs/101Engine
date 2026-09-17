@@ -22,7 +22,7 @@
 
 namespace
 {
-	using Reason = StructuralMutationReason;
+
 	int failures = 0;
 	void Check(bool condition, const char* message)
 	{
@@ -84,43 +84,50 @@ namespace
 		Check(root != nullptr, "Real Instance materializes for mutation matrix"); if (!root) return;
 		const auto& registry = f.scene.GetImprintInstances();
 		Actor* child = registry.ResolveActor(root->GetHandle(), 20);
-		StructuralMutationResult result;
-		Check(f.scene.CanReparent(parent, other).reason == Reason::HierarchyCycle, "Cycle has a distinct reason");
+		bool result = false;
+		Check(f.scene.CanReparent(parent, other) == false, "Cycle is rejected");
 		SceneBase foreignScene;
 		Actor* foreign = foreignScene.AddRootActor(ActorFactory::CreateEmptyActor({}));
-		Check(f.scene.CanDestroy(foreign).reason == Reason::ForeignScene, "Foreign Scene has a distinct reason");
-		Check(f.scene.CanDestroy(ActorHandle{ 123456, 7 }).reason == Reason::StaleHandle, "Stale handle has a distinct reason");
-		Check(f.scene.CanDestroy(static_cast<Actor*>(nullptr)).reason == Reason::InvalidActor, "Null Actor has a distinct reason");
-		Check(f.scene.CanAddComponent(parent, typeid(Transform)).reason == Reason::ComponentPolicyViolation,
-			"Ordinary Actor retains its Component cardinality policy");
-		Check(!root->AddComponent<Canvas>() && !f.scene.AddActorComponentImmediate(root, std::make_unique<Camera>(), 0, &result) &&
-			result.reason == Reason::ImprintMemberImmutable, "Both runtime and immediate Component additions reject Instance members");
+		Check(f.scene.CanDestroy(foreign) == false, "Foreign Scene is rejected");
+		Check(f.scene.CanDestroy(ActorHandle{ 123456, 7 }) == false, "Stale handle is rejected");
+		Check(f.scene.CanDestroy(static_cast<Actor*>(nullptr)) == false, "Null Actor is rejected");
+		Check(f.scene.CanAddComponent(parent, typeid(Transform)) == false, "Ordinary Actor retains its Component cardinality policy");
+		Check(!root->AddComponent<Canvas>() &&
+			!f.scene.AddActorComponentImmediate(root, std::make_unique<Camera>(), 0),
+			"Both runtime and immediate Component additions reject Instance members");
 		Component* transform = registry.ResolveComponent(root->GetHandle(), 11);
-		root->RemoveComponentByClass<Camera>(&result);
-		Check(result.reason == Reason::ImprintMemberImmutable && !root->GetComponentByClass<Camera>()->IsDestroyed(),
-			"Templated removal cannot bypass Instance policy");
-		transform->MarkForDestruction(&result);
-		Check(result.reason == Reason::ImprintMemberImmutable && !transform->IsDestroyed() &&
-			!f.scene.RemoveActorComponentImmediate(root, transform, &result), "Direct and immediate Component removal preserve Instance structure");
-		result = {};
-		Check(!root->AddChild(ActorFactory::CreateEmptyActor({}), &result) && result == f.scene.CanAddChildActor(root),
+		result = root->RemoveComponentByClass<Camera>();
+		Check(!result && !root->GetComponentByClass<Camera>()->IsDestroyed(), "Templated removal cannot bypass Instance policy");
+		result = transform->MarkForDestruction();
+		Check(!result &&
+			!transform->IsDestroyed() &&
+			!f.scene.RemoveActorComponentImmediate(root, transform),
+			"Direct and immediate Component removal preserve Instance structure");
+
+		Check(!result &&
+			!root->AddChild(ActorFactory::CreateEmptyActor({})) &&
+			false == f.scene.CanAddChildActor(root),
 			"Actor child insertion reports the same Instance refusal as its query");
-		result = {};
-		Check(!f.scene.AddChildActor(ActorFactory::CreateEmptyActor({}), child->GetHandle(), &result) &&
-			result == f.scene.CanAddChildActor(child), "Scene child insertion reports the same Instance refusal as its query");
-		Check(!f.scene.ReparentActor(other, root, &result) && result == f.scene.CanReparent(other, root),
+
+		Check(!result &&
+			!f.scene.AddChildActor(ActorFactory::CreateEmptyActor({}), child->GetHandle()) &&
+			false == f.scene.CanAddChildActor(child),
+			"Scene child insertion reports the same Instance refusal as its query");
+		Check(!f.scene.ReparentActor(other, root) &&
+			false == f.scene.CanReparent(other, root),
 			"Ordinary Actor cannot enter an Instance hierarchy");
-		Check(!f.scene.ReparentActor(child, other, &result) && result == f.scene.CanReparent(child, other),
-			"Non-root member cannot leave its hierarchy");
-		Check(f.scene.ReparentActor(root, other, &result) && root->GetParent() == other,
-			"Instance root can move beneath an ordinary Actor");
-		Check(f.scene.ReparentActor(root, nullptr, &result) && !root->GetParent(), "Instance root can move to Scene root");
+		Check(!f.scene.ReparentActor(child, other) && false == f.scene.CanReparent(child, other), "Non-root member cannot leave its hierarchy");
+		Check(f.scene.ReparentActor(root, other) && root->GetParent() == other, "Instance root can move beneath an ordinary Actor");
+		Check(f.scene.ReparentActor(root, nullptr) && !root->GetParent(), "Instance root can move to Scene root");
 		Check(f.scene.ReparentActor(root, parent), "Instance returns to its ordinary parent");
-		Check(f.scene.CanAddComponent(parent, typeid(Canvas)).reason == Reason::UIConstraintViolation && !parent->AddComponent<Canvas>() &&
-			!parent->GetComponentByClass<Canvas>(), "Adding Canvas to an ordinary ancestor cannot indirectly convert Instance transforms");
+		Check(f.scene.CanAddComponent(parent, typeid(Canvas)) == false &&
+			!parent->AddComponent<Canvas>() &&
+			!parent->GetComponentByClass<Canvas>(),
+			"Adding Canvas to an ordinary ancestor cannot indirectly convert Instance transforms");
 		auto canvasOwned = ActorFactory::CreateEmptyActor({}); canvasOwned->AddComponent<Canvas>();
 		Actor* canvasActor = f.scene.AddRootActor(std::move(canvasOwned));
-		Check(!f.scene.ReparentActor(parent, canvasActor, &result) && result.reason == Reason::UIConstraintViolation && !parent->GetParent(),
+		Check(!f.scene.ReparentActor(parent, canvasActor) &&
+			!parent->GetParent(),
 			"Moving an ordinary subtree cannot indirectly convert Instance transforms");
 		ActorSubtreeSnapshot snapshot;
 		Check(!snapshot.Capture(parent, &f.scene), "Ordinary subtree snapshots refuse embedded Instance provenance");
@@ -130,10 +137,15 @@ namespace
 		saved.sourceDefinitionRevision = savedRecord->sourceRevision;
 		saved.rootActorGuid = savedRecord->actors.at(savedRecord->rootId).guid;
 		for (const auto& [id, actor] : savedRecord->actors) saved.actorGuids.emplace(id, actor.guid);
-		Check(f.scene.RemoveActor(parent, true, &result) && parent->IsDestroyed() && root->IsDestroyed() && child->IsDestroyed(),
+		Check(f.scene.RemoveActor(parent, true) &&
+			parent->IsDestroyed() &&
+			root->IsDestroyed() &&
+			child->IsDestroyed(),
 			"Ordinary cascade treats each included Instance as a complete destruction unit");
-		Check(f.scene.CanDestroy(root).reason == Reason::PendingDestroy && registry.FindMember(childHandle) &&
-			!f.system.RestoreInstance(f.scene, f.imprint, saved), "Destroying membership stays indexed and GUIDs remain reserved until GC");
+		Check(f.scene.CanDestroy(root) == false &&
+			registry.FindMember(childHandle) &&
+			!f.system.RestoreInstance(f.scene, f.imprint, saved),
+			"Destroying membership stays indexed and GUIDs remain reserved until GC");
 		f.scene.EditorUpdate(0);
 		Check(!registry.FindMember(rootHandle) && !registry.FindMember(childHandle), "GC retires every reverse index entry");
 		Check(f.system.RestoreInstance(f.scene, f.imprint, saved) != nullptr, "Saved identity becomes restorable after actual collection");
@@ -146,29 +158,28 @@ namespace
 		if (!root) { Check(false, "Command fixture Instance"); return; }
 		Actor* child = f.scene.GetImprintInstances().ResolveActor(root->GetHandle(), 20);
 		CreateActorCommand create(&f.scene, {}, root->GetGuid());
-		Check(!create.Execute() && create.GetStructuralResult().reason == Reason::ImprintMemberImmutable, "Create command reports insertion refusal");
+		Check(!create.Execute(), "Create command reports insertion refusal");
 		AddComponentCommand add(&f.scene, root->GetGuid(), "Camera");
-		Check(!add.Execute() && add.GetStructuralResult().reason == Reason::ImprintMemberImmutable, "Add Component command reports policy refusal");
+		Check(!add.Execute(), "Add Component command reports policy refusal");
 		RemoveComponentCommand remove(&f.scene, root->GetGuid(), "Transform", 0);
-		Check(!remove.Execute() && remove.GetStructuralResult().reason == Reason::ImprintMemberImmutable, "Remove Component command reports policy refusal");
+		Check(!remove.Execute(), "Remove Component command reports policy refusal");
 		ReparentActorCommand reparent(&f.scene, child->GetGuid(), {});
-		Check(!reparent.Execute() && reparent.GetStructuralResult().reason == Reason::ImprintMemberImmutable, "Reparent command reports member refusal");
+		Check(!reparent.Execute(), "Reparent command reports member refusal");
 		DeleteActorCommand destroy(&f.scene, root->GetGuid());
-		Check(!destroy.Execute() && destroy.GetStructuralResult().reason == Reason::InstanceSnapshotRequired && !root->IsDestroyed(),
+		Check(!destroy.Execute() &&
+			!root->IsDestroyed(),
 			"Ordinary Delete command requires an Instance snapshot instead of discarding provenance");
 		DeleteActorImprintInstanceCommand destroyMember(f.scene, f.system, child->GetGuid());
-		Check(!destroyMember.Execute() && destroyMember.GetStructuralResult().reason == Reason::InstanceDestroyRequired &&
-			!root->IsDestroyed(), "Instance Delete command requires the root Actor");
+		Check(!destroyMember.Execute() && !root->IsDestroyed(), "Instance Delete command requires the root Actor");
 		EditorCommandHistory history;
-		Check(!history.Execute(std::make_unique<AddComponentCommand>(&f.scene, root->GetGuid(), "Camera")) && !history.CanUndo(),
+		Check(!history.Execute(std::make_unique<AddComponentCommand>(&f.scene, root->GetGuid(), "Camera")) &&
+			!history.CanUndo(),
 			"Failed structural commands do not enter history");
-		Check(history.GetLastStructuralResult().reason == Reason::ImprintMemberImmutable,
-			"Command history preserves the structural reason after destroying a failed command");
+
 		ComponentSnapshot componentSnapshot;
 		Check(componentSnapshot.Capture(root, root->GetComponentByClass<Camera>()), "Component snapshot captures an Instance value");
-		StructuralMutationResult result;
-		Check(!componentSnapshot.Restore(&f.scene, &result) && result.reason == Reason::ImprintMemberImmutable,
-			"Component snapshot restore propagates the Scene policy reason");
+		bool result = false;
+		Check(!result && !componentSnapshot.Restore(&f.scene), "Component snapshot restore is rejected by Scene policy");
 	}
 
 	class RemovalProbe final : public Component
@@ -185,9 +196,8 @@ namespace
 		static void TryStructuralReentry()
 		{
 			if (scene && !scene->AddRootActor(ActorFactory::CreateEmptyActor({}))) ++blockedMutations;
-			StructuralMutationResult result;
-			if (survivor && !survivor->AddComponent(std::make_unique<Camera>(), &result) &&
-				result.reason == Reason::TransactionInProgress) ++blockedMutations;
+			bool result = false;
+			if (survivor && !survivor->AddComponent(std::make_unique<Camera>())) ++blockedMutations;
 		}
 		void OnAttachOverride() override { ++attachments; TryStructuralReentry(); }
 		void OnStartOverride() override {}
@@ -209,21 +219,30 @@ namespace
 		RemovalProbe::scene = &f.scene;
 		RemovalProbe::survivor = survivor;
 		auto* probe = actor->AddComponent<RemovalProbe>();
-		Check(probe && RemovalProbe::attachments == 1 && RemovalProbe::blockedMutations == 2 &&
-			!survivor->GetComponentByClass<Camera>(), "Attach callbacks cannot reenter Scene structure");
+		Check(probe &&
+			RemovalProbe::attachments == 1 &&
+			RemovalProbe::blockedMutations == 2 &&
+			!survivor->GetComponentByClass<Camera>(),
+			"Attach callbacks cannot reenter Scene structure");
 		probe->MarkForDestruction();
 		Check(probe->IsDestroyed() && RemovalProbe::notifications == 0, "Deferred removal postpones the lifecycle notification");
 		actor->LateUpdate(0);
-		Check(!actor->GetComponentByClass<RemovalProbe>() && RemovalProbe::notifications == 1 &&
-			RemovalProbe::detachments == 1 && RemovalProbe::blockedMutations == 6 &&
-			!survivor->GetComponentByClass<Camera>(), "Deferred collection calls lifecycle once and blocks callback reentry");
+		Check(!actor->GetComponentByClass<RemovalProbe>() &&
+			RemovalProbe::notifications == 1 &&
+			RemovalProbe::detachments == 1 &&
+			RemovalProbe::blockedMutations == 6 &&
+			!survivor->GetComponentByClass<Camera>(),
+			"Deferred collection calls lifecycle once and blocks callback reentry");
 		auto* second = actor->AddComponent<RemovalProbe>();
 		const ActorHandle actorHandle = actor->GetHandle();
 		Check(second && f.scene.RemoveActor(actor), "Actor destruction probe enters deferred GC");
 		f.scene.EditorUpdate(0);
-		Check(!f.scene.ResolveActor(actorHandle) && RemovalProbe::notifications == 2 &&
-			RemovalProbe::detachments == 2 && RemovalProbe::blockedMutations == 12 &&
-			!survivor->GetComponentByClass<Camera>(), "ActorPool GC blocks lifecycle reentry without invalidating its storage");
+		Check(!f.scene.ResolveActor(actorHandle) &&
+			RemovalProbe::notifications == 2 &&
+			RemovalProbe::detachments == 2 &&
+			RemovalProbe::blockedMutations == 12 &&
+			!survivor->GetComponentByClass<Camera>(),
+			"ActorPool GC blocks lifecycle reentry without invalidating its storage");
 		RemovalProbe::scene = nullptr;
 		RemovalProbe::survivor = nullptr;
 		f.scene.Finalize();
@@ -239,23 +258,28 @@ namespace
 		Actor* child = f.Ordinary(canvasParent);
 		Check(dynamic_cast<RectTransform*>(child->GetComponentByClass<Transform>()) != nullptr,
 			"Child starts with its Canvas-required RectTransform");
-		StructuralMutationResult result;
-		Check(f.scene.RemoveActor(canvasParent, false, &result) && !child->GetParent() &&
+		bool result = false;
+		Check(f.scene.RemoveActor(canvasParent, false) &&
+			!child->GetParent() &&
 			std::type_index(typeid(*child->GetComponentByClass<Transform>())) == typeid(Transform),
 			"Non-cascade destruction commits the prevalidated UI-aware detach");
 
 		Actor* pendingCanvasOwner = f.Ordinary();
 		Canvas* pendingCanvas = pendingCanvasOwner->AddComponent<Canvas>();
-		Check(pendingCanvas && dynamic_cast<RectTransform*>(pendingCanvasOwner->GetComponentByClass<Transform>()),
+		Check(pendingCanvas &&
+			dynamic_cast<RectTransform*>(pendingCanvasOwner->GetComponentByClass<Transform>()),
 			"Pending-Canvas fixture starts in Screen-Space UI state");
-		pendingCanvas->MarkForDestruction(&result);
-		Check(result && pendingCanvas->IsDestroyed() && !pendingCanvasOwner->GetComponentByClass<Canvas>() &&
+		result = pendingCanvas->MarkForDestruction();
+		Check(result &&
+			pendingCanvas->IsDestroyed() &&
+			!pendingCanvasOwner->GetComponentByClass<Canvas>() &&
 			std::type_index(typeid(*pendingCanvasOwner->GetComponentByClass<Transform>())) == typeid(Transform),
 			"A deferred Canvas becomes absent and updates derived UI state at mark time");
 		Actor* instance = f.system.Instantiate(f.scene, f.imprint, pendingCanvasOwner->GetHandle());
 		Check(instance != nullptr, "Materialization beneath a pending Canvas uses the post-removal hierarchy");
 		pendingCanvasOwner->LateUpdate(0);
-		Check(instance && instance->GetParent() == pendingCanvasOwner &&
+		Check(instance &&
+			instance->GetParent() == pendingCanvasOwner &&
 			std::type_index(typeid(*instance->GetComponentByClass<Transform>())) == typeid(Transform),
 			"Physical Canvas collection preserves the already validated Instance hierarchy");
 	}

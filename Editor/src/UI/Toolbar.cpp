@@ -44,6 +44,7 @@ void Toolbar::Render(const Callbacks& callbacks)
 
 	ImGui::SameLine();
 	bool showColliders = callbacks.showColliders;
+
 	if (ImGui::Checkbox("Colliders", &showColliders) && callbacks.onShowCollidersChanged)
 	{
 		callbacks.onShowCollidersChanged(showColliders);

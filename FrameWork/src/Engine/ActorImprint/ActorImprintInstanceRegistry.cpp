@@ -18,9 +18,19 @@ const ActorImprintMembership* ActorImprintInstanceRegistry::FindMember(ActorHand
 Actor* ActorImprintInstanceRegistry::ResolveActor(ActorHandle root, LocalObjectId id) const
 {
 	const auto* record = FindInstance(root);
-	if (!record) return nullptr;
+
+	if (!record)
+	{
+		return nullptr;
+	}
+
 	const auto it = record->actors.find(id);
-	if (it == record->actors.end()) return nullptr;
+
+	if (it == record->actors.end())
+	{
+		return nullptr;
+	}
+
 	Actor* actor = m_scene.ResolveActor(it->second.handle);
 	return actor && actor->GetGuid() == it->second.guid ? actor : nullptr;
 }
@@ -28,11 +38,26 @@ Actor* ActorImprintInstanceRegistry::ResolveActor(ActorHandle root, LocalObjectI
 Component* ActorImprintInstanceRegistry::ResolveComponent(ActorHandle root, LocalObjectId id) const
 {
 	const auto* record = FindInstance(root);
-	if (!record) return nullptr;
+
+	if (!record)
+	{
+		return nullptr;
+	}
+
 	const auto it = record->components.find(id);
-	if (it == record->components.end()) return nullptr;
+
+	if (it == record->components.end())
+	{
+		return nullptr;
+	}
+
 	Actor* actor = ResolveActor(root, it->second.actorId);
-	if (!actor || actor->IsDestroyed()) return nullptr;
+
+	if (!actor || actor->IsDestroyed())
+	{
+		return nullptr;
+	}
+
 	const auto type = ComponentRegistry::Get().GetTypeId(it->second.typeName);
 	return type ? actor->GetComponentByExactType(*type, it->second.occurrence) : nullptr;
 }
@@ -40,9 +65,20 @@ Component* ActorImprintInstanceRegistry::ResolveComponent(ActorHandle root, Loca
 LocalObjectId ActorImprintInstanceRegistry::FindComponentId(ActorHandle root, const Component* component) const
 {
 	const auto* record = FindInstance(root);
-	if (!record || !component) return InvalidLocalObjectId;
+
+	if (!record || !component)
+	{
+		return InvalidLocalObjectId;
+	}
+
 	for (const auto& [id, locator] : record->components)
-		if (ResolveComponent(root, id) == component) return id;
+	{
+		if (ResolveComponent(root, id) == component)
+		{
+			return id;
+		}
+	}
+
 	return InvalidLocalObjectId;
 }
 
@@ -51,17 +87,25 @@ void ActorImprintInstanceRegistry::OnActorsCollected(const std::vector<ActorHand
 	for (const auto handle : handles)
 	{
 		const auto member = m_members.find(handle);
-		if (member == m_members.end()) continue;
+
+		if (member == m_members.end())
+		{
+			continue;
+		}
+
 		const auto instance = m_instances.find(member->second.root);
+
 		if (instance != m_instances.end())
 		{
 			instance->second.actors.erase(member->second.objectId);
+
 			if (instance->second.actors.empty())
 			{
 				m_system->ReleaseInstance(instance->second.imprint);
 				m_instances.erase(instance);
 			}
 		}
+
 		m_members.erase(member);
 	}
 }

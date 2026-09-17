@@ -15,14 +15,19 @@ class ActorImprintReferenceCodec final : public ActorReferenceCodec
 {
 public:
 	using ActorGuids = std::unordered_map<LocalObjectId, Guid>;
-	explicit ActorImprintReferenceCodec(ActorGuids actorGuids,
+	explicit ActorImprintReferenceCodec(
+		ActorGuids actorGuids,
 		ActorImprintReferenceMode mode = ActorImprintReferenceMode::DefinitionLocalOnly);
 
-	ActorReferenceCodecResult Serialize(const ActorReference& reference,
-		const ActorReferenceSaveContext& context, nlohmann::json& outJson) const override;
-	ActorReferenceCodecResult Deserialize(const nlohmann::json& json,
+	bool Serialize(
+		const ActorReference& reference,
+		const ActorReferenceSaveContext& context,
+		nlohmann::json& outJson) const override;
+	bool Deserialize(
+		const nlohmann::json& json,
 		ActorReference& outReference) const override;
-	ActorReferenceCodecResult Resolve(ActorReference& reference,
+	bool Resolve(
+		ActorReference& reference,
 		const ActorReferenceRestoreContext& context) const override;
 
 private:

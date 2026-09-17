@@ -13,7 +13,8 @@ class SceneBase;
 class ActorImprintEditingCommand final : public IEditorCommand
 {
 public:
-	ActorImprintEditingCommand(SceneBase& scene,
+	ActorImprintEditingCommand(
+		SceneBase& scene,
 		ActorImprintEditingObjectMap& objectMap,
 		std::unique_ptr<IEditorCommand> command);
 

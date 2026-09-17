@@ -8,11 +8,19 @@
 
 ActorImprintEditorDocument::ActorImprintEditorDocument(
 	std::unique_ptr<ActorImprintEditingContext> context,
-	uint32_t viewportWidth, uint32_t viewportHeight)
+	uint32_t viewportWidth,
+	uint32_t viewportHeight)
 	: IEditorDocument(viewportWidth, viewportHeight), m_context(std::move(context))
 {
-	if (m_context) m_displayName = std::filesystem::path(m_context->GetAssetPath()).filename().string();
-	if (m_displayName.empty()) m_displayName = "ActorImprint";
+	if (m_context)
+	{
+		m_displayName = std::filesystem::path(m_context->GetAssetPath()).filename().string();
+	}
+
+	if (m_displayName.empty())
+	{
+		m_displayName = "ActorImprint";
+	}
 }
 
 ActorImprintEditorDocument::~ActorImprintEditorDocument() = default;
@@ -29,7 +37,11 @@ const SceneBase* ActorImprintEditorDocument::GetWorkingScene() const
 
 bool ActorImprintEditorDocument::Save()
 {
-	if (!PrepareSave()) return false;
+	if (!PrepareSave())
+	{
+		return false;
+	}
+
 	CommitPreparedSave();
 	return true;
 }
@@ -41,7 +53,11 @@ bool ActorImprintEditorDocument::PrepareSave()
 
 void ActorImprintEditorDocument::CommitPreparedSave()
 {
-	if (!m_context) return;
+	if (!m_context)
+	{
+		return;
+	}
+
 	m_context->CommitPendingSave();
 	MarkClean();
 }
@@ -59,7 +75,12 @@ Guid ActorImprintEditorDocument::GetSourceAssetGuid() const
 bool ActorImprintEditorDocument::ExecuteCommand(std::unique_ptr<IEditorCommand> command)
 {
 	SceneBase* scene = GetWorkingScene();
-	if (!m_context || !scene || !command) return false;
+
+	if (!m_context || !scene || !command)
+	{
+		return false;
+	}
+
 	return IEditorDocument::ExecuteCommand(std::make_unique<ActorImprintEditingCommand>(
 		*scene, m_context->GetObjectMap(), std::move(command)));
 }

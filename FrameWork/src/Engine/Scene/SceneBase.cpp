@@ -26,8 +26,14 @@ SceneBase::~SceneBase()
 {
 	// Imprint records pin App-owned definitions until their Actors are gone.
 	// Preserve the existing explicit-Finalize contract for ordinary Scenes.
-	if (m_unpublishedCandidate) DiscardUnpublishedCandidate();
-	else if (!m_imprintInstances.GetInstances().empty()) Finalize();
+	if (m_unpublishedCandidate)
+	{
+		DiscardUnpublishedCandidate();
+	}
+	else if (!m_imprintInstances.GetInstances().empty())
+	{
+		Finalize();
+	}
 }
 
 // Initialization
@@ -39,46 +45,91 @@ void SceneBase::Initialize(EngineContext& context)
 // Post-update (for late update)
 void SceneBase::PreUpdate(float deltaTime)
 {
-	if (m_actorBatchActive || m_unpublishedCandidate) return;
-	m_actorPool.ForEach([deltaTime](Actor* actor) {
-		if (!actor->IsActive() || actor->IsDestroyed()) return;
+	if (m_actorBatchActive || m_unpublishedCandidate)
+	{
+		return;
+	}
+
+	m_actorPool.ForEach([deltaTime](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
+		{
+			return;
+		}
+
 		actor->PreUpdate(deltaTime);
-		});
+	});
 }
 
 // Update
 void SceneBase::Update(float deltaTime)
 {
-	if (m_actorBatchActive || m_unpublishedCandidate) return;
-	m_actorPool.ForEach([deltaTime](Actor* actor) {
-		if (!actor->IsActive() || actor->IsDestroyed()) return;
+	if (m_actorBatchActive || m_unpublishedCandidate)
+	{
+		return;
+	}
+
+	m_actorPool.ForEach([deltaTime](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
+		{
+			return;
+		}
+
 		actor->Update(deltaTime);
-		});
+	});
 
 	// Flush transforms recursively from root actors
-	m_actorPool.ForEach([this](Actor* actor) {
-		if (!actor->IsActive() || actor->IsDestroyed()) return;
-		if (!actor->GetParentHandle().IsNull()) return;	// only recurse from roots to maintain correct order
+	m_actorPool.ForEach([this](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
+		{
+			return;
+		}
+
+		if (!actor->GetParentHandle().IsNull())
+		{
+			return; // only recurse from roots to maintain correct order
+		}
+
 		actor->FlushTransform();
-		});
+	});
 }
 
 // Late update
 void SceneBase::LateUpdate(float deltaTime)
 {
-	if (m_actorBatchActive || m_unpublishedCandidate) return;
-	m_actorPool.ForEach([deltaTime](Actor* actor) {
-		if (!actor->IsActive() || actor->IsDestroyed()) return;
+	if (m_actorBatchActive || m_unpublishedCandidate)
+	{
+		return;
+	}
+
+	m_actorPool.ForEach([deltaTime](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
+		{
+			return;
+		}
+
 		actor->LateUpdate(deltaTime);
-		});
+	});
 
 	// Flush transforms/collider
-	m_actorPool.ForEach([this](Actor* actor) {
-		if (!actor->IsActive() || actor->IsDestroyed()) return;
-		if (!actor->GetParentHandle().IsNull()) return;
+	m_actorPool.ForEach([this](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
+		{
+			return;
+		}
+
+		if (!actor->GetParentHandle().IsNull())
+		{
+			return;
+		}
+
 		actor->FlushTransform();
 		actor->FlushColliderTransforms();
-		});
+	});
 
 	// Check colliders
 	m_pCollisionSystem->CheckColliders();
@@ -107,7 +158,7 @@ void SceneBase::OnRender(
 	// Check if main camera exists before rendering.
 	if (!pCameraInfo)
 	{
-		DBG("SceneBase::OnRender: No main camera set, skipping render.");		
+		DBG("SceneBase::OnRender: No main camera set, skipping render.");
 		return;
 	}
 
@@ -123,8 +174,16 @@ void SceneBase::OnRender(
 // Finalization
 void SceneBase::Finalize()
 {
-	if (m_actorBatchActive) return;
-	if (m_isFinalized) return;
+	if (m_actorBatchActive)
+	{
+		return;
+	}
+
+	if (m_isFinalized)
+	{
+		return;
+	}
+
 	m_isFinalized = true;
 
 	// Internal teardown bypasses normal mutation policy and recursive traversal.
@@ -140,7 +199,10 @@ void SceneBase::Finalize()
 
 void SceneBase::DiscardUnpublishedCandidate() noexcept
 {
-	if (!m_unpublishedCandidate) return;
+	if (!m_unpublishedCandidate)
+	{
+		return;
+	}
 
 	// The unpublished objects never entered the lifecycle. Releasing their
 	// ownership directly mirrors SceneActorBatch's failed-candidate teardown.
@@ -159,6 +221,7 @@ void SceneBase::DiscardUnpublishedCandidate() noexcept
 			m_imprintInstances.m_system->ReleaseInstance(record.imprint);
 		}
 	}
+
 	m_imprintInstances.m_instances.clear();
 	m_imprintInstances.m_members.clear();
 	m_imprintInstances.m_system = nullptr;
@@ -172,23 +235,37 @@ const std::vector<Actor*>& SceneBase::PrepareUnpublishedCandidateForCommit()
 		m_unpublishedCommitActors.clear();
 		return m_unpublishedCommitActors;
 	}
+
 	m_unpublishedCommitActors = GetAllActors();
+
 	for (Actor* actor : m_unpublishedCommitActors)
 	{
-		if (actor) actor->PrepareComponentsForAttach();
+		if (actor)
+		{
+			actor->PrepareComponentsForAttach();
+		}
 	}
+
 	return m_unpublishedCommitActors;
 }
 
 void SceneBase::PublishUnpublishedCandidate() noexcept
 {
-	if (!m_unpublishedCandidate) return;
+	if (!m_unpublishedCandidate)
+	{
+		return;
+	}
+
 	m_unpublishedCandidate = false;
 	{
 		StructuralMutationScope mutationScope(this);
+
 		for (Actor* actor : m_unpublishedCommitActors)
 		{
-			if (actor) actor->AttachComponents();
+			if (actor)
+			{
+				actor->AttachComponents();
+			}
 		}
 	}
 	m_unpublishedCommitActors.clear();
@@ -196,66 +273,115 @@ void SceneBase::PublishUnpublishedCandidate() noexcept
 
 void SceneBase::EditorUpdate(float deltaTime)
 {
-	if (m_actorBatchActive || m_unpublishedCandidate) return;
+	if (m_actorBatchActive || m_unpublishedCandidate)
+	{
+		return;
+	}
+
 	// Reflect changes of the transform
 	m_actorPool.ForEach([](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			if (!actor->IsActive() || actor->IsDestroyed()) return;
-			if (!actor->GetParentHandle().IsNull()) return;
+			return;
+		}
 
-			actor->FlushTransform();
-		});
+		if (!actor->GetParentHandle().IsNull())
+		{
+			return;
+		}
+
+		actor->FlushTransform();
+	});
 
 	// Synchronize collider transforms with the updated transforms
 	m_actorPool.ForEach([](Actor* actor)
+	{
+		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			if (!actor->IsActive() || actor->IsDestroyed()) return;
-			if (!actor->GetParentHandle().IsNull()) return;
+			return;
+		}
 
-			actor->FlushColliderTransforms();
-		});
+		if (!actor->GetParentHandle().IsNull())
+		{
+			return;
+		}
+
+		actor->FlushColliderTransforms();
+	});
 
 	// Reflect changes made to scene camera components.
-	if (m_pCameraSystem) m_pCameraSystem->Flush(0.0f);
+	if (m_pCameraSystem)
+	{
+		m_pCameraSystem->Flush(0.0f);
+	}
 
 	// Finalize delayed Actor destruction requested by editor commands.
 	CollectDestroyedActors();
 }
 
-Actor* SceneBase::AddRootActor(std::unique_ptr<Actor> actor,
-	StructuralMutationResult* result)
+Actor* SceneBase::AddRootActor(std::unique_ptr<Actor> actor)
 {
-	if (!CanAddRootActor().Report(result)) return nullptr;
+	if (!CanAddRootActor())
+	{
+		DBG("Scene structural operation was rejected.");
+		return nullptr;
+	}
+
 	return RegisterActor(std::move(actor), ActorHandle::Null(), /*applyUIConstraints=*/true);
 }
 
 bool SceneBase::EnableSingleRootClosedSubtreePolicy()
 {
-	if (m_structurePolicy == SceneStructurePolicy::SingleRootClosedSubtree) return true;
-	if (m_actorBatchActive || m_isFinalized || !m_imprintInstances.GetInstances().empty()) return false;
+	if (m_structurePolicy == SceneStructurePolicy::SingleRootClosedSubtree)
+	{
+		return true;
+	}
+
+	if (m_actorBatchActive || m_isFinalized || !m_imprintInstances.GetInstances().empty())
+	{
+		return false;
+	}
+
 	const auto roots = GetRootActors();
-	if (roots.size() != 1 || !roots.front() || roots.front()->IsDestroyed()) return false;
+
+	if (roots.size() != 1 || !roots.front() || roots.front()->IsDestroyed())
+	{
+		return false;
+	}
+
 	m_structurePolicy = SceneStructurePolicy::SingleRootClosedSubtree;
 	return true;
 }
 
-Actor* SceneBase::AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle,
-	StructuralMutationResult* result)
+Actor* SceneBase::AddChildActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle)
 {
-	if (!CanAddChildActor(ResolveActor(parentHandle)).Report(result)) return nullptr;
+	if (!CanAddChildActor(ResolveActor(parentHandle)))
+	{
+		DBG("Scene structural operation was rejected.");
+		return nullptr;
+	}
 
 	return RegisterActor(std::move(actor), parentHandle, /*applyUIConstraints=*/true);
 }
 
 Actor* SceneBase::RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parentHandle, bool applyUIConstraints)
 {
-	if (m_actorBatchActive) return nullptr;
-	if (!actor) return nullptr;
+	if (m_actorBatchActive)
+	{
+		return nullptr;
+	}
+
+	if (!actor)
+	{
+		return nullptr;
+	}
 
 	// Ensure the actor has exactly one Transform-family component
 	if (actor->CountComponentFamily(ComponentFamily::Transform) != 1)
 	{
-		DBG("SceneBase::RegisterActor: Actor '%s' must have exactly one Transform-family component.",actor->GetName().c_str());
+		DBG("SceneBase::RegisterActor: Actor '%s' must have exactly one Transform-family component.",
+			actor->GetName().c_str());
 		return nullptr;
 	}
 
@@ -286,6 +412,7 @@ Actor* SceneBase::RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parent
 	if (!parentHandle.IsNull())
 	{
 		Actor* parent = m_actorPool.Resolve(parentHandle);
+
 		if (!parent || parent->IsDestroyed())
 		{
 			DBG("SceneBase::RegisterActor: Parent is pending destruction.");
@@ -298,6 +425,7 @@ Actor* SceneBase::RegisterActor(std::unique_ptr<Actor> actor, ActorHandle parent
 
 	// Register the actor in the ActorPool
 	const ActorHandle handle = m_actorPool.Register(std::move(actor));
+
 	if (handle.IsNull())
 	{
 		DBG("SceneBase::RegisterActor: Failed to register actor in ActorPool.");
@@ -354,7 +482,11 @@ void SceneBase::CollectDestroyedActors()
 	for (const ActorHandle& handle : collectedHandles)
 	{
 		auto it = m_actorHandleGuidMap.find(handle);
-		if (it == m_actorHandleGuidMap.end()) continue;
+
+		if (it == m_actorHandleGuidMap.end())
+		{
+			continue;
+		}
 
 		m_actorGuidMap.erase(it->second);
 		m_actorHandleGuidMap.erase(it);
@@ -373,7 +505,10 @@ void SceneBase::OnActorComponentAdded(Actor* actor, Component* component)
 		dynamic_cast<Canvas*>(component) != nullptr ||
 		dynamic_cast<RendererComponent*>(component) != nullptr;
 
-	if (!affectsUIHierarchy) return;
+	if (!affectsUIHierarchy)
+	{
+		return;
+	}
 
 	// Get the governing canvas in the hierarchy for the actor (if any)
 	Canvas* governingCanvas = FindClosestCanvas(actor->GetParent());
@@ -381,31 +516,45 @@ void SceneBase::OnActorComponentAdded(Actor* actor, Component* component)
 	// Reapply UI hierarchy constraints for the actor and its descendants
 	if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
 	{
-		DBG("SceneBase::OnActorComponentAdded: Failed to reapply UI hierarchy constraints for Actor '%s'.", actor->GetName().c_str());
+		DBG("SceneBase::OnActorComponentAdded: Failed to reapply UI hierarchy constraints for Actor '%s'.",
+			actor->GetName().c_str());
 	}
 }
 
 Component* SceneBase::AddActorComponentImmediate(
 	Actor* actor,
 	std::unique_ptr<Component> component,
-	std::size_t occurrenceIndex,
-	StructuralMutationResult* result
+	std::size_t occurrenceIndex
 )
 {
-	if (!component) { StructuralMutationResult{ StructuralMutationReason::InvalidComponent }.Report(result); return nullptr; }
-	if (!CanAddComponent(actor, typeid(*component)).Report(result)) return nullptr;
-	if (occurrenceIndex > actor->GetComponentsByExactType(typeid(*component)).size())
+	if (!component)
 	{
-		StructuralMutationResult{ StructuralMutationReason::InvalidComponent }.Report(result);
+		DBG("Structural operation rejected: InvalidComponent.");
 		return nullptr;
 	}
+
+	if (!CanAddComponent(actor, typeid(*component)))
+	{
+		DBG("Scene structural operation was rejected.");
+		return nullptr;
+	}
+
+	if (occurrenceIndex > actor->GetComponentsByExactType(typeid(*component)).size())
+	{
+		DBG("Structural operation rejected: InvalidComponent.");
+		return nullptr;
+	}
+
 	StructuralMutationScope mutationScope(this);
 	Component* added = actor->AddComponentImmediate(
 		std::move(component),
 		occurrenceIndex
 	);
 
-	if (!added) return nullptr;
+	if (!added)
+	{
+		return nullptr;
+	}
 
 	OnActorComponentAdded(actor, added);
 	added->OnAttach();
@@ -413,9 +562,14 @@ Component* SceneBase::AddActorComponentImmediate(
 	return added;
 }
 
-bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component, StructuralMutationResult* result)
+bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component)
 {
-	if (!CanRemoveComponent(actor, component).Report(result)) return false;
+	if (!CanRemoveComponent(actor, component))
+	{
+		DBG("Scene structural operation was rejected.");
+		return false;
+	}
+
 	StructuralMutationScope mutationScope(this);
 
 	// Check if given component affects the UI hierarchy (Canvas or RendererComponent)
@@ -436,19 +590,30 @@ bool SceneBase::RemoveActorComponentImmediate(Actor* actor, Component* component
 
 		if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
 		{
-			DBG("SceneBase::RemoveActorComponentImmediate: Failed to reapply UI hierarchy constraints for Actor '%s'.", actor->GetName().c_str());
+			DBG("SceneBase::RemoveActorComponentImmediate: Failed to reapply UI hierarchy constraints for Actor '%s'.",
+				actor->GetName().c_str());
 		}
 	}
 
 	return true;
 }
 
-bool SceneBase::ReparentActor(Actor* actor, Actor* newParent, StructuralMutationResult* result)
+bool SceneBase::ReparentActor(Actor* actor, Actor* newParent)
 {
-	if (!CanReparent(actor, newParent).Report(result)) return false;
+	if (!CanReparent(actor, newParent))
+	{
+		DBG("Scene structural operation was rejected.");
+		return false;
+	}
+
 	StructuralMutationScope mutationScope(this);
+
 	if (!ReparentActorInternal(actor, newParent, /*applyUIConstraints=*/true))
-		return StructuralMutationResult{ StructuralMutationReason::UIConstraintViolation }.Report(result);
+	{
+		DBG("Structural operation rejected: UIConstraintViolation.");
+		return false;
+	}
+
 	return true;
 }
 
@@ -495,12 +660,16 @@ bool SceneBase::ReparentActorInternal(Actor* actor, Actor* newParent, bool apply
 	// Get handle of the new parent (or null if newParent is nullptr)
 	const ActorHandle newParentHandle = newParent ? newParent->GetHandle() : ActorHandle::Null();
 
-	if (actor->GetParentHandle() == newParentHandle) return true; // No change needed
+	if (actor->GetParentHandle() == newParentHandle)
+	{
+		return true; // No change needed
+	}
 
 	// Check for hierarchy cycle
 	if (WouldCreateHierarchyCycle(actor, newParent))
 	{
-		DBG("SceneBase::ReparentActor: Reparenting Actor '%s' would create a hierarchy cycle.", actor->GetName().c_str());
+		DBG("SceneBase::ReparentActor: Reparenting Actor '%s' would create a hierarchy cycle.",
+			actor->GetName().c_str());
 		return false;
 	}
 
@@ -523,7 +692,8 @@ bool SceneBase::ReparentActorInternal(Actor* actor, Actor* newParent, bool apply
 
 		if (!ApplyUIHierarchyConstraints(actor, governingCanvas))
 		{
-			DBG("SceneBase::ReparentActor: Failed to apply UI hierarchy constraints for Actor '%s'.", actor->GetName().c_str());
+			DBG("SceneBase::ReparentActor: Failed to apply UI hierarchy constraints for Actor '%s'.",
+				actor->GetName().c_str());
 			return false;
 		}
 	}
@@ -533,7 +703,11 @@ bool SceneBase::ReparentActorInternal(Actor* actor, Actor* newParent, bool apply
 
 bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 {
-	if (m_actorBatchActive) return false;
+	if (m_actorBatchActive)
+	{
+		return false;
+	}
+
 	if (!canvas)
 	{
 		DBG("SceneBase::SetCanvasRenderMode: Canvas is null.");
@@ -566,12 +740,17 @@ bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 
 	if (topmostCanvas != canvas)
 	{
-		DBG("SceneBase::SetCanvasRenderMode: Nested Canvas '%s' inherits its topmost Canvas render mode.", owner->GetName().c_str());
+		DBG("SceneBase::SetCanvasRenderMode: Nested Canvas '%s' inherits its topmost Canvas render mode.",
+			owner->GetName().c_str());
 		return false;
 	}
 
 	// Set the render mode of the topmost canvas
-	if (!CanApplyUIHierarchy(owner, nullptr, owner, renderMode)) return false;
+	if (!CanApplyUIHierarchy(owner, nullptr, owner, renderMode))
+	{
+		return false;
+	}
+
 	StructuralMutationScope mutationScope(this);
 	canvas->SetAuthoredRenderMode(renderMode);
 
@@ -603,6 +782,7 @@ bool SceneBase::SetCanvasReferenceSize(Canvas* canvas, const Vector2& referenceS
 	}
 
 	Actor* owner = canvas->GetOwner();
+
 	if (!owner || owner->GetOwner() != this)
 	{
 		DBG("SceneBase::SetCanvasReferenceSize: Canvas does not belong to an actor in this scene.");
@@ -618,16 +798,19 @@ bool SceneBase::SetCanvasReferenceSize(Canvas* canvas, const Vector2& referenceS
 	// Set the reference size of the canvas
 	canvas->SetReferenceSize(referenceSize);
 
-	// Mark all RectTransform under this canvas as dirty 
+	// Mark all RectTransform under this canvas as dirty
 	// to update their layout based on the new reference size
 	MarkRectTransformHierarchyDirty(owner);
-	
+
 	return true;
 }
 
 bool SceneBase::SetCanvasScaleMode(Canvas* canvas, CanvasScaleMode scaleMode)
 {
-	if (!canvas) return false;
+	if (!canvas)
+	{
+		return false;
+	}
 
 	// Validate the scale mode
 	if (scaleMode < CanvasScaleMode::ConstantPixelSize ||
@@ -646,7 +829,7 @@ bool SceneBase::SetCanvasScaleMode(Canvas* canvas, CanvasScaleMode scaleMode)
 		return false;
 	}
 
-	// Set the scale mode of the canvas and 
+	// Set the scale mode of the canvas and
 	// mark all RectTransform under this canvas as dirty
 	canvas->SetScaleMode(scaleMode);
 	MarkRectTransformHierarchyDirty(owner);
@@ -657,8 +840,15 @@ bool SceneBase::SetCanvasScaleMode(Canvas* canvas, CanvasScaleMode scaleMode)
 bool SceneBase::SetCanvasMatchWidthOrHeight(Canvas* canvas, float match)
 {
 	// Validate the input parameters
-	if (!canvas || !std::isfinite(match)) return false;
-	if (match < 0.0f || match > 1.0f) return false;
+	if (!canvas || !std::isfinite(match))
+	{
+		return false;
+	}
+
+	if (match < 0.0f || match > 1.0f)
+	{
+		return false;
+	}
 
 	// Get Actor owner of the canvas and validate it
 	Actor* owner = canvas->GetOwner();
@@ -680,27 +870,47 @@ bool SceneBase::SetCanvasMatchWidthOrHeight(Canvas* canvas, float match)
 
 void SceneBase::SetViewportSize(UINT width, UINT height)
 {
-	if (width == 0 || height == 0) return;
+	if (width == 0 || height == 0)
+	{
+		return;
+	}
 
 	Vector2 newSize(static_cast<float>(width), static_cast<float>(height));
 
-	if (m_viewportSize == newSize) return;
+	if (m_viewportSize == newSize)
+	{
+		return;
+	}
 
 	// Update the viewport size
 	m_viewportSize = newSize;
 
 	for (Actor* actor : GetAllActors())
 	{
-		if (!actor || actor->IsDestroyed()) continue;
+		if (!actor || actor->IsDestroyed())
+		{
+			continue;
+		}
 
 		Canvas* canvas = actor->GetComponentByClass<Canvas>();
 
 		// Find the topmost canvas whose render mode is screen-space
-		if (!canvas) continue;
-		if (FindTopmostCanvas(actor) != canvas) continue;
-		if (canvas->GetRenderMode() != CanvasRenderMode::ScreenSpace) continue;
+		if (!canvas)
+		{
+			continue;
+		}
 
-		// Mark all RectTransform under this canvas as dirty 
+		if (FindTopmostCanvas(actor) != canvas)
+		{
+			continue;
+		}
+
+		if (canvas->GetRenderMode() != CanvasRenderMode::ScreenSpace)
+		{
+			continue;
+		}
+
+		// Mark all RectTransform under this canvas as dirty
 		// to update their layout based on the new viewport size
 		MarkRectTransformHierarchyDirty(actor);
 	}
@@ -708,7 +918,10 @@ void SceneBase::SetViewportSize(UINT width, UINT height)
 
 bool SceneBase::WouldCreateHierarchyCycle(const Actor* actor, const Actor* newParent) const
 {
-	if (!actor || !newParent) return false;
+	if (!actor || !newParent)
+	{
+		return false;
+	}
 
 	std::unordered_set<const Actor*> visited;	// Collection of the actors which have been already visited in the traversal.
 
@@ -716,10 +929,16 @@ bool SceneBase::WouldCreateHierarchyCycle(const Actor* actor, const Actor* newPa
 	for (const Actor* current = newParent; current; current = current->GetParent())
 	{
 		// Reaching the target actor means the proposed parent is its descendant
-		if (current == actor) return true;
+		if (current == actor)
+		{
+			return true;
+		}
 
 		// Re-visiting an ancestor means the existing hierarchy is already cyclic
-		if (!visited.insert(current).second) return true;
+		if (!visited.insert(current).second)
+		{
+			return true;
+		}
 	}
 
 	return false;
@@ -744,7 +963,8 @@ bool SceneBase::EnsureActorTransformKind(Actor* actor, TransformKind requiredKin
 
 	if (!currentTransform)
 	{
-		DBG("SceneBase::EnsureActorTransformKind: Actor '%s' has no Transform-family component.", actor->GetName().c_str());
+		DBG("SceneBase::EnsureActorTransformKind: Actor '%s' has no Transform-family component.",
+			actor->GetName().c_str());
 		return false;
 	}
 
@@ -753,17 +973,23 @@ bool SceneBase::EnsureActorTransformKind(Actor* actor, TransformKind requiredKin
 	{
 		return true;
 	}
-	if (m_imprintInstances.FindMember(actor->GetHandle())) return false;
+
+	if (m_imprintInstances.FindMember(actor->GetHandle()))
+	{
+		return false;
+	}
 
 	// Build a chain of transforms from the root to the target actor
 	std::vector<Transform*> transformChain;
+
 	for (Actor* current = actor; current; current = current->GetParent())
 	{
 		Transform* transform = current->GetComponentByClass<Transform>();
 
 		if (!transform)
 		{
-			DBG("SceneBase::EnsureActorTransformKind: Actor '%s' has no Transform-family component.", current->GetName().c_str());
+			DBG("SceneBase::EnsureActorTransformKind: Actor '%s' has no Transform-family component.",
+				current->GetName().c_str());
 			return false;
 		}
 
@@ -806,6 +1032,7 @@ Canvas* SceneBase::FindTopmostCanvas(Actor* actor) const
 	for (Actor* current = actor; current; current = current->GetParent())
 	{
 		Canvas* canvas = current->GetComponentByClass<Canvas>();
+
 		if (canvas)
 		{
 			topmostCanvas = canvas;
@@ -823,6 +1050,7 @@ Canvas* SceneBase::FindClosestCanvas(Actor* actor) const
 	for (Actor* current = actor; current; current = current->GetParent())
 	{
 		Canvas* canvas = current->GetComponentByClass<Canvas>();
+
 		if (canvas)
 		{
 			closestCanvas = canvas;
@@ -833,11 +1061,22 @@ Canvas* SceneBase::FindClosestCanvas(Actor* actor) const
 	return closestCanvas;
 }
 
-bool SceneBase::ApplyUIHierarchyConstraints(Actor* root, Canvas* governingCanvas,
-	bool allowTransformConversion, Actor** outInvalidActor)
+bool SceneBase::ApplyUIHierarchyConstraints(
+	Actor* root,
+	Canvas* governingCanvas,
+	bool allowTransformConversion,
+	Actor** outInvalidActor)
 {
-	if (outInvalidActor) *outInvalidActor = nullptr;
-	if (!root) return false;
+	if (outInvalidActor)
+	{
+		*outInvalidActor = nullptr;
+	}
+
+	if (!root)
+	{
+		return false;
+	}
+
 	// Iterative traversal also serves deep Imprint candidates without stack growth.
 	std::vector<std::pair<Actor*, Canvas*>> pending{ { root, governingCanvas } };
 	while (!pending.empty())
@@ -845,43 +1084,72 @@ bool SceneBase::ApplyUIHierarchyConstraints(Actor* root, Canvas* governingCanvas
 		auto [actor, governing] = pending.back();
 		pending.pop_back();
 		Canvas* actorCanvas = actor->GetComponentByClass<Canvas>();
+
 		if (actorCanvas)
 		{
-			if (governing) actorCanvas->SetInheritedRenderMode(governing->GetRenderMode());
-			else actorCanvas->RestoreAuthoredRenderMode();
+			if (governing)
+			{
+				actorCanvas->SetInheritedRenderMode(governing->GetRenderMode());
+			}
+			else
+			{
+				actorCanvas->RestoreAuthoredRenderMode();
+			}
 		}
-		const auto requiredKind = RequiredUITransformKind(governing != nullptr,
-			actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
+
+		const auto requiredKind = RequiredUITransformKind(
+			governing != nullptr, actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
 		const bool definitionOwned = m_imprintInstances.FindMember(actor->GetHandle()) != nullptr;
+
 		if (allowTransformConversion && !definitionOwned)
 		{
 			if (!EnsureActorTransformKind(actor, requiredKind))
 			{
-				if (outInvalidActor) *outInvalidActor = actor;
+				if (outInvalidActor)
+				{
+					*outInvalidActor = actor;
+				}
+
 				return false;
 			}
 		}
 		else
 		{
 			const Transform* transform = actor->GetComponentByClass<Transform>();
+
 			if (!transform || TransformConversion::GetKind(*transform) != requiredKind)
 			{
-				if (outInvalidActor) *outInvalidActor = actor;
+				if (outInvalidActor)
+				{
+					*outInvalidActor = actor;
+				}
+
 				return false;
 			}
 		}
+
 		if (auto* renderer = actor->GetComponentByClass<RendererComponent>())
+		{
 			renderer->SetGoverningCanvas(governing);
+		}
+
 		const auto children = actor->GetDirectChildren();
+
 		for (auto it = children.rbegin(); it != children.rend(); ++it)
+		{
 			pending.emplace_back(*it, actorCanvas ? actorCanvas : governing);
+		}
 	}
 	return true;
 }
 
 bool SceneBase::ApplyAllUIHierarchyConstraints(Actor** outInvalidActor)
 {
-	if (outInvalidActor) *outInvalidActor = nullptr;
+	if (outInvalidActor)
+	{
+		*outInvalidActor = nullptr;
+	}
+
 	for (Actor* root : GetRootActors())
 	{
 		if (!ApplyUIHierarchyConstraints(root, nullptr, true, outInvalidActor))
@@ -895,7 +1163,10 @@ bool SceneBase::ApplyAllUIHierarchyConstraints(Actor** outInvalidActor)
 
 void SceneBase::MarkRectTransformHierarchyDirty(Actor* root)
 {
-	if (!root) return;
+	if (!root)
+	{
+		return;
+	}
 
 	// Mark the RectTransform of the root actor as dirty if it exists
 	if (RectTransform* rectTransform = root->GetComponentByClass<RectTransform>())
@@ -918,9 +1189,11 @@ bool SceneBase::RollbackRestoredActors(const std::vector<ActorHandle>& restoredH
 	for (auto it = restoredHandles.rbegin(); it != restoredHandles.rend(); ++it)
 	{
 		Actor* actor = m_actorPool.Resolve(*it);
+
 		if (!actor)
 		{
-			DBG("SceneBase::RollbackRestoredActors: Failed to resolve a restored Actor."); succeeded = false;
+			DBG("SceneBase::RollbackRestoredActors: Failed to resolve a restored Actor.");
+			succeeded = false;
 			continue;
 		}
 

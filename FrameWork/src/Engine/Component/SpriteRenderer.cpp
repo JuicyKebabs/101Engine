@@ -12,13 +12,25 @@
 void SpriteRenderer::OnAttachOverride()
 {
 	auto* owner = GetOwner();
-	if (!owner) return;
+
+	if (!owner)
+	{
+		return;
+	}
 
 	auto* scene = owner->GetOwner();
-	if (!scene) return;
+
+	if (!scene)
+	{
+		return;
+	}
 
 	auto* renderSystem = scene->GetRenderSystem();
-	if (!renderSystem) return;
+
+	if (!renderSystem)
+	{
+		return;
+	}
 
 	renderSystem->Register(this);
 }
@@ -42,13 +54,25 @@ void SpriteRenderer::LateUpdateOverride(float deltaTime)
 void SpriteRenderer::OnDetachOverride()
 {
 	auto* owner = GetOwner();
-	if (!owner) return;
+
+	if (!owner)
+	{
+		return;
+	}
 
 	auto* scene = owner->GetOwner();
-	if (!scene) return;
+
+	if (!scene)
+	{
+		return;
+	}
 
 	auto* renderSystem = scene->GetRenderSystem();
-	if (!renderSystem) return;
+
+	if (!renderSystem)
+	{
+		return;
+	}
 
 	renderSystem->Unregister(this);
 }
@@ -60,6 +84,7 @@ void SpriteRenderer::OnDestroyOverride()
 bool SpriteRenderer::SetTextureAsset(const Guid& assetId)
 {
 	PreparedTextureAssetState prepared;
+
 	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;
@@ -81,22 +106,26 @@ AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
 	}
 
 	const EngineContext* context = GetEngineContext();
+
 	if (!context || !context->pAssetManager || !context->pTextureManager)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
+
 	if (!assetEntry)
 	{
 		return AssetPrepareResult::MissingAsset;
 	}
+
 	if (assetEntry->type != AssetType::Texture)
 	{
 		return AssetPrepareResult::Failed;
 	}
 
 	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
+
 	if (textureHandle == InvalidTextureHandle)
 	{
 		return AssetPrepareResult::Failed;
@@ -143,18 +172,26 @@ const SpriteRendererProxy& SpriteRenderer::GetRenderProxy(const CameraInfo& came
 	if (m_isProxyDirty)
 	{
 		RebuildRenderProxy(cameraInfo);
-		if (transform) m_transformGeneration = transform->GetWorldGeneration();
+
+		if (transform)
+		{
+			m_transformGeneration = transform->GetWorldGeneration();
+		}
+
 		m_isProxyDirty = false;
 	}
+
 	return m_proxy;
 }
 
 void SpriteRenderer::RebuildRenderProxy(const CameraInfo& cameraInfo)
 {
 	auto owner = GetOwner();
-	if (owner) 
+
+	if (owner)
 	{
 		auto transform = owner->GetComponentByClass<Transform>();
+
 		if (transform) 
 		{
 			m_proxy.common.position = transform->GetWorldPosition();
@@ -175,10 +212,12 @@ void SpriteRenderer::RebuildRenderProxy(const CameraInfo& cameraInfo)
 				m_proxy.common.worldMatrix = transform->GetWorldMatrix();
 				break;
 			case BillboardType::Spherical:
-				m_proxy.common.worldMatrix = transform->GetWorldMatrix().ToBillboard(cameraInfo.position, cameraInfo.up);
+				m_proxy.common.worldMatrix =
+					transform->GetWorldMatrix().ToBillboard(cameraInfo.position, cameraInfo.up);
 				break;
 			case BillboardType::Cylindrical:
-				m_proxy.common.worldMatrix = transform->GetWorldMatrix().ToCylindricalBillboard(cameraInfo.position, cameraInfo.up);
+				m_proxy.common.worldMatrix =
+					transform->GetWorldMatrix().ToCylindricalBillboard(cameraInfo.position, cameraInfo.up);
 				break;
 			default:
 				break;
@@ -188,23 +227,31 @@ void SpriteRenderer::RebuildRenderProxy(const CameraInfo& cameraInfo)
 	}
 }
 
-
 bool SpriteRenderer::ResolveReferences(SceneBase& scene)
 {
 	// If there is no pending texture asset ID, there is nothing to resolve
-	if (!m_pendingTextureAssetId.has_value()) return true;
+	if (!m_pendingTextureAssetId.has_value())
+	{
+		return true;
+	}
 
 	// Get owner actor and check if it belongs to the provided scene
 	Actor* owner = GetOwner();
-	if (!owner || owner->GetOwner()!= &scene) return false;
+
+	if (!owner || owner->GetOwner() != &scene)
+	{
+		return false;
+	}
 
 	const Guid assetId = *m_pendingTextureAssetId;
 	PreparedTextureAssetState prepared;
 	const AssetPrepareResult result = PrepareTextureAssetState(assetId, prepared);
+
 	if (result == AssetPrepareResult::MissingAsset)
 	{
 		return true;
 	}
+
 	if (result != AssetPrepareResult::Ready)
 	{
 		return false;
@@ -227,7 +274,12 @@ bool SpriteRenderer::SetPendingTextureAssetReference(const AssetReference<Textur
 	m_template.billboardType = m_billboardType;
 	m_textureAssetId = {};
 	m_pendingTextureAssetId.reset();
-	if (value.HasValue()) m_pendingTextureAssetId = value.GetGuid();
+
+	if (value.HasValue())
+	{
+		m_pendingTextureAssetId = value.GetGuid();
+	}
+
 	m_isProxyDirty = true;
 	return true;
 }
@@ -244,6 +296,7 @@ bool SpriteRenderer::TrySetTextureAssetReference(const AssetReference<TextureAss
 
 	PreparedTextureAssetState prepared;
 	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
+
 	if (PrepareTextureAssetState(assetId, prepared) != AssetPrepareResult::Ready)
 	{
 		return false;

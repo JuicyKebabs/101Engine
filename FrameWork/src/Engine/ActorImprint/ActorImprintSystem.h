@@ -4,7 +4,6 @@
 #include "ActorImprintInstanceRecord.h"
 #include "ActorImprintReferenceCodec.h"
 #include "Engine/Actor/ActorHandle.h"
-#include "Engine/Scene/StructuralMutationResult.h"
 #include "Engine/Core/Reflection/AssetReferenceCodec.h"
 #include "Engine/Resource/AssetChange.h"
 #include "Engine/Resource/AssetReference.h"
@@ -26,15 +25,6 @@ enum class ActorImprintAvailability
 	Missing,
 };
 
-enum class ActorImprintMaterializationErrorCode { None, InvalidScene, InvalidAsset, InvalidParent, CandidateFailed };
-struct ActorImprintMaterializationError
-{
-	ActorImprintMaterializationErrorCode code = ActorImprintMaterializationErrorCode::None;
-	LocalObjectId objectId = 0;
-	std::string path;
-	std::string message;
-};
-
 struct ActorImprintRestoreInput
 {
 	DefinitionRevision sourceDefinitionRevision;
@@ -44,24 +34,6 @@ struct ActorImprintRestoreInput
 	ActorHandle externalParent;
 };
 
-enum class ActorImprintLoadErrorCode
-{
-	None,
-	InvalidReference,
-	InvalidAsset,
-	Missing,
-	PoolExhausted,
-	TransactionInProgress,
-};
-
-struct ActorImprintLoadError
-{
-	ActorImprintLoadErrorCode code = ActorImprintLoadErrorCode::None;
-	AssetReferenceCodecResult referenceResult = AssetReferenceCodecResult::Success;
-	ActorImprintAssetError assetError;
-	std::string message;
-};
-
 enum class ActorImprintReloadStatus
 {
 	Ignored,
@@ -69,26 +41,6 @@ enum class ActorImprintReloadStatus
 	Reloaded,
 	Missing,
 	Failed,
-};
-
-enum class ActorImprintReloadErrorCode
-{
-	None,
-	InvalidChange,
-	TransactionInProgress,
-	InvalidSceneSet,
-	IncompleteLiveSceneSet,
-	CandidateAssetFailed,
-	SceneSnapshotFailed,
-	SceneCandidateFailed,
-};
-
-struct ActorImprintReloadError
-{
-	ActorImprintReloadErrorCode code = ActorImprintReloadErrorCode::None;
-	std::size_t sceneIndex = static_cast<std::size_t>(-1);
-	std::string path;
-	std::string message;
 };
 
 // A successful Scene replacement keeps displaced Scenes and the old immutable
@@ -109,13 +61,18 @@ public:
 	DefinitionRevision previousRevision;
 	DefinitionRevision currentRevision;
 	std::vector<std::size_t> affectedSceneIndices;
-	ActorImprintReloadError error;
 
-	explicit operator bool() const { return status != ActorImprintReloadStatus::Failed; }
-	bool ReplacedScenes() const { return status == ActorImprintReloadStatus::Reloaded && !affectedSceneIndices.empty(); }
+	explicit operator bool() const
+	{
+		return status != ActorImprintReloadStatus::Failed;
+	}
+	bool ReplacedScenes() const
+	{
+		return status == ActorImprintReloadStatus::Reloaded && !affectedSceneIndices.empty();
+	}
 	void FinalizeRetiredScenes() noexcept;
 
-private:
+  private:
 	friend class ActorImprintSystem;
 	// Declaration order makes the retired Scenes die before their definition if
 	// ordinary stack unwinding ever bypasses FinalizeRetiredScenes().
@@ -132,10 +89,12 @@ public:
 	ActorImprintSystem(const ActorImprintSystem&) = delete;
 	ActorImprintSystem& operator=(const ActorImprintSystem&) = delete;
 
-	ActorImprintHandle Load(const Guid& assetGuid, ActorImprintLoadError* outError = nullptr);
-	ActorImprintHandle Load(const AssetReference<ActorImprint>& reference, ActorImprintLoadError* outError = nullptr)
+	// Load an ActorImprint asset into the system.
+	// From .imprint file to
+	ActorImprintHandle Load(const Guid& assetGuid);
+	ActorImprintHandle Load(const AssetReference<ActorImprint>& reference)
 	{
-		return Load(reference.GetGuid(), outError);
+		return Load(reference.GetGuid());
 	}
 
 	ActorImprintHandle FindHandle(const Guid& assetGuid) const;
@@ -158,12 +117,21 @@ public:
 
 	ActorImprintReloadResult Reload(const AssetChange& change,std::span<std::unique_ptr<SceneBase>* const> liveScenes);
 
-	Actor* Instantiate(SceneBase& scene, ActorImprintHandle imprint, ActorHandle externalParent = {}, ActorImprintMaterializationError* outError = nullptr);
-	Actor* Instantiate(SceneBase& scene, const AssetReference<ActorImprint>& imprint,ActorHandle externalParent = {}, ActorImprintMaterializationError* outError = nullptr);
-	
-	Actor* RestoreInstance(SceneBase& scene, ActorImprintHandle imprint,const ActorImprintRestoreInput& input, ActorImprintMaterializationError* outError = nullptr);
-	
-	bool DestroyInstance(SceneBase& scene, ActorHandle root, StructuralMutationResult* result = nullptr);
+	// Instantiate from a loaded ActorImprintHandle
+	Actor* Instantiate(
+		SceneBase& scene,
+		ActorImprintHandle imprint,
+		ActorHandle externalParent = {});
+
+	// Instantiate from an assetReference
+	Actor* Instantiate(
+		SceneBase& scene,
+		const AssetReference<ActorImprint>& imprint,
+		ActorHandle externalParent = {});
+
+	Actor* RestoreInstance(SceneBase& scene, ActorImprintHandle imprint,const ActorImprintRestoreInput& input);
+
+	bool DestroyInstance(SceneBase& scene, ActorHandle root);
 
 	// Borrowed definition pointers expire on successful Reload, Unload/Clear,
 	// or System destruction. A successful Reload preserves the Handle identity.
@@ -171,24 +139,29 @@ public:
 	bool Clear();
 
 private:
+	// A Slot is a single entry in the ActorImprintSystem's internal storage.
 	struct Slot
 	{
-		std::unique_ptr<const ActorImprint> definition;
-		Guid assetGuid;
-		std::uint32_t generation = 0;
-		std::size_t instances = 0;
-		bool missing = false;
+		std::unique_ptr<const ActorImprint> definition;	// The loaded ActorImprint definition
+		Guid assetGuid;									// Guid of the original asset, used for lookup and reload
+		std::uint32_t generation = 0;					// Generation of reuse for this handle index
+		std::size_t instances = 0;						// Number of live Actor instances materialized from this definition
+		bool missing = false;							// Whether the asset is missing
 	};
 
 	const AssetManager& m_assets;
-	std::vector<Slot> m_slots;
-	std::vector<std::uint32_t> m_freeIndices;
-	std::unordered_map<Guid, ActorImprintHandle> m_handles;
 
-	bool m_materializing = false;
-	bool m_reloading = false;
-	bool m_buildingReloadCandidate = false;
+	std::vector<Slot> m_slots;								// Internal storage of slots
+	std::vector<std::uint32_t> m_freeIndices;				// Indices of free slots
+	std::unordered_map<Guid, ActorImprintHandle> m_handles;	// Mapping from asset GUID to handle
 
+	// Flags to track the state of the system during materialization and reloading
+	bool m_materializing = false;			// If the system is currently materializing an ActorImprint
+	bool m_reloading = false;				// If the system is currently reloading an ActorImprint
+	bool m_buildingReloadCandidate = false;	// If the system is currently building a reload candidate
+
+	// Save the handle and definition of the ActorImprint being reloaded
+	// to reference it during the reload process.
 	ActorImprintHandle m_reloadHandle;
 	const ActorImprint* m_reloadDefinition = nullptr;
 
@@ -197,23 +170,23 @@ private:
 	friend class SceneBase;
 	friend class SceneLoader;
 
+	// Defferred destruction of an ActorImprint instance.
 	void CommitDestroyInstance(SceneBase& scene, ActorHandle root) noexcept;
 
 	void ReleaseInstance(ActorImprintHandle handle);
 
 	Actor* RestoreInstanceForSceneCandidate(
-		SceneBase& scene, ActorImprintHandle imprint,
-		const ActorImprintRestoreInput& input, 
-		const std::unordered_set<Guid>& reservedSceneGuids,
-		ActorImprintMaterializationError* outError);
+		SceneBase& scene,
+		ActorImprintHandle imprint,
+		const ActorImprintRestoreInput& input,
+		const std::unordered_set<Guid>& reservedSceneGuids);
 
 	Actor* Materialize(
-		SceneBase& scene, 
-		ActorImprintHandle imprint, 
+		SceneBase& scene,
+		ActorImprintHandle imprint,
 		ActorHandle externalParent,
-		const ActorImprintRestoreInput* restoreInput, 
-		const std::unordered_set<Guid>* reservedSceneGuids,
-		ActorImprintMaterializationError* outError);
+		const ActorImprintRestoreInput* restoreInput,
+		const std::unordered_set<Guid>* reservedSceneGuids);
 
 	const ActorImprint* ResolveForSceneCandidate(ActorImprintHandle handle) const;
 

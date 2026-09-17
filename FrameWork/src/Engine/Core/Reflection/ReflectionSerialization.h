@@ -6,12 +6,11 @@
 // Reflection serialization and deserialization system
 // This system provides a way to serialize and deserialize objects based on their reflection metadata.
 // Serializer convert given type-erased value to JSON object with suitable expression
-// Deserializer convert JSON object to type-erased value without knowing the concrete type 
+// Deserializer convert JSON object to type-erased value without knowing the concrete type
 // (concrete type is hidden within the accessor callbacks in the PropertyMetadata).
 //-----------------------------------------------------------------------------------------------------------
 
 class TypeMetadata;
-struct ReflectionError;
 class ActorReferenceCodec;
 class ActorReferenceSaveContext;
 class ActorReferenceRestoreContext;
@@ -26,7 +25,7 @@ enum class UnknownPropertyPolicy
 	Ignore,	// Ignore unknown properties and continue deserialization (e.g., for hotreload).
 };
 
-// Context for saving and restoreing reflection data, 
+// Context for saving and restoreing reflection data,
 // including codecs and contexts for ActorReference and AssetReference serialization and deserialization.
 struct ReflectionSaveContext
 {
@@ -53,8 +52,7 @@ public:
 		std::type_index objectType,
 		const void* object,
 		nlohmann::json& outJson,
-		ReflectionSaveContext context = {},
-		ReflectionError* outError = nullptr);
+		ReflectionSaveContext context = {});
 };
 
 class ReflectionDeserializer
@@ -65,6 +63,5 @@ public:
 		std::type_index objectType,
 		const nlohmann::json& json,
 		void* object,
-		ReflectionRestoreContext context = {},
-		ReflectionError* outError = nullptr);
+		ReflectionRestoreContext context = {});
 };

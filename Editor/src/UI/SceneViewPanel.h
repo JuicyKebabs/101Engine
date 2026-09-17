@@ -94,7 +94,8 @@ class SceneViewPanel
 public:
 	void Render(
 		D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
-		UINT textureWidth, UINT textureHeight,
+		UINT textureWidth,
+		UINT textureHeight,
 		EditorViewportContext* viewportContext,
 		const ViewportOverlayData& overlayData,
 		std::span<const EditorDocumentInfo> documents,

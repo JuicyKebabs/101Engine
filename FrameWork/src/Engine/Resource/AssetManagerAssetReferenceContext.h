@@ -13,16 +13,16 @@ public:
 		: m_assetManager(assetManager)
 	{}
 
-	AssetReferenceCodecResult Validate(
+	bool Validate(
 		const Guid& guid,
 		AssetType expectedType) const override;
 
-	AssetReferenceCodecResult Resolve(
+	bool Resolve(
 		const Guid& guid,
 		AssetType expectedType) const override;
 
 private:
-	AssetReferenceCodecResult Check(
+	bool Check(
 		const Guid& guid,
 		AssetType expectedType) const;
 

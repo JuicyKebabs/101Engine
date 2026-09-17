@@ -62,11 +62,10 @@ namespace
 		builder.Property("texture", &OverrideProbe::texture);
 		builder.Property("low", &OverrideProbe::low);
 		builder.Property("high", &OverrideProbe::high);
-		builder.SetValidator([](const OverrideProbe& probe) -> std::optional<ReflectionError>
+		builder.SetValidator([](const OverrideProbe& probe) -> bool
 		{
-			if (probe.low <= probe.high) return std::nullopt;
-			return ReflectionError{ ReflectionErrorCode::TypeInvariantViolation,
-				PropertyPath::FromString("/high"), "OverrideProbe low must not exceed high." };
+			if (probe.low <= probe.high) return true;
+			return false;
 		});
 		ComponentRegistry::Get().RegisterGameComponent("OverrideProbeET12",
 			[]() -> Component* { return new OverrideProbe(); }, typeid(OverrideProbe),
@@ -166,30 +165,38 @@ namespace
 
 		json unedited;
 		Check(ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, unedited) &&
-			!unedited.contains("propertyOverrides"), "Unedited Instance emits no Property Overrides");
+			!unedited.contains("propertyOverrides"),
+			"Unedited Instance emits no Property Overrides");
 		root->SetName("Elite Enemy");
 		transform->SetLocalPosition({ 10.0f, 0.0f, 5.0f });
 		probe->weight = 2.0f;
 		probe->texture.Clear();
 
 		json saved;
-		ActorImprintInstanceSerializationError serializationError;
-		Check(ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, saved, &serializationError),
-			"Edited Instance serializes from live values");
+
+		Check(ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, saved), "Edited Instance serializes from live values");
 		const json* name = FindOverride(saved, 10, "/name");
 		const json* position = FindOverride(saved, 11, "/position");
 		const json* weight = FindOverride(saved, 12, "/weight");
 		const json* texture = FindOverride(saved, 12, "/texture");
-		Check(name && *name == "Elite Enemy" && position && position->is_array() && position->size() == 3 &&
-			weight && *weight == 2.0 && texture && texture->is_null(),
+		Check(name &&
+			*name == "Elite Enemy" &&
+			position &&
+			position->is_array() &&
+			position->size() == 3 &&
+			weight &&
+			*weight == 2.0 &&
+			texture &&
+			texture->is_null(),
 			"Actor, atomic array, float and explicit null Overrides use LocalObjectID paths");
 		json repeated;
-		Check(ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, repeated) && repeated == saved,
+		Check(ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, repeated) &&
+			repeated == saved,
 			"Instance Serializer output is deterministic");
 		const json beforeInvalidLiveSave = repeated;
 		probe->low = 20.0f;
 		probe->high = 10.0f;
-		Check(!ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, repeated, &serializationError) &&
+		Check(!ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, repeated) &&
 			repeated == beforeInvalidLiveSave,
 			"Serializer rejects a live cross-property invariant violation without changing its output");
 		probe->low = 0.0f;
@@ -202,12 +209,15 @@ namespace
 			const std::size_t actorCount = destination.GetActorPool().Count();
 			const ActorHandle sentinelHandle = sentinel ? sentinel->GetHandle() : ActorHandle{};
 			const Guid sentinelGuid = sentinel ? sentinel->GetGuid() : Guid{};
-			ActorImprintInstanceDeserializationError error;
-			Actor* rejected = ActorImprintInstanceDeserializer::Restore(invalid, destination, fixture.system, &error);
-			Check(sentinel && !rejected && destination.GetActorPool().Count() == actorCount &&
+
+			Actor* rejected = ActorImprintInstanceDeserializer::Restore(invalid, destination, fixture.system);
+			Check(sentinel &&
+				!rejected &&
+				destination.GetActorPool().Count() == actorCount &&
 				destination.ResolveActor(sentinelHandle) == sentinel &&
 				destination.FindActorHandle(sentinelGuid) == sentinelHandle &&
-				destination.GetImprintInstances().GetInstances().empty(), label);
+				destination.GetImprintInstances().GetInstances().empty(),
+				label);
 			destination.Finalize();
 		};
 		json missingExternalParent = saved;
@@ -221,9 +231,10 @@ namespace
 		destroyingExternalParent["externalParentActorGuid"] = destroyingParent->GetGuid().ToString();
 		Check(destroyingParentScene.RemoveActor(destroyingParent), "External-parent fixture enters pending destruction");
 		const std::size_t destroyingParentCount = destroyingParentScene.GetActorPool().Count();
-		ActorImprintInstanceDeserializationError parentError;
+
 		Check(!ActorImprintInstanceDeserializer::Restore(destroyingExternalParent, destroyingParentScene,
-			fixture.system, &parentError) && destroyingParentScene.GetActorPool().Count() == destroyingParentCount &&
+			fixture.system) &&
+			destroyingParentScene.GetActorPool().Count() == destroyingParentCount &&
 			destroyingParentScene.GetImprintInstances().GetInstances().empty(),
 			"Destroying external parent is rejected before Instance construction");
 		destroyingParentScene.Finalize();
@@ -235,16 +246,19 @@ namespace
 		const std::size_t fixtureActorCount = fixture.scene.GetActorPool().Count();
 		const std::size_t fixtureInstanceCount = fixture.scene.GetImprintInstances().GetInstances().size();
 		Check(!ActorImprintInstanceDeserializer::Deserialize(memberExternalParent, fixture.scene,
-			fixture.system, parentSentinel, &parentError) && parentSentinel.input.rootActorGuid == parentSentinelGuid &&
+			fixture.system, parentSentinel) &&
+			parentSentinel.input.rootActorGuid == parentSentinelGuid &&
 			fixture.scene.GetActorPool().Count() == fixtureActorCount &&
 			fixture.scene.GetImprintInstances().GetInstances().size() == fixtureInstanceCount,
 			"ActorImprint member cannot be used as an external parent and Prepare output stays unchanged");
 
 		SceneBase restoredScene;
 		restoredScene.Initialize(fixture.context);
-		ActorImprintInstanceDeserializationError restoreError;
-		Actor* restored = ActorImprintInstanceDeserializer::Restore(saved, restoredScene, fixture.system, &restoreError);
-		Check(restored && restored->GetGuid() == root->GetGuid() && restored->GetName() == "Elite Enemy",
+
+		Actor* restored = ActorImprintInstanceDeserializer::Restore(saved, restoredScene, fixture.system);
+		Check(restored &&
+			restored->GetGuid() == root->GetGuid() &&
+			restored->GetName() == "Elite Enemy",
 			"Same-revision record restores saved identity and Actor Override");
 		if (restored)
 		{
@@ -253,10 +267,15 @@ namespace
 			auto* restoredProbe = static_cast<OverrideProbe*>(restoredScene.GetImprintInstances().ResolveComponent(restoredHandle, 12));
 			Actor* restoredChild = restoredScene.GetImprintInstances().ResolveActor(restoredHandle, 20);
 			const Vector3 restoredPosition = restoredTransform->GetLocalPosition();
-			Check(restoredChild && restoredProbe && restoredProbe->target.Resolve(restoredScene) == restoredChild,
+			Check(restoredChild &&
+				restoredProbe &&
+				restoredProbe->target.Resolve(restoredScene) == restoredChild,
 				"Same-Instance ActorReference restores through LocalObjectID");
-			Check(restoredPosition.x == 10.0f && restoredPosition.y == 0.0f && restoredPosition.z == 5.0f &&
-				restoredProbe->weight == 2.0f && !restoredProbe->texture.HasValue(),
+			Check(restoredPosition.x == 10.0f &&
+				restoredPosition.y == 0.0f &&
+				restoredPosition.z == 5.0f &&
+				restoredProbe->weight == 2.0f &&
+				!restoredProbe->texture.HasValue(),
 				"Completed reflected objects retain array, float and null values");
 		}
 		restoredScene.Finalize();
@@ -270,8 +289,9 @@ namespace
 			}
 		SceneBase invalidScene;
 		invalidScene.Initialize(fixture.context);
-		Check(!ActorImprintInstanceDeserializer::Restore(invalidInvariant, invalidScene, fixture.system, &restoreError) &&
-			invalidScene.GetActorPool().Count() == 0 && invalidScene.GetImprintInstances().GetInstances().empty(),
+		Check(!ActorImprintInstanceDeserializer::Restore(invalidInvariant, invalidScene, fixture.system) &&
+			invalidScene.GetActorPool().Count() == 0 &&
+			invalidScene.GetImprintInstances().GetInstances().empty(),
 			"Completed-object invariant failure leaves no partial Instance");
 		invalidScene.Finalize();
 		json sameMissingPath = saved;
@@ -301,7 +321,8 @@ namespace
 		SceneBase internalScopeScene;
 		internalScopeScene.Initialize(fixture.context);
 		Check(!ActorImprintInstanceDeserializer::Restore(internalAsScene, internalScopeScene,
-			fixture.system, &restoreError) && internalScopeScene.GetActorPool().Count() == 0,
+			fixture.system) &&
+			internalScopeScene.GetActorPool().Count() == 0,
 			"Internal ActorReference cannot bypass LocalObjectID persistence with Scene scope");
 		internalScopeScene.Finalize();
 		json danglingLocal = saved;
@@ -350,13 +371,15 @@ namespace
 		invalidStructureScene.Initialize(fixture.context);
 		ActorImprintPreparedRestore invalidStructure;
 		Check(ActorImprintInstanceDeserializer::Deserialize(migrated, invalidStructureScene,
-			fixture.system, invalidStructure, &restoreError), "Valid migration record prepares before direct-input validation test");
+			fixture.system, invalidStructure),
+			"Valid migration record prepares before direct-input validation test");
 		for (auto& target : invalidStructure.input.propertyOverrides)
 			if (target.targetLocalObjectId == 999)
 				target.properties.emplace_back(*PropertyPath::FromString("/removed/child"), true);
-		ActorImprintMaterializationError materializationError;
+
 		Check(!fixture.system.RestoreInstance(invalidStructureScene, invalidStructure.imprint,
-			invalidStructure.input, &materializationError) && invalidStructureScene.GetActorPool().Count() == 0 &&
+			invalidStructure.input) &&
+			invalidStructureScene.GetActorPool().Count() == 0 &&
 			invalidStructureScene.GetImprintInstances().GetInstances().empty(),
 			"Deleted Override target still rejects ancestor path conflicts before commit");
 		invalidStructureScene.Finalize();
@@ -364,12 +387,14 @@ namespace
 		invalidValueScene.Initialize(fixture.context);
 		ActorImprintPreparedRestore invalidValue;
 		Check(ActorImprintInstanceDeserializer::Deserialize(migrated, invalidValueScene,
-			fixture.system, invalidValue, &restoreError), "Valid migration record prepares before direct value validation test");
+			fixture.system, invalidValue),
+			"Valid migration record prepares before direct value validation test");
 		for (auto& target : invalidValue.input.propertyOverrides)
 			if (target.targetLocalObjectId == 999)
 				target.properties[0].value = (std::numeric_limits<double>::quiet_NaN)();
 		Check(!fixture.system.RestoreInstance(invalidValueScene, invalidValue.imprint,
-			invalidValue.input, &materializationError) && invalidValueScene.GetActorPool().Count() == 0,
+			invalidValue.input) &&
+			invalidValueScene.GetActorPool().Count() == 0,
 			"Deleted Override target still rejects non-finite JSON before stale classification");
 		invalidValueScene.Finalize();
 		json preservedMigration = saved;
@@ -377,10 +402,12 @@ namespace
 		SceneBase preservedScene;
 		preservedScene.Initialize(fixture.context);
 		Actor* preservedRoot = ActorImprintInstanceDeserializer::Restore(
-			preservedMigration, preservedScene, fixture.system, &restoreError);
+			preservedMigration, preservedScene, fixture.system);
 		Actor* preservedChild = preservedRoot
 			? preservedScene.GetImprintInstances().ResolveActor(preservedRoot->GetHandle(), 20) : nullptr;
-		Check(preservedRoot && preservedRoot->GetGuid() == root->GetGuid() && preservedChild &&
+		Check(preservedRoot &&
+			preservedRoot->GetGuid() == root->GetGuid() &&
+			preservedChild &&
 			preservedChild->GetGuid() == child->GetGuid(),
 			"Revision migration preserves GUIDs for every surviving Actor LocalObjectID");
 		preservedScene.Finalize();
@@ -389,25 +416,28 @@ namespace
 		Actor* rootMismatchSentinel = rootMismatchScene.AddRootActor(ActorFactory::CreateEmptyActor({}));
 		ActorImprintPreparedRestore rootMismatch;
 		Check(ActorImprintInstanceDeserializer::Deserialize(preservedMigration, rootMismatchScene,
-			fixture.system, rootMismatch, &restoreError), "Valid migration prepares before root mapping validation test");
+			fixture.system, rootMismatch),
+			"Valid migration prepares before root mapping validation test");
 		rootMismatch.input.actorGuids[10] = GuidGenerator::Generate();
 		const std::size_t rootMismatchCount = rootMismatchScene.GetActorPool().Count();
-		Check(!fixture.system.RestoreInstance(rootMismatchScene, rootMismatch.imprint, rootMismatch.input,
-			&materializationError) && rootMismatchScene.GetActorPool().Count() == rootMismatchCount &&
-			rootMismatchSentinel && rootMismatchScene.ResolveActor(rootMismatchSentinel->GetHandle()) == rootMismatchSentinel &&
+		Check(!fixture.system.RestoreInstance(rootMismatchScene, rootMismatch.imprint, rootMismatch.input) &&
+			rootMismatchScene.GetActorPool().Count() == rootMismatchCount &&
+			rootMismatchSentinel &&
+			rootMismatchScene.ResolveActor(rootMismatchSentinel->GetHandle()) == rootMismatchSentinel &&
 			rootMismatchScene.GetImprintInstances().GetInstances().empty(),
 			"Current root LocalObjectID mapping mismatch is fatal before Scene publication");
 		rootMismatchScene.Finalize();
 		SceneBase migratedScene;
 		migratedScene.Initialize(fixture.context);
-		Actor* migratedRoot = ActorImprintInstanceDeserializer::Restore(migrated, migratedScene, fixture.system, &restoreError);
+		Actor* migratedRoot = ActorImprintInstanceDeserializer::Restore(migrated, migratedScene, fixture.system);
 		Check(migratedRoot && migratedRoot->GetName() == "Migrated", "Revision migration retains valid Overrides");
 		if (migratedRoot)
 		{
 			const auto migratedHandle = migratedRoot->GetHandle();
 			Actor* migratedChild = migratedScene.GetImprintInstances().ResolveActor(migratedHandle, 20);
 			auto* migratedTransform = static_cast<Transform*>(migratedScene.GetImprintInstances().ResolveComponent(migratedHandle, 11));
-			Check(migratedChild && migratedChild->GetGuid() != retiredGuid &&
+			Check(migratedChild &&
+				migratedChild->GetGuid() != retiredGuid &&
 				migratedTransform->GetLocalPosition().x == 0.0f,
 				"Revision migration generates added Actor identity and drops deleted mapping and stale values");
 			json normalized;
@@ -426,22 +456,30 @@ namespace
 		const Guid rootGuid = root->GetGuid();
 		const Guid childGuid = child->GetGuid();
 		Check(fixture.system.DestroyInstance(fixture.scene, rootHandle), "Snapshot fixture destroys the whole Instance");
-		Check(!ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, repeated, &serializationError),
-			"Destroying Instance cannot be serialized");
+		Check(!ActorImprintInstanceSerializer::Serialize(fixture.scene, rootHandle, repeated), "Destroying Instance cannot be serialized");
 		fixture.scene.EditorUpdate(0.0f);
-		Actor* undo = snapshot.Restore(fixture.scene, fixture.system, &restoreError);
-		Check(undo && undo->GetGuid() == rootGuid && undo->GetParent() == parent,
+		Actor* undo = snapshot.Restore(fixture.scene, fixture.system);
+		Check(undo &&
+			undo->GetGuid() == rootGuid &&
+			undo->GetParent() == parent,
 			"Snapshot restore uses RestoreInstance and reconnects the external parent by GUID");
 		if (undo)
 		{
 			auto* undoProbe = static_cast<OverrideProbe*>(fixture.scene.GetImprintInstances().ResolveComponent(undo->GetHandle(), 12));
 			auto* undoTransform = static_cast<Transform*>(fixture.scene.GetImprintInstances().ResolveComponent(undo->GetHandle(), 11));
 			Actor* undoChild = fixture.scene.GetImprintInstances().ResolveActor(undo->GetHandle(), 20);
-			Check(undo->GetName() == "Elite Enemy" && undoProbe && undoProbe->weight == 2.0f &&
-				!undoProbe->texture.HasValue(), "Snapshot restore retains live Property Overrides");
-			Check(undoChild && undoChild->GetGuid() == childGuid && undoProbe &&
-				undoProbe->target.Resolve(fixture.scene) == undoChild && undoTransform &&
-				undoTransform->GetLocalPosition().x == 10.0f && undoTransform->GetLocalPosition().z == 5.0f,
+			Check(undo->GetName() == "Elite Enemy" &&
+				undoProbe &&
+				undoProbe->weight == 2.0f &&
+				!undoProbe->texture.HasValue(),
+				"Snapshot restore retains live Property Overrides");
+			Check(undoChild &&
+				undoChild->GetGuid() == childGuid &&
+				undoProbe &&
+				undoProbe->target.Resolve(fixture.scene) == undoChild &&
+				undoTransform &&
+				undoTransform->GetLocalPosition().x == 10.0f &&
+				undoTransform->GetLocalPosition().z == 5.0f,
 				"Snapshot restores child identity, local reference and Transform state");
 		}
 
@@ -463,10 +501,12 @@ namespace
 			Actor* externalTarget = externalScene.AddRootActor(
 				ActorFactory::RestoreEmptyActor({}, external->GetGuid()));
 			Actor* externalRestore = ActorImprintInstanceDeserializer::Restore(
-				externalRecord, externalScene, fixture.system, &restoreError);
+				externalRecord, externalScene, fixture.system);
 			auto* externalProbe = externalRestore ? static_cast<OverrideProbe*>(
 				externalScene.GetImprintInstances().ResolveComponent(externalRestore->GetHandle(), 12)) : nullptr;
-			Check(externalTarget && externalRestore && externalProbe &&
+			Check(externalTarget &&
+				externalRestore &&
+				externalProbe &&
 				externalProbe->target.Resolve(externalScene) == externalTarget &&
 				externalProbe->target.Resolve(externalScene) == externalTarget,
 				"External ActorReference resolves against the mutation-blocked destination before commit and after publication");
@@ -483,10 +523,12 @@ namespace
 					if (target["targetLocalObjectId"] == 12)
 						target["properties"]["/target"]["actorGuid"] = otherInstanceChild->GetGuid().ToString();
 			Actor* crossInstanceRestore = otherInstanceChild ? ActorImprintInstanceDeserializer::Restore(
-				crossInstanceRecord, crossInstanceScene, fixture.system, &restoreError) : nullptr;
+				crossInstanceRecord, crossInstanceScene, fixture.system) : nullptr;
 			auto* crossInstanceProbe = crossInstanceRestore ? static_cast<OverrideProbe*>(
 				crossInstanceScene.GetImprintInstances().ResolveComponent(crossInstanceRestore->GetHandle(), 12)) : nullptr;
-			Check(otherInstanceChild && crossInstanceRestore && crossInstanceProbe &&
+			Check(otherInstanceChild &&
+				crossInstanceRestore &&
+				crossInstanceProbe &&
 				crossInstanceProbe->target.Resolve(crossInstanceScene) == otherInstanceChild &&
 				crossInstanceScene.GetImprintInstances().GetInstances().size() == 2,
 				"Scene-scope ActorReference may target an Actor in another live Instance");
@@ -499,7 +541,8 @@ namespace
 			SceneBase missingReferenceScene;
 			missingReferenceScene.Initialize(fixture.context);
 			Check(!ActorImprintInstanceDeserializer::Restore(missingExternalReference, missingReferenceScene,
-				fixture.system, &restoreError) && missingReferenceScene.GetActorPool().Count() == 0 &&
+				fixture.system) &&
+				missingReferenceScene.GetActorPool().Count() == 0 &&
 				missingReferenceScene.GetImprintInstances().GetInstances().empty(),
 				"Missing external ActorReference fails without publishing candidate Actors");
 			missingReferenceScene.Finalize();
@@ -508,11 +551,12 @@ namespace
 			destroyingReferenceScene.Initialize(fixture.context);
 			Actor* destroyingTarget = destroyingReferenceScene.AddRootActor(
 				ActorFactory::RestoreEmptyActor({}, external->GetGuid()));
-			Check(destroyingTarget && destroyingReferenceScene.RemoveActor(destroyingTarget),
+			Check(destroyingTarget &&
+				destroyingReferenceScene.RemoveActor(destroyingTarget),
 				"External-reference fixture enters pending destruction");
 			const std::size_t destroyingReferenceCount = destroyingReferenceScene.GetActorPool().Count();
 			Check(!ActorImprintInstanceDeserializer::Restore(externalRecord, destroyingReferenceScene,
-				fixture.system, &restoreError) &&
+				fixture.system) &&
 				destroyingReferenceScene.GetActorPool().Count() == destroyingReferenceCount &&
 				destroyingReferenceScene.GetImprintInstances().GetInstances().empty(),
 				"Destroying external ActorReference target fails without publishing candidate Actors");

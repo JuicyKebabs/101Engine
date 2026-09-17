@@ -20,7 +20,7 @@ private:
 	SceneBase& Candidate() { return m_candidate; }
 	const std::vector<ActorHandle>& Handles() const { return m_handles; }
 	bool SetParent(Actor* actor, Actor* parent);
-	bool ResolveAndValidate(Actor* root, Actor* externalParent, std::string& error);
+	bool ResolveAndValidate(Actor* root, Actor* externalParent);
 	void PrepareCommit(Actor* root, Actor* externalParent);
 	void Commit() noexcept;
 	void Attach() noexcept;

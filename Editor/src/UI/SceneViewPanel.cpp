@@ -5,7 +5,8 @@
 
 void SceneViewPanel::Render(
 	D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
-	UINT textureWidth, UINT textureHeight,
+	UINT textureWidth,
+	UINT textureHeight,
 	EditorViewportContext* viewportContext,
 	const ViewportOverlayData& overlayData,
 	std::span<const EditorDocumentInfo> documents,
@@ -24,12 +25,14 @@ void SceneViewPanel::Render(
 	m_isHovered = ImGui::IsWindowHovered();
 	m_isFocused = ImGui::IsWindowFocused();
 	m_documentTabBar.Render(documents, documentCallbacks);
+
 	if (!viewportContext)
 	{
 		ImGui::TextDisabled("No document is open.");
 		ImGui::End();
 		return;
 	}
+
 	const auto getViewMode = [viewportContext]() { return viewportContext->GetViewMode(); };
 
 	// Display the resolution of the render target
@@ -271,60 +274,61 @@ void SceneViewPanel::Render(
 
 	// Lamda function to draw a collection of canvas overlay rectangles on the image
 	const auto drawCanvasRects = [this, drawList](const std::vector<ViewportCanvasRect>& rects)
+	{
+		if (rects.empty())
 		{
-			if (rects.empty()) return;
+			return;
+		}
 
-			// Calculate the width and height of the image of the scene view panel
-			const float imageWidth = m_imageMax.x - m_imageMin.x;
-			const float imageHeight = m_imageMax.y - m_imageMin.y;
+		// Calculate the width and height of the image of the scene view panel
+		const float imageWidth = m_imageMax.x - m_imageMin.x;
+		const float imageHeight = m_imageMax.y - m_imageMin.y;
 
-			// Push a clipping rectangle to ensure that the
-			// overlay rectangles are only drawn within the bounds of the image
-			drawList->PushClipRect(m_imageMin, m_imageMax, true);
+		// Push a clipping rectangle to ensure that the
+		// overlay rectangles are only drawn within the bounds of the image
+		drawList->PushClipRect(m_imageMin, m_imageMax, true);
 
-			// Iterate through each canvas overlay rectangle and draw it on the image
-			for (const ViewportCanvasRect& rect : rects)
+		// Iterate through each canvas overlay rectangle and draw it on the image
+		for (const ViewportCanvasRect& rect : rects)
+		{
+			ImVec2 canvasCorners[4]{};
+
+			// Calculate the canvas corners in the ImGui window based on the
+			// normalized coordinates of the canvas rectangle and the size of the image
+			for (size_t i = 0; i < 4; i++)
 			{
-				ImVec2 canvasCorners[4]{};
-
-				// Calculate the canvas corners in the ImGui window based on the
-				// normalized coordinates of the canvas rectangle and the size of the image
-				for (size_t i = 0; i < 4; i++)
-				{
-					canvasCorners[i] =
+				canvasCorners[i] =
 					{
 						m_imageMin.x + rect.corners[i].x * imageWidth,
-						m_imageMin.y + rect.corners[i].y * imageHeight
-					};
-				}
-
-				ImU32 color = IM_COL32(120, 165, 185, 100);
-				float thickness = 1.0f;
-
-				// Change the color and thickness of the rectangle based on its role in the canvas overlay
-				// Highlight them in the order of EditingRoot > Selected > Ancestor
-				switch (rect.role)
-				{
-				case ViewportCanvasRole::EditingRoot:
-					color = IM_COL32(230, 180, 70, 220);
-					thickness = 2.0f;
-					break;
-				case ViewportCanvasRole::Selected:
-					color = IM_COL32(90, 190, 255, 255);
-					thickness = 2.5f;
-					break;
-				case ViewportCanvasRole::Ancestor:
-					break;
-				}
-
-				drawList->AddPolyline(
-					canvasCorners, 4, color,
-					ImDrawFlags_Closed, thickness
-				);
+						m_imageMin.y + rect.corners[i].y * imageHeight};
 			}
 
-			drawList->PopClipRect();
-		};
+			ImU32 color = IM_COL32(120, 165, 185, 100);
+			float thickness = 1.0f;
+
+			// Change the color and thickness of the rectangle based on its role in the canvas overlay
+			// Highlight them in the order of EditingRoot > Selected > Ancestor
+			switch (rect.role)
+			{
+			case ViewportCanvasRole::EditingRoot:
+				color = IM_COL32(230, 180, 70, 220);
+				thickness = 2.0f;
+				break;
+			case ViewportCanvasRole::Selected:
+				color = IM_COL32(90, 190, 255, 255);
+				thickness = 2.5f;
+				break;
+			case ViewportCanvasRole::Ancestor:
+				break;
+			}
+
+			drawList->AddPolyline(
+				canvasCorners, 4, color,
+				ImDrawFlags_Closed, thickness);
+		}
+
+		drawList->PopClipRect();
+	};
 
 	if (getViewMode() == EditorViewportMode::Canvas)
 	{// Canvas View Mode
@@ -370,7 +374,10 @@ void SceneViewPanel::Render(
 
 bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)
 {
-	if (!m_isViewportResized) return false;
+	if (!m_isViewportResized)
+	{
+		return false;
+	}
 
 	const UINT width = static_cast<UINT>(m_viewportSize.x);
 	const UINT height = static_cast<UINT>(m_viewportSize.y);
@@ -390,7 +397,10 @@ bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)
 
 bool SceneViewPanel::ConsumePickRequest(Vector2& outViewportUV)
 {
-	if (!m_hasPickRequest) return false;
+	if (!m_hasPickRequest)
+	{
+		return false;
+	}
 
 	outViewportUV = m_pickUV;
 	m_hasPickRequest = false;
@@ -400,7 +410,10 @@ bool SceneViewPanel::ConsumePickRequest(Vector2& outViewportUV)
 
 bool SceneViewPanel::ConsumeCanvasOpenRequest(Guid& outCanvasActorGuid)
 {
-	if (!m_canvasOpenRequest.IsValid()) return false;
+	if (!m_canvasOpenRequest.IsValid())
+	{
+		return false;
+	}
 
 	outCanvasActorGuid = m_canvasOpenRequest;
 	m_canvasOpenRequest = {};
@@ -410,7 +423,10 @@ bool SceneViewPanel::ConsumeCanvasOpenRequest(Guid& outCanvasActorGuid)
 
 bool SceneViewPanel::ConsumeCanvasNavigationInput(CanvasNavigationInput& outInput)
 {
-	if (!m_hasCanvasNavigationInput) return false;
+	if (!m_hasCanvasNavigationInput)
+	{
+		return false;
+	}
 
 	outInput = m_canvasNavigationInput;
 
@@ -422,7 +438,10 @@ bool SceneViewPanel::ConsumeCanvasNavigationInput(CanvasNavigationInput& outInpu
 
 bool SceneViewPanel::ConsumeSceneNavigationInput(SceneNavigationInput& outInput)
 {
-	if (!m_hasSceneNavigationInput) return false;
+	if (!m_hasSceneNavigationInput)
+	{
+		return false;
+	}
 
 	outInput = m_sceneNavigationInput;
 	m_sceneNavigationInput = {};

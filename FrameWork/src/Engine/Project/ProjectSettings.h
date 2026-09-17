@@ -10,7 +10,9 @@
 class ProjectSettings
 {
 public:
-	static bool Load(const std::filesystem::path& path, ProjectSettings& outSettings,
+	static bool Load(
+		const std::filesystem::path& path,
+		ProjectSettings& outSettings,
 		std::string* outError = nullptr);
 	bool Save(const std::filesystem::path& path, std::string* outError = nullptr) const;
 

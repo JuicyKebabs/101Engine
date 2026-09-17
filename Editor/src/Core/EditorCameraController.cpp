@@ -53,7 +53,10 @@ void EditorCameraController::Fly(
     const Vector3& localMovement,
     float distance) const
 {
-    if (localMovement.LengthSq() <= kDirectionEpsilonSq || distance == 0.0f) return;
+    if (localMovement.LengthSq() <= kDirectionEpsilonSq || distance == 0.0f)
+    {
+        return;
+    }
 
     CameraPose pose = camera.GetCameraPose();
     const Vector3 forward = pose.rotation.RotateVector3(Vector3::Forward());
@@ -64,7 +67,10 @@ void EditorCameraController::Fly(
         Vector3::Up() * localMovement.y +
         forward * localMovement.z;
 
-    if (direction.LengthSq() <= kDirectionEpsilonSq) return;
+    if (direction.LengthSq() <= kDirectionEpsilonSq)
+    {
+        return;
+    }
 
     const Vector3 translation = direction.Normalized() * distance;
     pose.position += translation;
@@ -120,12 +126,19 @@ void EditorCameraController::Dolly(
     float distanceFractionPerStep,
     float minimumDistance) const
 {
-    if (wheelDelta == 0.0f) return;
+    if (wheelDelta == 0.0f)
+    {
+        return;
+    }
 
     CameraPose pose = camera.GetCameraPose();
     const Vector3 toPivot = pivot - pose.position;
     const float currentDistance = toPivot.Length();
-    if (currentDistance <= kDirectionEpsilonSq) return;
+
+    if (currentDistance <= kDirectionEpsilonSq)
+    {
+        return;
+    }
 
     const float nextDistance = std::max(
         minimumDistance,

@@ -44,7 +44,10 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 	// Iterate through all actors in the scene to check for intersection with the ray
 	for (Actor* actor : scene.GetAllActors())
 	{
-		if (!actor || !actor->IsActive() || actor->IsDestroyed()) continue;
+		if (!actor || !actor->IsActive() || actor->IsDestroyed())
+		{
+			continue;
+		}
 
 		float distance = 0.0f;			// Distance from the ray origin to the intersection point
 		std::vector<uint32_t> sortPath;	// Sort path for the actor's renderer in the canvas hierarchy (used for screen space sorting)
@@ -55,7 +58,10 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 		{
 			if (isCanvasView)
 			{
-				if (!canvasViewRoot->ContainsRenderer(meshRenderer)) continue;
+				if (!canvasViewRoot->ContainsRenderer(meshRenderer))
+				{
+					continue;
+				}
 			}
 			else if (meshRenderer->GetRenderSpace() != targetRenderSpace)
 			{
@@ -68,17 +74,26 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 			Matrix4x4 pickMatrix = proxy.common.worldMatrix;
 
 			// If we are in a canvas view, apply the world-to-canvas transformation to the pick matrix
-			if (isCanvasView) pickMatrix *= worldToCanvas;
+			if (isCanvasView)
+			{
+				pickMatrix *= worldToCanvas;
+			}
 
 			hit = IntersectMesh(ray, *meshRenderer, pickMatrix, distance);
 
-			if (hit) sortPath = meshRenderer->BuildCanvasSortPath();
+			if (hit)
+			{
+				sortPath = meshRenderer->BuildCanvasSortPath();
+			}
 		}
 		else if (SpriteRenderer* spriteRenderer = actor->GetComponentByClass<SpriteRenderer>())
 		{
 			if (isCanvasView)
 			{
-				if (!canvasViewRoot->ContainsRenderer(spriteRenderer)) continue;
+				if (!canvasViewRoot->ContainsRenderer(spriteRenderer))
+				{
+					continue;
+				}
 			}
 			else if (spriteRenderer->GetRenderSpace() != targetRenderSpace)
 			{
@@ -91,17 +106,26 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 			Matrix4x4 pickMatrix = proxy.common.worldMatrix;
 
 			// If we are in a canvas view, apply the world-to-canvas transformation to the pick matrix
-			if (isCanvasView) pickMatrix *= worldToCanvas;
+			if (isCanvasView)
+			{
+				pickMatrix *= worldToCanvas;
+			}
 
 			hit = IntersectSprite(ray, cameraInfo, *spriteRenderer, pickMatrix, distance);
 
-			if (hit) sortPath = spriteRenderer->BuildCanvasSortPath();
+			if (hit)
+			{
+				sortPath = spriteRenderer->BuildCanvasSortPath();
+			}
 		}
 		else if (UIRenderer* uiRenderer = actor->GetComponentByClass<UIRenderer>())
 		{
 			if (isCanvasView)
 			{
-				if (!canvasViewRoot->ContainsRenderer(uiRenderer)) continue;
+				if (!canvasViewRoot->ContainsRenderer(uiRenderer))
+				{
+					continue;
+				}
 			}
 			else if (uiRenderer->GetRenderSpace() != targetRenderSpace)
 			{
@@ -114,30 +138,40 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 			Matrix4x4 pickMatrix = proxy.common.worldMatrix;
 
 			// If we are in a canvas view, apply the world-to-canvas transformation to the pick matrix
-			if (isCanvasView) pickMatrix *= worldToCanvas;
+			if (isCanvasView)
+			{
+				pickMatrix *= worldToCanvas;
+			}
 
 			hit = IntersectUI(ray, *uiRenderer, pickMatrix, distance);
 
-			if (hit) sortPath = uiRenderer->BuildCanvasSortPath();
-
+			if (hit)
+			{
+				sortPath = uiRenderer->BuildCanvasSortPath();
+			}
 		}
 
-		if (!hit) continue;
+		if (!hit)
+		{
+			continue;
+		}
 
 		// Compare the distance of the current hit with the nearest hit found so far
 
 		auto IsHigherOrder = [](const std::vector<uint32_t>& a, const std::vector<uint32_t>& b) -> bool
+		{
+			size_t minSize = std::min(a.size(), b.size());
+
+			for (size_t i = 0; i < minSize; ++i)
 			{
-				size_t minSize = std::min(a.size(), b.size());
-				for (size_t i = 0; i < minSize; ++i)
+				if (a[i] != b[i])
 				{
-					if (a[i] != b[i])
-					{
-						return a[i] > b[i]; // Higher order if the current element is greater
-					}
+					return a[i] > b[i]; // Higher order if the current element is greater
 				}
-				return a.size() > b.size(); // Longer path is considered higher order
-			};
+			}
+
+			return a.size() > b.size(); // Longer path is considered higher order
+		};
 
 		if (isCanvasView || targetRenderSpace == RenderSpace::Screen)
 		{
@@ -224,7 +258,10 @@ bool ScenePicker::IntersectSphere(
 	float& outDistance
 )
 {
-	if (radius <= 0.0f) return false;
+	if (radius <= 0.0f)
+	{
+		return false;
+	}
 
 	const Vector3 originToCenter = ray.origin - center;
 
@@ -234,15 +271,24 @@ bool ScenePicker::IntersectSphere(
 
 	const float discriminant = b * b - c;
 
-	if (discriminant < 0.0f) return false;
+	if (discriminant < 0.0f)
+	{
+		return false;
+	}
 
 	const float offset = std::sqrt(discriminant);
 
 	float distance = -b - offset;
 
-	if (distance < 0.0f) distance = -b + offset;
+	if (distance < 0.0f)
+	{
+		distance = -b + offset;
+	}
 
-	if (distance < 0.0f) return false;
+	if (distance < 0.0f)
+	{
+		return false;
+	}
 
 	outDistance = distance;
 
@@ -311,7 +357,10 @@ bool ScenePicker::IntersectMesh(
 		float distance = 0.0f;
 
 		// Check if the ray intersects the bounding sphere of the mesh
-		if (!IntersectSphere(ray, worldCenter, worldRadius, distance)) continue;
+		if (!IntersectSphere(ray, worldCenter, worldRadius, distance))
+		{
+			continue;
+		}
 
 		hit = true;
 
@@ -319,7 +368,10 @@ bool ScenePicker::IntersectMesh(
 		nearestDistance = std::min(nearestDistance, distance);
 	}
 
-	if (!hit) return false;
+	if (!hit)
+	{
+		return false;
+	}
 
 	outDistance = nearestDistance;
 	return true;
@@ -412,7 +464,10 @@ bool ScenePicker::IntersectLocalQuad(
 	// (z = 0 in local space)
 	const float localDistance = -localOrigin.z / localDirection.z;
 
-	if (localDistance < 0.0f) return false; // Intersection is behind the ray origin
+	if (localDistance < 0.0f)
+	{
+		return false; // Intersection is behind the ray origin
+	}
 
 	// Calculate the intersection point in local space
 	const Vector3 localHit = localOrigin + localDirection * localDistance;
@@ -431,7 +486,10 @@ bool ScenePicker::IntersectLocalQuad(
 
 	const float worldDistance = (worldHit - ray.origin).Dot(ray.direction);
 
-	if (worldDistance < 0.0f) return false; // Intersection is behind the ray origin
+	if (worldDistance < 0.0f)
+	{
+		return false; // Intersection is behind the ray origin
+	}
 
 	outDistance = worldDistance;
 

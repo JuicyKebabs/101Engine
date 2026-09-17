@@ -91,10 +91,21 @@ public:
 	{
 		auto metadata = [&]
 		{
-			if constexpr (requires { T::BuildMetadata(); }) return T::BuildMetadata();
-			else return TypeMetadataBuilder<T>(name).Build();
+			if constexpr (requires { T::BuildMetadata(); })
+			{
+				return T::BuildMetadata();
+			}
+			else
+			{
+				return TypeMetadataBuilder<T>(name).Build();
+			}
 		}();
-		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name) return false;
+
+		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name)
+		{
+			return false;
+		}
+
 		RegisterGameComponent(name, [] { return static_cast<Component*>(new T()); }, typeid(T),
 			std::make_unique<TypeMetadata>(std::move(*metadata)));
 		return true;
@@ -106,6 +117,7 @@ public:
 		for (const auto& name : m_gameComponentNames)
 		{
 			auto entryIt = m_entries.find(name);
+
 			if (entryIt != m_entries.end())
 			{
 				m_policies.erase(entryIt->second.typeId.name());
@@ -133,16 +145,18 @@ public:
 	}
 
 	// Create a component instance by name from the registry
-	Component* Create(const std::string& name) const 
+	Component* Create(const std::string& name) const
 	{
 		auto it = m_entries.find(name);
+
 		if (it != m_entries.end()) 
 		{
 			return it->second.factory();
 		}
+
 		return nullptr;
 	}
-	
+
 	// Check if a behavior factory exists in the registry
 	bool Has(const std::string& name) const 
 	{
@@ -152,7 +166,10 @@ public:
 	// Create a component instance by name and add it to the given actor
 	bool AddToActor(const std::string& name, Actor* actor) const
 	{
-		if (!actor) return false;
+		if (!actor)
+		{
+			return false;
+		}
 
 		auto it = m_entries.find(name);
 
@@ -166,13 +183,17 @@ public:
 
 		if (!actor->CanAddComponent(entry.typeId))
 		{
-			DBG("ComponentRegistry: Component '%s' cannot be added to Actor '%s'.", name.c_str(), actor->GetName().c_str());
+			DBG("ComponentRegistry: Component '%s' cannot be added to Actor '%s'.", name.c_str(),
+				actor->GetName().c_str());
 			return false;
 		}
 
 		std::unique_ptr<Component> component(entry.factory());
 
-		if (!component) return false;
+		if (!component)
+		{
+			return false;
+		}
 
 		return actor->AddComponent(std::move(component)) != nullptr;
 	}
@@ -181,11 +202,13 @@ public:
 	std::string GetNameByTypeIndex(std::type_index typeId) const
 	{
 		auto it = m_typeNames.find(typeId.name());
+
 		if (it == m_typeNames.end())
 		{
 			DBG("ComponentRegistry: No name found for component type index '%s'", typeId.name());
 			return "";
 		}
+
 		return it->second;
 	}
 
@@ -209,21 +232,36 @@ public:
 	std::optional<std::type_index> GetTypeId(const std::string& name) const
 	{
 		auto it = m_entries.find(name);
-		if (it == m_entries.end()) return std::nullopt;
+
+		if (it == m_entries.end())
+		{
+			return std::nullopt;
+		}
+
 		return it->second.typeId;
 	}
 
 	std::optional<ComponentPolicyInfo> GetPolicy(const std::string& name) const
 	{
 		auto it = m_entries.find(name);
-		if (it == m_entries.end()) return std::nullopt;
+
+		if (it == m_entries.end())
+		{
+			return std::nullopt;
+		}
+
 		return GetPolicy(it->second.typeId);
 	}
 
 	std::optional<ComponentPolicyInfo> GetPolicy(std::type_index typeId) const
 	{
 		auto it = m_policies.find(typeId.name());
-		if (it == m_policies.end()) return std::nullopt;
+
+		if (it == m_policies.end())
+		{
+			return std::nullopt;
+		}
+
 		return it->second;
 	}
 
@@ -231,7 +269,11 @@ public:
 	template<class T>
 	bool RegisterReflected(const std::string& name, std::unique_ptr<TypeMetadata> metadata)
 	{
-		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name) return false;
+		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name)
+		{
+			return false;
+		}
+
 		using Policy = ComponentPolicy<T>;
 		Register(name, [] { return static_cast<Component*>(new T()); }, typeid(T),
 			Policy::cardinality, Policy::family, std::move(metadata));
@@ -255,10 +297,17 @@ public:
 	// Used by inspector panel to determine if a component can be added to an actor
 	bool CanAddToActor(const std::string& name, const Actor* actor) const
 	{
-		if (!actor) return false;
+		if (!actor)
+		{
+			return false;
+		}
 
 		const auto typeId = GetTypeId(name);
-		if (!typeId) return false;
+
+		if (!typeId)
+		{
+			return false;
+		}
 
 		return actor->CanAddComponent(*typeId);
 	}
@@ -280,7 +329,6 @@ private:
 	// Set of component names registered from GameCode.dll (used for hot-reloading)
 	std::unordered_set <std::string> m_gameComponentNames;
 };
-
 
 // Place once in the component's .cpp file. Uses ClassName::BuildMetadata() when provided.
 #define REGISTER_GAME_COMPONENT(ClassName) \

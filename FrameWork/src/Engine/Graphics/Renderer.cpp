@@ -115,7 +115,6 @@ void Renderer::RenderShadowMap(ID3D12GraphicsCommandList* p_commandList)
 	framePtr->proj = m_directionalLight.proj;
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_shadowFrameCB->GetAddress());
 
-
 	const size_t totalMeshCount = m_frameRenderData.GetMeshCount();
 
 	// Allocate constant buffers for shadow map rendering
@@ -131,7 +130,10 @@ void Renderer::RenderShadowMap(ID3D12GraphicsCommandList* p_commandList)
 
 	for (auto& item : m_frameRenderData.opaque)
 	{
-		if (item.renderType == RenderType::Mesh) RenderMeshForShadow(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle));
+		if (item.renderType == RenderType::Mesh)
+		{
+			RenderMeshForShadow(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle));
+		}
 	}
 }
 
@@ -167,9 +169,11 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 
 	// Allocate constant buffers for this frame
 	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
+
 	if (m_meshCB.size() < totalMeshCount)
 	{
 		size_t toAllocate = totalMeshCount - m_meshCB.size();
+
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_meshCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(MeshRenderConstants)));
@@ -177,9 +181,11 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 	}
 
 	size_t totalSpriteCount = m_frameRenderData.GetSpriteCount();
+
 	if (m_spriteCB.size() < totalSpriteCount)
 	{
 		size_t toAllocate = totalSpriteCount - m_spriteCB.size();
+
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_spriteCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
@@ -187,9 +193,11 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 	}
 
 	size_t totalUIItemCount = m_frameRenderData.GetUICount();
+
 	if (m_uiCB.size() < totalUIItemCount)
 	{
 		size_t toAllocate = totalUIItemCount - m_uiCB.size();
+
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_uiCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
@@ -202,6 +210,7 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 	if (m_frameRenderData.sky.has_value())
 	{
 		const RenderItemRef& sky = *m_frameRenderData.sky;
+
 		if (sky.renderType == RenderType::Mesh && sky.handle < m_frameRenderData.GetMeshCount())
 		{
 			RenderMesh(p_commandList, m_frameRenderData.GetMesh(sky.handle),
@@ -214,13 +223,16 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare,
+				RenderTargetFormat::HDR);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle),
+				compare, RenderTargetFormat::HDR);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare,
+				RenderTargetFormat::HDR);
 			break;
 		default:
 			break;
@@ -232,13 +244,16 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare,
+				RenderTargetFormat::HDR);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle),
+				compare, RenderTargetFormat::HDR);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare,
+				RenderTargetFormat::HDR);
 			break;
 		default:
 			break;
@@ -276,7 +291,10 @@ void Renderer::RenderScreenSpace(
 	const CameraInfo* overrideCameraInfo
 )
 {
-	if (viewportWidth == 0 || viewportHeight == 0) return;
+	if (viewportWidth == 0 || viewportHeight == 0)
+	{
+		return;
+	}
 
 	// Set orthographic projection for screen space rendering
 	Matrix4x4 viewMatrix = Matrix4x4::Identity();
@@ -304,9 +322,11 @@ void Renderer::RenderScreenSpace(
 
 	// Allocate constant buffers for ui items
 	size_t totalUIItemCount = m_frameRenderData.GetUICount();
+
 	if (m_uiCB.size() < totalUIItemCount)
 	{
 		size_t toAllocate = totalUIItemCount - m_uiCB.size();
+
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_uiCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
@@ -320,13 +340,16 @@ void Renderer::RenderScreenSpace(
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, targetFormat);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare,
+				targetFormat);
 			break;
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, targetFormat);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle),
+				compare, targetFormat);
 			break;
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, targetFormat);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare,
+				targetFormat);
 			break;
 		default:
 			break;
@@ -355,6 +378,7 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 	if (m_selectionSpriteCB.size() < spriteCount)
 	{
 		size_t toAllocate = spriteCount - m_selectionSpriteCB.size();
+
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_selectionSpriteCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(SpriteRenderConstants)));
@@ -367,6 +391,7 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 	if (m_selectionUICB.size() < uiCount)
 	{
 		size_t toAllocate = uiCount - m_selectionUICB.size();
+
 		for (size_t i = 0; i < toAllocate; i++)
 		{
 			m_selectionUICB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(UIRenderConstants)));
@@ -398,11 +423,13 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 		p_commandList->SetGraphicsRootConstantBufferView(1, m_selectionMeshCB[count]->GetAddress());
 
 		auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
+
 		if (meshGPU == nullptr)
 		{
 			DBG("MeshGPU is null\n");
 			continue;
 		}
+
 		auto vbv = meshGPU->GetVertexBuffer()->GetView();
 		auto ibv = meshGPU->GetIndexBuffer()->GetView();
 		p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
@@ -424,7 +451,10 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 	// Render all sprites in the selection render data
 	PipelineState* spriteMaskPso = GetPipelineStateObject(m_selectionSpriteMaskKey);
 
-	if (!spriteMaskPso) return;
+	if (!spriteMaskPso)
+	{
+		return;
+	}
 
 	p_commandList->SetPipelineState(spriteMaskPso->GetPipelineState());
 
@@ -439,7 +469,10 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 
 		ConstantBuffer* constantBuffer = m_selectionSpriteCB[i].get();
 
-		if (!constantBuffer || !constantBuffer->GetIsValid()) continue;
+		if (!constantBuffer || !constantBuffer->GetIsValid())
+		{
+			continue;
+		}
 
 		auto constants = constantBuffer->GetPtr<SpriteRenderConstants>();
 
@@ -457,8 +490,12 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 
 		p_commandList->SetGraphicsRootConstantBufferView(1, constantBuffer->GetAddress());
 
-		const int32_t textureSrvIndex =m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
-		if (textureSrvIndex < 0) continue;
+		const int32_t textureSrvIndex = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+
+		if (textureSrvIndex < 0)
+		{
+			continue;
+		}
 
 		const auto textureHandle =m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(textureSrvIndex);
 
@@ -471,7 +508,10 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 
 	PipelineState* uiMaskPso = GetPipelineStateObject(m_selectionUIMaskKey);
 
-	if (!uiMaskPso) return;
+	if (!uiMaskPso)
+	{
+		return;
+	}
 
 	p_commandList->SetPipelineState(uiMaskPso->GetPipelineState());
 
@@ -486,7 +526,10 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 
 		ConstantBuffer* constantBuffer = m_selectionUICB[i].get();
 
-		if (!constantBuffer || !constantBuffer->GetIsValid()) continue;
+		if (!constantBuffer || !constantBuffer->GetIsValid())
+		{
+			continue;
+		}
 
 		auto constants = constantBuffer-> GetPtr<UIRenderConstants>();
 		constants->worldMatrix = item.common.worldMatrix;
@@ -504,8 +547,12 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 
 		p_commandList->SetGraphicsRootConstantBufferView(1, constantBuffer->GetAddress());
 
-		const int32_t textureSrvIndex =m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
-		if (textureSrvIndex < 0) continue;
+		const int32_t textureSrvIndex = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+
+		if (textureSrvIndex < 0)
+		{
+			continue;
+		}
 
 		const auto textureHandle =m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(textureSrvIndex);
 
@@ -533,7 +580,12 @@ void Renderer::RenderColliderDebug(
 	p_commandList->SetGraphicsRootConstantBufferView(0, m_colliderDebugFrameCB->GetAddress());
 
 	PipelineState* pso = GetPipelineStateObject(m_colliderDebugKey);
-	if (!pso) return;
+
+	if (!pso)
+	{
+		return;
+	}
+
 	p_commandList->SetPipelineState(pso->GetPipelineState());
 
 	for (size_t i = 0; i < meshCount; ++i)
@@ -547,7 +599,11 @@ void Renderer::RenderColliderDebug(
 		p_commandList->SetGraphicsRootConstantBufferView(1, m_colliderDebugMeshCB[i]->GetAddress());
 
 		MeshGPU* meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
-		if (!meshGPU) continue;
+
+		if (!meshGPU)
+		{
+			continue;
+		}
 
 		auto vbv = meshGPU->GetVertexBuffer()->GetView();
 		auto ibv = meshGPU->GetIndexBuffer()->GetView();
@@ -562,11 +618,18 @@ void Renderer::RenderColliderDebug(
 
 void Renderer::RenderSelectionOutline(ID3D12GraphicsCommandList* p_commandList, GpuTexture* selectionMask)
 {
-	if (!p_commandList || !selectionMask) return;
+	if (!p_commandList || !selectionMask)
+	{
+		return;
+	}
 
 	// Get pipeline state object for selection outline rendering
 	PipelineState* pso = GetPipelineStateObject(m_selectionOutlineKey);
-	if (!pso) return;
+
+	if (!pso)
+	{
+		return;
+	}
 
 	p_commandList->SetPipelineState(pso->GetPipelineState());
 
@@ -601,6 +664,7 @@ void Renderer::RenderMesh(
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
+
 	if (!m_meshCB[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
@@ -624,7 +688,6 @@ void Renderer::RenderMesh(
 		compare = currentKey;										// Update the compare key
 	}
 
-
 	// Set up the constant buffer for this mesh
 	auto ptr = m_meshCB[itemIndex]->GetPtr<MeshRenderConstants>();
 	ptr->worldMatrix = item.common.worldMatrix;
@@ -635,11 +698,13 @@ void Renderer::RenderMesh(
 
 	// Set mesh data
 	auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
+
 	if (meshGPU == nullptr)
 	{
 		DBG("MeshGPU is null\n");
 		return;
 	}
+
 	auto vbv = meshGPU->GetVertexBuffer()->GetView();
 	auto ibv = meshGPU->GetIndexBuffer()->GetView();
 	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
@@ -676,11 +741,13 @@ void Renderer::RenderMeshForShadow(
 
 	// Set mesh data
 	auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
+
 	if (meshGPU == nullptr)
 	{
 		DBG("MeshGPU is null\n");
 		return;
 	}
+
 	auto vbv = meshGPU->GetVertexBuffer()->GetView();
 	auto ibv = meshGPU->GetIndexBuffer()->GetView();
 	p_commandList->IASetPrimitiveTopology(meshGPU->GetTopology());
@@ -711,6 +778,7 @@ void Renderer::RenderSprite(
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
+
 	if (!m_spriteCB[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
@@ -721,8 +789,15 @@ void Renderer::RenderSprite(
 	PSOKey currentKey = item.common.materialDesc.psoKey;
 	currentKey.rtvFormat = targetFormat;
 
-	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite) currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
-	if (!currentKey.indexFree) currentKey.indexFree = true;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Sprite)
+	{
+		currentKey.vsKey.fileID = VS_FILE_ID::Sprite;
+	}
+
+	if (!currentKey.indexFree)
+	{
+		currentKey.indexFree = true;
+	}
 
 	if (currentKey != compare || itemIndex == 0)
 	{
@@ -769,6 +844,7 @@ void Renderer::RenderUI(
 		DBG("Not enough constant buffers allocated\n");
 		return;
 	}
+
 	if (!m_uiCB[itemIndex]->GetIsValid())
 	{
 		DBG("Constant buffer is not valid\n");
@@ -779,9 +855,20 @@ void Renderer::RenderUI(
 	PSOKey currentKey = item.common.materialDesc.psoKey;
 	currentKey.rtvFormat = targetFormat;
 
-	if (currentKey.vsKey.fileID != VS_FILE_ID::UI) currentKey.vsKey.fileID = VS_FILE_ID::UI;
-	if (currentKey.psKey.fileID != PS_FILE_ID::UI) currentKey.psKey.fileID = PS_FILE_ID::UI;
-	if (!currentKey.indexFree) currentKey.indexFree = true;
+	if (currentKey.vsKey.fileID != VS_FILE_ID::UI)
+	{
+		currentKey.vsKey.fileID = VS_FILE_ID::UI;
+	}
+
+	if (currentKey.psKey.fileID != PS_FILE_ID::UI)
+	{
+		currentKey.psKey.fileID = PS_FILE_ID::UI;
+	}
+
+	if (!currentKey.indexFree)
+	{
+		currentKey.indexFree = true;
+	}
 
 	if (currentKey != compare || itemIndex == 0)
 	{
@@ -818,6 +905,7 @@ PipelineState* Renderer::GetPipelineStateObject(PSOKey key)
 {
 	// Serch for the PSO in the map
 	auto it = m_psoMap.find(key);
+
 	if (it != m_psoMap.end())
 	{
 		return it->second.get();	// Return
@@ -843,25 +931,30 @@ std::shared_ptr<PipelineState> Renderer::CreatePipelineStateObject(const PSOKey&
 	pso->SetRootSignature(m_pRootSignature->GetRootSignature());
 
 	auto vs = m_pShaderLibrary->GetVS(key.vsKey.fileID, key.vsKey.entryID, key.vsKey.defines, key.commonDefines);
+
 	if (!vs) 
 	{
 		OutputDebugStringA("Vertex shader blob missing\n");
 		return nullptr;
 	}
+
 	pso->SetVertexShader(vs.Get());
 
-	if (!key.depthOnly) 
+	if (!key.depthOnly)
 	{
 		auto ps = m_pShaderLibrary->GetPS(key.psKey.fileID, key.psKey.entryID, key.psKey.defines, key.commonDefines);
+
 		if (!ps)
 		{
 			OutputDebugStringA("Pixel shader blob missing\n");
 			return nullptr;
 		}
+
 		pso->SetPixelShader(ps.Get());
 		pso->SetBlendMode(key.blend);
 		pso->FreeIndex(key.indexFree);
 	}
+
 	pso->SetDepthMode(key.depth);
 	pso->SetCullMode(key.cull);
 	pso->SetFillMode(key.fill);

@@ -10,8 +10,10 @@ class ActorImprintEditingContext;
 class ActorImprintEditorDocument final : public IEditorDocument
 {
 public:
-	ActorImprintEditorDocument(std::unique_ptr<ActorImprintEditingContext> context,
-		uint32_t viewportWidth, uint32_t viewportHeight);
+	ActorImprintEditorDocument(
+		std::unique_ptr<ActorImprintEditingContext> context,
+		uint32_t viewportWidth,
+		uint32_t viewportHeight);
 	~ActorImprintEditorDocument() override;
 
 	SceneBase* GetWorkingScene() override;

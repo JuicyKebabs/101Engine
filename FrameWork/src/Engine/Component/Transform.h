@@ -2,8 +2,6 @@
 #include "Component.h"
 #include "Engine/Core/Math/Math.h"
 
-
-
 // TransformComponent Class
 class Transform : public Component
 {

@@ -5,6 +5,7 @@ TimeManager& TimeManager::GetInstance()
 	if (!m_instance) {
 		m_instance = std::unique_ptr<TimeManager>(new TimeManager());
 	}
+
 	return *m_instance;
 }
 

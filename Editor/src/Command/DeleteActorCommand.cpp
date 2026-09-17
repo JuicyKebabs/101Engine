@@ -12,24 +12,40 @@ DeleteActorCommand::DeleteActorCommand(
 
 bool DeleteActorCommand::Execute()
 {
-	if (!m_scene || !m_actorGuid.IsValid()) return false;
+	if (!m_scene || !m_actorGuid.IsValid())
+	{
+		return false;
+	}
 
 	// Resolve the actor by its Guid
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
 
-	if (!actor || actor->IsDestroyed()) return false;
-	if (!m_scene->CanCaptureOrdinarySubtree(actor).Report(&m_structuralResult)) return false;
+	if (!actor || actor->IsDestroyed())
+	{
+		return false;
+	}
+
+	if (!m_scene->CanCaptureOrdinarySubtree(actor))
+	{
+		return false;
+	}
 
 	if (!m_hasSnapshot)
 	{
 		// Capture a snapshot of the actor subtree before deletion
-		if (!m_snapshot.Capture(actor, m_scene)) return false;
+		if (!m_snapshot.Capture(actor, m_scene))
+		{
+			return false;
+		}
 
 		m_hasSnapshot = true;
 	}
 
 	// Remove the actor subtree from the scene
-	if (!m_scene->RemoveActor(actor, /*cascadeToChildren=*/true, &m_structuralResult)) return false;
+	if (!m_scene->RemoveActor(actor, /*cascadeToChildren=*/true))
+	{
+		return false;
+	}
 
 	// Verify that the actor is marked as destroyed
 	return actor->IsDestroyed();
@@ -46,7 +62,10 @@ bool DeleteActorCommand::Undo()
 	}
 
 	// Check if the actor with the same Guid already exists in the scene
-	if (m_scene->ResolveActor(m_actorGuid)) return false;
+	if (m_scene->ResolveActor(m_actorGuid))
+	{
+		return false;
+	}
 
 	// Restore the actor subtree from the snapshot
 	Actor* restoredRoot = ActorSubtreeRestorer::Restore(m_snapshot, m_scene);

@@ -9,9 +9,13 @@ RenameActorCommand::RenameActorCommand(SceneBase* scene, const Guid& actorGuid, 
 
 bool RenameActorCommand::Execute()
 {
-    if (!m_pScene) return false;
+    if (!m_pScene)
+    {
+        return false;
+    }
 
     Actor* actor = m_pScene->ResolveActor(m_actorGuid);
+
     if (!actor ||
         actor->IsDestroyed() ||
         actor->GetOwner() != m_pScene ||
@@ -25,7 +29,10 @@ bool RenameActorCommand::Execute()
     {
         auto oldName = actor->GetName();
 
-        if (oldName == m_newName) return false;
+        if (oldName == m_newName)
+        {
+            return false;
+        }
 
         m_oldName = oldName;
         m_hasExecuted = true;
@@ -35,7 +42,10 @@ bool RenameActorCommand::Execute()
     }
 
     // Redo
-    if (actor->GetName() != m_oldName) return false;
+    if (actor->GetName() != m_oldName)
+    {
+        return false;
+    }
 
     actor->SetName(m_newName);
 
@@ -44,9 +54,13 @@ bool RenameActorCommand::Execute()
 
 bool RenameActorCommand::Undo()
 {
-    if (!m_hasExecuted || !m_pScene) return false;
+    if (!m_hasExecuted || !m_pScene)
+    {
+        return false;
+    }
 
     Actor* actor = m_pScene->ResolveActor(m_actorGuid);
+
     if (!actor ||
         actor->IsDestroyed() ||
         actor->GetOwner() != m_pScene)
@@ -54,7 +68,10 @@ bool RenameActorCommand::Undo()
         return false;
     }
 
-    if (actor->GetName() != m_newName) return false;
+    if (actor->GetName() != m_newName)
+    {
+        return false;
+    }
 
     actor->SetName(m_oldName);
 

@@ -10,8 +10,7 @@
 namespace
 {
 	using json = nlohmann::json;
-	using ActorImprintDetail::ObjectGraphError;
-	using ActorImprintDetail::ValidateObjectGraph;
+		using ActorImprintDetail::ValidateObjectGraph;
 	int g_failures = 0;
 
 	void Check(bool condition, const std::string& name)
@@ -44,60 +43,57 @@ namespace
 		};
 	}
 
-	bool RejectedAt(const json& graph, const std::string& path)
+	bool Rejects(const json& graph)
 	{
 		const json before = graph;
-		ObjectGraphError error;
-		return !ValidateObjectGraph(graph, error) && error.path == path &&
-			!error.message.empty() && graph == before;
+
+		return !ValidateObjectGraph(graph) && graph == before;
 	}
 
 	void TestValidGraphs()
 	{
 		json graph = MakeGraph();
 		const json before = graph;
-		ObjectGraphError error{ "/previous", "previous error" };
-		Check(ValidateObjectGraph(graph, error) && graph == before &&
-			error.path.empty() && error.message.empty(),
-			"Closed hierarchy validates without mutation and clears an old diagnostic");
+
+		Check(ValidateObjectGraph(graph) && graph == before, "Closed hierarchy validates without mutation");
 
 		std::reverse(graph["actors"].begin(), graph["actors"].end());
 		std::reverse(graph["actors"][2]["components"].begin(), graph["actors"][2]["components"].end());
-		Check(ValidateObjectGraph(graph, error), "Child-first Actors and reordered Components are accepted");
+		Check(ValidateObjectGraph(graph), "Child-first Actors and reordered Components are accepted");
 
 		graph = MakeGraph();
 		graph["actors"].erase(graph["actors"].begin() + 1, graph["actors"].end());
-		Check(ValidateObjectGraph(graph, error), "One root with no child Actors is accepted");
+		Check(ValidateObjectGraph(graph), "One root with no child Actors is accepted");
 
 		graph = MakeGraph();
 		const LocalObjectId largest = (std::numeric_limits<LocalObjectId>::max)();
 		graph["actors"][2]["components"][0]["localObjectId"] = largest - 1;
 		graph["nextLocalObjectId"] = largest;
-		Check(ValidateObjectGraph(graph, error), "IDs above signed 64-bit range retain unsigned precision");
+		Check(ValidateObjectGraph(graph), "IDs above signed 64-bit range retain unsigned precision");
 		graph["actors"][2]["components"][0]["localObjectId"] = largest;
-		Check(RejectedAt(graph, "/nextLocalObjectId"), "No ID increment may wrap past UINT64_MAX");
+		Check(Rejects(graph), "No ID increment may wrap past UINT64_MAX");
 	}
 
 	void TestIdentityFailures()
 	{
 		json graph = MakeGraph();
 		graph["actors"][2]["localObjectId"] = 20;
-		Check(RejectedAt(graph, "/actors/2/localObjectId"), "Duplicate Actor ID is rejected");
+		Check(Rejects(graph), "Duplicate Actor ID is rejected");
 		graph = MakeGraph();
 		graph["actors"][2]["components"][0]["localObjectId"] = 11;
-		Check(RejectedAt(graph, "/actors/2/components/0/localObjectId"), "Components on different Actors share one ID namespace");
+		Check(Rejects(graph), "Components on different Actors share one ID namespace");
 		graph = MakeGraph();
 		graph["actors"][0]["components"][1]["localObjectId"] = 10;
-		Check(RejectedAt(graph, "/actors/0/components/1/localObjectId"), "Component ID cannot collide with an Actor ID");
+		Check(Rejects(graph), "Component ID cannot collide with an Actor ID");
 		graph = MakeGraph();
 		graph["actors"][2]["localObjectId"] = 11;
-		Check(RejectedAt(graph, "/actors/2/localObjectId"), "Actor ID cannot collide with an earlier Component ID");
+		Check(Rejects(graph), "Actor ID cannot collide with an earlier Component ID");
 
 		for (int nextId : { 31, 30 })
 		{
 			graph = MakeGraph();
 			graph["nextLocalObjectId"] = nextId;
-			Check(RejectedAt(graph, "/nextLocalObjectId"), "Next ID must exceed all issued IDs: " + std::to_string(nextId));
+			Check(Rejects(graph), "Next ID must exceed all issued IDs: " + std::to_string(nextId));
 		}
 
 		const std::vector<json> invalidIds{ nullptr, false, true, 0, -1, 1.5, "10", json::array(), json::object(),
@@ -114,7 +110,7 @@ namespace
 				// A null non-root parent is a hierarchy error at this same location.
 				graph = MakeGraph();
 				graph[json::json_pointer(path)] = invalid;
-				allRejected &= RejectedAt(graph, path);
+				allRejected &= Rejects(graph);
 			}
 			Check(allRejected, "Invalid ID values are rejected at " + path);
 		}
@@ -124,32 +120,32 @@ namespace
 	{
 		json graph = MakeGraph();
 		graph["actors"] = json::array();
-		Check(RejectedAt(graph, "/actors"), "Zero Actor definitions are rejected");
+		Check(Rejects(graph), "Zero Actor definitions are rejected");
 		graph = MakeGraph();
 		graph["rootActorLocalObjectId"] = 11;
-		Check(RejectedAt(graph, "/rootActorLocalObjectId"), "Root cannot identify a Component");
+		Check(Rejects(graph), "Root cannot identify a Component");
 		graph["rootActorLocalObjectId"] = 99;
-		Check(RejectedAt(graph, "/rootActorLocalObjectId"), "Missing root is rejected");
+		Check(Rejects(graph), "Missing root is rejected");
 		graph = MakeGraph();
 		graph["actors"][0]["parentLocalObjectId"] = 20;
-		Check(RejectedAt(graph, "/actors/0/parentLocalObjectId"), "Declared root must have a null parent");
+		Check(Rejects(graph), "Declared root must have a null parent");
 		graph = MakeGraph();
 		graph["actors"][1]["parentLocalObjectId"] = nullptr;
-		Check(RejectedAt(graph, "/actors/1/parentLocalObjectId"), "Second root is rejected");
+		Check(Rejects(graph), "Second root is rejected");
 		graph = MakeGraph();
 		graph["actors"][1]["parentLocalObjectId"] = 99;
-		Check(RejectedAt(graph, "/actors/1/parentLocalObjectId"), "External parent is rejected");
+		Check(Rejects(graph), "External parent is rejected");
 		graph["actors"][1]["parentLocalObjectId"] = 11;
-		Check(RejectedAt(graph, "/actors/1/parentLocalObjectId"), "Parent cannot identify a Component");
+		Check(Rejects(graph), "Parent cannot identify a Component");
 		graph["actors"][1]["parentLocalObjectId"] = 20;
-		Check(RejectedAt(graph, "/actors/1/parentLocalObjectId"), "Self-parent cycle is rejected");
+		Check(Rejects(graph), "Self-parent cycle is rejected");
 		graph["actors"][1]["parentLocalObjectId"] = 30;
-		Check(RejectedAt(graph, "/actors/1/parentLocalObjectId"), "Disconnected cycle is rejected even when a valid root exists");
+		Check(Rejects(graph), "Disconnected cycle is rejected even when a valid root exists");
 	}
 
 	void TestMalformedRecords()
 	{
-		Check(RejectedAt(nullptr, ""), "Non-object asset is rejected");
+		Check(Rejects(nullptr), "Non-object asset is rejected");
 		const std::vector<std::string> requiredPaths{
 			"/rootActorLocalObjectId", "/nextLocalObjectId", "/actors",
 			"/actors/0/localObjectId", "/actors/0/parentLocalObjectId", "/actors/0/components",
@@ -160,13 +156,13 @@ namespace
 			json graph = MakeGraph();
 			const json::json_pointer pointer(path);
 			graph[pointer.parent_pointer()].erase(pointer.back());
-			Check(RejectedAt(graph, path), "Missing required graph field is rejected at " + path);
+			Check(Rejects(graph), "Missing required graph field is rejected at " + path);
 		}
 		for (const std::string& path : { "/actors", "/actors/0", "/actors/0/components", "/actors/0/components/0" })
 		{
 			json graph = MakeGraph();
 			graph[json::json_pointer(path)] = 42;
-			Check(RejectedAt(graph, path), "Malformed record is diagnosed at " + path);
+			Check(Rejects(graph), "Malformed record is diagnosed at " + path);
 		}
 	}
 
@@ -187,8 +183,8 @@ namespace
 				{ "components", json::array() }
 			});
 		}
-		ObjectGraphError error;
-		Check(ValidateObjectGraph(graph, error), "Deep child-first hierarchy validates without recursive stack growth");
+
+		Check(ValidateObjectGraph(graph), "Deep child-first hierarchy validates without recursive stack growth");
 	}
 }
 

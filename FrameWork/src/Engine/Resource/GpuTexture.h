@@ -153,15 +153,12 @@ public:
 
 	// Resize the texture to a new width and height. 
 	// This will release the existing resource and create a new one.
-	bool Resize(
-		ID3D12Device* device,
-		DescriptorHeapAllocator* allocator,
-		UINT newWidth,
-		UINT newHeight
-	);
+	bool Resize(ID3D12Device* device, DescriptorHeapAllocator* allocator, UINT newWidth, UINT newHeight);
 
-
-	ID3D12Resource* GetResource() const { return m_pResource.Get(); }
+	ID3D12Resource* GetResource() const
+	{
+		return m_pResource.Get();
+	}
 	ResourceState GetState() const { return m_currentState; }
 	ColorFormat GetFormat() const { return m_colorFormat; }
 	UINT GetWidth() const { return m_width; }
@@ -169,10 +166,26 @@ public:
 	const float* GetClearColor() const { return m_clearColor; }
 	float GetClearDepth() const { return m_clearDepth; }
 
-	uint32_t GetRtvIndex() { assert(m_rtvIndex != UINT32_MAX && "GpuTexture: RTV index is not set"); return m_rtvIndex; }
-	uint32_t GetDsvIndex() { assert(m_dsvIndex != UINT32_MAX && "GpuTexture: DSV index is not set"); return m_dsvIndex; }
-	uint32_t GetSrvIndex() { assert(m_srvIndex != UINT32_MAX && "GpuTexture: SRV index is not set"); return m_srvIndex; }
-	uint32_t GetUavIndex() { assert(m_uavIndex != UINT32_MAX && "GpuTexture: UAV index is not set"); return m_uavIndex; }
+	uint32_t GetRtvIndex()
+	{
+		assert(m_rtvIndex != UINT32_MAX && "GpuTexture: RTV index is not set");
+		return m_rtvIndex;
+	}
+	uint32_t GetDsvIndex()
+	{
+		assert(m_dsvIndex != UINT32_MAX && "GpuTexture: DSV index is not set");
+		return m_dsvIndex;
+	}
+	uint32_t GetSrvIndex()
+	{
+		assert(m_srvIndex != UINT32_MAX && "GpuTexture: SRV index is not set");
+		return m_srvIndex;
+	}
+	uint32_t GetUavIndex()
+	{
+		assert(m_uavIndex != UINT32_MAX && "GpuTexture: UAV index is not set");
+		return m_uavIndex;
+	}
 
 private:
 	ComPtr<ID3D12Resource> m_pResource = nullptr;	// The underlying GPU resource for the texture.

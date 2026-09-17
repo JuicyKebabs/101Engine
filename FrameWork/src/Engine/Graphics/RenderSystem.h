@@ -122,11 +122,17 @@ public:
 	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }
 
 	// Create render item functions (used to create draw packets from sort entries)
-	static MeshRenderItem CreateMeshRenderItem(const SubmeshRenderTemplate& renderTemplate, const MeshRendererProxy& renderProxy);			// Create a draw packet from a sort entry
-	static SpriteRenderItem CreateSpriteRenderItem(const SpriteRenderTemplate& renderTemplate, const SpriteRendererProxy& renderProxy);		// Create a sprite draw packet from a sort entry
-	static UIRenderItem CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy);						// Create a UI draw packet from a sort entry
+	static MeshRenderItem CreateMeshRenderItem(
+		const SubmeshRenderTemplate& renderTemplate,
+		const MeshRendererProxy& renderProxy); // Create a draw packet from a sort entry
+	static SpriteRenderItem CreateSpriteRenderItem(
+		const SpriteRenderTemplate& renderTemplate,
+		const SpriteRendererProxy& renderProxy); // Create a sprite draw packet from a sort entry
+	static UIRenderItem CreateUIRenderItem(
+		const UIRenderElement& renderTemplate,
+		const UIRendererProxy& renderProxy); // Create a UI draw packet from a sort entry
 
-private:
+  private:
 	SceneBase* m_scene = nullptr;
 	SkyRenderer* m_skyRenderer = nullptr;			// Pointer to the sky renderer in the scene (if any)
 	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
@@ -154,8 +160,10 @@ private:
 	// PSOKey comparison
 	static inline bool PSOKeyLess(const PSOKey& a, const PSOKey& b)
 	{
-		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID, a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat, a.indexFree, a.fill)
-			< std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID, b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, b.rtvFormat, b.indexFree, b.fill);
+		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID,
+				   a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat, a.indexFree, a.fill) <
+			   std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID,
+				   b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, b.rtvFormat, b.indexFree, b.fill);
 	}
 
 	// Bind sort comparison
@@ -193,6 +201,7 @@ private:
 		// First, sort by whether the blend mode is order-dependent
 		const bool aOrderDependent = isOrderDependent(a.psoKey.blend);
 		const bool bOrderDependent = isOrderDependent(b.psoKey.blend);
+
 		if (aOrderDependent != bOrderDependent)
 		{// Order-dependent blends first
 			return aOrderDependent > bOrderDependent;
@@ -205,12 +214,19 @@ private:
 			const int64_t bucketB = static_cast<int64_t>(std::floor(b.depth * 64.0f));
 
 			//First, sort by bucket (greater bucket first)
-			if (bucketA != bucketB) return bucketA > bucketB;
+			if (bucketA != bucketB)
+			{
+				return bucketA > bucketB;
+			}
 
 			//Then, sort by fine depth within the bucket (greater fine depth first)
 			const int64_t fineA = (int64_t)std::llround(a.depth * 4096.0f);
 			const int64_t fineB = (int64_t)std::llround(b.depth * 4096.0f);
-			if (fineA != fineB) return fineA > fineB;
+
+			if (fineA != fineB)
+			{
+				return fineA > fineB;
+			}
 
 			return false;	// Ignore same depth
 		}

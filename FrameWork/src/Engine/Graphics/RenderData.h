@@ -193,27 +193,36 @@ struct PSOKey
 	}
 
 	// Add multiple vertex shader defines at once
-	PSOKey AddVSDefines(std::initializer_list<VS_DEFINE> defines) const {
+	PSOKey AddVSDefines(std::initializer_list<VS_DEFINE> defines) const
+	{
 		PSOKey k = *this;
+
 		for (auto d : defines) {
 			k.vsKey.defines |= static_cast<uint64_t>(d);
 		}
+
 		return k;
 	}
 	// Add multiple pixel shader defines at once
-	PSOKey AddPSDefines(std::initializer_list<PS_DEFINE> defines) const {
+	PSOKey AddPSDefines(std::initializer_list<PS_DEFINE> defines) const
+	{
 		PSOKey k = *this;
+
 		for (auto d : defines) {
 			k.psKey.defines |= static_cast<uint64_t>(d);
 		}
+
 		return k;
 	}
 	// Add multiple common shader defines at once
-	PSOKey AddCommonDefines(std::initializer_list<COMMON_SHADER_DEFINE> defines) const {
+	PSOKey AddCommonDefines(std::initializer_list<COMMON_SHADER_DEFINE> defines) const
+	{
 		PSOKey k = *this;
+
 		for (auto d : defines) {
 			k.commonDefines |= static_cast<uint64_t>(d);
 		}
+
 		return k;
 	}
 
@@ -229,21 +238,37 @@ struct PSOKey
 
 namespace PSO_KEY_DEFAULT
 {
-	// Predefined PSO keys for common rendering configurations
-	inline constexpr PSOKey MESH_OPAQUE{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
-	inline constexpr PSOKey MESH_TRANSPARENT{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
-	inline constexpr PSOKey MESH_MASKED{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR };
-	inline constexpr PSOKey MESH_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
-	inline constexpr PSOKey MESH_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
-	inline constexpr PSOKey MESH_SKY{ VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0, BlendMode::Opaque, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR };
+// Predefined PSO keys for common rendering configurations
+inline constexpr PSOKey MESH_OPAQUE{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
+	BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR};
+inline constexpr PSOKey MESH_TRANSPARENT{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
+	BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
+inline constexpr PSOKey MESH_MASKED{VS_KEY{.fileID = VS_FILE_ID::Mesh},
+	PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque,
+	DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR};
+inline constexpr PSOKey MESH_ADDITIVE{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
+	BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
+inline constexpr PSOKey MESH_MULTIPLY{VS_KEY{.fileID = VS_FILE_ID::Mesh},
+	PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0,
+	BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
+inline constexpr PSOKey MESH_SKY{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
+	BlendMode::Opaque, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
 
-	inline constexpr PSOKey SPRITE_OPAQUE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true };
-	inline constexpr PSOKey SPRITE_TRANSPARENT{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
-	inline constexpr PSOKey SPRITE_MASKED{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true };
-	inline constexpr PSOKey SPRITE_ADDITIVE{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0, BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
-	inline constexpr PSOKey SPRITE_MULTIPLY{ VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite,.defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0, BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true };
+inline constexpr PSOKey SPRITE_OPAQUE{VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0,
+	BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true};
+inline constexpr PSOKey SPRITE_TRANSPARENT{VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite},
+	0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true};
+inline constexpr PSOKey SPRITE_MASKED{VS_KEY{.fileID = VS_FILE_ID::Sprite},
+	PS_KEY{.fileID = PS_FILE_ID::Sprite, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque,
+	DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true};
+inline constexpr PSOKey SPRITE_ADDITIVE{VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0,
+	BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true};
+inline constexpr PSOKey SPRITE_MULTIPLY{VS_KEY{.fileID = VS_FILE_ID::Sprite},
+	PS_KEY{.fileID = PS_FILE_ID::Sprite, .defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0,
+	BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true};
 
-	inline constexpr PSOKey UI{ VS_KEY{.fileID = VS_FILE_ID::UI}, PS_KEY{.fileID = PS_FILE_ID::UI}, 0, BlendMode::Alpha, DepthMode::Disable, CullMode::Front, RenderTargetFormat::LDR, true };
+inline constexpr PSOKey UI{VS_KEY{.fileID = VS_FILE_ID::UI}, PS_KEY{.fileID = PS_FILE_ID::UI}, 0, BlendMode::Alpha,
+	DepthMode::Disable, CullMode::Front, RenderTargetFormat::LDR, true};
 }
 
 // Hash function for PSOKey to be used in unordered_map
@@ -253,9 +278,11 @@ struct PSOKeyHash
 	{
 		size_t h1 = std::hash<VS_FILE_ID>{}(k.vsKey.fileID) ^ std::hash<PS_FILE_ID>{}(k.psKey.fileID);
 		size_t h2 = std::hash<VS_ENTRY_ID>{}(k.vsKey.entryID) ^ std::hash<PS_ENTRY_ID>{}(k.psKey.entryID);
-		size_t h3 = std::hash<int>{}(static_cast<int>(k.blend)) ^ std::hash<int>{}(static_cast<int>(k.depth)) ^ std::hash<int>{}(static_cast<int>(k.cull)) ^ std::hash<int>{}(static_cast<int>(k.rtvFormat));
+		size_t h3 = std::hash<int>{}(static_cast<int>(k.blend)) ^ std::hash<int>{}(static_cast<int>(k.depth)) ^
+					std::hash<int>{}(static_cast<int>(k.cull)) ^ std::hash<int>{}(static_cast<int>(k.rtvFormat));
 		size_t h4 = std::hash<bool>{}(k.indexFree) ^ std::hash<bool>{}(k.depthOnly);
-		size_t h5 = std::hash<uint64_t>{}(k.commonDefines) ^ std::hash<uint64_t>{}(k.vsKey.defines) ^ std::hash<uint64_t>{}(k.psKey.defines);
+		size_t h5 = std::hash<uint64_t>{}(k.commonDefines) ^ std::hash<uint64_t>{}(k.vsKey.defines) ^
+					std::hash<uint64_t>{}(k.psKey.defines);
 		size_t h6 = std::hash<int>{}(static_cast<int>(k.fill));
 		return ((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5);
 	}

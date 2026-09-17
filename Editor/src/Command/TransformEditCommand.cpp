@@ -27,7 +27,10 @@ bool TransformEditCommand::Undo()
 
 bool TransformEditCommand::Apply(const Transform3D& state)
 {
-	if (!m_scene || !m_actorGuid.IsValid()) return false;
+	if (!m_scene || !m_actorGuid.IsValid())
+	{
+		return false;
+	}
 
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
 
@@ -44,7 +47,11 @@ bool TransformEditCommand::Apply(const Transform3D& state)
 	);
 
 	Transform* transform = static_cast<Transform*>(component);
-	if (!transform) return false;
+
+	if (!transform)
+	{
+		return false;
+	}
 
 	transform->SetLocalTransform(state);
 	return true;

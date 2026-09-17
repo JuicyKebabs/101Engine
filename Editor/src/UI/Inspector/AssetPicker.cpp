@@ -11,27 +11,49 @@ namespace
 		std::string& outStorage
 	)
 	{
-		if (!currentAssetId.IsValid()) return "<None>";
+		if (!currentAssetId.IsValid())
+		{
+			return "<None>";
+		}
 
 		const AssetEntry* entry = assetManager.GetAssetEntry(currentAssetId);
 
-		if (!entry) return "<Missing Asset>";
+		if (!entry)
+		{
+			return "<Missing Asset>";
+		}
 
-		if (entry->type != expectedType) return "<Invalid Asset Type>";
+		if (entry->type != expectedType)
+		{
+			return "<Invalid Asset Type>";
+		}
 
 		outStorage = entry->relativePath;
 		return outStorage.c_str();
 	}
 }
 
-bool AssetPicker::TrySelectPayload(const AssetManager& assetManager,
-	AssetType expectedType, const EditorAssetDragDropPayload& payload,
-	const Guid& currentAssetId, Guid& outSelectedAssetId)
+bool AssetPicker::TrySelectPayload(
+	const AssetManager& assetManager,
+	AssetType expectedType,
+	const EditorAssetDragDropPayload& payload,
+	const Guid& currentAssetId,
+	Guid& outSelectedAssetId)
 {
 	outSelectedAssetId = currentAssetId;
-	if (!payload.assetGuid.IsValid() || payload.assetType != expectedType) return false;
+
+	if (!payload.assetGuid.IsValid() || payload.assetType != expectedType)
+	{
+		return false;
+	}
+
 	const AssetEntry* entry = assetManager.GetAssetEntry(payload.assetGuid);
-	if (!entry || entry->type != expectedType || entry->guid == currentAssetId) return false;
+
+	if (!entry || entry->type != expectedType || entry->guid == currentAssetId)
+	{
+		return false;
+	}
+
 	outSelectedAssetId = entry->guid;
 	return true;
 }
@@ -72,7 +94,10 @@ bool AssetPicker::Draw(
 			}
 		}
 
-		if (noneSelected) ImGui::SetItemDefaultFocus();
+		if (noneSelected)
+		{
+			ImGui::SetItemDefaultFocus();
+		}
 
 		// Get all asset entries registered with the AssetManager for the specified asset type
 		const std::vector<AssetEntry> entries = assetManager.GetAssetEntries(assetType);
@@ -90,6 +115,7 @@ bool AssetPicker::Draw(
 			for (const AssetEntry& entry : entries)
 			{
 				const bool selected = (entry.guid == currentAssetId);
+
 				if (ImGui::Selectable(entry.relativePath.c_str(), selected))
 				{
 					if (entry.guid != currentAssetId)
@@ -98,9 +124,14 @@ bool AssetPicker::Draw(
 						changed = true;
 					}
 				}
-				if (selected) ImGui::SetItemDefaultFocus();
+
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
 			}
 		}
+
 		ImGui::EndCombo();
 	}
 
@@ -111,13 +142,16 @@ bool AssetPicker::Draw(
 		{
 			const auto& payload = *static_cast<const EditorAssetDragDropPayload*>(raw->Data);
 			Guid selected;
+
 			if (TrySelectPayload(assetManager, assetType, payload, currentAssetId, selected))
 			{
 				outSelectedAssetId = selected;
 				changed = true;
 			}
 		}
+
 		ImGui::EndDragDropTarget();
 	}
+
 	return changed;
 }

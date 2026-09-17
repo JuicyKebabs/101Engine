@@ -19,8 +19,8 @@ public:
 		: m_scene(scene)
 	{}
 
-	ActorReferenceCodecResult Validate(const Guid& guid) const override;
-	ActorReferenceCodecResult FindActor(const Guid& guid, Actor*& outActor) const override;
+	bool Validate(const Guid& guid) const override;
+	bool FindActor(const Guid& guid, Actor*& outActor) const override;
 
 private:
 	const SceneBase& m_scene;

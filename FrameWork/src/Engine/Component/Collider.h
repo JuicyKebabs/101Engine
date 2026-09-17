@@ -8,7 +8,6 @@
 // Forward declaration
 class Actor;
 
-
 // Enumration for collider types
 enum class ColliderType
 {
@@ -107,9 +106,19 @@ public:
 	const SphereCollider& GetCurrentSphereCollider() const { return m_currentSphereCollider; }
 	const SphereCollider& GetPreviousSphereCollider() const { return m_previousSphereCollider; }
 	const CapsuleCollider& GetCurrentCapsuleCollider() const { return m_currentCapsuleCollider; }
-	const CapsuleCollider& GetPreviousCapsuleCollider() const { return m_previousCapsuleCollider; }
-	Matrix4x4 GetWorldMatrix() const { return Matrix4x4::CreateTRS(m_worldTransformCurrent.position, m_worldTransformCurrent.rotation, m_worldTransformCurrent.scale); }
-	TagId GetOwnerTag() const { return m_ownerTag; }
+	const CapsuleCollider& GetPreviousCapsuleCollider() const
+	{
+		return m_previousCapsuleCollider;
+	}
+	Matrix4x4 GetWorldMatrix() const
+	{
+		return Matrix4x4::CreateTRS(
+			m_worldTransformCurrent.position, m_worldTransformCurrent.rotation, m_worldTransformCurrent.scale);
+	}
+	TagId GetOwnerTag() const
+	{
+		return m_ownerTag;
+	}
 	std::vector<CollisionInfo>& GetCollisionInfos() { return m_collisionInfos; }
 	bool isDetected() const { return m_isDetected; }
 	bool deleteFlag() const { return m_deleteFlag; }
@@ -124,15 +133,43 @@ public:
 	void SetAuthoredType(ColliderType type);
 
 	// Setters
-	void SetLocalCenter(const Vector3& center) { m_localTransform.position = center; m_isDirty = true; }
-	void SetLocalRotation(const Quaternion& rotation) { m_localTransform.rotation = rotation; m_isDirty = true; }
-	void SetLocalScale(const Vector3& scale) { m_localTransform.scale = scale; m_isDirty = true; }
-	void SetType(ColliderType type) { m_type = type; m_isDirty = true; }
-	void SetLayer(CollisionLayer layer) { m_layer = layer; m_layerMask = MakeLayerMask(layer); m_isDirty = true; }
+	void SetLocalCenter(const Vector3& center)
+	{
+		m_localTransform.position = center;
+		m_isDirty = true;
+	}
+	void SetLocalRotation(const Quaternion& rotation)
+	{
+		m_localTransform.rotation = rotation;
+		m_isDirty = true;
+	}
+	void SetLocalScale(const Vector3& scale)
+	{
+		m_localTransform.scale = scale;
+		m_isDirty = true;
+	}
+	void SetType(ColliderType type)
+	{
+		m_type = type;
+		m_isDirty = true;
+	}
+	void SetLayer(CollisionLayer layer)
+	{
+		m_layer = layer;
+		m_layerMask = MakeLayerMask(layer);
+		m_isDirty = true;
+	}
 	void SetTrigger(bool trigger) { m_isTrigger = trigger; }
 	void SetDetected(bool flag) { m_isDetected = flag; }
-	void SetDeleteFlag(bool flag) { m_deleteFlag = flag; }
-	void SetActive(bool flag) { m_isActive = flag; m_isDirty = true; }
+	void SetDeleteFlag(bool flag)
+	{
+		m_deleteFlag = flag;
+	}
+	void SetActive(bool flag)
+	{
+		m_isActive = flag;
+		m_isDirty = true;
+	}
 
 	// Serialization and deserialization methods
 

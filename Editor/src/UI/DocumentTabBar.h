@@ -15,19 +15,28 @@ public:
 		bool canInteract = true;
 	};
 
-	void Render(std::span<const EditorDocumentInfo> documents,
+	void Render(
+		std::span<const EditorDocumentInfo> documents,
 		const Callbacks& callbacks);
 
 	static bool DispatchActivate(const Callbacks& callbacks, EditorDocumentId id)
 	{
-		if (!callbacks.canInteract || !callbacks.onActivate) return false;
+		if (!callbacks.canInteract || !callbacks.onActivate)
+		{
+			return false;
+		}
+
 		callbacks.onActivate(id);
 		return true;
 	}
 
 	static bool DispatchClose(const Callbacks& callbacks, EditorDocumentId id)
 	{
-		if (!callbacks.canInteract || !callbacks.onClose) return false;
+		if (!callbacks.canInteract || !callbacks.onClose)
+		{
+			return false;
+		}
+
 		callbacks.onClose(id);
 		return true;
 	}

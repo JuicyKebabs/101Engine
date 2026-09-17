@@ -18,7 +18,11 @@ const std::vector<MeshHandle>& MeshManager::LoadModel(const std::wstring& path)
 {
 	// Check if the model is already loaded
 	auto it = m_loadedModels.find(path);
-	if (it != m_loadedModels.end()) return it->second;	// Return existing handles if already loaded
+
+	if (it != m_loadedModels.end())
+	{
+		return it->second; // Return existing handles if already loaded
+	}
 
 	// Load meshes
 	std::vector<Mesh> meshes;
@@ -38,10 +42,12 @@ const std::vector<MeshHandle>& MeshManager::LoadModel(const std::wstring& path)
 		// Build material info for the mesh amd store it in the materials map
 		MeshMaterialInfo materialInfo;
 		materialInfo.materialColor = mesh.materialColor;
+
 		if (!mesh.texPath.empty())
 		{
-			materialInfo.textureHandle = m_pTextureManager->LoadTexture(mesh.texPath); 
+			materialInfo.textureHandle = m_pTextureManager->LoadTexture(mesh.texPath);
 		}
+
 		m_materials[handle] = materialInfo;
 
 		// Store the handle in the handles vector
@@ -57,6 +63,7 @@ MeshHandle MeshManager::CreateMeshHandle(Mesh& src)
 	{
 		Vector3 minPos = src.vertices.front().position;
 		Vector3 maxPos = minPos;
+
 		for (const Vertex& vertex : src.vertices)
 		{
 			const Vector3& pos = vertex.position;
@@ -67,6 +74,7 @@ MeshHandle MeshManager::CreateMeshHandle(Mesh& src)
 			maxPos.y = std::max(maxPos.y, pos.y);
 			maxPos.z = std::max(maxPos.z, pos.z);
 		}
+
 		src.boundsCenter = (minPos + maxPos) * 0.5f;
 		src.boundsRadius = (maxPos - minPos).Length() * 0.5f;
 	}
@@ -79,21 +87,36 @@ MeshHandle MeshManager::CreateMeshHandle(Mesh& src)
 MeshGPU* MeshManager::GetMeshGPU(MeshHandle handle)
 {
 	auto it = m_meshes.find(handle);
-	if (it != m_meshes.end()) return it->second.get();
+
+	if (it != m_meshes.end())
+	{
+		return it->second.get();
+	}
+
 	return nullptr;
 }
 
 MeshMaterialInfo MeshManager::GetMeshMaterialInfo(MeshHandle handle)
 {
 	auto it = m_materials.find(handle);
-	if (it != m_materials.end()) return it->second;
+
+	if (it != m_materials.end())
+	{
+		return it->second;
+	}
+
 	return MeshMaterialInfo{};
 }
 
 std::wstring MeshManager::GetSourcePath(MeshHandle handle)
 {
 	auto it = m_sorurcePathes.find(handle);
-	if (it != m_sorurcePathes.end()) return it->second;
+
+	if (it != m_sorurcePathes.end())
+	{
+		return it->second;
+	}
+
 	return L"";
 }
 
@@ -101,6 +124,7 @@ void MeshManager::CreateErrorMesh()
 {
 	// Create cube mesh for error mesh
 	Model cubeModel = RenderTemplateFactory::LoadDefaultModel(DefaultMesh::Cube);
+
 	if (cubeModel.empty())
 	{
 		DBG("MeshManager: Failed to create error mesh (default cube model is empty).");
@@ -124,10 +148,18 @@ void MeshManager::CreateErrorMesh()
 MeshHandle MeshManager::LoadDefaultMesh(DefaultMesh type)
 {
 	const auto loaded = m_loadedDefaultMeshes.find(type);
-	if (loaded != m_loadedDefaultMeshes.end()) return loaded->second;
+
+	if (loaded != m_loadedDefaultMeshes.end())
+	{
+		return loaded->second;
+	}
 
 	Model model = GetDefaultModel(type);
-	if (model.empty()) return m_errorMeshHandle;
+
+	if (model.empty())
+	{
+		return m_errorMeshHandle;
+	}
 
 	MeshHandle handle = CreateMeshHandle(model.front());
 	m_materials[handle] = MeshMaterialInfo{};

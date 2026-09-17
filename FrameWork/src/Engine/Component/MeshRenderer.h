@@ -8,7 +8,6 @@
 
 class Transform;
 
-
 //---------------------------------------------------------
 // MeshRenderer class
 // A component for rendering static meshes in the scene
@@ -45,7 +44,11 @@ public:
 			renderTemplate.materialDesc.psoKey = renderTemplate.materialDesc.psoKey.WithLighting();
 		}
 
-		if (!m_templates.empty()) SetBlendMode(m_templates.front().materialDesc.psoKey.blend);
+		if (!m_templates.empty())
+		{
+			SetBlendMode(m_templates.front().materialDesc.psoKey.blend);
+		}
+
 		m_meshAssetId = {};
 		m_pendingMeshAssetId.reset();
 		m_textureOverrideAssetId = {};

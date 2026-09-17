@@ -29,6 +29,7 @@ bool CommandQueue::Initialize(ID3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE typ
 
 	// Create command queue
 	hr = pDevice->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&m_pCommandQueue));
+
 	if (FAILED(hr))
 	{
 		DBG("CommandQueue::Initialize: Failed to create command queue.");
@@ -37,6 +38,7 @@ bool CommandQueue::Initialize(ID3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE typ
 
 	// Create fence with initial value of 0
 	hr = pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence));
+
 	if (FAILED(hr))
 	{
 		DBG("CommandQueue::Initialize: Failed to create fence.");
@@ -45,6 +47,7 @@ bool CommandQueue::Initialize(ID3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE typ
 
 	// Create an event for fence synchronization
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
 	if (!m_fenceEvent)
 	{
 		DBG("CommandQueue::Initialize: Failed to create fence event.");

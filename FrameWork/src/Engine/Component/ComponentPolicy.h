@@ -18,7 +18,6 @@ class UIImage;
 // Family : a grouping of component types that are related
 //-------------------------------------------------------------------------------------
 
-
 enum class ComponentCardinality
 {
 	UniqueRequired,	// Only one instance allowed and it must be present

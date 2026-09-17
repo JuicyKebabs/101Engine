@@ -13,7 +13,12 @@ namespace ValueValidation
 	inline bool NormalizeRotation(Quaternion& rotation)
 	{
 		const float lengthSquared = rotation.LengthSq();
-		if (!std::isfinite(lengthSquared) || lengthSquared <= 0.000001f) return false;
+
+		if (!std::isfinite(lengthSquared) || lengthSquared <= 0.000001f)
+		{
+			return false;
+		}
+
 		rotation = rotation.Normalized();
 		return true;
 	}

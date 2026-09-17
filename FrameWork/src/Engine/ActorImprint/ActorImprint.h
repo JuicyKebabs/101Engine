@@ -35,7 +35,10 @@ public:
 
 private:
 	friend class ActorImprintAssetDeserializer;
-	ActorImprint(DefinitionRevision revision, LocalObjectId rootId, LocalObjectId nextId,
+	ActorImprint(
+		DefinitionRevision revision,
+		LocalObjectId rootId,
+		LocalObjectId nextId,
 		std::vector<ActorDefinition> actors)
 		: m_revision(revision), m_rootActorId(rootId), m_nextLocalObjectId(nextId), m_actors(std::move(actors))
 	{}

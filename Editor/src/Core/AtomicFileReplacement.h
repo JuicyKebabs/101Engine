@@ -30,10 +30,13 @@ struct AtomicFileReplacementError
 class AtomicFileReplacement
 {
 public:
-	static bool WriteTemporary(const std::filesystem::path& destination,
-		std::string_view bytes, std::filesystem::path& outTemporary,
+	static bool WriteTemporary(
+		const std::filesystem::path& destination,
+		std::string_view bytes,
+		std::filesystem::path& outTemporary,
 		AtomicFileReplacementError* outError = nullptr);
-	static bool Replace(const std::filesystem::path& temporary,
+	static bool Replace(
+		const std::filesystem::path& temporary,
 		const std::filesystem::path& destination,
 		AtomicFileReplacementError* outError = nullptr);
 	static void RemoveTemporary(const std::filesystem::path& temporary) noexcept;

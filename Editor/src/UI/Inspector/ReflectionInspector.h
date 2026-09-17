@@ -54,15 +54,6 @@ struct ReflectionInspectorServices
 		const char*, const PropertyMetadata&, const AssetReferenceValue&, AssetReferenceValue&)> drawAssetReference;
 };
 
-struct ReflectionInspectorResult
-{
-	std::size_t displayedProperties = 0;
-	std::size_t readFailures = 0;
-	std::size_t unsupportedProperties = 0;
-	std::size_t writeFailures = 0;
-	std::size_t restoreFailures = 0;
-};
-
 class ReflectionInspector
 {
 public:
@@ -71,7 +62,7 @@ public:
 		const TypeMetadata& metadata,
 		ReflectionInspectorPolicy policy);
 
-	ReflectionInspectorResult Draw(
+	bool Draw(
 		const TypeMetadata& metadata,
 		std::type_index objectType,
 		void* object,

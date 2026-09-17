@@ -9,8 +9,7 @@ class PropertyPath
 {
 public:
 	static std::optional<PropertyPath> FromString(std::string_view path);
-	static std::optional<PropertyPath> FromMembers(
-		const std::vector<std::string>& members);
+	static std::optional<PropertyPath> FromMembers(const std::vector<std::string>& members);
 
 	const std::string& ToString() const { return m_path; }
 	const std::vector<std::string>& GetMembers() const { return m_members; }

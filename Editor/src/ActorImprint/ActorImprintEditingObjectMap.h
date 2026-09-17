@@ -36,7 +36,8 @@ public:
 		LocalObjectId nextLocalObjectId = InvalidLocalObjectId;
 	};
 
-	bool Initialize(const SceneBase& scene,
+	bool Initialize(
+		const SceneBase& scene,
 		const ActorImprintDefinitionExpansion& expansion,
 		LocalObjectId nextLocalObjectId);
 	bool Reconcile(const SceneBase& scene);

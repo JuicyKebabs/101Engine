@@ -30,7 +30,12 @@ public:
 	void SetParams(const ParamDesc& desc) {
 		SetCanvas(desc.pCanvas);
 		m_renderTemplate = desc.renderTemplate;
-		if (!m_renderTemplate.empty()) SetBlendMode(m_renderTemplate.front().materialDesc.psoKey.blend);
+
+		if (!m_renderTemplate.empty())
+		{
+			SetBlendMode(m_renderTemplate.front().materialDesc.psoKey.blend);
+		}
+
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
 		SetOrder(desc.order);
@@ -49,7 +54,11 @@ public:
 	AssetReference<TextureAsset> GetTextureAssetReference() const;
 	bool TrySetTextureAssetReference(const AssetReference<TextureAsset>& value);
 	Guid GetTextureAssetId() const {
-		if (m_textureAssetId.IsValid()) return m_textureAssetId;
+		if (m_textureAssetId.IsValid())
+		{
+			return m_textureAssetId;
+		}
+
 		return m_pendingTextureAssetId.value_or(Guid{});
 	}
 

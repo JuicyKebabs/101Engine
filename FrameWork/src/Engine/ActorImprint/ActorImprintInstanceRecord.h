@@ -43,23 +43,3 @@ struct ActorImprintSerializedInstanceRecord
 	std::vector<ActorImprintActorGuidEntry> actorGuids;
 	std::vector<ActorImprintPropertyOverrideTarget> propertyOverrides;
 };
-
-enum class ActorImprintInstanceRecordErrorCode
-{
-	None,
-	InvalidSchema,
-	InvalidAssetGuid,
-	InvalidDefinitionRevision,
-	InvalidRootActorGuid,
-	InvalidExternalParentActorGuid,
-	InvalidActorGuidMapping,
-	InvalidPropertyOverride,
-};
-
-struct ActorImprintInstanceRecordError
-{
-	ActorImprintInstanceRecordErrorCode code = ActorImprintInstanceRecordErrorCode::None;
-	LocalObjectId targetLocalObjectId = InvalidLocalObjectId;
-	std::string path; // JSON Pointer into the Instance record.
-	std::string message;
-};

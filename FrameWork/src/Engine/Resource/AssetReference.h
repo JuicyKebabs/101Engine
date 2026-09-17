@@ -84,7 +84,11 @@ public:
 
 	bool SetGuid(const Guid& guid)
 	{
-		if (!guid.IsValid()) return false;
+		if (!guid.IsValid())
+		{
+			return false;
+		}
+
 		m_guid = guid;
 		m_resolved = false;
 		return true;
@@ -104,7 +108,11 @@ public:
 
 	bool SetValue(const AssetReferenceValue& value)
 	{
-		if (value.expectedType != GetExpectedType()) return false;
+		if (value.expectedType != GetExpectedType())
+		{
+			return false;
+		}
+
 		if (!value.HasValue())
 		{
 			Clear();

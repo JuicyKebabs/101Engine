@@ -63,7 +63,7 @@ bool ComponentSnapshot::Capture(Actor* actor, Component* component)
 	return true;
 }
 
-Component* ComponentSnapshot::Restore(SceneBase* scene, StructuralMutationResult* result) const
+Component* ComponentSnapshot::Restore(SceneBase* scene) const
 {
 	if (!scene ||
 		!m_isValid ||
@@ -85,22 +85,27 @@ Component* ComponentSnapshot::Restore(SceneBase* scene, StructuralMutationResult
 	std::unique_ptr<Component> component =
 		ComponentDeserializer::DeserializeRecord(m_componentRecord);
 
-	if (!component) return nullptr;
+	if (!component)
+	{
+		return nullptr;
+	}
 
 	// Restore the Component to the exact-type occurrence position captured in the Memento.
 	Component* restored = scene->AddActorComponentImmediate(
 		actor,
 		std::move(component),
-		m_occurrenceIndex,
-		result
+		m_occurrenceIndex
 	);
 
-	if (!restored) return nullptr;
+	if (!restored)
+	{
+		return nullptr;
+	}
 
 	// Reference resolution requires the restored Component to already belong to an Actor and Scene.
 	if (!restored->ResolveReferences(*scene))
 	{
-		if (!scene->RemoveActorComponentImmediate(actor, restored, result))
+		if (!scene->RemoveActorComponentImmediate(actor, restored))
 		{
 			DBG("ComponentSnapshot::Restore: Failed to roll back a Component after reference resolution failed.");
 		}

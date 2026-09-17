@@ -11,7 +11,12 @@ DefinitionRevision DefinitionRevision::Generate()
 bool DefinitionRevision::TryParse(const std::string& text, DefinitionRevision& outRevision)
 {
 	Guid guid;
-	if (text.find('\0') != std::string::npos || !Guid::TryParse(text, guid)) return false;
+
+	if (text.find('\0') != std::string::npos || !Guid::TryParse(text, guid))
+	{
+		return false;
+	}
+
 	outRevision.m_guid = guid;
 	return true;
 }

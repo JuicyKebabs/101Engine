@@ -48,6 +48,7 @@ bool ClassTemplateGenerator::Generate(const std::string& className)
     // Generate .cpp
     {
         std::ofstream source(sourcePath);
+
         if (!source.is_open())
         {
             DBG("ClassTemplateGenerator: Failed to create %s", sourcePath.c_str());

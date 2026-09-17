@@ -6,21 +6,32 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplate(MeshManager& meshManager, TextureManager& textureManager, const MeshInput& meshInput, const MaterialInput& materialInput)
+MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplate(
+	MeshManager& meshManager,
+	TextureManager& textureManager,
+	const MeshInput& meshInput,
+	const MaterialInput& materialInput)
 {
 	Model model = LoadModelFromFile(meshInput.modelPath, meshInput.inverseU, meshInput.inverseV);
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
 	return BuildRenderTemplate(meshManager, model, materialDesc);
 }
 
-MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(MeshManager& meshManager, TextureManager& textureManager, DefaultMesh mesh, const MaterialInput& materialInput)
+MeshRenderTemplate RenderTemplateFactory::CreateMeshRenderTemplateFromDefaultMesh(
+	MeshManager& meshManager,
+	TextureManager& textureManager,
+	DefaultMesh mesh,
+	const MaterialInput& materialInput)
 {
 	Model model = LoadDefaultModel(mesh);
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
 	return BuildRenderTemplate(meshManager, model, materialDesc);
 }
 
-SpriteRenderTemplate RenderTemplateFactory::CreateSpriteRenderTemplate(TextureManager& textureManager, const MaterialInput& materialInput, BillboardType billboardType)
+SpriteRenderTemplate RenderTemplateFactory::CreateSpriteRenderTemplate(
+	TextureManager& textureManager,
+	const MaterialInput& materialInput,
+	BillboardType billboardType)
 {
 	SpriteRenderTemplate temp;
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
@@ -29,7 +40,9 @@ SpriteRenderTemplate RenderTemplateFactory::CreateSpriteRenderTemplate(TextureMa
 	return temp;
 }
 
-UIRenderTemplate RenderTemplateFactory::CreateUIImageRenderTemplate(TextureManager& textureManager, const MaterialInput& materialInput)
+UIRenderTemplate RenderTemplateFactory::CreateUIImageRenderTemplate(
+	TextureManager& textureManager,
+	const MaterialInput& materialInput)
 {
 	UIRenderTemplate temp;
 	MaterialDesc materialDesc = BuildMaterialDesc(textureManager, materialInput);
@@ -73,7 +86,10 @@ Model RenderTemplateFactory::LoadDefaultModel(DefaultMesh type)
 	return model;
 }
 
-MeshRenderTemplate RenderTemplateFactory::BuildRenderTemplate(MeshManager& meshManager, Model& model, MaterialDesc& materialDesc)
+MeshRenderTemplate RenderTemplateFactory::BuildRenderTemplate(
+	MeshManager& meshManager,
+	Model& model,
+	MaterialDesc& materialDesc)
 {
 	MeshRenderTemplate temp;
 

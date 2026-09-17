@@ -19,16 +19,31 @@ RemoveComponentCommand::RemoveComponentCommand(
 bool RemoveComponentCommand::Execute()
 {
 	// Apply only when the component is not already removed
-	if (m_isRemoved) return false;
+	if (m_isRemoved)
+	{
+		return false;
+	}
 
 	// Resolve actor from scene by its GUID
 	Actor* actor = ResolveActor();
-	if (!actor) return false;
+
+	if (!actor)
+	{
+		return false;
+	}
 
 	// Resolve component from actor by its occurrence index
 	Component* component = ResolveComponent(actor);
-	if (!component) return false;
-	if (!m_scene->CanRemoveComponent(actor, component).Report(&m_structuralResult)) return false;
+
+	if (!component)
+	{
+		return false;
+	}
+
+	if (!m_scene->CanRemoveComponent(actor, component))
+	{
+		return false;
+	}
 
 	if (!m_hasSnapshot)
 	{// First execution
@@ -38,12 +53,12 @@ bool RemoveComponentCommand::Execute()
 		{
 			return false;
 		}
-		
+
 		m_hasSnapshot = true;
 	}
 
 	// Remove the component from the actor immediately
-	if (!m_scene->RemoveActorComponentImmediate(actor, component, &m_structuralResult))
+	if (!m_scene->RemoveActorComponentImmediate(actor, component))
 	{
 		return false;
 	}
@@ -62,8 +77,12 @@ bool RemoveComponentCommand::Undo()
 	}
 
 	// Restore the component from the snapshot
-	Component* restored = m_componentSnapshot.Restore(m_scene, &m_structuralResult);
-	if (!restored) return false;
+	Component* restored = m_componentSnapshot.Restore(m_scene);
+
+	if (!restored)
+	{
+		return false;
+	}
 
 	m_isRemoved = false;	// Mark as not removed to allow re-execution
 	return true;
@@ -71,7 +90,10 @@ bool RemoveComponentCommand::Undo()
 
 Actor* RemoveComponentCommand::ResolveActor() const
 {
-	if (!m_scene || !m_actorGuid.IsValid()) return nullptr;
+	if (!m_scene || !m_actorGuid.IsValid())
+	{
+		return nullptr;
+	}
 
 	Actor* actor = m_scene->ResolveActor(m_actorGuid);
 
@@ -87,15 +109,20 @@ Actor* RemoveComponentCommand::ResolveActor() const
 
 Component* RemoveComponentCommand::ResolveComponent(Actor* actor) const
 {
-	if (!actor) return nullptr;
+	if (!actor)
+	{
+		return nullptr;
+	}
 
 	const auto typeId = ComponentRegistry::Get().GetTypeId(m_componentName);
 
-	if (!typeId) return nullptr;
+	if (!typeId)
+	{
+		return nullptr;
+	}
 
 	return actor->GetComponentByExactType(
 		*typeId,
 		m_occurrenceIndex
 	);
 }
-

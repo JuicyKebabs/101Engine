@@ -1,4 +1,5 @@
 #include "TestBehavior.h"
+#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Core/Context/Context.h"
@@ -14,7 +15,6 @@ std::optional<TypeMetadata> TestBehavior::BuildMetadata()
 	builder.Property("actorImprint", &TestBehavior::m_actorImprint).Optional();
 	return builder.Build();
 }
-
 
 void TestBehavior::Start()
 {
@@ -54,11 +54,9 @@ void TestBehavior::Update()
 	}
 
 	const Vector3 spawnPosition = sourceTransform->GetWorldPosition();
-	ActorImprintMaterializationError error;
-	Actor* instanceRoot = context->pActorImprintSystem->Instantiate(*scene, m_actorImprint, {}, &error);
+	Actor* instanceRoot = context->pActorImprintSystem->Instantiate(*scene, m_actorImprint, {});
 	if (!instanceRoot)
 	{
-		DBG("TestBehavior: ActorImprint instantiation failed: %s", error.message.c_str());
 		return;
 	}
 
