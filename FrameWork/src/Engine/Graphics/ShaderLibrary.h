@@ -53,6 +53,7 @@ struct ShaderDesc
 static const std::wstring VS_FILE_TABLE[] = {
     L"shader\\compiled\\VertexShader\\MeshVS.cso",
     L"shader\\compiled\\VertexShader\\SpriteVS.cso",
+    L"shader\\compiled\\VertexShader\\WaveVS.cso",
     L"shader\\compiled\\VertexShader\\UIVS.cso",
     L"shader\\compiled\\VertexShader\\ShadowVS.cso",
     L"shader\\compiled\\VertexShader\\PostEffectVS.cso",

@@ -47,6 +47,7 @@ message(STATUS "Using fxc.exe: ${FXC_EXECUTABLE}")
 set(SHADER_COMPILE_LIST
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/MeshVS.hlsl|vs_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/SpriteVS.hlsl|vs_5_0|main"
+    "${CMAKE_SOURCE_DIR}/shader/VertexShader/WaveVS.hlsl|vs_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/UIVS.hlsl|vs_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/ShadowVS.hlsl|vs_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/VertexShader/PostEffectVS.hlsl|vs_5_0|main"

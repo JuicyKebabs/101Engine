@@ -1,6 +1,7 @@
 #include "../Constants/BasicShader.hlsli"
 #include "../Constants/FrameConstants.hlsli"
 #include "../Constants/MeshObjectConstants.hlsli"
+
 //頂点シェーダー入力データ構造体
 struct VSInput
 {

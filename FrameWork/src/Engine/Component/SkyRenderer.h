@@ -51,8 +51,10 @@ private:
 
 	FollowMode m_followMode = FollowMode::Owner;	// Selects the source of the sky sphere's world position
 	ActorReference m_followActor;					// Reference to the actor to follow when FollowMode is Actor
+	
 	Guid m_skyTextureId;							// Reference to the sky texture asset
 	std::optional<Guid> m_pendingSkyTextureId;
+	
 	ActorHandle m_cachedFollowActorHandle = ActorHandle::Null();
 	uint64_t m_cachedFollowTransformGeneration = static_cast<uint64_t>(-1);
 	float m_sphereScale = 500.0f;

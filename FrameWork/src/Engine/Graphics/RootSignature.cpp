@@ -15,12 +15,13 @@ RootSignature::RootSignature(ID3D12Device* pDevice)
 	texturesSrvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1 ,0);
 	shadowMapSrvRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1 ,1);
 
-	CD3DX12_ROOT_PARAMETER rootParam[5] = {}; // Root parameters
-	rootParam[0].InitAsConstantBufferView(0);					// b0 : Frame constants
-	rootParam[1].InitAsConstantBufferView(1);					// b1 : Mesh and Sprite render constants
-	rootParam[2].InitAsConstantBufferView(2);					// b2 : Liting constants
-	rootParam[3].InitAsDescriptorTable(1, &texturesSrvRange);	// t0 : Textures
-	rootParam[4].InitAsDescriptorTable(1, &shadowMapSrvRange);	// t1 : Shadow map
+	CD3DX12_ROOT_PARAMETER rootParam[6] = {}; // Root parameters
+	rootParam[0].InitAsConstantBufferView(0);										// b0 : Frame constants
+	rootParam[1].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_VERTEX);	// b1 : Render constants for vertex shader
+	rootParam[2].InitAsConstantBufferView(2);										// b2 : Liting constants
+	rootParam[3].InitAsDescriptorTable(1, &texturesSrvRange);						// t0 : Textures
+	rootParam[4].InitAsDescriptorTable(1, &shadowMapSrvRange);						// t1 : Shadow map
+	rootParam[5].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_PIXEL);		// b1 : Render constants for pixel shader
 
 	// Setting up samplers ( 0: Linear filtering for regular textures, 1: Comparison sampler for shadow maps)
 	CD3DX12_STATIC_SAMPLER_DESC samplers[2] = {};

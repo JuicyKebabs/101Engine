@@ -38,6 +38,7 @@ void RenderSystem::Register(MeshRenderer* renderer)
 		m_meshRenderers.push_back(renderer);
 	}
 }
+
 void RenderSystem::Register(SpriteRenderer* renderer)
 {
 	if (std::find(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer) == m_spriteRenderers.end())
@@ -45,6 +46,15 @@ void RenderSystem::Register(SpriteRenderer* renderer)
 		m_spriteRenderers.push_back(renderer);
 	}
 }
+
+void RenderSystem::Register(WaveRenderer* renderer)
+{
+	if (std::find(m_waveRenderers.begin(), m_waveRenderers.end(), renderer) == m_waveRenderers.end())
+	{
+		m_waveRenderers.push_back(renderer);
+	}
+}
+
 void RenderSystem::Register(UIRenderer* renderer)
 {
 	if (std::find(m_uiRenderers.begin(), m_uiRenderers.end(), renderer) == m_uiRenderers.end())
@@ -64,6 +74,11 @@ void RenderSystem::Unregister(SpriteRenderer* renderer)
 		std::remove(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer), m_spriteRenderers.end());
 }
 
+void RenderSystem::Unregister(WaveRenderer* renderer)
+{
+	m_waveRenderers.erase(std::remove(m_waveRenderers.begin(), m_waveRenderers.end(), renderer), m_waveRenderers.end());
+}
+
 void RenderSystem::Unregister(UIRenderer* renderer)
 {
 	m_uiRenderers.erase(std::remove(m_uiRenderers.begin(), m_uiRenderers.end(), renderer), m_uiRenderers.end());
@@ -71,18 +86,48 @@ void RenderSystem::Unregister(UIRenderer* renderer)
 
 void RenderSystem::FlushRegisters()
 {
-	for(auto& renderer : m_meshRenderers)
+	if (m_skyRenderer && !m_skyRenderer->IsDestroyed() && m_skyRenderer->GetOwner() && !m_skyRenderer->GetOwner()->IsDestroyed())
 	{
+		m_skyRenderer->Flush();
+	}
+
+	for (auto& renderer : m_meshRenderers)
+	{
+		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
+		{
+			continue;
+		}
+
 		renderer->Flush();
 	}
 
-	for(auto& renderer : m_spriteRenderers)
+	for (auto& renderer : m_spriteRenderers)
 	{
+		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
+		{
+			continue;
+		}
+
 		renderer->Flush();
 	}
 
-	for(auto& renderer : m_uiRenderers)
+	for (auto& renderer : m_waveRenderers)
 	{
+		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
+		{
+			continue;
+		}
+
+		renderer->Flush();
+	}
+
+	for (auto& renderer : m_uiRenderers)
+	{
+		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
+		{
+			continue;
+		}
+
 		renderer->Flush();
 	}
 }
@@ -293,6 +338,56 @@ void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderView
 		}
 	}
 
+	// Build draw packets for wave renderers
+	for (const auto& renderer : m_waveRenderers)
+	{
+		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
+		{
+			const auto& renderTemplate = renderer->GetRenderTemplate();
+			const auto& renderProxy = renderer->GetRenderProxy();
+			auto item = CreateWaveRenderItem(renderTemplate, renderProxy);
+
+			// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
+			if (isCanvasView)
+			{
+				item.common.worldMatrix *= worldToCanvas;
+			}
+
+			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
+			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
+
+			// Skip render items that do not match the current render space filter
+			if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
+			{
+				continue;
+			}
+
+			if (queue == RenderQueue::Opaque)
+			{
+				auto handle = m_frameRenderData.AddWaves(item);
+				RenderItemRef ref;
+				ref.renderType = RenderType::Wave;
+				ref.handle = handle;
+				SortKeyOpaque opaqueKey;
+				opaqueKey.psoKey = item.common.materialDesc.psoKey;
+				ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
+				m_frameRenderData.AddOpaque(ref);
+			}
+			else
+			{
+				auto handle = m_frameRenderData.AddWaves(item);
+				RenderItemRef ref;
+				ref.renderType = RenderType::Wave;
+				ref.handle = handle;
+				SortKeyTransparent transparentKey;
+				transparentKey.psoKey = item.common.materialDesc.psoKey;
+				transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
+				ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
+				m_frameRenderData.AddTransparent(ref);
+			}
+		}
+	}
+
 	// Build draw packets for UI renderers
 	for(const auto& renderer : m_uiRenderers)
 	{
@@ -406,6 +501,28 @@ SpriteRenderItem RenderSystem::CreateSpriteRenderItem(
 	item.uvOffset = renderProxy.uvOffset;
 	item.pivot = renderProxy.pivot;
 	item.flip = renderProxy.flip;
+	return item;
+}
+
+WaveRenderItem RenderSystem::CreateWaveRenderItem(
+	const SubmeshRenderTemplate& renderTemplate,
+	const WaveRendererProxy& renderProxy)
+{
+	WaveRenderItem item;
+	item.common.materialDesc = renderTemplate.materialDesc;
+
+	if (renderProxy.textureOverrideHandle != InvalidTextureHandle)
+	{
+		item.common.materialDesc.textureHandle = renderProxy.textureOverrideHandle;
+	}
+
+	item.common.worldMatrix = renderProxy.common.worldMatrix;
+	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
+	item.vertexDivisions = renderProxy.vertexDivisions;
+	item.time = renderProxy.time;
+	item.waveAmplitude = renderProxy.waveAmplitude;
+	item.waveFrequency = renderProxy.waveFrequency;
+	item.waveDirection = renderProxy.waveDirection;
 	return item;
 }
 

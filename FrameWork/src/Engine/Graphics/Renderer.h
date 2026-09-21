@@ -93,11 +93,14 @@ private:
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_meshForShadowCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_spriteCB;
+	std::vector<std::unique_ptr<ConstantBuffer>> m_waveCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_uiCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionMeshCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionSpriteCB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_selectionUICB;
 	std::vector<std::unique_ptr<ConstantBuffer>> m_colliderDebugMeshCB;
+
+	int m_nextMeshCBIndexThisFrame = 0;	// Next index for mesh constant buffer for this frame
 
 	// Lighting information
 	DirectionalLight m_directionalLight{};	// Directional light
@@ -128,6 +131,13 @@ private:
 		int itemIndex,
 		PSOKey& compare,
 		RenderTargetFormat targetFormat); // Render a sprite
+	void RenderWave(
+		ID3D12GraphicsCommandList* p_commandList,
+		const WaveRenderItem& item,
+		int waveItemIndex,
+		int meshItemIndex,
+		PSOKey& compare,
+		RenderTargetFormat targetFormat); // Render a wave mesh
 	void RenderUI(
 		ID3D12GraphicsCommandList* p_commandList,
 		const UIRenderItem& item,
