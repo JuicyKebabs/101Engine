@@ -240,8 +240,8 @@ public:
 	// Read and Write the property value from/to the given object with registered callbacks.
 	// The object type and property value type must match the registered types in the metadata.
 	bool Read(std::type_index objectType, const void* object, PropertyValue& outValue) const;
-	bool ValidateValue(const PropertyValue& value) const;
 	bool Write(std::type_index objectType, void* object, const PropertyValue& value) const;
+	bool ValidateValue(const PropertyValue& value) const;
 
 private:
 	PropertyMetadata(
@@ -262,14 +262,16 @@ private:
 	bool IsValid() const;
 	bool IsRegisteredEnumValue(const PropertyValue& value) const;
 
-	std::string m_serializedName;
-	PropertyPath m_path;
-	PropertyLogicalType m_logicalType = PropertyLogicalType::Invalid;
+	std::string m_serializedName;										// The name of this property
+	PropertyPath m_path;												// The path of this property, which may include nested members (e.g., "parent/child")
+	PropertyLogicalType m_logicalType = PropertyLogicalType::Invalid;	// Indicates the type of this property with a logical enum expression
 
 	std::type_index m_objectType;		// The type of the object that owns this property. Read and write callbacks will be invoked on this type ().
 	std::type_index m_valueType;		// The type of the property value. Read and write callbacks will be invoked with this type.
-	AssetType m_assetType = AssetType::Unknown;
+	
 	ValueValidator m_valueValidator;
+	
+	AssetType m_assetType = AssetType::Unknown;
 
 	// Only way to access the instance's property value from/to the object.
 	ReadCallback m_read;
@@ -288,22 +290,28 @@ private:
 class TypeMetadata
 {
 public:
-	using ValidationCallback = std::function<bool(
-		std::type_index, const void*)>;
+	using ValidationCallback = std::function<bool(std::type_index, const void*)>;
 
 	std::type_index GetType() const { return m_type; }
 	const std::string& GetStableTypeName() const { return m_stableTypeName; }
 	const std::vector<PropertyMetadata>& GetProperties() const { return m_properties; }
+
 	const PropertyMetadata* FindProperty(std::string_view serializedName) const;
 	const PropertyMetadata* FindPropertyByPath(const PropertyPath& path) const;
+	
+	// Validate the entire object state,
 	bool Validate(
 		std::type_index objectType,
 		const void* object) const;
+
+	// Write the property value to the given object with rollback support.
 	bool TryWriteProperty(
 		std::type_index objectType,
 		void* object,
 		const PropertyMetadata& property,
 		const PropertyValue& value) const;
+
+	// Copy the serializable property to the other object which is the same type.
 	bool CopySerializableState(
 		std::type_index objectType,
 		const void* source,
@@ -325,7 +333,7 @@ private:
 	std::string m_stableTypeName;
 
 	std::vector<PropertyMetadata> m_properties;	// The lists of properties that this type has.
-	ValidationCallback m_validator;
+	ValidationCallback m_validator;				// Optional callback to validate the entire object state, not just individual properties.
 
 	template<class ObjectType>
 	friend class TypeMetadataBuilder;	// Only built by TypeMetadataBuilder
@@ -336,7 +344,7 @@ namespace PropertyMetadataDetail
 {
 	// CleanType is a pure type without any modifiers (const, volatile, reference).
 	template<class ValueType>
-	using CleanType = std::remove_cv_t<std::remove_reference_t<ValueType>>;
+	using CleanType = std::remove_cvref_t<ValueType>;
 
 	// Receive a ValueType and deduce the PropertyLogicalType for it.
 	template<class ValueType>
@@ -639,6 +647,7 @@ public:
 		std::size_t m_index;
 	};
 
+	// Add property witouh any accessors
 	template<class Value>
 	auto Property(std::string name, Value ObjectType::* member)
 	{
@@ -647,28 +656,40 @@ public:
 			return Accessor<Value>(std::move(name), {}, {});
 		}
 
-		return Accessor<Value>(std::move(name),
-			[member](const ObjectType& object, Value& value)
-		{
-			value = object.*member;
-			return true;
-		}, [member](ObjectType& object, const Value& value)
-		{
-			object.*member = value;
-			return true;
-		});
+		// Read and write callbacks for accessing the property value from/to the object.
+		ReadFunction<Value> read = [member](const ObjectType& object, Value& value)
+			{
+				value = object.*member;
+				return true;
+			};
+
+		WriteFunction<Value> write = [member](ObjectType& object, const Value& value)
+			{
+				object.*member = value;
+				return true;
+			};
+
+		return Accessor<Value>(std::move(name), read, write);
 	}
 
+	// Add property with accessors
 	template<class Getter, class Setter>
 	auto Property(std::string name, Getter getter, Setter setter)
 	{
-		using Value = PropertyMetadataDetail::CleanType<std::invoke_result_t<Getter, const ObjectType&>>;
+		// Deduce the property value type from the getter callback.
+		using EstimatedType = std::invoke_result_t<Getter, const ObjectType&>;
 
+		// CleanType removes const, volatile, and reference qualifiers from the
+		// EstimatedType to get the actual type of the property value.
+		using ActualType = PropertyMetadataDetail::CleanType<EstimatedType>;
+
+		// If the getter or setter is a pointer or member pointer, check if they are null.
+		// Validate at compile time to avoid the case that getter or setter can not be validated with ! operator.
 		if constexpr (std::is_pointer_v<Getter> || std::is_member_pointer_v<Getter>)
 		{
 			if (!getter)
 			{
-				return Accessor<Value>(std::move(name), {}, {});
+				return Accessor<ActualType>(std::move(name), {}, {});
 			}
 		}
 
@@ -676,31 +697,40 @@ public:
 		{
 			if (!setter)
 			{
-				return Accessor<Value>(std::move(name), {}, {});
+				return Accessor<ActualType>(std::move(name), {}, {});
 			}
 		}
 
-		return Accessor<Value>(std::move(name),
-			[getter](const ObjectType& object, Value& value)
-		{
-			value = std::invoke(getter, object);
-			return true;
-		}, [setter](ObjectType& object, const Value& value)
-		{
-			using Result = std::invoke_result_t<Setter, ObjectType&, const Value&>;
-			static_assert(
-				std::is_same_v<Result, bool> || std::is_void_v<Result>, "A property setter returns bool or void.");
-
-			if constexpr (std::is_same_v<Result, bool>)
+		// Wrapper Read and write callbacks for accessing the property value from/to the object.
+		// Capture only the getter and setter to avoid capturing the object by reference.
+		// This allows the property to be accessed from any object of the same type, not just the one used to create the property.
+		ReadFunction<ActualType> read = [getter](const ObjectType& object, ActualType& value)
 			{
-				return std::invoke(setter, object, value);
-			}
-			else
-			{
-				std::invoke(setter, object, value);
+				value = std::invoke(getter, object);
 				return true;
-			}
-		});
+			};
+
+		WriteFunction<ActualType> write = [setter](ObjectType& object, const ActualType& value)
+			{
+				// Get the result type of the setter callback
+				using Result = std::invoke_result_t<Setter, ObjectType&, const ActualType&>;
+
+				// result must be bool or void, otherwise the setter is not valid
+				static_assert(std::is_same_v<Result, bool> || std::is_void_v<Result>, "A property setter returns bool or void.");
+				
+				// If the result type is void, write function returns true explicitly
+				if constexpr (std::is_same_v<Result, bool>)
+				{
+					return std::invoke(setter, object, value);
+				}
+				else
+				{
+					std::invoke(setter, object, value);
+					return true;
+				}
+			};
+
+		return Accessor<ActualType>(std::move(name), std::move(read), std::move(write));
 	}
 
 	// Select one field in a Component-owned aggregate without recursively reflecting the aggregate.
@@ -712,6 +742,7 @@ public:
 			return Accessor<Value>(std::move(name), {}, {});
 		}
 
+		// Check if the pointer of getter and setter is null
 		if constexpr (std::is_pointer_v<Getter> || std::is_member_pointer_v<Getter>)
 		{
 			if (!getter)
@@ -728,14 +759,22 @@ public:
 			}
 		}
 
-		return Property(std::move(name),
-			[getter, member](const ObjectType& object) { return std::invoke(getter, object).*member; },
-			[getter, setter, member](ObjectType& object, const Value& value)
+		// Read and write callbacks for accessing the property value from/to the object.
+		// Use std::invoke to call the getter and setter, which allows them to be member function pointers or other callable types.
+		ReadFunction<Value> read = [getter, member](const ObjectType& object, Value& value)
+			{
+				value = std::invoke(getter, object).*member;
+				return true;
+			};
+
+		WriteFunction<Value> write = [getter, setter, member](ObjectType& object, const Value& value)
 			{
 				auto aggregate = std::invoke(getter, object);
 				aggregate.*member = value;
 				return std::invoke(setter, object, aggregate);
-			});
+			};
+
+		return Accessor<Value>(std::move(name), std::move(read), std::move(write));
 	}
 
 	// Fallible reads and exceptional access operations use the same property/facet representation.
@@ -743,6 +782,8 @@ public:
 	auto Accessor(std::string name, ReadFunction<Value> read, WriteFunction<Value> write)
 	{
 		const auto index = m_properties.size();
+
+		// Add accessor 
 		AddAccessorAtPath<Value>({std::move(name)}, std::move(read), std::move(write));
 		return PropertyConfiguration<Value>(*this, index);
 	}
@@ -924,13 +965,24 @@ private:
 			};
 		}
 
-		PropertyMetadata property(members.back(), *path, PropertyMetadataDetail::DeducedLogicalType<Value>(),
-			typeid(ObjectType), typeid(Value), PropertyMetadataDetail::DeducedAssetType<Value>(),
-			[](const PropertyValue& value)
-		{
-			Value converted{};
-			return PropertyMetadataDetail::FromPropertyValue(value, converted);
-		}, std::move(erasedRead), std::move(erasedWrite));
+		PropertyMetadata::ValueValidator validator = [](const PropertyValue& value) 
+			{ 
+				Value converted{};
+				return PropertyMetadataDetail::FromPropertyValue(value, converted);
+			};
+
+
+		// Construct the PropertyMetadata instance
+		PropertyMetadata property(
+			members.back(), 
+			*path, 
+			PropertyMetadataDetail::DeducedLogicalType<Value>(),
+			typeid(ObjectType), 
+			typeid(Value), 
+			PropertyMetadataDetail::DeducedAssetType<Value>(),
+			std::move(validator),
+			std::move(erasedRead),
+			std::move(erasedWrite));
 
 		if constexpr (std::is_enum_v<Value>)
 		{

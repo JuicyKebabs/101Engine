@@ -171,6 +171,8 @@ bool TypeMetadata::TryWriteProperty(
 	const PropertyMetadata& property,
 	const PropertyValue& value) const
 {
+	// Check if the given property belongs to this type metadata
+	// by searching for it by its path.
 	if (FindPropertyByPath(property.GetPath()) != &property)
 	{
 		DBG("Property does not belong to this type metadata.");
@@ -179,16 +181,19 @@ bool TypeMetadata::TryWriteProperty(
 
 	PropertyValue before;
 
+	// Store the current property value before attempting to write the new value.
 	if (!property.Read(objectType, object, before))
 	{
 		DBG("Failed to capture the property value before editing.");
 		return false;
 	}
-
+	
+	// Attempt to write the new value to the property.
 	if (!property.Write(objectType, object, value))
 	{
 		DBG("Property rejected the edited value.");
 
+		// Rollback to the previous value if writing the new value failed.
 		if (!property.Write(objectType, object, before))
 		{
 			DBG("Property edit rollback failed.");
@@ -197,11 +202,13 @@ bool TypeMetadata::TryWriteProperty(
 		return false;
 	}
 
+	// Validate the entire object state after the property edit.
 	if (Validate(objectType, object))
 	{
 		return true;
 	}
 
+	// Rollback to the previous value if the object state is invalid after the property edit.
 	if (!property.Write(objectType, object, before))
 	{
 		DBG("Property edit rollback failed.");
@@ -215,6 +222,7 @@ bool TypeMetadata::CopySerializableState(
 	const void* source,
 	void* destination) const
 {
+	// Both objects must be valid and of the same type as this metadata.
 	if (!source || !destination || objectType != m_type)
 	{
 		DBG("Source or destination does not match its reflection metadata.");
@@ -224,13 +232,16 @@ bool TypeMetadata::CopySerializableState(
 	struct StateEntry
 	{
 		const PropertyMetadata* property = nullptr;
-		PropertyValue sourceValue;
-		PropertyValue destinationValue;
+		PropertyValue sourceValue;		// The value of the property which will be copied from the source object.
+		PropertyValue destinationValue;	// The original value of the destination property which will be restored if the copy fails.
 	};
+
 	std::vector<StateEntry> entries;
 
+	// Colect the serializable properties and their values from both the source and destination objects.
 	for (const PropertyMetadata& property : m_properties)
 	{
+		// Copy only serializable properties
 		if (!property.GetSerializationMetadata())
 		{
 			continue;
@@ -238,6 +249,8 @@ bool TypeMetadata::CopySerializableState(
 
 		StateEntry entry;
 		entry.property = &property;
+
+		// Get the current property value from both the source and destination objects.
 		const bool sourceRead = property.Read(objectType, source, entry.sourceValue);
 		const bool destinationRead = property.Read(objectType, destination, entry.destinationValue);
 
@@ -251,6 +264,8 @@ bool TypeMetadata::CopySerializableState(
 	}
 
 	std::size_t appliedCount = 0;
+
+	// Lambda function to rollback the applied property values in case of failure.
 	auto rollback = [&]()
 	{
 		bool restored = true;
@@ -270,25 +285,30 @@ bool TypeMetadata::CopySerializableState(
 		}
 	};
 
+	// Apply the collected property values from the source object to the destination object.
 	for (const StateEntry& entry : entries)
 	{
 		++appliedCount;
 
+		// Write the source property value to the destination object.
 		if (entry.property->Write(objectType, destination, entry.sourceValue))
 		{
 			continue;
 		}
 
+		// Roll back if failed
 		DBG("Failed to copy reflected component state.");
 		rollback();
 		return false;
 	}
 
+	// Validate the entire destination object state after copying the property values.
 	if (Validate(objectType, destination))
 	{
 		return true;
 	}
 
+	// Roll back if the destination object state is invalid
 	rollback();
 	return false;
 }

@@ -91,23 +91,32 @@ public:
 	{
 		auto metadata = [&]
 		{
+			// Check if the T class has a static member function named BuildMetadata
+			// (Check if it's compilable)
 			if constexpr (requires { T::BuildMetadata(); })
 			{
 				return T::BuildMetadata();
 			}
 			else
 			{
+				// Build empty metadata for expeced component type
 				return TypeMetadataBuilder<T>(name).Build();
 			}
 		}();
 
+		// Check if the TypeMetadata is valid and matches the expected type and name
 		if (!metadata || metadata->GetType() != typeid(T) || metadata->GetStableTypeName() != name)
 		{
 			return false;
 		}
 
-		RegisterGameComponent(name, [] { return static_cast<Component*>(new T()); }, typeid(T),
+		// Register the component with the registry
+		RegisterGameComponent(
+			name,
+			[] { return static_cast<Component*>(new T()); },
+			typeid(T),
 			std::make_unique<TypeMetadata>(std::move(*metadata)));
+
 		return true;
 	}
 
@@ -274,9 +283,17 @@ public:
 			return false;
 		}
 
+		auto factory = [] { return static_cast<Component*>(new T()); };
+
 		using Policy = ComponentPolicy<T>;
-		Register(name, [] { return static_cast<Component*>(new T()); }, typeid(T),
-			Policy::cardinality, Policy::family, std::move(metadata));
+		Register(
+			name,
+			factory,
+			typeid(T),
+			Policy::cardinality,
+			Policy::family,
+			std::move(metadata));
+
 		return true;
 	}
 

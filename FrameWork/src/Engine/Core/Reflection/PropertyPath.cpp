@@ -2,6 +2,7 @@
 
 namespace
 {
+	// Escape a member of a JSON Pointer path according to RFC 6901.
 	std::string EscapeMember(std::string_view member)
 	{
 		std::string escaped;
@@ -33,6 +34,7 @@ std::optional<PropertyPath> PropertyPath::FromString(std::string_view path)
 		return std::nullopt;
 	}
 
+	// Split the path into its members
 	std::vector<std::string> members;
 	std::size_t begin = 1;
 	while (begin <= path.size())
@@ -91,6 +93,7 @@ std::optional<PropertyPath> PropertyPath::FromString(std::string_view path)
 		begin = end + 1;
 	}
 
+	// Construct the PropertyPath instance from the members
 	return FromMembers(members);
 }
 
@@ -104,6 +107,7 @@ std::optional<PropertyPath> PropertyPath::FromMembers(
 
 	std::string path;
 
+	// Convert the members to a normalized JSON Pointer path.
 	for (const std::string& member : members)
 	{
 		if (member.empty())
@@ -115,5 +119,6 @@ std::optional<PropertyPath> PropertyPath::FromMembers(
 		path += EscapeMember(member);
 	}
 
+	// Construct the PropertyPath instance with the normalized path and members.
 	return PropertyPath(std::move(path), members);
 }
