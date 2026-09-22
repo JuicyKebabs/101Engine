@@ -59,8 +59,12 @@ float4 main(VSOutPut input) : SV_TARGET
     float3 diffuse = lightColor_Ambient.rgb;
     float3 ambient = lightColor_Ambient.a;
         
-    float3 lambert = CreateLambert(input.normal, -lightDir_Intensity.xyz, diffuse);
-    float specular = CreateSpecular(input.normal, -lightDir_Intensity.xyz, normalize(cameraPos - input.worldPos), 2.0f);
+    float3 N = normalize(input.normal);
+    float3 L = normalize(-lightDir_Intensity.xyz);
+    float3 V = normalize(cameraPos - input.worldPos);
+
+    float3 lambert = CreateLambert(N, L, diffuse);
+    float specular = CreateSpecular(N, L, V, 2.0f);
     float shadow = CalculateShadow(float4(input.worldPos, 1.0f));
     
     float3 lightEffect = (lambert.xyz + specular) * shadow + ambient;

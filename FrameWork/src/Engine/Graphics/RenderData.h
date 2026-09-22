@@ -24,6 +24,7 @@ enum class VS_FILE_ID
 {
 	Mesh = 0,
 	Sprite,
+	Wave,
 	UI,
 	ShadowMap,
 	PostEffect,

@@ -167,8 +167,10 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 	auto shadowGpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(shadowMapSrvIndex);
 	p_commandList->SetGraphicsRootDescriptorTable(4, shadowGpuHandle);
 
-	// Allocate constant buffers for this frame
-	size_t totalMeshCount = m_frameRenderData.GetMeshCount();
+	// Allocate constant buffers for this frame (Count mesh and wave render item)
+	size_t totalMeshCount = m_frameRenderData.GetMeshCount()
+		+ (m_frameRenderData.sky.has_value() ? 1 : 0)
+		+ m_frameRenderData.GetWaveCount();
 
 	if (m_meshCB.size() < totalMeshCount)
 	{
@@ -192,6 +194,17 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		}
 	}
 
+	size_t totalWaveCount = m_frameRenderData.GetWaveCount();
+
+	if (m_waveCB.size() < totalWaveCount)
+	{
+		size_t toAllocate = totalWaveCount - m_waveCB.size();
+		for (size_t i = 0; i < toAllocate; i++)
+		{
+			m_waveCB.push_back(std::make_unique<ConstantBuffer>(m_pDevice, sizeof(WaveRenderConstants)));
+		}
+	}
+
 	size_t totalUIItemCount = m_frameRenderData.GetUICount();
 
 	if (m_uiCB.size() < totalUIItemCount)
@@ -206,6 +219,8 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 
 	PSOKey compare{};
 
+	m_nextMeshCBIndexThisFrame = 0;
+
 	// Draw through the existing mesh path after frame state and mesh buffers are ready.
 	if (m_frameRenderData.sky.has_value())
 	{
@@ -213,8 +228,8 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 
 		if (sky.renderType == RenderType::Mesh && sky.handle < m_frameRenderData.GetMeshCount())
 		{
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(sky.handle),
-				static_cast<int>(sky.handle), compare, RenderTargetFormat::HDR);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(sky.handle), m_nextMeshCBIndexThisFrame, compare, RenderTargetFormat::HDR);
+			m_nextMeshCBIndexThisFrame++;
 		}
 	}
 
@@ -223,17 +238,23 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare,
-				RenderTargetFormat::HDR);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), m_nextMeshCBIndexThisFrame, compare, RenderTargetFormat::HDR);
+			m_nextMeshCBIndexThisFrame++;
 			break;
+
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle),
-				compare, RenderTargetFormat::HDR);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
+
+		case RenderType::Wave:
+			RenderWave(p_commandList, m_frameRenderData.GetWave(item.handle), static_cast<int>(item.handle),m_nextMeshCBIndexThisFrame, compare, RenderTargetFormat::HDR);
+			m_nextMeshCBIndexThisFrame++;
+			break;
+
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare,
-				RenderTargetFormat::HDR);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
+
 		default:
 			break;
 		}
@@ -244,17 +265,23 @@ void Renderer::RenderScene(ID3D12GraphicsCommandList* p_commandList, uint32_t sh
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare,
-				RenderTargetFormat::HDR);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
+			m_nextMeshCBIndexThisFrame++;
 			break;
+		
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle),
-				compare, RenderTargetFormat::HDR);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
+
+		case RenderType::Wave:
+			RenderWave(p_commandList, m_frameRenderData.GetWave(item.handle), static_cast<int>(item.handle), m_nextMeshCBIndexThisFrame, compare, RenderTargetFormat::HDR);
+			m_nextMeshCBIndexThisFrame++;
+			break;
+
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare,
-				RenderTargetFormat::HDR);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, RenderTargetFormat::HDR);
 			break;
+
 		default:
 			break;
 		}
@@ -340,17 +367,23 @@ void Renderer::RenderScreenSpace(
 		switch (item.renderType)
 		{
 		case RenderType::Mesh:
-			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), static_cast<int>(item.handle), compare,
-				targetFormat);
+			RenderMesh(p_commandList, m_frameRenderData.GetMesh(item.handle), m_nextMeshCBIndexThisFrame, compare, targetFormat);
+			m_nextMeshCBIndexThisFrame++;
 			break;
+
 		case RenderType::Sprite:
-			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle),
-				compare, targetFormat);
+			RenderSprite(p_commandList, m_frameRenderData.GetSprite(item.handle), static_cast<int>(item.handle), compare, targetFormat);
 			break;
+
+		case RenderType::Wave:
+			RenderWave(p_commandList, m_frameRenderData.GetWave(item.handle), static_cast<int>(item.handle), m_nextMeshCBIndexThisFrame, compare, targetFormat);
+			m_nextMeshCBIndexThisFrame++;
+			break;
+
 		case RenderType::UI:
-			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare,
-				targetFormat);
+			RenderUI(p_commandList, m_frameRenderData.GetUI(item.handle), static_cast<int>(item.handle), compare, targetFormat);
 			break;
+
 		default:
 			break;
 		}
@@ -403,7 +436,7 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 	framePtr->view = m_cameraInfoThisFrame.viewMatrix;
 	framePtr->proj = m_cameraInfoThisFrame.projMatrix;
 	framePtr->cameraPosition = m_cameraInfoThisFrame.position;
-	p_commandList->SetGraphicsRootConstantBufferView(0, m_selectionFrameCB->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(5, m_selectionFrameCB->GetAddress());
 
 	// Set the pipeline state object for selection mask rendering
 	auto pso = GetPipelineStateObject(m_selectionMeshMaskKey);
@@ -421,6 +454,7 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 		ptr->lightViewProj = Matrix4x4::Identity();
 		ptr->objectColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 		p_commandList->SetGraphicsRootConstantBufferView(1, m_selectionMeshCB[count]->GetAddress());
+		p_commandList->SetGraphicsRootConstantBufferView(5, m_selectionMeshCB[count]->GetAddress());
 
 		auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
 
@@ -489,6 +523,7 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 		constants->flip = item.flip;
 
 		p_commandList->SetGraphicsRootConstantBufferView(1, constantBuffer->GetAddress());
+		p_commandList->SetGraphicsRootConstantBufferView(5, constantBuffer->GetAddress());
 
 		const int32_t textureSrvIndex = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
 
@@ -546,6 +581,7 @@ void Renderer::RenderSelectionMask(ID3D12GraphicsCommandList* p_commandList, con
 		constants->flip = item.flip;
 
 		p_commandList->SetGraphicsRootConstantBufferView(1, constantBuffer->GetAddress());
+		p_commandList->SetGraphicsRootConstantBufferView(5, constantBuffer->GetAddress());
 
 		const int32_t textureSrvIndex = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
 
@@ -597,6 +633,7 @@ void Renderer::RenderColliderDebug(
 		constants->lightViewProj = Matrix4x4::Identity();
 		constants->objectColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 		p_commandList->SetGraphicsRootConstantBufferView(1, m_colliderDebugMeshCB[i]->GetAddress());
+		p_commandList->SetGraphicsRootConstantBufferView(5, m_colliderDebugMeshCB[i]->GetAddress());
 
 		MeshGPU* meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
 
@@ -695,6 +732,7 @@ void Renderer::RenderMesh(
 	ptr->lightViewProj = m_directionalLight.view * m_directionalLight.proj;
 	ptr->objectColor = item.common.color;
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_meshCB[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(5, m_meshCB[itemIndex]->GetAddress());
 
 	// Set mesh data
 	auto meshGPU = m_pMeshManager->GetMeshGPU(item.meshDesc.meshHandle);
@@ -819,6 +857,7 @@ void Renderer::RenderSprite(
 	ptr->pivot = item.pivot;
 	ptr->flip = item.flip;
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_spriteCB[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(5, m_spriteCB[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
@@ -828,6 +867,97 @@ void Renderer::RenderSprite(
 	// Draw command (assuming a full-screen quad for sprites)
 	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	p_commandList->DrawInstanced(6, 1, 0, 0); // Draw a quad (2 triangles)
+}
+
+void Renderer::RenderWave(
+	ID3D12GraphicsCommandList* p_commandList,
+	const WaveRenderItem& item,
+	int waveItemIndex,
+	int meshItemIndex,
+	PSOKey& compare,
+	RenderTargetFormat targetFormat
+)
+{
+	// Check if the Constant buffer is valid
+	if (waveItemIndex >= m_waveCB.size())
+	{
+		DBG("Not enough constant buffers allocated\n");
+		return;
+	}
+	if (!m_waveCB[waveItemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid\n");
+		return;
+	}
+	
+	if (meshItemIndex >= m_meshCB.size())
+	{
+		DBG("Not enough constant buffers allocated for mesh\n");
+		return;
+	}
+
+	if (!m_meshCB[meshItemIndex]->GetIsValid())
+	{
+		DBG("Constant buffer is not valid for mesh\n");
+		return;
+	}
+
+	// Compare PSO keys to minimize state changes (optional optimization)
+	PSOKey currentKey = item.common.materialDesc.psoKey;
+	currentKey.rtvFormat = targetFormat;
+
+	if (currentKey.vsKey.fileID != VS_FILE_ID::Wave)
+	{
+		currentKey.vsKey.fileID = VS_FILE_ID::Wave;
+	}
+
+	if (currentKey != compare || waveItemIndex == 0 || meshItemIndex == 0)
+	{
+		auto pso = GetPipelineStateObject(currentKey);				// Get the pipeline state object for this item
+		p_commandList->SetPipelineState(pso->GetPipelineState());	// Set the pipeline state for this item
+		compare = currentKey;										// Update the compare key
+	}
+
+	// Set up the constant buffer for this mesh
+	auto vertexPtr = m_waveCB[waveItemIndex]->GetPtr<WaveRenderConstants>();
+	vertexPtr->worldMatrix = item.common.worldMatrix;
+	vertexPtr->waveDirection = item.waveDirection;
+	vertexPtr->waveAmplitude = item.waveAmplitude;
+	vertexPtr->waveFrequency = item.waveFrequency;
+	vertexPtr->time = item.time;
+
+	const uint32_t subdivisionX = item.vertexDivisions.x;
+	const uint32_t subdivisionY = item.vertexDivisions.y;
+
+	vertexPtr->subdivisionsX = subdivisionX;
+	vertexPtr->subdivisionsY = subdivisionY;
+
+	vertexPtr->color = item.common.color;
+
+	vertexPtr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+
+	p_commandList->SetGraphicsRootConstantBufferView(1, m_waveCB[waveItemIndex]->GetAddress());
+
+	// Use mesh constant buffer for pixel shader data
+	auto pixelPtr = m_meshCB[meshItemIndex]->GetPtr<MeshRenderConstants>();
+	pixelPtr->worldMatrix = item.common.worldMatrix;
+	pixelPtr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+	pixelPtr->lightViewProj = m_directionalLight.view * m_directionalLight.proj;
+	pixelPtr->objectColor = item.common.color;
+
+	p_commandList->SetGraphicsRootConstantBufferView(5, m_meshCB[meshItemIndex]->GetAddress());
+
+	// Set SRV for the texture
+	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+
+	// Calculate the number of vertices based on the vertex divisions
+	const uint32_t vertexCount = subdivisionX * subdivisionY * 6;
+
+	// Draw command (assuming a full-screen quad for waves)
+	p_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	p_commandList->DrawInstanced(vertexCount, 1, 0, 0); // Draw a divided grid based on vertex divisions
 }
 
 void Renderer::RenderUI(
@@ -889,6 +1019,7 @@ void Renderer::RenderUI(
 	);
 	ptr->flip = item.flip;
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_uiCB[itemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(5, m_uiCB[itemIndex]->GetAddress());
 
 	// Set SRV for the texture
 	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);

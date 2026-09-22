@@ -2,6 +2,7 @@
 #include "Engine/Graphics/FrameRenderData.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
+#include "Engine/Component/WaveRenderer.h"
 #include "Engine/UI/UIRenderer.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
 #include "Engine/Graphics/RenderData.h"
@@ -103,10 +104,12 @@ public:
 
 	void Register(MeshRenderer* renderer);						// Register a mesh renderer to be rendered
 	void Register(SpriteRenderer* renderer);					// Register a sprite renderer to be rendered
+	void Register(WaveRenderer* renderer);						// Register a wave renderer to be rendered
 	void Register(UIRenderer* renderer);						// Register a UI renderer to be rendered
 	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
 	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
 	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
+	void Unregister(WaveRenderer* renderer);						// Unregister a wave renderer (stop rendering it)
 
 	bool SetActiveSkyRenderer(SkyRenderer* renderer);	// Set the active sky renderer for the scene
 	void ClearActiveSkyRenderer(SkyRenderer* renderer);
@@ -128,16 +131,22 @@ public:
 	static SpriteRenderItem CreateSpriteRenderItem(
 		const SpriteRenderTemplate& renderTemplate,
 		const SpriteRendererProxy& renderProxy); // Create a sprite draw packet from a sort entry
+	static WaveRenderItem CreateWaveRenderItem(
+		const SubmeshRenderTemplate& renderTemplate,
+		const WaveRendererProxy& renderProxy); // Create a wave draw packet from a sort entry
 	static UIRenderItem CreateUIRenderItem(
 		const UIRenderElement& renderTemplate,
 		const UIRendererProxy& renderProxy); // Create a UI draw packet from a sort entry
 
   private:
 	SceneBase* m_scene = nullptr;
+
 	SkyRenderer* m_skyRenderer = nullptr;			// Pointer to the sky renderer in the scene (if any)
 	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
 	std::vector<SpriteRenderer*> m_spriteRenderers;	// List of sprite renderers in the scene
+	std::vector<WaveRenderer*> m_waveRenderers;		// List of wave renderers in the scene
 	std::vector<UIRenderer*> m_uiRenderers;			// List of UI renderers in the scene
+
 	FrameRenderData m_frameRenderData;				// Render data for the current frame (contains draw packets and other rendering information)
 	FrameSortData m_frameSortData;					// Sort data for the current frame (contains sort keys for sorting draw packets)
 	CameraInfo m_cameraInfo;						// Cached camera information for the current frame (used for sorting transparent objects)

@@ -39,6 +39,21 @@ struct alignas(256) SpriteRenderConstants
 	Vector2   flip;			// Axis flip: (1,-1) to flip; (1,1) for none
 };
 
+// b1 - Per-object data for wave rendering (e.g., water surface)
+struct alignas(256) WaveRenderConstants
+{
+	Matrix4x4 worldMatrix;			// Object-to-world transform
+	Vector2 waveDirection;			// Direction of the wave effect (normalized)
+	float waveAmplitude;			// Amplitude of the wave effect
+	float waveFrequency;			// Frequency of the wave effect
+	float time;						// Time parameter for animating the wave
+	uint32_t subdivisionsX;			// Number of vertex divisions along the X axis
+	uint32_t subdivisionsY;			// Number of vertex divisions along the Y axis
+	uint32_t padding;				// Padding to align to 16 bytes
+	Vector4 color;					// Tint color (RGBA)
+	Matrix4x4 worldInvTranspose;	// Inverse transpose of the world matrix
+};
+
 // b1 - Per-object data for UI rendering
 struct alignas(256) UIRenderConstants
 {

@@ -120,7 +120,6 @@ public:
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
-
 	struct PreparedTextureAssetState
 	{
 		Guid assetId;

@@ -4,6 +4,7 @@
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Component/SkyRenderer.h"
+#include "Engine/Component/WaveRenderer.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIImage.h"
@@ -80,6 +81,20 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SkyRenderer(std::stri
 	builder.Property("skyTextureAssetId", &T::GetSkyTextureAssetReference, &T::TrySetSkyTextureAssetReference);
 	builder.Property("followMode", &T::GetFollowMode, &T::SetFollowMode).SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("followActorId", &T::GetFollowActorReference, &T::SetFollowActorReference);
+	return PersistentMetadata::Finish(builder);
+}
+
+std::unique_ptr<TypeMetadata> PersistentComponentMetadata::WaveRenderer(std::string stableTypeName)
+{
+	using T = ::WaveRenderer;
+	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
+	AddRendererProperties(builder);
+	builder.Property("waveTextureAssetId", &T::GetWaveTextureAssetReference, &T::TrySetWaveTextureAssetReference);
+	builder.Property("vertexDivisions", &T::GetVertexDivisions, &T::SetVertexDivisions).Validate(ValueValidation::Finite2);
+	builder.Property("waveAmplitude", &T::GetWaveAmplitude, &T::SetWaveAmplitude);
+	builder.Property("waveFrequency", &T::GetWaveFrequency, &T::SetWaveFrequency);
+	builder.Property("waveSpeed", &T::GetWaveSpeed, &T::SetWaveSpeed);
+	builder.Property("waveDirection", &T::GetWaveDirection, &T::SetWaveDirection).Validate(ValueValidation::Finite2);
 	return PersistentMetadata::Finish(builder);
 }
 
