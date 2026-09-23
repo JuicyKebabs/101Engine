@@ -20,6 +20,7 @@ public:
 	void Update();
 
 	float GetDeltaTime() const { return m_deltaTime; }
+	float GetPassedTime() const;
 
 private:
 	TimeManager() = default;	// Constructor
@@ -29,9 +30,14 @@ private:
 	std::chrono::high_resolution_clock::time_point m_currentTime = std::chrono::high_resolution_clock::now();	// Current time point
 
 	float m_deltaTime = 0.0f;	// Delta time variable
+
+	// The time when the TimeManager was initiated, in seconds since epoch
+	std::chrono::high_resolution_clock::time_point m_initiatedTime = m_currentTime;
 };
 
 namespace Time
 {
-	static float GetTimeSeconds();
+	float GetTimeSeconds();
+	float GetPassedTime();
 }
+

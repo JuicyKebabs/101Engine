@@ -18,9 +18,9 @@
               1.0
             ],
             "scale": [
-              1.0,
-              1.0,
-              0.15000000596046448
+              0.0020000000949949026,
+              0.0020000000949949026,
+              0.0020000000949949026
             ]
           },
           "type": "Transform"
@@ -45,7 +45,7 @@
             "scale": [
               1.5,
               1.5,
-              3.5
+              1.5
             ],
             "type": 0
           },
@@ -81,8 +81,8 @@
             "rotation": [
               0.0,
               0.0,
-              0.3826834559440613,
-              0.9238795042037964
+              0.0,
+              1.0
             ],
             "scale": [
               1.0,
@@ -97,12 +97,12 @@
           "properties": {
             "blendMode": 0,
             "color": [
-              0.8578416705131531,
-              0.1965342015028,
-              0.9053117632865906,
+              0.7470817565917969,
+              0.7470817565917969,
+              0.7470817565917969,
               1.0
             ],
-            "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
+            "meshAssetId": "{A18CCD1A-CA67-4B67-A209-9196270F6F3A}",
             "name": "",
             "sortOrderInCanvas": 0,
             "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
@@ -120,7 +120,7 @@
       }
     }
   ],
-  "definitionRevision": "{F487B4BB-0B3F-4FFE-AEB0-6F6A174320D6}",
+  "definitionRevision": "{6DF91331-9EA9-4472-8A7C-AC5E4BD2EEAF}",
   "nextLocalObjectId": 15,
   "rootActorLocalObjectId": 1,
   "version": 1

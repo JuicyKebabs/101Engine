@@ -10,6 +10,7 @@
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Graphics/GpuBufferLayouts.h"
 #include "Engine/Graphics/PipelineState.h"
+#include "Engine/Core/Time/Time.h"
 
 using namespace DirectX;
 
@@ -299,6 +300,15 @@ void Renderer::RenderFullScreenPass(ID3D12GraphicsCommandList* p_commandList, Gp
 	auto srvIndex = input->GetSrvIndex();	// Get the SRV index for the input render target
 	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(srvIndex);
 	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+
+	const float passedTime = Time::GetPassedTime();
+
+	p_commandList->SetGraphicsRoot32BitConstants(
+		6,              // rootParam[6]
+		1,              // 32bitの値を1個
+		&passedTime,	// コピーする値のアドレス
+		0               // 書き込み先の先頭から
+	);
 
 	// Reset vertex/index buffers
 	D3D12_VERTEX_BUFFER_VIEW nullVBV{};

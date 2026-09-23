@@ -3,6 +3,8 @@
 #include "Engine/ActorImprint/ActorImprintSystem.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
+#include "Engine/Component/Transform.h"
+#include "Engine/Core/Time/Time.h"
 
 REGISTER_GAME_COMPONENT(FixedTarget)
 
@@ -38,9 +40,53 @@ void FixedTarget::Start()
 	}
 
 	m_gameManager = gameManager;
+
+	auto transform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+	if (transform)
+	{
+		baseY = transform->GetLocalPosition().y;
+	}
+
+	// 経過時間をランダムに進める
+	phase = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 10.0f; // 0から10秒の範囲でランダムに初期化
 }
 void FixedTarget::PreUpdate() {}
-void FixedTarget::Update() {}
+void FixedTarget::Update() 
+{
+	auto owner = GetOwner();
+	auto transform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+
+	if (transform)
+	{
+		const float speed = 1.0f; // 上下の動きの速さ
+		const float amplitude = 0.3f; // 上下の動きの振幅
+		float deltaTime = Time::GetTimeSeconds();
+
+		float s = sinf(phase);
+
+		float phaseSpeed = speed;
+
+		if (s < 0.0f)
+		{
+			phaseSpeed = speed * 1.1f;
+		}
+
+		float wave = sin(phase);
+
+		// -1 に近いほど速度を上げる
+		float bottomFactor = std::max(0.0f, -wave);
+
+		float currentSpeed = phaseSpeed * (1.0f + bottomFactor * 1.5f);
+		phase += deltaTime * currentSpeed;
+
+		float newY = baseY + amplitude * sinf(phase);
+
+		// フワフワと浮かせるような動きをさせる
+		Vector3 position = transform->GetLocalPosition();
+		position.y = newY;
+		transform->SetLocalPosition(position);
+	}
+}
 void FixedTarget::LateUpdate() {}
 void FixedTarget::Destroy() {}
 
