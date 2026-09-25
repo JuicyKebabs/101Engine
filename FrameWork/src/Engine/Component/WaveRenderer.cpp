@@ -89,7 +89,7 @@ void WaveRenderer::OnAttachOverride()
 	m_template.meshDesc.boundsRadius = meshGPU->GetBoundsRadius();
 
 	m_template.materialDesc.psoKey.vsKey.fileID = VS_FILE_ID::Wave;					// Use the original wave vertex shader for the vertex animation
-	m_template.materialDesc.psoKey.psKey.fileID = PS_FILE_ID::Mesh;					// Use same pixel shader as the mesh renderer for the water surface
+	m_template.materialDesc.psoKey.psKey.fileID = PS_FILE_ID::Wave;					// Use same pixel shader as the mesh renderer for the water surface
 	m_template.materialDesc.psoKey = m_template.materialDesc.psoKey.WithLighting();	// Enable lighting for the water surface
 	m_template.materialDesc.lightingEnabled = true;
 

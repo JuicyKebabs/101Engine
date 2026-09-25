@@ -54,6 +54,7 @@ set(SHADER_COMPILE_LIST
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/MeshPS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/SpritePS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/UIPS.hlsl|ps_5_0|main"
+    "${CMAKE_SOURCE_DIR}/shader/PixelShader/WavePS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/PostEffectPS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/SelectionMaskPS.hlsl|ps_5_0|main"
     "${CMAKE_SOURCE_DIR}/shader/PixelShader/SelectionOutlinePS.hlsl|ps_5_0|main"

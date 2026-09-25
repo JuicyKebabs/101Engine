@@ -131,9 +131,11 @@ public:
 	static SpriteRenderItem CreateSpriteRenderItem(
 		const SpriteRenderTemplate& renderTemplate,
 		const SpriteRendererProxy& renderProxy); // Create a sprite draw packet from a sort entry
-	static WaveRenderItem CreateWaveRenderItem(
+
+	WaveRenderItem CreateWaveRenderItem(
 		const SubmeshRenderTemplate& renderTemplate,
 		const WaveRendererProxy& renderProxy); // Create a wave draw packet from a sort entry
+	
 	static UIRenderItem CreateUIRenderItem(
 		const UIRenderElement& renderTemplate,
 		const UIRendererProxy& renderProxy); // Create a UI draw packet from a sort entry

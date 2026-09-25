@@ -63,6 +63,7 @@ static const std::wstring VS_FILE_TABLE[] = {
 static const std::wstring PS_FILE_TABLE[] = {
     L"shader\\compiled\\PixelShader\\MeshPS.cso",
     L"shader\\compiled\\PixelShader\\SpritePS.cso",
+    L"shader\\compiled\\PixelShader\\WavePS.cso",
     L"shader\\compiled\\PixelShader\\UIPS.cso",
     L"shader\\compiled\\PixelShader\\PostEffectPS.cso",
     L"shader\\compiled\\PixelShader\\SelectionMaskPS.cso",

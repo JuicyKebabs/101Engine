@@ -769,9 +769,23 @@ public:
 
 		WriteFunction<Value> write = [getter, setter, member](ObjectType& object, const Value& value)
 			{
+				// Get the copy of the aggregate from the object, modify the member, and then set the aggregate back to the object.
 				auto aggregate = std::invoke(getter, object);
 				aggregate.*member = value;
-				return std::invoke(setter, object, aggregate);
+
+				using Result = std::invoke_result_t<Setter, ObjectType&, decltype(aggregate)&>;
+
+				static_assert(std::is_same_v<Result, bool> || std::is_void_v<Result>, "A property setter returns bool or void.");
+
+				if constexpr (std::is_same_v<Result, bool>)
+				{
+					return std::invoke(setter, object, aggregate);
+				}
+				else
+				{
+					std::invoke(setter, object, aggregate);
+					return true;
+				}
 			};
 
 		return Accessor<Value>(std::move(name), std::move(read), std::move(write));

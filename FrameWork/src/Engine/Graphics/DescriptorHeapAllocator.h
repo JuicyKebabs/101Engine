@@ -24,6 +24,16 @@ public:
 		m_cbvSrvUavHeap.Initialize(m_pDevice, DescriptorHeap::Type::CBV_SRV_UAV, MAX_CBV_SRV_UAV_DESCRIPTORS);
 		m_rtvHeap.Initialize(m_pDevice, DescriptorHeap::Type::RTV, MAX_RTV_DESCRIPTORS);
 		m_dsvHeap.Initialize(m_pDevice, DescriptorHeap::Type::DSV, MAX_DSV_DESCRIPTORS);
+
+		m_nullTexture2DSrvIndex = m_cbvSrvUavHeap.AllocateDescriptor();
+		D3D12_SHADER_RESOURCE_VIEW_DESC nullSrvDesc{};
+		nullSrvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		nullSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		nullSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		nullSrvDesc.Texture2D.MipLevels = 1;
+		m_pDevice->CreateShaderResourceView(
+			nullptr, &nullSrvDesc, m_cbvSrvUavHeap.GetCpuHandle(m_nullTexture2DSrvIndex));
+
 		m_isInitialized = true;
 	}
 
@@ -79,12 +89,18 @@ public:
 		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
 		return m_cbvSrvUavHeap.GetGpuHandle(index);
 	}
+	D3D12_GPU_DESCRIPTOR_HANDLE GetNullTexture2DSrvGpuHandle() const
+	{
+		assert(m_isInitialized && "DescriptorHeapAllocator: Not initialized.");
+		return m_cbvSrvUavHeap.GetGpuHandle(m_nullTexture2DSrvIndex);
+	}
 
 private:
 	ID3D12Device* m_pDevice = nullptr;
 	DescriptorHeap m_cbvSrvUavHeap;
 	DescriptorHeap m_rtvHeap;
 	DescriptorHeap m_dsvHeap;
+	uint32_t m_nullTexture2DSrvIndex = UINT32_MAX;
 
 	bool m_isInitialized = false;
 };

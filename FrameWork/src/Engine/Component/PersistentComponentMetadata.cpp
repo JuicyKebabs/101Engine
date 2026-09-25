@@ -89,7 +89,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::WaveRenderer(std::str
 	using T = ::WaveRenderer;
 	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
 	AddRendererProperties(builder);
-	builder.Property("waveTextureAssetId", &T::GetWaveTextureAssetReference, &T::TrySetWaveTextureAssetReference);
+	builder.Property("waveTextureAssetId", &T::GetWaveTextureAssetReference, &T::TrySetWaveTextureAssetReference).Optional();
 	builder.Property("vertexDivisions", &T::GetVertexDivisions, &T::SetVertexDivisions).Validate(ValueValidation::Finite2);
 	builder.Property("waveAmplitude", &T::GetWaveAmplitude, &T::SetWaveAmplitude);
 	builder.Property("waveFrequency", &T::GetWaveFrequency, &T::SetWaveFrequency);

@@ -57,7 +57,7 @@ private:
 	
 	ActorHandle m_cachedFollowActorHandle = ActorHandle::Null();
 	uint64_t m_cachedFollowTransformGeneration = static_cast<uint64_t>(-1);
-	float m_sphereScale = 500.0f;
+	float m_sphereScale = 1000.0f;
 
 private:
 	void OnAttachOverride() override;
