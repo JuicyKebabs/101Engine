@@ -34,6 +34,7 @@ enum class PS_FILE_ID
 {
 	Mesh = 0,
 	Sprite,
+	Wave,
 	UI,
 	PostEffect,
 	SelectionMask,

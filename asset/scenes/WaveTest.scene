@@ -98,7 +98,7 @@
                         "name": "",
                         "position": [
                             0.0,
-                            -2.75,
+                            -3.950000047683716,
                             0.0
                         ],
                         "rotation": [
@@ -119,9 +119,9 @@
                     "data": {
                         "blendMode": 0,
                         "color": [
-                            1.0,
-                            1.0,
-                            1.0,
+                            0.27073585987091064,
+                            0.34238311648368835,
+                            0.4157043695449829,
                             1.0
                         ],
                         "name": "",
@@ -131,13 +131,13 @@
                             200.0
                         ],
                         "visible": true,
-                        "waveAmplitude": 0.5,
+                        "waveAmplitude": 0.20000000298023224,
                         "waveDirection": [
-                            1.0,
+                            0.550000011920929,
                             1.25
                         ],
-                        "waveFrequency": 33.599998474121094,
-                        "waveSpeed": 7.650000095367432,
+                        "waveFrequency": 38.25,
+                        "waveSpeed": 6.25,
                         "waveTextureAssetId": "{5B3F7E70-3336-4E30-8309-C9534FB476D4}"
                     },
                     "type": "WaveRenderer"
@@ -147,6 +147,55 @@
             "name": "Wave",
             "parentId": null,
             "tag": "None"
+        },
+        {
+            "actorId": "{BA7EB3F6-B3E5-4EF1-A4A0-978ADC98FA5E}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "blendMode": 0,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "followActorId": "{08267FEB-ABFA-4115-B548-9008AE34E87A}",
+                        "followMode": 2,
+                        "name": "",
+                        "skyTextureAssetId": "{5C383CA1-7D26-4DC4-8225-846075C43E73}",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "SkyRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Sky",
+            "parentId": null,
+            "tag": "InitialSky"
         }
     ],
     "directional_light": {

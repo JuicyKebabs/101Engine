@@ -919,38 +919,43 @@ void Renderer::RenderWave(
 	}
 
 	// Set up the constant buffer for this mesh
-	auto vertexPtr = m_waveCB[waveItemIndex]->GetPtr<WaveRenderConstants>();
-	vertexPtr->worldMatrix = item.common.worldMatrix;
-	vertexPtr->waveDirection = item.waveDirection;
-	vertexPtr->waveAmplitude = item.waveAmplitude;
-	vertexPtr->waveFrequency = item.waveFrequency;
-	vertexPtr->time = item.time;
+	auto wavePtr = m_waveCB[waveItemIndex]->GetPtr<WaveRenderConstants>();
+	wavePtr->worldMatrix = item.common.worldMatrix;
+	wavePtr->waveDirection = item.waveDirection;
+	wavePtr->waveAmplitude = item.waveAmplitude;
+	wavePtr->waveFrequency = item.waveFrequency;
+	wavePtr->time = item.time;
 
 	const uint32_t subdivisionX = item.vertexDivisions.x;
 	const uint32_t subdivisionY = item.vertexDivisions.y;
 
-	vertexPtr->subdivisionsX = subdivisionX;
-	vertexPtr->subdivisionsY = subdivisionY;
+	wavePtr->subdivisionsX = subdivisionX;
+	wavePtr->subdivisionsY = subdivisionY;
 
-	vertexPtr->color = item.common.color;
+	wavePtr->color = item.common.color;
 
-	vertexPtr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+	wavePtr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
+	wavePtr->lightViewProj = m_directionalLight.view * m_directionalLight.proj;
+
+	bool IsReflective = item.common.materialDesc.textureHandle != InvalidTextureHandle;
+	wavePtr->IsReflective = IsReflective ? 1 : 0;
+
 
 	p_commandList->SetGraphicsRootConstantBufferView(1, m_waveCB[waveItemIndex]->GetAddress());
-
-	// Use mesh constant buffer for pixel shader data
-	auto pixelPtr = m_meshCB[meshItemIndex]->GetPtr<MeshRenderConstants>();
-	pixelPtr->worldMatrix = item.common.worldMatrix;
-	pixelPtr->worldInvTranspose = Matrix4x4::Transpose(item.common.worldMatrix.Inverse());
-	pixelPtr->lightViewProj = m_directionalLight.view * m_directionalLight.proj;
-	pixelPtr->objectColor = item.common.color;
-
-	p_commandList->SetGraphicsRootConstantBufferView(5, m_meshCB[meshItemIndex]->GetAddress());
+	p_commandList->SetGraphicsRootConstantBufferView(5, m_waveCB[waveItemIndex]->GetAddress());
 
 	// Set SRV for the texture
-	int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
-	auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
-	p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+	if (IsReflective)
+	{
+		int32_t idx = m_pTextureManager->GetTextureSrvIndex(item.common.materialDesc.textureHandle);
+		auto gpuHandle = m_pDescriptorHeapAllocator->GetCbvSrvUavGpuHandle(idx);
+		p_commandList->SetGraphicsRootDescriptorTable(3, gpuHandle);
+	}
+	else
+	{
+		// Set null descriptor table if no texture is used
+		p_commandList->SetGraphicsRootDescriptorTable(3, m_pDescriptorHeapAllocator->GetNullTexture2DSrvGpuHandle());
+	}
 
 	// Calculate the number of vertices based on the vertex divisions
 	const uint32_t vertexCount = subdivisionX * subdivisionY * 6;

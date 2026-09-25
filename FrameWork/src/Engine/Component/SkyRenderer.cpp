@@ -388,8 +388,11 @@ void SkyRenderer::RebuildRenderProxy()
 	Transform* followTransform = ResolveFollowTransform(followActor);
 	const Vector3 position = followTransform
 		? followTransform->GetWorldPosition() : Vector3::Zero();
-	const Quaternion rotation = followTransform
-		? followTransform->GetWorldRotationQuat() : Quaternion::Identity();
+
+	auto ownerTransform = owner->GetComponentByClass<Transform>();
+	const Quaternion rotation = ownerTransform
+		? ownerTransform->GetWorldRotationQuat() : Quaternion::Identity();
+
 	m_proxy.common.position = position;
 	m_proxy.common.worldMatrix = Matrix4x4::CreateTRS(position, rotation, Vector3(m_sphereScale));
 	m_proxy.common.renderSpace = RenderSpace::World;

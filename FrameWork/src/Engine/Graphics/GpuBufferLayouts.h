@@ -52,6 +52,8 @@ struct alignas(256) WaveRenderConstants
 	uint32_t padding;				// Padding to align to 16 bytes
 	Vector4 color;					// Tint color (RGBA)
 	Matrix4x4 worldInvTranspose;	// Inverse transpose of the world matrix
+	Matrix4x4 lightViewProj;		// Light-space VP matrix (for shadow map lookup)
+	bool IsReflective;				// Flag indicating if the wave surface is reflective
 };
 
 // b1 - Per-object data for UI rendering

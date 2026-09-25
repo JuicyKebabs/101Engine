@@ -15,4 +15,7 @@ cbuffer WaveObjectConstants : register(b1)
     float4 color;           // Overall color for the wave object
     
     float4x4 worldInvTranspose; // Inverse transpose of the world matrix
+    float4x4 lightViewProj; // Light view-projection matrix for shadow mapping
+    
+    bool isReflective; // Flag indicating if the wave object is reflective
 }

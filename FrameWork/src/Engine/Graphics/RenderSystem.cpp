@@ -4,6 +4,7 @@
 #include "Engine/Actor/Actor.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
+#include "Engine/Resource/AssetManager.h"
 
 bool RenderSystem::SetActiveSkyRenderer(SkyRenderer* renderer)
 {
@@ -511,10 +512,23 @@ WaveRenderItem RenderSystem::CreateWaveRenderItem(
 	WaveRenderItem item;
 	item.common.materialDesc = renderTemplate.materialDesc;
 
-	if (renderProxy.textureOverrideHandle != InvalidTextureHandle)
+	TextureHandle textureHandle = InvalidTextureHandle;
+
+	if (m_skyRenderer 
+		&& !m_skyRenderer->IsDestroyed()
+		&& m_skyRenderer->IsVisible()
+		&& m_skyRenderer->IsConfigured()
+		&& m_skyRenderer->GetOwner() && !m_skyRenderer->GetOwner()->IsDestroyed() && m_skyRenderer->GetOwner()->IsActive())
 	{
-		item.common.materialDesc.textureHandle = renderProxy.textureOverrideHandle;
+		const auto id = m_skyRenderer->GetSkyTextureAssetId();
+
+		if (id.IsValid())
+		{
+			textureHandle = m_scene->GetEngineContext()->pAssetManager->GetTextureHandle(id);
+		}
 	}
+
+	item.common.materialDesc.textureHandle = textureHandle;
 
 	item.common.worldMatrix = renderProxy.common.worldMatrix;
 	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
