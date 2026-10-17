@@ -14,11 +14,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-add_subdirectory(Framework)
-add_subdirectory(Game/GameCode)
-add_subdirectory(Editor)
-add_subdirectory(Game)
+option(ENGINE101_BUILD_ENGINE "Build Framework, GamecCode, Editor, and Game" ON)
+option(ENGINE101_BUILD_RENDERER_SANDBOX "Build RendererSandbox" ON)
 
-if(BUILD_TESTING)
-    add_subdirectory(Tests)
+add_subdirectory(Renderer)
+
+# Renderer専用実行環境
+if(ENGINE101_BUILD_RENDERER_SANDBOX)
+    add_subdirectory(RendererSandbox)
+endif()
+
+# Engine実行環境
+if(ENGINE101_BUILD_ENGINE)
+    add_subdirectory(Framework)
+    add_subdirectory(Game/GameCode)
+    add_subdirectory(Editor)
+    add_subdirectory(Game)
+
+    # テスト環境の追加
+    if(BUILD_TESTING)
+        add_subdirectory(Tests)
+    endif()
 endif()

@@ -273,7 +273,10 @@ bool App::InitInstance()
 	);
 
 	// Initialize audio before AssetManager can lazily load audio assets.
-	if (!m_audioManager.Initialize()) return false;
+	if (!m_audioManager.Initialize())
+	{
+		DBG("App: Audio initialization failed; continuing without audio.");
+	}
 
 	// Initialize asset manager
 	if (!m_pAssetManager->Initialize(

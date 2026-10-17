@@ -1,1 +1,46 @@
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S "C:\Users\kamka\デスクトップ\101Engine-developing\101Engine" -B "C:\Users\kamka\デスクトップ\101Engine-developing\101Engine/build" -G "Visual Studio 17 2022" -A x64 > "C:\Users\kamka\デスクトップ\101Engine-developing\101Engine/cmake_reconfigure.log" 2>&1
+@echo off
+setlocal EnableExtensions DisableDelayedExpansion
+set "RESULT=1"
+
+if not exist "%~dp0CMakeLists.txt" (
+    echo [ERROR] Place this file next to the project's top-level CMakeLists.txt.
+    goto :finish
+)
+
+rem Prefer PATH, then look for CMake bundled with Visual Studio 2022.
+set "CMAKE_EXE="
+for /f "delims=" %%I in ('where cmake.exe 2^>nul') do if not defined CMAKE_EXE set "CMAKE_EXE=%%I"
+
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not defined CMAKE_EXE if exist "%VSWHERE%" (
+    for /f "usebackq delims=" %%I in (`call "%VSWHERE%" -products * -version "[17.0,18.0)" -find Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe 2^>nul`) do (
+        if not defined CMAKE_EXE if exist "%%I" set "CMAKE_EXE=%%I"
+    )
+)
+
+rem Also support standalone CMake installations that are not on PATH.
+for %%I in ("%ProgramFiles%\CMake\bin\cmake.exe" "%ProgramFiles(x86)%\CMake\bin\cmake.exe" "%LOCALAPPDATA%\Programs\CMake\bin\cmake.exe") do (
+    if not defined CMAKE_EXE if exist "%%~I" set "CMAKE_EXE=%%~I"
+)
+
+if not defined CMAKE_EXE (
+    echo [ERROR] cmake.exe was not found. Install CMake and add its bin folder to PATH,
+    echo         or install C++ CMake tools for Windows in Visual Studio 2022.
+    goto :finish
+)
+
+echo Using CMake: "%CMAKE_EXE%"
+echo Configuring Visual Studio 2022 x64...
+"%CMAKE_EXE%" -S "%~dp0." -B "%~dp0build" -G "Visual Studio 17 2022" -A x64
+set "RESULT=%ERRORLEVEL%"
+if not "%RESULT%"=="0" (
+    echo [ERROR] CMake configuration failed. See the output above.
+    goto :finish
+)
+
+echo [OK] Configuration complete.
+
+:finish
+echo.
+pause
+exit /b %RESULT%

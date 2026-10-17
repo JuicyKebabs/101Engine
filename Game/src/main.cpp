@@ -3,7 +3,7 @@
 #include <objbase.h>
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
-{
+														{
 	// Get executable path and initialize path manager
 	char exePath[MAX_PATH];
 	GetModuleFileNameA(nullptr, exePath, MAX_PATH);

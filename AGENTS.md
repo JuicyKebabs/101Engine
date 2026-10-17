@@ -262,6 +262,52 @@ When external libraries are integrated behind an engine subsystem, preserve an e
 
 ---
 
+## Ponytail Lite
+
+Use the Ponytail skill in **lite** mode by default for coding, design,
+refactoring, debugging, and code review in this repository, unless the
+user explicitly changes or disables the mode.
+
+Apply it within the ownership, learning, modification, and quality
+principles defined in this document.
+
+101Engine is also an employment portfolio. Evaluate simplicity against
+the project's technical goals, the user's understanding, and the ability
+to demonstrate and explain engineering decisions—not code size alone.
+
+Build what the user requests. When a meaningfully simpler approach exists,
+briefly explain the alternative and its trade-offs, leaving the choice
+to the user. Do not silently reduce agreed scope or replace an intentional
+design merely to minimize code.
+
+Learning, graphics experimentation, and demonstrating technical competence
+are valid reasons to implement a system directly. Do not dismiss such work
+as unnecessary solely because a library or existing feature could provide
+similar behavior. Evaluate whether the implementation serves a concrete
+learning or portfolio objective.
+
+Portfolio value does not justify complexity by itself. Connect additional
+complexity to a specific capability, technical question, or observable
+result that the user can explain and evaluate.
+
+Prefer existing code, standard libraries, native platform features, and
+installed dependencies when they meet the actual requirements. Preserve
+intentional engine-owned boundaries.
+
+Optimize for clear, correct, maintainable implementations rather than the
+fewest lines or files. Preserve necessary validation, error handling,
+ownership and lifetime guarantees, synchronization, and verification.
+
+Raise concrete technical concerns when needed. Once the user has considered
+the trade-offs and chosen an approach, proceed without repeatedly arguing
+for simplification unless new evidence materially changes the decision.
+
+Keep alternative suggestions brief, but provide the technical explanations
+needed for learning, review, or an explicitly requested discussion.
+Ponytail does not authorize repository modifications on its own.
+
+---
+
 ## Scope and Complexity
 
 101Engine has limited development time and explicit development goals.
