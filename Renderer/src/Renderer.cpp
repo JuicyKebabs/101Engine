@@ -113,280 +113,9 @@ struct Renderer::impl
 	}
 
 	Result UploadSelectedResources(std::span<const GeometryUploadTarget> geometries, std::span<const TextureUploadTarget> textures);
+	
+	Result CollectDestroyedResources();
 };
-
-Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTarget> geometries, std::span<const TextureUploadTarget> textures)
-{
-	if (!initialized || !geometryResources || !textureResources)
-	{
-		return { false, "UploadSelectedResources: Renderer is not initialized." };
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	// 1. Query previous upload completion without waiting.
-	//    Release completed upload buffers; retain the context for reuse.
-	//    Destination resources remain owned by their registries.
-	//-------------------------------------------------------------------------------------------------
-	Result result = backend.CollectUploads();
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	using GeometryWork = UploadWork<GeometryUploadTarget, backend::GeometryUploadData>;
-	using TextureWork = UploadWork<TextureUploadTarget, backend::TextureUploadData>;
-	std::vector<GeometryWork> geometryWork;
-	std::vector<TextureWork> textureWork;
-	//-------------------------------------------------------------------------------------------------
-	// 2. Gather the resources for upload.
-	//    Validate the selected content without replacing it or rejecting an accepted Destroy request.
-	//-------------------------------------------------------------------------------------------------
-	const auto gather = [](auto targets, auto& registry, auto& work) -> Result
-		{
-			work.reserve(targets.size());
-
-			for (const auto& target : targets)
-			{
-				// Check if registry still has the same content for the given handle.
-				if (!target.content || registry.FindRegisteredContent(target.handle) != target.content)
-				{
-					return { false, "Upload target no longer matches its registered content." };
-				}
-
-				// Only pending content can be uploaded.
-				if (target.content->state.preparationState != detail::ResourcePreparationState::Pending)
-				{
-					continue;
-				}
-
-				// Check duplication of the same target in the work list.
-				const auto duplicate = std::find_if(work.begin(), work.end(), [&](const auto& item)
-					{
-						return item.target.handle == target.handle;
-					});
-
-				if (duplicate != work.end())
-				{
-					continue;
-				}
-
-				if (target.content->gpuData || target.content->uploadFenceValue != 0)
-				{
-					return { false, "Pending upload target has unexpected GPU preparation state." };
-				}
-
-				work.push_back({ target });
-			}
-
-			return {};
-		};
-
-	try
-	{
-		// Gather the selected geometries and textures for upload preparation.
-		result = gather(geometries, *geometryResources, geometryWork);
-		if (result.IsSuccess())
-		{
-			result = gather(textures, *textureResources, textureWork);
-		}
-	}
-	catch (const std::bad_alloc&)
-	{
-		return { false, "Upload work allocation failed." };
-	}
-	catch (const std::length_error&)
-	{
-		return { false, "Upload work size is unsupported." };
-	}
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	// Only before recording or after discarding this invocation's unsubmitted commands.
-	const auto resetPrepared = [&]()
-		{
-			const auto reset = [](auto& work)
-				{
-					for (auto& item : work)
-					{
-						if (item.prepared)
-						{
-							item.upload.reset();
-							item.target.content->gpuData.reset();
-							item.prepared = false;
-						}
-					}
-				};
-
-			reset(geometryWork);
-			reset(textureWork);
-		};
-
-	//-------------------------------------------------------------------------------------------------
-	// 3. Prepare destination resources in the Default heap and upload buffers.
-	//    Copy CPU data into the upload buffers.
-	//    No GPU commands are recorded or submitted here.
-	//-------------------------------------------------------------------------------------------------
-	bool hasPrepared = false;
-	const auto prepare = [&](auto& work, auto& registry, auto prepareFunction) -> Result
-		{
-			for (auto& item : work)
-			{
-				auto& content = *item.target.content;
-				Result prepared = (backend.*prepareFunction)(content.cpuData, content.gpuData, item.upload);
-
-				if (!prepared.IsSuccess())
-				{
-					if (prepared.failureKind != FailureKind::General)
-					{
-						return prepared;
-					}
-
-					OutputDebugStringA("[101Renderer] Resource preparation failed: ");
-					OutputDebugStringA(prepared.message.c_str());
-					OutputDebugStringA("\n");
-
-					if (!registry.MarkPreparationFailed(item.target.handle, content))
-					{
-						return { false, "Failed preparation state update was rejected." };
-					}
-
-					continue;
-				}
-
-				item.prepared = true;
-				hasPrepared = true;
-			}
-
-			return {};
-		};
-
-	result = prepare(geometryWork, *geometryResources, &backend::Backend::PrepareGeometry);
-	if (result.IsSuccess())
-	{
-		result = prepare(textureWork, *textureResources, &backend::Backend::PrepareTexture);
-	}
-
-	if (!result.IsSuccess())
-	{
-		resetPrepared();
-		return result;
-	}
-
-	if (!hasPrepared)
-	{
-		return {};
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	// 4. Make the upload batch available and begin command recording.
-	//    Wait for the previous upload batch only if it is still in flight.
-	//-------------------------------------------------------------------------------------------------
-	result = backend.BeginUploads();
-	if (!result.IsSuccess())
-	{
-		resetPrepared();
-		return result;
-	}
-
-	const auto cancelAndReset = [&](Result failure) -> Result
-		{
-			Result canceled = backend.CancelUploads();
-			if (!canceled.IsSuccess())
-			{
-				// Preserve destinations if their commands could not be discarded.
-				canceled.failureKind = FailureKind::GpuCompletionUnknown;
-				return canceled;
-			}
-
-			resetPrepared();
-			return failure;
-		};
-
-	//-------------------------------------------------------------------------------------------------
-	// 5. Record copy commands and resource transitions.
-	//    Each successful Add transfers upload ownership to UploadBatch.
-	//-------------------------------------------------------------------------------------------------
-	const auto record = [&](auto& work, auto addFunction) -> Result
-		{
-			for (auto& item : work)
-			{
-				if (!item.prepared)
-				{
-					continue;
-				}
-
-				Result added = (backend.*addFunction)(*item.target.content->gpuData, item.upload);
-				if (!added.IsSuccess())
-				{
-					return added;
-				}
-			}
-
-			return {};
-		};
-
-	result = record(geometryWork, &backend::Backend::AddGeometryUpload);
-	if (result.IsSuccess())
-	{
-		result = record(textureWork, &backend::Backend::AddTextureUpload);
-	}
-
-	if (!result.IsSuccess())
-	{
-		return cancelAndReset(std::move(result));
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	// 6. Submit the upload commands and enqueue a fence signal.
-	//    Mark prepared contents Ready after successful Execute + Signal.
-	//    Ready does not imply CPU-observed GPU completion.
-	//-------------------------------------------------------------------------------------------------	
-	const auto submission = backend.SubmitUploads();
-	if (!submission.status.IsSuccess())
-	{
-		if (submission.executionIssued)
-		{
-			// Submitted destinations must remain owned by their registries.
-			return submission.status;
-		}
-
-		return cancelAndReset(submission.status);
-	}
-
-	if (!submission.executionIssued || submission.fenceValue == 0 || submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
-	{
-		return { false, "Upload submission returned inconsistent success information.", FailureKind::GpuCompletionUnknown };
-	}
-
-	const auto markReady = [&](auto& work, auto& registry) -> Result
-		{
-			for (auto& item : work)
-			{
-				if (!item.prepared)
-				{
-					continue;
-				}
-
-				if (!registry.MarkReadyAfterUploadSubmission(item.target.handle, *item.target.content, submission.fenceValue))
-				{
-					return { false, "Ready update failed after upload submission.", FailureKind::GpuCompletionUnknown };
-				}
-			}
-
-			return {};
-		};
-
-	result = markReady(geometryWork, *geometryResources);
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	return markReady(textureWork, *textureResources);
-}
 
 Renderer::Renderer()
 	: m_pImpl(std::make_unique<impl>())
@@ -733,6 +462,307 @@ Result Renderer::DestroyTexture(TextureHandle handle)
 	}
 
 	return {};
+}
+
+Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTarget> geometries, std::span<const TextureUploadTarget> textures)
+{
+	if (!initialized || !geometryResources || !textureResources)
+	{
+		return { false, "UploadSelectedResources: Renderer is not initialized." };
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	// 1. Query previous upload completion without waiting.
+	//    Release completed upload buffers; retain the context for reuse.
+	//    Destination resources remain owned by their registries.
+	//-------------------------------------------------------------------------------------------------
+	Result result = backend.CollectUploads();
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	using GeometryWork = UploadWork<GeometryUploadTarget, backend::GeometryUploadData>;
+	using TextureWork = UploadWork<TextureUploadTarget, backend::TextureUploadData>;
+	std::vector<GeometryWork> geometryWork;
+	std::vector<TextureWork> textureWork;
+	//-------------------------------------------------------------------------------------------------
+	// 2. Gather the resources for upload.
+	//    Validate the selected content without replacing it or rejecting an accepted Destroy request.
+	//-------------------------------------------------------------------------------------------------
+	const auto gather = [](auto targets, auto& registry, auto& work) -> Result
+		{
+			work.reserve(targets.size());
+
+			for (const auto& target : targets)
+			{
+				// Check if registry still has the same content for the given handle.
+				if (!target.content || registry.FindRegisteredContent(target.handle) != target.content)
+				{
+					return { false, "Upload target no longer matches its registered content." };
+				}
+
+				// Only pending content can be uploaded.
+				if (target.content->state.preparationState != detail::ResourcePreparationState::Pending)
+				{
+					continue;
+				}
+
+				// Check duplication of the same target in the work list.
+				const auto duplicate = std::find_if(work.begin(), work.end(), [&](const auto& item)
+					{
+						return item.target.handle == target.handle;
+					});
+
+				if (duplicate != work.end())
+				{
+					continue;
+				}
+
+				if (target.content->gpuData || target.content->uploadFenceValue != 0)
+				{
+					return { false, "Pending upload target has unexpected GPU preparation state." };
+				}
+
+				work.push_back({ target });
+			}
+
+			return {};
+		};
+
+	try
+	{
+		// Gather the selected geometries and textures for upload preparation.
+		result = gather(geometries, *geometryResources, geometryWork);
+		if (result.IsSuccess())
+		{
+			result = gather(textures, *textureResources, textureWork);
+		}
+	}
+	catch (const std::bad_alloc&)
+	{
+		return { false, "Upload work allocation failed." };
+	}
+	catch (const std::length_error&)
+	{
+		return { false, "Upload work size is unsupported." };
+	}
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	// Only before recording or after discarding this invocation's unsubmitted commands.
+	const auto resetPrepared = [&]()
+		{
+			const auto reset = [](auto& work)
+				{
+					for (auto& item : work)
+					{
+						if (item.prepared)
+						{
+							item.upload.reset();
+							item.target.content->gpuData.reset();
+							item.prepared = false;
+						}
+					}
+				};
+
+			reset(geometryWork);
+			reset(textureWork);
+		};
+
+	//-------------------------------------------------------------------------------------------------
+	// 3. Prepare destination resources in the Default heap and upload buffers.
+	//    Copy CPU data into the upload buffers.
+	//    No GPU commands are recorded or submitted here.
+	//-------------------------------------------------------------------------------------------------
+	bool hasPrepared = false;
+	const auto prepare = [&](auto& work, auto& registry, auto prepareFunction) -> Result
+		{
+			for (auto& item : work)
+			{
+				auto& content = *item.target.content;
+				Result prepared = (backend.*prepareFunction)(content.cpuData, content.gpuData, item.upload);
+
+				if (!prepared.IsSuccess())
+				{
+					if (prepared.failureKind != FailureKind::General)
+					{
+						return prepared;
+					}
+
+					OutputDebugStringA("[101Renderer] Resource preparation failed: ");
+					OutputDebugStringA(prepared.message.c_str());
+					OutputDebugStringA("\n");
+
+					if (!registry.MarkPreparationFailed(item.target.handle, content))
+					{
+						return { false, "Failed preparation state update was rejected." };
+					}
+
+					continue;
+				}
+
+				item.prepared = true;
+				hasPrepared = true;
+			}
+
+			return {};
+		};
+
+	result = prepare(geometryWork, *geometryResources, &backend::Backend::PrepareGeometry);
+	if (result.IsSuccess())
+	{
+		result = prepare(textureWork, *textureResources, &backend::Backend::PrepareTexture);
+	}
+
+	if (!result.IsSuccess())
+	{
+		resetPrepared();
+		return result;
+	}
+
+	if (!hasPrepared)
+	{
+		return {};
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	// 4. Make the upload batch available and begin command recording.
+	//    Wait for the previous upload batch only if it is still in flight.
+	//-------------------------------------------------------------------------------------------------
+	result = backend.BeginUploads();
+	if (!result.IsSuccess())
+	{
+		resetPrepared();
+		return result;
+	}
+
+	const auto cancelAndReset = [&](Result failure) -> Result
+		{
+			Result canceled = backend.CancelUploads();
+			if (!canceled.IsSuccess())
+			{
+				// Preserve destinations if their commands could not be discarded.
+				canceled.failureKind = FailureKind::GpuCompletionUnknown;
+				return canceled;
+			}
+
+			resetPrepared();
+			return failure;
+		};
+
+	//-------------------------------------------------------------------------------------------------
+	// 5. Record copy commands and resource transitions.
+	//    Each successful Add transfers upload ownership to UploadBatch.
+	//-------------------------------------------------------------------------------------------------
+	const auto record = [&](auto& work, auto addFunction) -> Result
+		{
+			for (auto& item : work)
+			{
+				if (!item.prepared)
+				{
+					continue;
+				}
+
+				Result added = (backend.*addFunction)(*item.target.content->gpuData, item.upload);
+				if (!added.IsSuccess())
+				{
+					return added;
+				}
+			}
+
+			return {};
+		};
+
+	result = record(geometryWork, &backend::Backend::AddGeometryUpload);
+	if (result.IsSuccess())
+	{
+		result = record(textureWork, &backend::Backend::AddTextureUpload);
+	}
+
+	if (!result.IsSuccess())
+	{
+		return cancelAndReset(std::move(result));
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	// 6. Submit the upload commands and enqueue a fence signal.
+	//    Mark prepared contents Ready after successful Execute + Signal.
+	//    Ready does not imply CPU-observed GPU completion.
+	//-------------------------------------------------------------------------------------------------	
+	const auto submission = backend.SubmitUploads();
+	if (!submission.status.IsSuccess())
+	{
+		if (submission.executionIssued)
+		{
+			// Submitted destinations must remain owned by their registries.
+			return submission.status;
+		}
+
+		return cancelAndReset(submission.status);
+	}
+
+	if (!submission.executionIssued || submission.fenceValue == 0 || submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
+	{
+		return { false, "Upload submission returned inconsistent success information.", FailureKind::GpuCompletionUnknown };
+	}
+
+	const auto markReady = [&](auto& work, auto& registry) -> Result
+		{
+			for (auto& item : work)
+			{
+				if (!item.prepared)
+				{
+					continue;
+				}
+
+				if (!registry.MarkReadyAfterUploadSubmission(item.target.handle, *item.target.content, submission.fenceValue))
+				{
+					return { false, "Ready update failed after upload submission.", FailureKind::GpuCompletionUnknown };
+				}
+			}
+
+			return {};
+		};
+
+	result = markReady(geometryWork, *geometryResources);
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	return markReady(textureWork, *textureResources);
+}
+
+Result Renderer::impl::CollectDestroyedResources()
+{
+	if (stoppedFailure != FailureKind::General
+		|| submittedFrame
+		|| backend.HasPendingUploads())
+	{
+		return {};
+	}
+
+	Result result = backend.CollectUploads();
+
+	if (!result.IsSuccess() || backend.HasPendingUploads())
+	{
+		return result;
+	}
+
+	std::uint64_t completed = 0;
+	result = backend.QueryCompletedGraphicsFence(completed);
+
+	if (result.IsSuccess())
+	{
+		return result;
+	}
+
+
+
 }
 
 }

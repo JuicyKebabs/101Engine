@@ -61,6 +61,7 @@ Result DescriptorHeap::Initialize(
 	m_heap = std::move(heap);
 	m_descriptorSize = descriptorSize;
 	m_descriptorCount = descriptorCount;
+	m_shaderVisible = shaderVisible;
 
 	return {};
 }
@@ -70,6 +71,7 @@ void DescriptorHeap::Finalize() noexcept
 	m_heap.Reset();
 	m_descriptorSize = 0;
 	m_descriptorCount = 0;
+	m_shaderVisible = false;
 }
 
 Result DescriptorHeap::GetCpuHandle(uint32_t index, D3D12_CPU_DESCRIPTOR_HANDLE& outHandle) const
@@ -91,5 +93,28 @@ Result DescriptorHeap::GetCpuHandle(uint32_t index, D3D12_CPU_DESCRIPTOR_HANDLE&
 
 	return {};
 }
+
+Result DescriptorHeap::GetGpuHandle(std::uint32_t index, D3D12_GPU_DESCRIPTOR_HANDLE& outHandle) const
+{
+	outHandle = {};
+
+	if (!m_shaderVisible)
+	{
+		return { false, "DescriptorHeap is not shader-visible." };
+	}
+
+	if (!IsInitialized())
+	{
+		return { false, "DescriptorHeap is not initialized." };
+	}
+
+	if (index >= m_descriptorCount)
+	{
+		return { false, "DescriptorHeap index is out of range." };
+	}
+
+	outHandle = m_heap->GetGPUDescriptorHandleForHeapStart();
+	outHandle.ptr += static_cast<UINT64>(index) * m_descriptorSize;
+	return {};
 
 }

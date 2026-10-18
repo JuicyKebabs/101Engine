@@ -11,6 +11,7 @@
 #include "GeometryGpuData.h"
 #include "Resource/GeometryRegistry.h"
 #include "UploadBatch.h"
+#include "FrameResources.h"
 
 #include <array>
 #include <memory>
@@ -39,6 +40,24 @@ public:
 		const std::array<float, 4>& color);
 
 	Result Present(WindowOutputHandle handle);
+
+	Result BeginFrameResources();
+	Result EndFrameResources();
+
+	Result QueryCompletedGraphicsFence(std::uint64_t& outValue);
+	[[nodiscard]] bool HasPendingFrameResources() const noexcept
+	{
+		return m_frameActive;
+	}
+
+	Result AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output);
+	Result CopyFrameDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output);
+	Result KeepFrameObjectAlive(IUnknown* object);
+
+	[[nodiscard]] ID3D12DescriptorHeap* GetFrameDescriptorHeap() const noexcept
+	{
+		return m_frameResources.GetDescriptorHeap();
+	}
 	
 	// Check if there is a valid window output for the given handle.
 	[[nodiscard]]
@@ -66,14 +85,12 @@ public:
 		return m_uploadBatch.AddTexture(gpu, upload);
 	}
 
-	[[nodiscard]]
-	Result PrepareGeometry(
+	[[nodiscard]] Result PrepareGeometry(
 		const detail::GeometryCpuData& cpu,
 		std::unique_ptr<GeometryGpuData>& gpu,
 		std::unique_ptr<GeometryUploadData>& upload);
 
-	[[nodiscard]]
-	Result PrepareTexture(
+	[[nodiscard]] Result PrepareTexture(
 		const detail::TextureCpuData& cpu,
 		std::unique_ptr<TextureGpuData>& gpu,
 		std::unique_ptr<TextureUploadData>& upload);
@@ -83,21 +100,16 @@ private:
 	CommandQueue m_graphicsQueue;
 	CommandContext m_graphicsContext;
 
+	FrameResources m_frameResources;
+	bool m_frameActive = false;
+	bool m_frameCommandsNeedDiscard = false;
+	bool m_frameCompletionUnknown = false;
+	std::uint64_t m_frameFence = 0;
+
 	// Only one window output is supported for now.
 	// Making them pair of arrays for multiple window outputs in the future.
 	SwapChain m_windowSwapChain;
 	WindowOutputHandle m_windowOutputHandle{};
-
-	struct PendingGeometryTransfer
-	{
-		// Registry for this isolated initialization test only.
-		detail::GeometryRegistry registry{ 0 };
-
-		std::unique_ptr<GeometryUploadData> upload;
-		std::uint64_t fenceValue = 0;
-	};
-
-	std::unique_ptr<PendingGeometryTransfer> m_pendingGeometryTransfer;
 
 	UploadBatch m_uploadBatch;	// For resaource uploads.
 
@@ -106,9 +118,8 @@ private:
 	// after command submission or presentation.
 	Result HandleSubmissionFailure(Result failure);
 
-	Result VerifyGeometryTransfer(bool indexed);
-
-	Result VerifyGeometryFailureState();
+	[[nodiscard]] Result BeginFrameCommands();
+	[[nodiscard]] QueueSubmissionResult SubmitFrameCommands();
 };
 
 }

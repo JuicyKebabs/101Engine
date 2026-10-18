@@ -41,6 +41,9 @@ public:
 	// Caller must ensure no conflicting GPU use.
 	Result Write(std::span<const std::byte> data);
 
+	// Writes data at exact location by offset.
+	Result WriteAt(std::uint64_t offset, std::span<const std::byte> data);
+
 	ID3D12Resource* GetNativeResource() const noexcept
 	{
 		return m_resource.Get();

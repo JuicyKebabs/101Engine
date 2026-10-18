@@ -29,6 +29,13 @@ public:
 	void Finalize() noexcept;
 
 	Result GetCpuHandle(uint32_t index, D3D12_CPU_DESCRIPTOR_HANDLE& outHandle) const;
+	Result GetGpuHandle(uint32_t indesx, D3D12_GPU_DESCRIPTOR_HANDLE& outHandle) const;
+
+	[[nodiscard]]
+	ID3D12DescriptorHeap* GetNativeHeap() const noexcept
+	{
+		return  m_heap.Get();
+	}
 
 	[[nodiscard]]
 	bool IsInitialized() const { return m_heap != nullptr; }
@@ -38,6 +45,7 @@ private:
 
 	UINT m_descriptorSize = 0;
 	uint32_t m_descriptorCount = 0;
+	bool m_shaderVisible = false;
 };
 
 }

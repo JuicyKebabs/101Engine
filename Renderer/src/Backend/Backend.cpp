@@ -68,16 +68,24 @@ Result Backend::Initialize(const RendererConfiguration& configuration)
 		return commandContextResult;
 	}
 
-#if defined(_DEBUG)
+	// Initialize frame resources
+	const Result frameResult = m_frameResources.Initialize(
+		&m_device,
+		1024 * 1024,	// 1 MB for constants
+		1024,			// 1024 descriptors
+		4096);			// Retain up to 4096 objects
 
-#endif
-
+	if (!frameResult.IsSuccess())
+	{
+		Finalize();
+	}
 
 	return {};
 }
 
 void Backend::Finalize() noexcept
 {
+	// Lamda to terminates the application with debug output
 	const auto stopWithoutCleanUp =
 		[](const Result& failure)
 		{
@@ -90,6 +98,7 @@ void Backend::Finalize() noexcept
 
 	bool deviceLost = false;
 
+	// Check the status of the device before releasing resources.
 	if (m_device.IsInitialized())
 	{
 		const Result status = m_device.CheckStatus();
@@ -117,6 +126,7 @@ void Backend::Finalize() noexcept
 		}
 	}
 
+	// Finish the graphics queue to ensure all submitted commands are completed before releasing resources.
 	if (!deviceLost && m_graphicsQueue.IsInitialized())
 	{
 		const Result completed = m_graphicsQueue.Flush();
@@ -136,6 +146,7 @@ void Backend::Finalize() noexcept
 		}
 	}
 
+	// Make sure to finish the upload batch after the GPU completion check.
 	if (m_uploadBatch.IsInFlight())
 	{
 		if (deviceLost)
@@ -171,10 +182,16 @@ void Backend::Finalize() noexcept
 		stopWithoutCleanUp(canceled);
 	}
 
+
+	// Releases the components
 	m_windowOutputHandle = {};
 
 	m_graphicsContext.Finalize();
-	m_pendingGeometryTransfer.reset();
+	m_frameResources.Finalize();
+	m_frameCommandsNeedDiscard = false;
+	m_frameActive = false;
+	m_frameCompletionUnknown = false;
+	m_frameFence = 0;
 
 	m_windowSwapChain.Finalize();
 	m_graphicsQueue.Finalize();
@@ -221,29 +238,30 @@ WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDe
 
 Result Backend::ClearWindowOutput(WindowOutputHandle handle, const std::array<float, 4>& color)
 {
-	if (!IsWindowOutputValid(handle))
+	if (!m_frameActive || !IsWindowOutputValid(handle))
 	{
-		return { false, "ClearWindowOutput: Invalid window output handle." };
+		return { false, "ClearWindowOutput requires an active frame and valid output." };
 	}
 
 	ID3D12Resource* backBuffer = nullptr;
-	D3D12_CPU_DESCRIPTOR_HANDLE rtv{};
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle{};
 
-	Result result = m_windowSwapChain.GetCurrentBackBuffer(backBuffer, rtv);
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	// Previous successful calls have already waited for GPU completion.
-	result = m_graphicsContext.Begin();
+	Result result = m_windowSwapChain.GetCurrentBackBuffer(backBuffer, rtvHandle);
 
 	if (!result.IsSuccess())
 	{
 		return result;
 	}
 
+	// Begin recording commands for the current frame.
+	result = BeginFrameCommands();
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	// Transition RTV state from being presented to being written to as a render target.
 	result = m_graphicsContext.TransitionResource(
 		backBuffer,
 		D3D12_RESOURCE_STATE_PRESENT,
@@ -254,13 +272,15 @@ Result Backend::ClearWindowOutput(WindowOutputHandle handle, const std::array<fl
 		return result;
 	}
 
-	result = m_graphicsContext.ClearRenderTarget(rtv, color);
+	// Add command to clear the back buffer with the specified color.
+	result = m_graphicsContext.ClearRenderTarget(rtvHandle, color);
 
 	if (!result.IsSuccess())
 	{
 		return result;
 	}
 
+	// Transition RTV state back to being presented after clearing.
 	result = m_graphicsContext.TransitionResource(
 		backBuffer,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
@@ -271,6 +291,7 @@ Result Backend::ClearWindowOutput(WindowOutputHandle handle, const std::array<fl
 		return result;
 	}
 
+	// Closing the command list after recording all commands for the current frame.
 	result = m_graphicsContext.Close();
 
 	if (!result.IsSuccess())
@@ -278,22 +299,19 @@ Result Backend::ClearWindowOutput(WindowOutputHandle handle, const std::array<fl
 		return result;
 	}
 
-	const QueueSubmissionResult submission = m_graphicsQueue.Execute(m_graphicsContext);
-
+	// Execute the recorded commands. (Sends them to the GPU)
+	const QueueSubmissionResult submission = SubmitFrameCommands();
 	if (!submission.status.IsSuccess())
 	{
-		if (submission.executionIssued)
-		{
-			return HandleSubmissionFailure(submission.status);
-		}
-
 		return submission.status;
 	}
 
+	// Wait for GPU completion of the submitted commands.
 	result = m_graphicsQueue.WaitForFence(submission.fenceValue);
 
 	if (!result.IsSuccess())
 	{
+		// Deal with the device lost or unknown GPU completion situation.
 		return HandleSubmissionFailure(std::move(result));
 	}
 
@@ -473,8 +491,6 @@ Result Backend::PrepareTexture(
 	return result;
 }
 
-
-
 Result Backend::HandleSubmissionFailure(Result failure)
 {
 	const Result deviceStatus = m_device.CheckStatus();
@@ -500,203 +516,193 @@ Result Backend::HandleSubmissionFailure(Result failure)
 	return failure;
 }
 
-Result Backend::VerifyGeometryTransfer(bool indexed)
+Result Backend::BeginFrameResources()
 {
-	if (m_pendingGeometryTransfer)
-		return { false, "A geometry transfer is still retained." };
-
-	try
+	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
 	{
-		m_pendingGeometryTransfer = std::make_unique<PendingGeometryTransfer>();
-	}
-	catch (const std::bad_alloc&)
-	{
-		return { false, "Geometry transfer allocation failed." };
+		return { false, "BeginFrameResources: Backend is not initialized." };
 	}
 
-	auto& transfer = *m_pendingGeometryTransfer;
-	const auto cancelBeforeSubmission = [&](Result failure)
+	if (m_frameActive)
+	{
+		return { false, "BeginFrameResources: Frame resources are already active." };
+	}
+
+	// Graphics context must be initialized before starting frame resources.
+	if (m_graphicsContext.GetNativeCommandList())
+	{
+		Result initialized = m_graphicsContext.Initialize(
+			m_device.GetNativeDevice(),
+			D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+		if (!initialized.IsSuccess())
 		{
-			m_pendingGeometryTransfer.reset();
-			return failure;
-		};
-
-	const std::array<MeshVertex, 3> vertices{};
-	const std::array<std::uint32_t, 3> indices{ 0, 1, 2 };
-	GeometryDesc desc{};
-	desc.vertices = vertices;
-	if (indexed)
-		desc.indices = indices;
-
-	const auto registered = transfer.registry.Register(desc);
-	if (!registered.status.IsSuccess())
-		return cancelBeforeSubmission(registered.status);
-
-	// Simulate selecting content before Destroy; this is not a Submit implementation.
-	const auto* selected = transfer.registry.FindForNewUse(registered.handle);
-	auto* content = transfer.registry.FindRegisteredContent(registered.handle);
-	if (!content || selected != content)
-		return cancelBeforeSubmission({ false, "Registered geometry content was not found." });
-
-	assert(selected == content);
-	assert(!content->gpuData);
-	assert(content->state.preparationState == detail::ResourcePreparationState::Pending);
-	assert(!transfer.registry.FindRegisteredContent({}));
-
-	auto wrongOwner = registered.handle;
-	++wrongOwner.ownerId;
-	assert(!transfer.registry.FindRegisteredContent(wrongOwner));
-
-	const auto destroyed = transfer.registry.RequestDestroy(registered.handle);
-	if (destroyed != detail::ResourceHandleValidationResult::Success)
-		return cancelBeforeSubmission({ false, "Geometry test Destroy request failed." });
-
-	assert(!transfer.registry.FindForNewUse(registered.handle));
-	assert(transfer.registry.FindRegisteredContent(registered.handle) == content);
-
-	const auto failBeforeSubmission = [&](Result failure) -> Result
-		{
-			// This validation path has no outstanding earlier GPU work.
-			// Device loss is not an ordinary per-resource preparation failure.
-			if (failure.failureKind != FailureKind::General ||
-				!m_device.CheckStatus().IsSuccess())
-				return HandleSubmissionFailure(std::move(failure));
-
-			OutputDebugStringA("[101Renderer] Geometry preparation failed: ");
-			OutputDebugStringA(failure.message.c_str());
-			OutputDebugStringA("\n");
-			if (!transfer.registry.MarkPreparationFailed(registered.handle, *content))
-				failure.message += "\nFailed state transition was rejected.";
-
-			assert(content->state.preparationState == detail::ResourcePreparationState::Failed);
-			assert(!transfer.registry.FindForNewUse(registered.handle));
-
-			// Discard any unsubmitted commands before releasing their resources.
-			// This initializer returns failure and stops; it does not reuse this context.
-			m_graphicsContext.Finalize();
-			m_pendingGeometryTransfer.reset();
-			return failure;
-		};
-
-	Result result = PrepareGeometryUpload(
-		m_device.GetNativeDevice(), content->cpuData, content->gpuData, transfer.upload);
-	if (!result.IsSuccess())
-		return failBeforeSubmission(std::move(result));
-
-	const auto& gpu = *content->gpuData;
-	assert(selected->gpuData.get() == &gpu);
-	assert(content->state.preparationState == detail::ResourcePreparationState::Pending);
-	assert(gpu.vertexCount == 3);
-	assert(gpu.vertexView.SizeInBytes == sizeof(vertices));
-	assert(gpu.vertexView.StrideInBytes == sizeof(MeshVertex));
-	assert(gpu.indexCount == (indexed ? 3u : 0u));
-	if (indexed)
-	{
-		assert(gpu.indexView.SizeInBytes == sizeof(indices));
-		assert(gpu.indexView.Format == DXGI_FORMAT_R32_UINT);
-	}
-	else
-	{
-		assert(!gpu.indices.GetNativeResource());
-		assert(!transfer.upload->indices.GetNativeResource());
-		assert(gpu.indexView.BufferLocation == 0);
+			return initialized;
+		}
 	}
 
-	result = m_graphicsContext.Begin();
-	if (!result.IsSuccess())
-		return failBeforeSubmission(std::move(result));
-
-	result = RecordGeometryUpload(m_graphicsContext, gpu, *transfer.upload);
-	if (!result.IsSuccess())
-		return failBeforeSubmission(std::move(result));
-
-	result = m_graphicsContext.Close();
-	if (!result.IsSuccess())
-		return failBeforeSubmission(std::move(result));
-
-	const auto submission = m_graphicsQueue.Execute(m_graphicsContext);
-	if (!submission.status.IsSuccess())
-	{
-		if (submission.executionIssued)
-			return HandleSubmissionFailure(submission.status);
-		return failBeforeSubmission(submission.status);
-	}
-
-	transfer.fenceValue = submission.fenceValue;
-	if (!submission.executionIssued ||
-		!transfer.registry.MarkReadyAfterUploadSubmission(
-			registered.handle, *content, transfer.fenceValue))
-		return HandleSubmissionFailure({ false, "Ready transition after upload submission failed." });
-
-	// Ready is established before CPU waiting, not by the wait.
-	assert(content->state.preparationState == detail::ResourcePreparationState::Ready);
-	assert(content->uploadFenceValue == transfer.fenceValue);
-	assert(!transfer.registry.FindForNewUse(registered.handle)); // Destroy remains set.
-	OutputDebugStringW(L"[101Renderer] Geometry Ready before CPU fence wait.\n");
-
-	result = m_graphicsQueue.WaitForFence(transfer.fenceValue);
-	if (!result.IsSuccess())
-		return HandleSubmissionFailure(std::move(result));
-
-	transfer.upload.reset();
-	assert(content->state.preparationState == detail::ResourcePreparationState::Ready);
-	assert(content->gpuData.get() == &gpu);
-	assert(gpu.vertices.GetNativeResource());
-	assert(transfer.registry.FindRegisteredContent(registered.handle) == content);
-	assert(!transfer.registry.FindForNewUse(registered.handle));
-
-	// Test only: no retained frame or later Draw uses this registry.
-	// Its contents, including GPU buffers, may now be released.
-	m_pendingGeometryTransfer.reset();
-
-	OutputDebugStringW(indexed
-		? L"[101Renderer] Indexed GeometryContent transfer completed.\n"
-		: L"[101Renderer] Non-indexed GeometryContent transfer completed.\n");
+	m_frameActive = true;
+	m_frameFence = 0;	// Begin with no fence value.
+	m_frameCompletionUnknown = false;
+	
 	return {};
 }
 
-Result Backend::VerifyGeometryFailureState()
+Result Backend::BeginFrameCommands()
 {
-	// CPU-side failure test only: no commands are recorded or submitted.
-	detail::GeometryRegistry registry{ 0 };
-	const std::array<MeshVertex, 3> vertices{};
-	GeometryDesc desc{};
-	desc.vertices = vertices;
+	if (!m_frameActive || m_frameCompletionUnknown || m_frameCommandsNeedDiscard)
+	{
+		return { false, "Frame command recording is unavailable." };
+	}
 
-	const auto registered = registry.Register(desc);
-	if (!registered.status.IsSuccess())
-		return registered.status;
+	// Wait for the previous frame's GPU completion.
+	if (m_frameFence != 0)
+	{
+		Result completion = m_graphicsQueue.WaitForFence(m_frameFence);
+		
+		if (!completion.IsSuccess())
+		{
+			m_frameCompletionUnknown = true;
+			return HandleSubmissionFailure(std::move(completion));
+		}
+	}
+	m_frameCommandsNeedDiscard = true;
 
-	auto* content = registry.FindRegisteredContent(registered.handle);
-	if (!content)
-		return { false, "Failure test content was not found." };
+	// Begin recording commands for the current frame.
+	return m_graphicsContext.Begin();
+}
 
-	assert(registry.FindForNewUse(registered.handle) == content);
-	assert(!registry.MarkReadyAfterUploadSubmission(registered.handle, *content, 1));
+QueueSubmissionResult Backend::SubmitFrameCommands()
+{
+	if (!m_frameActive || m_frameCompletionUnknown || !m_frameCommandsNeedDiscard)
+	{
+		return { { false, "Frame submission is unavailable." } };
+	}
 
-	std::unique_ptr<GeometryUploadData> upload;
-	const Result failure = PrepareGeometryUpload(
-		nullptr, content->cpuData, content->gpuData, upload);
-	if (failure.IsSuccess())
-		return { false, "Null-device preparation unexpectedly succeeded." };
+	// Execute the recorded commands for the current frame and signal the fence
+	auto submission = m_graphicsQueue.Execute(m_graphicsContext);
 
-	OutputDebugStringA("[101Renderer] Expected preparation failure: ");
-	OutputDebugStringA(failure.message.c_str());
-	OutputDebugStringA("\n");
+	// Check execution completion
+	if (submission.executionIssued)
+	{
+		m_frameCommandsNeedDiscard = false;
 
-	if (!registry.MarkPreparationFailed(registered.handle, *content))
-		return { false, "Failed state transition was rejected." };
+		// Check signal completion and fence value validity
+		if (!submission.status.IsSuccess() || submission.fenceValue == 0 ||
+			submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
+		{
+			m_frameCompletionUnknown = true;
 
-	assert(content->state.preparationState == detail::ResourcePreparationState::Failed);
-	assert(content->uploadFenceValue == 0);
-	assert(!content->gpuData && !upload);
-	assert(!registry.FindForNewUse(registered.handle));
-	assert(registry.FindRegisteredContent(registered.handle) == content);
-	assert(!registry.MarkReadyAfterUploadSubmission(registered.handle, *content, 1));
+			if (submission.status.IsSuccess())
+			{
+				submission.status = { false, "Frame submission returned no valid fence." };
+			}
 
-	// No GPU work and no retained CPU users; this local registry can now be destroyed.
-	OutputDebugStringW(L"[101Renderer] Failed state and Destroy request verified.\n");
+			submission.status = HandleSubmissionFailure(std::move(submission.status));
+
+			return submission;
+		}
+
+		m_frameFence = submission.fenceValue;
+	}
+
+	return submission;
+}
+
+Result Backend::EndFrameResources()
+{
+	if (!m_frameActive)
+	{
+		return {};
+	}
+
+	if (m_frameCompletionUnknown)
+	{
+		return { false, "Frame completion is unknown; retain all storage.", FailureKind::GpuCompletionUnknown };
+	}
+
+	// Wait for the GPU to complete the frame's commands.
+	if (m_frameFence != 0)
+	{
+		Result completed = m_graphicsQueue.WaitForFence(m_frameFence);
+
+		if (!completed.IsSuccess())
+		{
+			m_frameCompletionUnknown = true;
+			return HandleSubmissionFailure(std::move(completed));
+		}
+	}
+
+	const bool recreateContext = m_frameCommandsNeedDiscard;
+
+	if (recreateContext)
+	{
+		m_graphicsContext.Finalize();
+	}
+
+	m_frameCommandsNeedDiscard = false;
+	m_frameResources.ResetAfterCompletion();
+	m_frameActive = false;
+	m_frameFence = 0;
+
+	if (recreateContext)
+	{
+		Result initialized = m_graphicsContext.Initialize(
+			m_device.GetNativeDevice(),
+			D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+		if (!initialized.IsSuccess() && !m_device.CheckStatus().IsSuccess())
+		{
+			return HandleSubmissionFailure(std::move(initialized));
+		}
+
+		return initialized;
+	}
+
 	return {};
+}
+
+Result Backend::QueryCompletedGraphicsFence(std::uint64_t& outValue)
+{
+	Result result = m_graphicsQueue.QueryCompletedFenceValue(outValue);
+
+	// Do not finish without checking the failuer reason.
+	if (!result.IsSuccess())
+	{
+		return HandleSubmissionFailure(std::move(result));
+	}
+
+	return {};
+}
+
+Result Backend::AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output)
+{
+	if (!m_frameActive || m_frameCompletionUnknown)
+	{
+		return { false, "Constant allocation requires an active healthy frame." };
+	}
+
+	return m_frameResources.AllocateConstants(data, output);
+}
+
+Result Backend::CopyFrameDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output)
+{
+	if (!m_frameActive || m_frameCompletionUnknown)
+	{
+		return { false, "Descriptor allocation requires an active healthy frame." };
+	}
+
+	return m_frameResources.CopyDescriptor(source, output);
+}
+
+Result Backend::KeepFrameObjectAlive(IUnknown* object)
+{
+	if (!m_frameActive || m_frameCompletionUnknown)
+	{
+		return { false, "Object retention requires an active healthy frame." };
+	}
+
+	return m_frameResources.KeepAlive(object);
 }
 
 }
