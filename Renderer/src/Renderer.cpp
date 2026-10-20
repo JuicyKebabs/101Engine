@@ -181,9 +181,9 @@ void Renderer::Finalize()
 
 	// Discard unsubmitted uploads and confirm all submitted GPU work
 	// before releasing registry-owned destination resources.
+	m_pImpl->submittedFrame.reset();
 	m_pImpl->backend.Finalize();
 
-	m_pImpl->submittedFrame.reset();
 	m_pImpl->geometryResources.reset();
 	m_pImpl->textureResources.reset();
 
@@ -289,113 +289,151 @@ RenderResult Renderer::Render()
 {
 	auto& state = *m_pImpl;
 	Result result = state.CheckPublicCall();
+
 	if (!result.IsSuccess())
 	{
 		return { std::move(result) };
 	}
 
-	if (!state.submittedFrame || !state.submittedFrame->frame.hasPendingSubmission)
-	{
-		OutputDebugStringA("[101Renderer] Render skipped: No pending submission.\n");
-		return { {}, RenderDisposition::SkippedNoSubmission };
-	}
-
-	// Use destructor to reset isrendering flag at the end of this scope
+	// Make sure to reset the isRendering flag by destructing 
+	// this scope guard at the end of the function.
 	struct RenderScope
 	{
 		bool& isRendering;
-
-		~RenderScope()
-		{
-			isRendering = false;
-		}
+		~RenderScope() { isRendering = false; }
 	};
 
 	state.isRendering = true;
-	RenderScope scope{ state.isRendering };	// Set reference of isRendering flag
+	RenderScope scopeGuard{ state.isRendering };
 
-	// Declare current after scope so CPU references are destroyed before clearing isRendering.
-	state.submittedFrame->frame.hasPendingSubmission = false;
-	SubmittedFrame current = std::move(*state.submittedFrame);
-	state.submittedFrame.reset();
+	// Process the submitted frame if it exists and has pending submission.
+	const bool hadSubmission = state.submittedFrame && state.submittedFrame->frame.hasPendingSubmission;
 
-	// Lamda function to process the rendering of the current frame.
-	const auto process = [&]() -> Result
-		{
-			std::vector<GeometryUploadTarget> geometries;
-			std::vector<TextureUploadTarget> textures;
-
-			//--------------------------------------------------------
-			// 1. Gather the resources to be uploaded for this frame.
-			//--------------------------------------------------------
-			try
-			{
-				geometries.reserve(current.objectResources.size());
-				textures.reserve(current.objectResources.size());
-
-				for (const auto& resources : current.objectResources)
-				{
-					if (resources.geometry.content)
-					{
-						geometries.push_back(resources.geometry);
-					}
-
-					if (resources.texture.content)
-					{
-						textures.push_back(resources.texture);
-					}
-				}
-			}
-			catch (const std::bad_alloc&)
-			{
-				return { false, "Render: Upload target allocation failed." };
-			}
-			catch (const std::length_error&)
-			{
-				return { false, "Render: Upload target size is unsupported." };
-			}
-
-			//--------------------------------------------------------
-			// 2. Upload the selected resources to the GPU.
-			//--------------------------------------------------------
-			Result uploaded = state.UploadSelectedResources(geometries, textures);
-			if (!uploaded.IsSuccess())
-			{
-				return uploaded;
-			}
-
-			//--------------------------------------------------------
-			// 3. Draw the submitted frame to the window outputs.
-			//    (Coming soon....)
-			//--------------------------------------------------------
-
-			// Initial output implementation. Object drawing and Graph execution come later.
-			const std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
-			for (const auto& view : current.frame.views)
-			{
-				Result cleared = state.backend.ClearWindowOutput(view.output, clearColor);
-				if (!cleared.IsSuccess())
-				{
-					return cleared;
-				}
-
-				Result presented = state.backend.Present(view.output);
-				if (!presented.IsSuccess())
-				{
-					return presented;
-				}
-			}
-
-			return {};
-		};
-
-	result = process();
-	if (!result.IsSuccess() && result.failureKind != FailureKind::General)
+	if (hadSubmission)
 	{
-		state.stoppedFailure = result.failureKind;
+		state.submittedFrame->frame.hasPendingSubmission = false;
+		SubmittedFrame current = std::move(*state.submittedFrame);
+		state.submittedFrame.reset();
+
+		// Lamda to process the submitted frame and its resources.
+		// This encapsulates the rendering logic.
+		const auto process = [&]() -> Result
+			{
+				// Set of the handle and CPU data of resources which will be uploaded.
+				std::vector<GeometryUploadTarget> geometryTargets;
+				std::vector<TextureUploadTarget> textureTargets;
+
+				try
+				{
+					// Collect the resources for the list of each kind.
+					geometryTargets.reserve(current.objectResources.size());
+					textureTargets.reserve(current.objectResources.size());
+
+					for (const auto& resources : current.objectResources)
+					{
+						if (resources.geometry.content)
+						{
+							geometryTargets.push_back(resources.geometry);
+						}
+
+						if (resources.texture.content)
+						{
+							textureTargets.push_back(resources.texture);
+						}
+					}
+				}
+				catch (const std::bad_alloc&)
+				{
+					return { false, "Render: Upload target allocation failed." };
+				}
+				catch (const std::length_error&)
+				{
+					return { false, "Render: Upload target size is unsupported." };
+				}
+
+				// Upload the selected resources and prepare them for rendering.
+				Result uploadedResult = state.UploadSelectedResources(geometryTargets, textureTargets);
+
+				if (!uploadedResult.IsSuccess())
+				{
+					return uploadedResult;
+				}
+
+				// Get ready for beginning the frame resources.
+				Result begunResult = state.backend.BeginFrameResources();
+
+				if (!begunResult.IsSuccess())
+				{
+					return begunResult;
+				}
+
+				// Initial output implementation. Object drawing and Graph execution come later.
+				// Current implemmentation:
+				// Clear the target output and ppresent the frame for every view.
+				const std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
+				
+				for (const auto& view : current.frame.views)
+				{
+					Result cleared = state.backend.ClearWindowOutput(view.output, clearColor);
+					
+					if (!cleared.IsSuccess())
+					{
+						return cleared;
+					}
+
+					Result presented = state.backend.Present(view.output);
+					if (!presented.IsSuccess())
+					{
+						return presented;
+					}
+				}
+
+				return {};
+			};
+
+		// Call the process lambda and return its result.
+		result = process();
 	}
 
-	const auto disposition = result.IsSuccess() ? RenderDisposition::Processed : RenderDisposition::NotProcessed;
+	// Stop the renderer if a fatal failure occurred during rendering process.
+	const auto stopIfFatal = [&](const Result& status)
+		{
+			if (!status.IsSuccess() && status.failureKind != FailureKind::General)
+			{
+				state.stoppedFailure = status.failureKind;
+			}
+		};
+
+	stopIfFatal(result);
+
+	const auto mergeCleanup = [&](Result cleanup)
+		{
+			stopIfFatal(cleanup);
+
+			if (!cleanup.IsSuccess())
+			{
+				if (!result.IsSuccess())
+				{
+					cleanup.message = result.message + "\n" + cleanup.message;
+				}
+
+				result = std::move(cleanup);
+			}
+		};
+
+	if (state.stoppedFailure == FailureKind::General)
+	{
+		mergeCleanup(state.backend.EndFrameResources());
+	}
+
+	if (state.stoppedFailure == FailureKind::General)
+	{
+		mergeCleanup(state.CollectDestroyedResources());
+	}
+
+	const auto disposition = !result.IsSuccess() ? RenderDisposition::NotProcessed :
+		(hadSubmission ? RenderDisposition::Processed : RenderDisposition::SkippedNoSubmission);
+	
 	return { std::move(result), disposition };
 }
 
@@ -741,11 +779,12 @@ Result Renderer::impl::CollectDestroyedResources()
 {
 	if (stoppedFailure != FailureKind::General
 		|| submittedFrame
-		|| backend.HasPendingUploads())
+		|| backend.HasPendingFrameResources())
 	{
 		return {};
 	}
 
+	// Collect completed uploads and release their upload buffers.
 	Result result = backend.CollectUploads();
 
 	if (!result.IsSuccess() || backend.HasPendingUploads())
@@ -753,16 +792,19 @@ Result Renderer::impl::CollectDestroyedResources()
 		return result;
 	}
 
+	// Destroy resources for the given completed fence value.
+	// This does not wait for GPU completion.
 	std::uint64_t completed = 0;
 	result = backend.QueryCompletedGraphicsFence(completed);
 
-	if (result.IsSuccess())
+	if (!result.IsSuccess())
 	{
 		return result;
 	}
 
-
-
+	geometryResources->CollectDestroyed(completed);
+	textureResources->CollectDestroyed(completed);
+	return {};
 }
 
 }

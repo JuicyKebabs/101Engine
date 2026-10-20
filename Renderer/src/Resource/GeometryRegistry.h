@@ -185,17 +185,19 @@ public:
 		return true;
 	}
 
-	void CollectDestruction(std::uint64_t completedGraphicsFence)
+	void CollectDestroyed(std::uint64_t completedGraphicsFence)
 	{
 		for (std::size_t index = 0; index < m_contents.size(); ++index)
 		{
 			const auto handle = m_slots.GetDestroyRequestedHandle(index);
+
 			if (handle == GeometryHandle{})
 			{
 				continue;
 			}
 
 			const auto& content = m_contents[index];
+
 			if (!content)
 			{
 				std::terminate(); // Inconsistent state: destroy requested but no content.

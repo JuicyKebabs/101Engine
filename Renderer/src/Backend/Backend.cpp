@@ -78,6 +78,7 @@ Result Backend::Initialize(const RendererConfiguration& configuration)
 	if (!frameResult.IsSuccess())
 	{
 		Finalize();
+		return frameResult;
 	}
 
 	return {};
@@ -529,7 +530,7 @@ Result Backend::BeginFrameResources()
 	}
 
 	// Graphics context must be initialized before starting frame resources.
-	if (m_graphicsContext.GetNativeCommandList())
+	if (!m_graphicsContext.GetNativeCommandList())
 	{
 		Result initialized = m_graphicsContext.Initialize(
 			m_device.GetNativeDevice(),

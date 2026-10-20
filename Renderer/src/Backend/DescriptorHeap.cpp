@@ -118,3 +118,5 @@ Result DescriptorHeap::GetGpuHandle(std::uint32_t index, D3D12_GPU_DESCRIPTOR_HA
 	return {};
 
 }
+
+}

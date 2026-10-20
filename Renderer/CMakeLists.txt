@@ -13,6 +13,9 @@ add_library(101Renderer SHARED
     src/Backend/Buffer.cpp
     src/Backend/GeometryGpuData.cpp
     src/Backend/TextureGpuData.cpp
+    src/Backend/FrameResources.cpp
+    src/Graph/RenderPass.cpp
+    src/Graph/RenderGraph.cpp
 )
 
 # ディレクトリのインクルード
