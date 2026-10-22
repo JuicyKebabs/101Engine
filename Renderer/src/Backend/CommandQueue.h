@@ -22,7 +22,7 @@ struct [[nodiscard]] QueueSubmissionResult
 {
 	Result status;
 
-	// If the ExecuteCommandLists call was called.
+	// If the ExecuteCommandLists was called.
 	// This flag does not indicate the success and completion of the GPU execution.
 	bool executionIssued = false;
 

@@ -143,7 +143,11 @@ Result SwapChain::Initialize(
 
 	// Move the created objects into the member variables
 	m_swapChain = std::move(swapChain);
-	m_backBuffers = std::move(backBuffers);
+	for (UINT index = 0; index < BufferCount; ++index)
+	{
+		m_backBuffers[index].resource = std::move(backBuffers[index]);
+		m_backBuffers[index].submittedState = D3D12_RESOURCE_STATE_PRESENT;
+	}
 
 	OutputDebugStringA("[101Renderer] SwapChain initialized.\n");
 
@@ -154,56 +158,67 @@ void SwapChain::Finalize() noexcept
 {
 	for (auto& backBuffer : m_backBuffers)
 	{
-		backBuffer.Reset();
+		backBuffer.resource.Reset();
+		backBuffer.submittedState = D3D12_RESOURCE_STATE_PRESENT;
 	}
 
 	m_rtvHeap.Finalize();
 	m_swapChain.Reset();
 }
 
-Result SwapChain::GetCurrentBackBuffer(
-	ID3D12Resource*& outResource,
-	D3D12_CPU_DESCRIPTOR_HANDLE& outRtvHandle) const
+Result SwapChain::GetCurrentTexture(BackBufferInfo& output) const
 {
-	outResource = nullptr;
-	outRtvHandle = {};
+	output = {};
 
 	if (!IsInitialized())
 	{
-		return { false, "SwapChain is not initialized." };
+		return { false, "SwapChain: not initialized." };
 	}
 
-	// Get the current back buffer index from the swap chain
 	const UINT index = m_swapChain->GetCurrentBackBufferIndex();
 
 	if (index >= BufferCount)
 	{
-		return { false, "SwapChain::GetCurrentBackBuffer: Current back buffer index is out of range." };
+		return { false, "SwapChain: current buffer index is invalid." };
 	}
 
-	// Get the back buffer resource at the current index
-	ID3D12Resource* resource = m_backBuffers[index].Get();
+	const auto& backBuffer = m_backBuffers[index];
 
-	if (resource == nullptr)
+	if (!backBuffer.resource)
 	{
-		return { false, "SwapChain::GetCurrentBackBuffer: Current back buffer resource is null." };
+		return { false, "SwapChain: current resource is unavailable." };
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtv{};
-
-	// Get the RTV descriptor handle for the current back buffer
-	const Result result = m_rtvHeap.GetCpuHandle(index, rtv);
+	Result result = m_rtvHeap.GetCpuHandle(index, rtv);
 
 	if (!result.IsSuccess())
 	{
 		return result;
 	}
 
-	// Return the borrowed references to the caller
-	outResource = resource;
-	outRtvHandle = rtv;
+	BackBufferInfo info{};
+	info.resource = backBuffer.resource.Get();
+	info.rtv = rtv;
+	info.viewFormat = BackBufferFormat;
+	info.submittedState = backBuffer.submittedState;
 
+	output = info;	
 	return {};
+}
+
+void SwapChain::CommitSubmittedState(ID3D12Resource* resource, D3D12_RESOURCE_STATES state) noexcept
+{
+	for (auto& backBuffer : m_backBuffers)
+	{
+		if (resource && backBuffer.resource.Get() == resource)
+		{
+			backBuffer.submittedState = state;
+			return;
+		}
+	}
+
+	std::terminate(); // Owner identity was validated before submission.
 }
 
 Result SwapChain::Present(UINT syncInterval, UINT flags)

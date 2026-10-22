@@ -72,15 +72,13 @@ Result RenderPassBuilder::ReadTexture(GraphTextureHandle texture, ShaderStage st
 
 	try
 	{
-		m_description.uses.push_back(
-			{
-				texture,
-				TextureUse{ TextureUsage::ShaderRead, stages },
-				true,
-				false
-			}
-		);
+		PassTextureUse textureUse = {};
+		textureUse.texture = texture;
+		textureUse.use = { TextureUsage::ShaderRead, stages };
+		textureUse.requiresValidContents = true;
+		textureUse.initializesContents = false;
 
+		m_description.uses.push_back(textureUse);
 		return {};
 	}
 	catch (const std::bad_alloc&)
@@ -146,6 +144,7 @@ Result RenderPassBuilder::Build(std::optional<RenderPass>& output)&&
 {
 	output.reset();
 
+	// false to true transition is required (means only one build is allowed per builder).
 	if (std::exchange(m_consumed, true))
 	{
 		return { false, "Build: Builder was already consumed." };

@@ -161,6 +161,52 @@ Result CommandContext::TransitionResource(
 	return {};
 }
 
+Result CommandContext::SetRasterOutput(
+	std::span<const D3D12_CPU_DESCRIPTOR_HANDLE> colors,
+	UINT width,
+	UINT height)
+{
+	if (!IsRecording() || m_commandList->GetType() != D3D12_COMMAND_LIST_TYPE_DIRECT)
+	{
+		return { false, "SetRasterOutput: recording DIRECT context required." };
+	}
+
+	if (m_commandList->GetType() != D3D12_COMMAND_LIST_TYPE_DIRECT)
+	{
+		return { false, "SetRasterOutput: A direct command list is required." };
+	}
+
+	// Invalid format
+	if (colors.empty() || colors.size() > 1 || !colors.front().ptr 
+		|| width == 0 || height == 0 ||
+		width > static_cast<UINT>(D3D12_VIEWPORT_BOUNDS_MAX) ||
+		height > static_cast<UINT>(D3D12_VIEWPORT_BOUNDS_MAX))
+	{
+		return { false, "SetRasterOutput: unsupported color count, descriptor or extent." };
+	}
+
+	// Set the viewport and scissor rectangle to cover the entire render target.
+	m_commandList->OMSetRenderTargets(static_cast<UINT>(colors.size()), colors.data(), FALSE, nullptr);
+
+	const D3D12_VIEWPORT viewport{
+		0.0f, 0.0f,
+		static_cast<float>(width),
+		static_cast<float>(height),
+		0.0f, 1.0f
+	};
+
+	const D3D12_RECT scissorRect{
+		0, 0,
+		static_cast<LONG>(width),
+		static_cast<LONG>(height)
+	};
+
+	m_commandList->RSSetViewports(1, &viewport);
+	m_commandList->RSSetScissorRects(1, &scissorRect);
+
+	return {};
+}
+
 Result CommandContext::ClearRenderTarget(
 	D3D12_CPU_DESCRIPTOR_HANDLE rtv,
 	const std::array<float, 4>& color)

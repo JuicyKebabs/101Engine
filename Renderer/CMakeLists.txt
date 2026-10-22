@@ -16,6 +16,9 @@ add_library(101Renderer SHARED
     src/Backend/FrameResources.cpp
     src/Graph/RenderPass.cpp
     src/Graph/RenderGraph.cpp
+    src/Graph/RenderPassContext.cpp
+    src/Graph/GraphExecutor.cpp
+    src/FrameRenderer.cpp
 )
 
 # ディレクトリのインクルード

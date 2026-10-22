@@ -17,6 +17,21 @@
 namespace rendering::backend
 {
 
+// Native output snapshot, not resource ownership and not Graph storage.
+struct BackBufferInfo
+{
+	ID3D12Resource* resource = nullptr;
+	D3D12_CPU_DESCRIPTOR_HANDLE rtv{};
+	DXGI_FORMAT viewFormat = DXGI_FORMAT_UNKNOWN;
+	D3D12_RESOURCE_STATES submittedState = D3D12_RESOURCE_STATE_COMMON;
+
+	bool IsPresentable() const noexcept { return true; }
+	ID3D12Resource* Resource() const noexcept { return resource; }
+	D3D12_CPU_DESCRIPTOR_HANDLE Rtv() const noexcept { return rtv; }
+	DXGI_FORMAT ViewFormat() const noexcept { return viewFormat; }
+	D3D12_RESOURCE_STATES SubmittedState() const noexcept { return submittedState; }
+};
+
 class SwapChain
 {
 public:
@@ -38,10 +53,11 @@ public:
 
 	void Finalize() noexcept;
 
-	// Returns borrowed references to the current back buffer and its RTV.
-	Result GetCurrentBackBuffer(
-		ID3D12Resource*& outResource,
-		D3D12_CPU_DESCRIPTOR_HANDLE& outRtvHandle) const;
+	// Borrowed until owner finalization. Only the current buffer may start new work.
+	Result GetCurrentTexture(BackBufferInfo& output) const;
+
+	// Caller has validated identity before submission; owner storage stays stable.
+	void CommitSubmittedState(ID3D12Resource* resource, D3D12_RESOURCE_STATES state) noexcept;
 
 	// Request presentation.
 	// This does not wait for GPU completion.
@@ -58,7 +74,13 @@ private:
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swapChain;
 
-	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, BufferCount> m_backBuffers;
+	struct BackBuffer
+	{
+		Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+		D3D12_RESOURCE_STATES submittedState = D3D12_RESOURCE_STATE_PRESENT;
+	};
+
+	std::array<BackBuffer, BufferCount> m_backBuffers;
 
 	DescriptorHeap m_rtvHeap;
 };

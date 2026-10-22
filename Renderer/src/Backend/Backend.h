@@ -32,15 +32,39 @@ public:
 	Result Initialize(const RendererConfiguration& configuration);
 	void Finalize() noexcept;
 
+	//-------------------------------
+	// Command related operations
+	//-------------------------------
+	Result BeginFrameCommands();
+	QueueSubmissionResult SubmitFrameCommands();
+	Result WaitForFrameCompletion();
+	[[nodiscard]]
+	CommandContext& GetFrameCommandContext() noexcept
+	{
+		return m_graphicsContext;
+	}
+
+	//------------------------------
+	// Window output management
+	//------------------------------
+
 	// Create the swapchain and reserve the handle for the given Win32 window output description.
 	WindowOutputCreationResult CreateWindowOutput(const Win32WindowOutputDesc& outputDesc);
 
-	Result ClearWindowOutput(
-		WindowOutputHandle handle,
-		const std::array<float, 4>& color);
+	Result GetCurrentWindowTexture(WindowOutputHandle handle, BackBufferInfo& output) const;
+	Result QueryTextureInfo(ID3D12Resource* resource, BackBufferInfo& output) const;
+	void CommitTextureState(ID3D12Resource* resource, D3D12_RESOURCE_STATES state) noexcept;
 
+	// Present the swapchain assigned to the given window output handle.
 	Result Present(WindowOutputHandle handle);
 
+	// Check if there is a valid window output for the given handle.
+	[[nodiscard]]
+	bool IsWindowOutputValid(WindowOutputHandle handle) const noexcept;
+
+	//-------------------------------
+	// Frame resource management
+	//-------------------------------
 	Result BeginFrameResources();
 	Result EndFrameResources();
 
@@ -58,10 +82,10 @@ public:
 	{
 		return m_frameResources.GetDescriptorHeap();
 	}
-	
-	// Check if there is a valid window output for the given handle.
-	[[nodiscard]]
-	bool IsWindowOutputValid(WindowOutputHandle handle) const noexcept;
+
+	//-------------------------------
+	// Resource uploading
+	//-------------------------------
 
 	// Resource upload related functions. Only one upload batch is supported for now.
 	[[nodiscard]] Result CollectUploads();
@@ -76,6 +100,7 @@ public:
 		return m_uploadBatch.IsRecording() || m_uploadBatch.IsInFlight();
 	}
 
+	// Add a resource for uploading.
 	[[nodiscard]] Result AddGeometryUpload(const GeometryGpuData& gpu, std::unique_ptr<GeometryUploadData>& upload)
 	{
 		return m_uploadBatch.AddGeometry(gpu, upload);
@@ -85,6 +110,8 @@ public:
 		return m_uploadBatch.AddTexture(gpu, upload);
 	}
 
+	// Generate GPU data for resources from CPU data.
+	// Generation is done before uploading.
 	[[nodiscard]] Result PrepareGeometry(
 		const detail::GeometryCpuData& cpu,
 		std::unique_ptr<GeometryGpuData>& gpu,
@@ -100,10 +127,11 @@ private:
 	CommandQueue m_graphicsQueue;
 	CommandContext m_graphicsContext;
 
+	// Frame resources are used for per-frame allocations and descriptor management.
 	FrameResources m_frameResources;
-	bool m_frameActive = false;
-	bool m_frameCommandsNeedDiscard = false;
-	bool m_frameCompletionUnknown = false;
+	bool m_frameActive = false;					// If a frame is currently active and has not been finalized.
+	bool m_frameCommandsNeedDiscard = false;	// If the frame still has unsubmitted commands.
+	bool m_frameCompletionUnknown = false;		// If it's unable to confirm GPU completion for the frame (Don't allow refreshing).
 	std::uint64_t m_frameFence = 0;
 
 	// Only one window output is supported for now.
@@ -111,15 +139,12 @@ private:
 	SwapChain m_windowSwapChain;
 	WindowOutputHandle m_windowOutputHandle{};
 
-	UploadBatch m_uploadBatch;	// For resaource uploads.
+	UploadBatch m_uploadBatch;	// For resource uploads.
 
 private:
 	// Handles failures when GPU completion cannot be confirmed
 	// after command submission or presentation.
 	Result HandleSubmissionFailure(Result failure);
-
-	[[nodiscard]] Result BeginFrameCommands();
-	[[nodiscard]] QueueSubmissionResult SubmitFrameCommands();
 };
 
 }

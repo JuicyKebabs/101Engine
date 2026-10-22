@@ -199,124 +199,65 @@ void Backend::Finalize() noexcept
 	m_device.Finalize();
 }
 
-WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDesc& outputDesc)
+Result Backend::BeginFrameCommands()
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+	if (!m_frameActive || m_frameCompletionUnknown || m_frameCommandsNeedDiscard)
 	{
-		return { { false, "Backend is not initialized." },{} };
+		return { false, "Frame command recording is unavailable." };
 	}
 
-	if (m_windowSwapChain.IsInitialized())
+	// Wait for the previous frame's GPU completion.
+	if (m_frameFence != 0)
 	{
-		return { { false, "Only one window output is currently supported." },{} };
+		Result completion = m_graphicsQueue.WaitForFence(m_frameFence);
+
+		if (!completion.IsSuccess())
+		{
+			m_frameCompletionUnknown = true;
+			return HandleSubmissionFailure(std::move(completion));
+		}
 	}
-
-	// Reserve a unique handle for the new window output.
-	const WindowOutputHandle handle = ReserveWindowOutputHandle();
-
-	if (handle.value == 0)
-	{
-		return { { false, "Window output IDs are exhausted." },{} };
-	}
-
-	// Initialize the swap chain for the given window output description.
-	Result result = m_windowSwapChain.Initialize(
-		m_device.GetNativeDevice(),
-		m_device.GetNativeFactory(),
-		m_graphicsQueue.GetNativeCommandQueue(),
-		outputDesc);
-
-	if (!result.IsSuccess())
-	{
-		// The handle is not used if the swap chain initialization fails.
-		return { std::move(result), {} };
-	}
-
-	m_windowOutputHandle = handle;
-
-	return { {}, handle };
-}
-
-Result Backend::ClearWindowOutput(WindowOutputHandle handle, const std::array<float, 4>& color)
-{
-	if (!m_frameActive || !IsWindowOutputValid(handle))
-	{
-		return { false, "ClearWindowOutput requires an active frame and valid output." };
-	}
-
-	ID3D12Resource* backBuffer = nullptr;
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle{};
-
-	Result result = m_windowSwapChain.GetCurrentBackBuffer(backBuffer, rtvHandle);
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
+	m_frameCommandsNeedDiscard = true;
 
 	// Begin recording commands for the current frame.
-	result = BeginFrameCommands();
+	return m_graphicsContext.Begin();
+}
 
-	if (!result.IsSuccess())
+QueueSubmissionResult Backend::SubmitFrameCommands()
+{
+	if (!m_frameActive || m_frameCompletionUnknown || !m_frameCommandsNeedDiscard)
 	{
-		return result;
+		return { { false, "Frame submission is unavailable." } };
 	}
 
-	// Transition RTV state from being presented to being written to as a render target.
-	result = m_graphicsContext.TransitionResource(
-		backBuffer,
-		D3D12_RESOURCE_STATE_PRESENT,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// Execute the recorded commands for the current frame and signal the fence
+	auto submission = m_graphicsQueue.Execute(m_graphicsContext);
 
-	if (!result.IsSuccess())
+	// Check execution completion
+	if (submission.executionIssued)
 	{
-		return result;
+		m_frameCommandsNeedDiscard = false;
+
+		// Check signal completion and fence value validity
+		if (!submission.status.IsSuccess() || submission.fenceValue == 0 ||
+			submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
+		{
+			m_frameCompletionUnknown = true;
+
+			if (submission.status.IsSuccess())
+			{
+				submission.status = { false, "Frame submission returned no valid fence." };
+			}
+
+			submission.status = HandleSubmissionFailure(std::move(submission.status));
+
+			return submission;
+		}
+
+		m_frameFence = submission.fenceValue;
 	}
 
-	// Add command to clear the back buffer with the specified color.
-	result = m_graphicsContext.ClearRenderTarget(rtvHandle, color);
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	// Transition RTV state back to being presented after clearing.
-	result = m_graphicsContext.TransitionResource(
-		backBuffer,
-		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PRESENT);
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	// Closing the command list after recording all commands for the current frame.
-	result = m_graphicsContext.Close();
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	// Execute the recorded commands. (Sends them to the GPU)
-	const QueueSubmissionResult submission = SubmitFrameCommands();
-	if (!submission.status.IsSuccess())
-	{
-		return submission.status;
-	}
-
-	// Wait for GPU completion of the submitted commands.
-	result = m_graphicsQueue.WaitForFence(submission.fenceValue);
-
-	if (!result.IsSuccess())
-	{
-		// Deal with the device lost or unknown GPU completion situation.
-		return HandleSubmissionFailure(std::move(result));
-	}
-
-	return {};
+	return submission;
 }
 
 Result Backend::Present(WindowOutputHandle handle)
@@ -366,6 +307,109 @@ bool Backend::IsWindowOutputValid(WindowOutputHandle handle) const noexcept
 	return handle.value != 0
 		&& handle.value == m_windowOutputHandle.value
 		&& m_windowSwapChain.IsInitialized();
+}
+
+Result Backend::WaitForFrameCompletion()
+{
+	if (!m_frameActive || m_frameCompletionUnknown)
+	{
+		return { false, "WaitForFrameComletion: active healthy frame required." };
+	}
+
+	if (m_frameFence == 0)
+	{
+		// No fence value was recorded.
+		return {};
+	}
+
+	Result result = m_graphicsQueue.WaitForFence(m_frameFence);
+
+	if (!result.IsSuccess())
+	{
+		m_frameCompletionUnknown = true;
+		return HandleSubmissionFailure(std::move(result));
+	}
+
+	return {};
+}
+
+WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDesc& outputDesc)
+{
+	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+	{
+		return { { false, "Backend is not initialized." },{} };
+	}
+
+	if (m_windowSwapChain.IsInitialized())
+	{
+		return { { false, "Only one window output is currently supported." },{} };
+	}
+
+	// Reserve a unique handle for the new window output.
+	const WindowOutputHandle handle = ReserveWindowOutputHandle();
+
+	if (handle.value == 0)
+	{
+		return { { false, "Window output IDs are exhausted." },{} };
+	}
+
+	// Initialize the swap chain for the given window output description.
+	Result result = m_windowSwapChain.Initialize(
+		m_device.GetNativeDevice(),
+		m_device.GetNativeFactory(),
+		m_graphicsQueue.GetNativeCommandQueue(),
+		outputDesc);
+
+	if (!result.IsSuccess())
+	{
+		// The handle is not used if the swap chain initialization fails.
+		return { std::move(result), {} };
+	}
+
+	m_windowOutputHandle = handle;
+
+	return { {}, handle };
+}
+
+Result Backend::GetCurrentWindowTexture(WindowOutputHandle handle, BackBufferInfo& output) const
+{
+	output = {};
+
+	if (!m_frameActive || m_frameCompletionUnknown || !IsWindowOutputValid(handle))
+	{
+		return { false, "GetCurrentWindowTexture: Invalid state or window output handle." };
+	}
+
+	return m_windowSwapChain.GetCurrentTexture(output);
+}
+
+Result Backend::QueryTextureInfo(ID3D12Resource* resource, BackBufferInfo& output) const
+{
+	output = {};
+
+	if (!m_frameActive || m_frameCompletionUnknown)
+	{
+		return { false, "QueryTextureInfo: active healthy frame required." };
+	}
+
+	Result result = m_windowSwapChain.GetCurrentTexture(output);
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	if (!resource || output.resource != resource)
+	{
+		return { false, "QueryTextureInfo: resource is not the current window texture." };
+	}
+
+	return {};
+}
+
+void Backend::CommitTextureState(ID3D12Resource* resource, D3D12_RESOURCE_STATES state) noexcept
+{
+	m_windowSwapChain.CommitSubmittedState(resource, state);
 }
 
 Result Backend::CollectUploads()
@@ -492,31 +536,6 @@ Result Backend::PrepareTexture(
 	return result;
 }
 
-Result Backend::HandleSubmissionFailure(Result failure)
-{
-	const Result deviceStatus = m_device.CheckStatus();
-
-	if (!deviceStatus.IsSuccess() && deviceStatus.failureKind == FailureKind::DeviceLost)
-	{// In case of the device lost.
-		failure.failureKind = FailureKind::DeviceLost;
-		failure.message += "\n";
-		failure.message += deviceStatus.message;
-
-		// Finalize the backend to clean up resources without waiting for GPU completion.
-		Finalize();
-		return failure;
-	}
-
-	// It is impossible to confirm the GPU completion.
-	failure.failureKind = FailureKind::GpuCompletionUnknown;
-	failure.message += "\nGPU completion could not be confirmed.";
-
-	// Return the failure result without finalizing the backend to avoid potential crashes.
-	// User application must handle this situation by the abnormal termination of the application.
-	// It's also required to skip the destructor of the backend.
-	return failure;
-}
-
 Result Backend::BeginFrameResources()
 {
 	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
@@ -547,67 +566,6 @@ Result Backend::BeginFrameResources()
 	m_frameCompletionUnknown = false;
 	
 	return {};
-}
-
-Result Backend::BeginFrameCommands()
-{
-	if (!m_frameActive || m_frameCompletionUnknown || m_frameCommandsNeedDiscard)
-	{
-		return { false, "Frame command recording is unavailable." };
-	}
-
-	// Wait for the previous frame's GPU completion.
-	if (m_frameFence != 0)
-	{
-		Result completion = m_graphicsQueue.WaitForFence(m_frameFence);
-		
-		if (!completion.IsSuccess())
-		{
-			m_frameCompletionUnknown = true;
-			return HandleSubmissionFailure(std::move(completion));
-		}
-	}
-	m_frameCommandsNeedDiscard = true;
-
-	// Begin recording commands for the current frame.
-	return m_graphicsContext.Begin();
-}
-
-QueueSubmissionResult Backend::SubmitFrameCommands()
-{
-	if (!m_frameActive || m_frameCompletionUnknown || !m_frameCommandsNeedDiscard)
-	{
-		return { { false, "Frame submission is unavailable." } };
-	}
-
-	// Execute the recorded commands for the current frame and signal the fence
-	auto submission = m_graphicsQueue.Execute(m_graphicsContext);
-
-	// Check execution completion
-	if (submission.executionIssued)
-	{
-		m_frameCommandsNeedDiscard = false;
-
-		// Check signal completion and fence value validity
-		if (!submission.status.IsSuccess() || submission.fenceValue == 0 ||
-			submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
-		{
-			m_frameCompletionUnknown = true;
-
-			if (submission.status.IsSuccess())
-			{
-				submission.status = { false, "Frame submission returned no valid fence." };
-			}
-
-			submission.status = HandleSubmissionFailure(std::move(submission.status));
-
-			return submission;
-		}
-
-		m_frameFence = submission.fenceValue;
-	}
-
-	return submission;
 }
 
 Result Backend::EndFrameResources()
@@ -704,6 +662,31 @@ Result Backend::KeepFrameObjectAlive(IUnknown* object)
 	}
 
 	return m_frameResources.KeepAlive(object);
+}
+
+Result Backend::HandleSubmissionFailure(Result failure)
+{
+	const Result deviceStatus = m_device.CheckStatus();
+
+	if (!deviceStatus.IsSuccess() && deviceStatus.failureKind == FailureKind::DeviceLost)
+	{// In case of the device lost.
+		failure.failureKind = FailureKind::DeviceLost;
+		failure.message += "\n";
+		failure.message += deviceStatus.message;
+
+		// Finalize the backend to clean up resources without waiting for GPU completion.
+		Finalize();
+		return failure;
+	}
+
+	// It is impossible to confirm the GPU completion.
+	failure.failureKind = FailureKind::GpuCompletionUnknown;
+	failure.message += "\nGPU completion could not be confirmed.";
+
+	// Return the failure result without finalizing the backend to avoid potential crashes.
+	// User application must handle this situation by the abnormal termination of the application.
+	// It's also required to skip the destructor of the backend.
+	return failure;
 }
 
 }

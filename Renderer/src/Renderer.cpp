@@ -1,5 +1,6 @@
 #include "Renderer/Renderer.h"
 #include "Backend/Backend.h"
+#include "FrameRenderer.h"
 #include "Resource/ResourceSlotTable.h"
 #include "Resource/GeometryRegistry.h"
 #include "Resource/TextureRegistry.h"
@@ -372,16 +373,35 @@ RenderResult Renderer::Render()
 				// Clear the target output and ppresent the frame for every view.
 				const std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
 				
+				graph::RenderGraph graph;
+				graph::GraphExecutor executor(graph, state.backend);
+				FrameRenderer frameRenderer;
+
+				Result built = frameRenderer.Build(current.frame, state.backend, graph, executor);
+
+				if (!built.IsSuccess())
+				{
+					return built;
+				}
+
+				Result compiled = graph.Compile();
+
+				if (!compiled.IsSuccess())
+				{
+					return compiled;
+				}
+
+				Result executed = executor.Execute();
+
+				if (!executed.IsSuccess())
+				{
+					return executed;
+				}
+
 				for (const auto& view : current.frame.views)
 				{
-					Result cleared = state.backend.ClearWindowOutput(view.output, clearColor);
-					
-					if (!cleared.IsSuccess())
-					{
-						return cleared;
-					}
-
 					Result presented = state.backend.Present(view.output);
+
 					if (!presented.IsSuccess())
 					{
 						return presented;

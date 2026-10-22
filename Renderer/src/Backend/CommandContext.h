@@ -5,6 +5,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <array>
+#include <span>
 #include <cstdint>
 
 //------------------------------------------------------------------------------------
@@ -41,6 +42,12 @@ public:
 		D3D12_RESOURCE_STATES stateBefore,
 		D3D12_RESOURCE_STATES stateAfter,
 		UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+
+	// Record a 
+	Result SetRasterOutput(
+		std::span<const D3D12_CPU_DESCRIPTOR_HANDLE> colors,
+		UINT width,
+		UINT height);
 
 	// Records a clear of the entire RTV.
 	// The referenced subresources must already be in RENDER_TARGET state.

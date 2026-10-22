@@ -9,6 +9,12 @@
 #include <string>
 #include <vector>
 
+//-----------------------------------------------------------------------------------------------------------------------
+// RenderPass
+// A render pass is a single rendering operation that may read and write to multiple textures.
+// This doesn't know about other passes in the graph. So, a builder verifies the pass whitin the scope of a single pass.
+//-----------------------------------------------------------------------------------------------------------------------
+
 namespace rendering::graph
 {
 
@@ -17,10 +23,11 @@ class RenderGraph;
 
 using ExecuteCallback = std::function<Result(RenderPassContext&)>;
 
+// How attachments are loaded at the beginning of a render pass.
 enum class AttachmentLoadOp 
 { 
-	Clear,
-	Load
+	Clear,	// Initiaslized with a clear color or depth value.
+	Load	// Keep the previous contents for reading or writing.
 };
 
 // Attachment descriptions are used in the actual rendering process.
@@ -50,6 +57,7 @@ struct PassTextureUse
 	bool initializesContents = false;	// If this pass initializes contents. (LoadOp::Clear == true, LoadOp::Load == false)
 };
 
+// Metadata for a render pass.
 struct PassDescription
 {
 	std::string name;
@@ -77,6 +85,7 @@ private:
 
 	friend class RenderPassBuilder;
 	friend class RenderGraph;
+	friend class GraphExecutor;
 };
 
 class RenderPassBuilder

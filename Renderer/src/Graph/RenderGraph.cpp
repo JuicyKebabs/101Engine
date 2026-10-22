@@ -214,8 +214,17 @@ const ImportedTextureDesc* RenderGraph::FindTexture(GraphTextureHandle texture) 
 
 Result RenderGraph::ImportTexture(const ImportedTextureDesc& desc, GraphTextureHandle& output)
 {
-	m_plan.reset();
 	output = {};
+
+	// Accept only when the graph is before execution.
+	Result mutableGraph = CheckMutable();
+
+	if (!mutableGraph.IsSuccess())
+	{
+		return mutableGraph;
+	}
+
+	m_plan.reset();
 
 	if (!m_id)
 	{
@@ -265,6 +274,14 @@ Result RenderGraph::ImportTexture(const ImportedTextureDesc& desc, GraphTextureH
 
 Result RenderGraph::SetFinalUsage(GraphTextureHandle texture, TextureUse use)
 {
+	// Accept only when the graph is before execution.
+	Result mutableGraph = CheckMutable();
+
+	if (!mutableGraph.IsSuccess())
+	{
+		return mutableGraph;
+	}
+
 	m_plan.reset();
 
 	const auto* desc = FindTexture(texture);
@@ -288,6 +305,14 @@ Result RenderGraph::SetFinalUsage(GraphTextureHandle texture, TextureUse use)
 
 Result RenderGraph::AddPass(RenderPass&& pass)
 {
+	// Accept only when the graph is before execution.
+	Result mutableGraph = CheckMutable();
+
+	if (!mutableGraph.IsSuccess())
+	{
+		return mutableGraph;
+	}
+
 	m_plan.reset();
 
 	if (!m_id)
@@ -322,6 +347,15 @@ Result RenderGraph::AddPass(RenderPass&& pass)
 
 Result RenderGraph::Compile()
 {
+	// Accept only when the graph is before execution.
+	Result mutableGraph = CheckMutable();
+
+	if (!mutableGraph.IsSuccess())
+	{
+		return mutableGraph;
+	}
+
+
 	m_plan.reset();
 
 	if (!m_id)
@@ -370,6 +404,7 @@ Result RenderGraph::Compile()
 			compiled.colors = source.colors;
 			compiled.depth = source.depth;
 
+			// Validate every texture use in the pass.
 			for (const auto& use : source.uses)
 			{
 				const auto* desc = FindTexture(use.texture);
@@ -386,6 +421,7 @@ Result RenderGraph::Compile()
 					return fail(use.texture, checked.message);
 				}
 
+				// Combine shader stage flags of duplicated texture uses in the same pass.
 				auto previous = std::find_if(
 					compiled.uses.begin(), compiled.uses.end(),
 					[&](const PassTextureUse& item) { return item.texture == use.texture; });
@@ -404,9 +440,9 @@ Result RenderGraph::Compile()
 				}
 			}
 
-			const ImportedTextureDesc* firstAttachment = nullptr;
+			const ImportedTextureDesc* previousAttachment = nullptr;
 
-			const auto checkAttachment = [&](GraphTextureHandle texture)->Result
+			const auto compareAttachmentSettings = [&](GraphTextureHandle texture)->Result
 				{
 					const auto* desc = FindTexture(texture);
 
@@ -415,24 +451,25 @@ Result RenderGraph::Compile()
 						return fail(texture, "handle is invalid or belongs to another Graph.");
 					}
 
-					if (firstAttachment)
+					if (previousAttachment)
 					{
-						bool isDifferent = desc->width != firstAttachment->width || desc->height != firstAttachment->height ||
-							desc->sampleCount != firstAttachment->sampleCount || desc->sampleQuality != firstAttachment->sampleQuality;
+						bool isDifferent = desc->width != previousAttachment->width || desc->height != previousAttachment->height ||
+							desc->sampleCount != previousAttachment->sampleCount || desc->sampleQuality != previousAttachment->sampleQuality;
 
 						if (isDifferent)
 						{
-							return fail(texture, "attachment size or sample settings differ from the first attachment.");
+							return fail(texture, "attachment size or sample settings differ from the previous attachment.");
 						}
 					}
 
-					firstAttachment = desc;
+					previousAttachment = desc;
 					return {};
 				};
 
+			// Check if all color attachments and the depth attachment share the same size and sample settings.
 			for (const auto& color : compiled.colors)
 			{
-				Result checked = checkAttachment(color.texture);
+				Result checked = compareAttachmentSettings(color.texture);
 
 				if (!checked.IsSuccess())
 				{
@@ -442,7 +479,7 @@ Result RenderGraph::Compile()
 
 			if (compiled.depth)
 			{
-				Result checked = checkAttachment(compiled.depth->texture);
+				Result checked = compareAttachmentSettings(compiled.depth->texture);
 
 				if (!checked.IsSuccess())
 				{
@@ -450,6 +487,27 @@ Result RenderGraph::Compile()
 				}
 			}
 
+			// Fill the output layout with color formats, depth format, and sample settings.
+			// For the sample setting, set the last attachment's settings 
+			// after checking that all attachments have the same settings.
+			for (const auto& colorAttachment : compiled.colors)
+			{
+				compiled.outputLayout.colorFormats.push_back(FindTexture(colorAttachment.texture)->format);
+			}
+
+			if (compiled.depth)
+			{
+				compiled.outputLayout.depthFormat = FindTexture(compiled.depth->texture)->format;
+			}
+
+			if (previousAttachment)
+			{
+				compiled.outputLayout.sampleCount = previousAttachment->sampleCount;
+				compiled.outputLayout.sampleQuality = previousAttachment->sampleQuality;
+			}
+
+
+			// Build the state transitions for each texture use in the pass.
 			for (const auto& use : compiled.uses)
 			{
 				const auto index = use.texture.index;
@@ -477,6 +535,7 @@ Result RenderGraph::Compile()
 			candidate.passes.push_back(std::move(compiled));
 		}
 
+		// Compile the final state of every texture resource.
 		for (std::size_t index = 0; index < m_resources.size(); ++index)
 		{
 			const auto& resource = m_resources[index];
@@ -489,6 +548,7 @@ Result RenderGraph::Compile()
 				return { false, "Compile final usage '" + resource.desc.name + "': " + checked.message };
 			}
 
+			// ShaderRead and Present require valid contents in order for their contents to be used.
 			if ((finalUse.usage == TextureUsage::ShaderRead || finalUse.usage == TextureUsage::Present) && !contentsValid[index])
 			{
 				return { false, "Compile final usage: Texture[" + std::to_string(index) + "] '" + resource.desc.name + "': ShaderRead/Present requires valid contents." };
@@ -498,6 +558,7 @@ Result RenderGraph::Compile()
 
 			const auto required = RequiredState(finalUse);
 
+			// Force a transition to the final state if it differs from the last state after all passes.
 			if (states[index] != required)
 			{
 				candidate.finalTransitions.push_back({ texture, states[index], required });
@@ -518,7 +579,23 @@ Result RenderGraph::Compile()
 	{
 		return { false, "Compile: too many passes or resources." };
 	}
+}
 
+Result RenderGraph::CheckMutable()
+{
+	// One grapf can be executed only once.
+
+	if (!m_executionStarted)
+	{
+		return {};
+	}
+
+	if (m_executing)
+	{
+		m_executionViolated = true;
+	}
+
+	return { false, "Graph: mutation/Compile is forbidden after an execution attempt." };
 }
 
 }

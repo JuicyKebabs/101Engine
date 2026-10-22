@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderPass.h"
+#include "OutputLayout.h"
 
 #include <optional>
 #include <vector>
@@ -10,13 +11,17 @@ namespace rendering::graph
 
 struct PlannedTransition
 {
-	GraphTextureHandle texture;
-	TextureState before;
-	TextureState after;
+	GraphTextureHandle texture;	// Target to transition.
+	TextureState before;		// State before the transition.
+	TextureState after;			// State after the transition.
 };
 
+// A pass which is validated by RenderGraph.
+// State transition, Target, and output information are resolved and ready for execution.
+// Multiple transition for the same texture is not supported in a single pass. (should be separated into multiple passes.)
 struct CompiledPass
 {
+	OutputLayout outputLayout;
 	std::uint32_t sourcePass = 0;
 	std::vector<PassTextureUse> uses;
 	std::vector<ColorAttachment> colors;
@@ -24,6 +29,7 @@ struct CompiledPass
 	std::vector<PlannedTransition> transitions;
 };
 
+// Represents the final state of a texture used in the render graph.
 struct PlannedTextureResult
 {
 	GraphTextureHandle texture;
@@ -31,6 +37,9 @@ struct PlannedTextureResult
 	bool contentsValid = false;
 };
 
+// RenderGraph executes a rendering sequence based on this plan.
+// This holds every compiled pass that will be executed, the texture resources,
+// and their final state at the end of the render graph execution.
 struct CompiledPlan
 {
 	std::vector<CompiledPass> passes;
@@ -72,6 +81,15 @@ private:
 	std::vector<ResourceEntry> m_resources;
 	std::vector<RenderPass> m_passes;
 	std::optional<CompiledPlan> m_plan;
+
+	bool m_executionStarted = false;	// If this graph is tried to be executed (regardless of successful execution or not).
+	bool m_executing = false;			// If this graph is currently being executed (true only while successful execution).
+	bool m_executionViolated = false;	// If this graph's execution violated any rules (executing becomes false. started is kept being true).
+
+private:
+	Result CheckMutable();
+
+	friend class GraphExecutor;
 };
 
 }
