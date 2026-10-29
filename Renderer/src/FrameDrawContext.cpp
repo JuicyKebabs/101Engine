@@ -4,9 +4,11 @@
 // Keep Graph ownership connections here and delegate packing/PSO/draw preparation to DrawResources.
 
 #include "FrameDrawContext.h"
+#include "SceneFrameResources.h"
 #include "Failure.h"
 #include "Math/Finite.h"
 #include <cmath>
+#include <limits>
 #include "Graph/RenderPassContext.h"
 
 #include <algorithm>
@@ -45,11 +47,60 @@ FrameDrawContext::FrameDrawContext(
 	graph::FrameResourceBindings& bindings,
 	std::vector<DrawDiagnostic>& diagnostics,
 	std::size_t& drawnObjects,
-	RenderTargetTextureRegistry* targets) noexcept
-	: m_renderTargets(targets), m_frame(frame), m_resources(resources), m_geometries(geometries), m_textures(textures),
+	RenderTargetTextureRegistry* targets, SceneFrameResources* sceneResources) noexcept
+	: m_sceneResources(sceneResources), m_renderTargets(targets), m_frame(frame), m_resources(resources), m_geometries(geometries), m_textures(textures),
 	  m_backend(backend), m_depth(depth), m_bindings(bindings),
 	  m_diagnostics(diagnostics), m_drawnObjects(drawnObjects)
 {}
+
+Result FrameDrawContext::PrepareSceneImages(const RenderView& view, SceneOutputImages*& images, Result& shadowPreparation)
+{
+    if (!m_sceneResources || !m_renderTargets)
+    {
+        return Fail("Scene working-image owner is unavailable.");
+    }
+
+    return m_sceneResources->Prepare(view, m_backend, *m_renderTargets, m_resources,
+        images, shadowPreparation, m_frame.directionalLight.has_value());
+}
+
+backend::DepthTexture& FrameDrawContext::DisabledShadow() noexcept
+{
+    return m_sceneResources->DisabledShadow();
+}
+
+backend::DepthTexture* FrameDrawContext::SceneDepth(SceneOutputImages& images) noexcept
+{
+    auto* hdr = m_renderTargets->FindForNewUse(images.hdrColor);
+    return hdr ? &hdr->gpuData->Depth() : nullptr;
+}
+
+void FrameDrawContext::ReportViewFailure(ViewId viewId, const std::string& stage, const std::string& message)
+{
+    m_activeViewId = viewId;
+    DrawDiagnostic diagnostic;
+    diagnostic.objectIndex = (std::numeric_limits<std::size_t>::max)();
+    AddDiagnostic(diagnostic, stage, message);
+}
+
+PipelineHandle FrameDrawContext::ShadowPipeline() const noexcept
+{
+    return m_sceneResources->ShadowPipeline();
+}
+
+bool FrameDrawContext::SelectExplicitDraw(std::size_t index, const DrawSettings& settings)
+{
+    DrawInputs inputs;
+    DrawDiagnostic diagnostic;
+    Result result = ResolveObjectInputs(index, settings, inputs, diagnostic);
+    if (!result.IsSuccess())
+    {
+        AddDiagnostic(diagnostic, "AuxiliaryResolve", result.message);
+        return false;
+    }
+
+    return true;
+}
 
 Result FrameDrawContext::ResolveObjectInputs(
 	std::size_t objectIndex,
@@ -62,10 +113,96 @@ Result FrameDrawContext::ResolveObjectInputs(
 		return { false, "FrameDrawContext: Object index is out of range." };
 	}
 
-	// ponytail: repeat current lookups during the mutation-free Render scope; cache only if measured costly.
-	return m_resources.ResolveDrawInputs(
-		m_frame.objects[objectIndex], objectIndex, settings,
-		m_geometries, m_textures, inputs, diagnostic, m_renderTargets);
+    const RenderObject& sourceObject = m_frame.objects[objectIndex];
+    Result resolved = m_resources.ResolveDrawInputs(sourceObject, objectIndex, settings,
+        m_geometries, m_textures, inputs, diagnostic, m_renderTargets);
+    if (resolved.IsSuccess())
+    {
+        for (const auto& requirement : inputs.pipeline->layout.resources)
+        {
+            if (requirement.sampler || requirement.name == "RendererShadowMap")
+            {
+                continue;
+            }
+
+            const auto& parameters = inputs.material->desc.parameters;
+            const auto parameter = std::find_if(parameters.begin(), parameters.end(),
+                [&requirement](const MaterialParameter& candidate)
+                {
+                    return candidate.name == requirement.name;
+                });
+
+            if (parameter == parameters.end())
+            {
+                continue;
+            }
+
+            if (const auto* texture = std::get_if<TextureHandle>(&parameter->value))
+            {
+                if (!m_textures.FindForNewUse(*texture))
+                {
+                    AddDiagnostic(diagnostic, "TextureFallback", requirement.name + ": "
+                        + m_textures.DescribeUnavailable(*texture) + "; resident error Texture substituted.");
+                }
+            }
+            else if (const auto* target = std::get_if<RenderTargetTextureHandle>(&parameter->value))
+            {
+                if (m_renderTargets && !m_renderTargets->FindForNewUse(*target))
+                {
+                    AddDiagnostic(diagnostic, "TextureFallback", requirement.name + ": "
+                        + m_renderTargets->DescribeUnavailable(*target) + "; resident error Texture substituted.");
+                }
+            }
+        }
+
+        return resolved;
+    }
+
+    // Keep the first diagnostic and original public handles. This local copy is
+    // used for one resolution only; it is not a second persistent Object array.
+    const std::string originalFailure = resolved.message;
+    DrawDiagnostic sourceDiagnostic = diagnostic;
+    RenderObject effectiveObject = sourceObject;
+    DrawSettings effectiveSettings = settings;
+    const bool geometryUnavailable = !sourceObject.procedural &&
+        !m_geometries.FindForNewUse(sourceObject.geometry);
+    if (geometryUnavailable)
+    {
+        effectiveObject.geometry = m_resources.fallbackGeometry;
+        effectiveObject.bounds.reset();
+        DrawRange completeFallbackRange;
+        effectiveObject.drawRange = completeFallbackRange;
+        Vector4 neutralTint;
+        neutralTint.x = 1;
+        neutralTint.y = 1;
+        neutralTint.z = 1;
+        neutralTint.w = 1;
+        effectiveObject.tint = neutralTint;
+    }
+
+    effectiveObject.material = m_resources.fallbackMaterial;
+    effectiveSettings.materialOverride.reset();
+    if (effectiveSettings.pipelineOverride)
+    {
+        const auto* overridePipeline = m_resources.pipelines.FindForNewUse(*effectiveSettings.pipelineOverride);
+        const bool compatibleDepthOnly = overridePipeline && overridePipeline->desc.pixelShader == ShaderHandle{};
+        if (!compatibleDepthOnly)
+        {
+            effectiveSettings.pipelineOverride.reset();
+        }
+    }
+    resolved = m_resources.ResolveDrawInputs(effectiveObject, objectIndex, effectiveSettings,
+        m_geometries, m_textures, inputs, diagnostic, m_renderTargets);
+    if (!resolved.IsSuccess())
+    {
+        diagnostic = sourceDiagnostic;
+        return Fail(originalFailure + " Fallback is incompatible: " + resolved.message);
+    }
+
+    inputs.geometrySubstituted = geometryUnavailable;
+    AddDiagnostic(sourceDiagnostic, "Fallback", originalFailure +
+        (geometryUnavailable ? " Using resident Geometry and Material." : " Using resident Material on the original Geometry."));
+    return {};
 }
 
 void FrameDrawContext::AddDiagnostic(
@@ -73,6 +210,20 @@ void FrameDrawContext::AddDiagnostic(
 	const std::string& stage,
 	const std::string& message)
 {
+    // One root cause may be observed during select, estimate and record. Retain
+    // one message for that Object/View without hiding different failure causes.
+    const bool alreadyReported = std::any_of(m_diagnostics.begin(), m_diagnostics.end(),
+        [&](const DrawDiagnostic& previous)
+        {
+            const bool sameLocation = previous.objectIndex == diagnostic.objectIndex && previous.viewId == m_activeViewId;
+            const bool sameCause = previous.stage == stage && previous.message == message;
+            return sameLocation && sameCause;
+        });
+    if (alreadyReported)
+    {
+        return;
+    }
+
 	diagnostic.viewId = m_activeViewId;
     const auto view = std::find_if(m_frame.views.begin(), m_frame.views.end(),
         [this](const RenderView& candidate) { return candidate.id == m_activeViewId; });
@@ -112,7 +263,16 @@ Result FrameDrawContext::SelectAvailableDraws(const DrawSettings& settings, Rend
             }
         }
 
-        if (view && object.bounds)
+        // Resolve before culling: fallback selection must not be hidden by the
+        // original Geometry's obsolete Bounds. A submitted revision mismatch
+        // intentionally performs extra work instead of losing visible geometry.
+        const GeometryContent* boundsGeometry = m_geometries.FindForNewUse(object.geometry);
+        const bool proceduralBounds = object.procedural.has_value();
+        const bool currentGeometryBounds = boundsGeometry && object.boundsGeometryRevision != 0 &&
+            boundsGeometry->revision == object.boundsGeometryRevision;
+        const bool mayCull = proceduralBounds || currentGeometryBounds;
+
+        if (view && object.bounds && mayCull)
         {
             const auto& bounds = *object.bounds;
             const bool validCenter = Finite(bounds.center);
@@ -180,6 +340,15 @@ Result FrameDrawContext::SelectAvailableDraws(const DrawSettings& settings, Rend
 
 	objectIndices = std::move(availableObjects);
 	return {};
+}
+
+void FrameDrawContext::SetSceneInputs(const RenderView* billboardSource, backend::DepthTexture* shadow,
+    const Matrix4x4& shadowViewProjection, bool enabled) noexcept
+{
+    m_billboardSource = billboardSource;
+    m_shadowTexture = shadow;
+    m_shadowViewProjection = shadowViewProjection;
+    m_shadowEnabled = enabled;
 }
 
 bool FrameDrawContext::UsesAlphaBlending(std::size_t objectIndex, const DrawSettings& settings)
@@ -257,6 +426,19 @@ Result FrameDrawContext::CollectUploadTargets(
 Result FrameDrawContext::ResolveSample(const MaterialDesc& material,
     const ShaderResourceBinding& requirement, SampledTexture& sample)
 {
+    if (requirement.name == "RendererShadowMap")
+    {
+        if (!m_shadowTexture || !m_shadowTexture->AllowsSampling())
+        {
+            return Fail("The Scene View has no safe common Shadow sample binding.");
+        }
+
+        SampledTexture selected;
+        selected.depth = m_shadowTexture;
+        sample = selected;
+        return {};
+    }
+
     if (m_renderTargets)
     {
         return m_resources.ResolveSampledTexture(material, requirement, m_textures, *m_renderTargets, sample);
@@ -420,9 +602,13 @@ Result FrameDrawContext::DeclareDrawResources(
             {
                 result = m_bindings.ImportTexture(*sample.texture, requirement.name, graphTexture);
             }
-            else
+            else if (sample.target)
             {
                 result = m_bindings.ImportRenderTarget(*sample.target, requirement.name, graphTexture);
+            }
+            else
+            {
+                result = m_bindings.ImportDepth(*sample.depth, graphTexture);
             }
 			if (!result.IsSuccess())
 			{
@@ -456,6 +642,12 @@ Result FrameDrawContext::RecordRenderList(
     {
         return result;
     }
+    if (m_recordingWidth != 0 && m_recordingHeight != 0)
+    {
+        m_activeTargetWidth = m_recordingWidth;
+        m_activeTargetHeight = m_recordingHeight;
+    }
+
     Viewport fullOutput;
     fullOutput.width = static_cast<float>(m_activeTargetWidth);
     fullOutput.height = static_cast<float>(m_activeTargetHeight);
@@ -518,8 +710,13 @@ Result FrameDrawContext::CheckOutputReadOrder(const RenderList& indices, const D
                     const auto* target = std::get_if<RenderTargetTextureHandle>(&view.output);
                     return target && *target == sample.targetHandle;
                 });
+            const bool auxiliaryProducer = std::any_of(frame.auxiliaryPasses.begin(), frame.auxiliaryPasses.end(),
+                [&sample](const AuxiliaryPass& pass)
+                {
+                    return pass.colorOutput && *pass.colorOutput == sample.targetHandle;
+                });
             const bool alreadyProduced = std::find(producers.begin(), producers.end(), sample.targetHandle) != producers.end();
-            if (producedThisFrame && !alreadyProduced)
+            if ((producedThisFrame || auxiliaryProducer) && !alreadyProduced)
             {
                 return Fail("A current-frame RenderTarget is sampled before its producer.");
             }

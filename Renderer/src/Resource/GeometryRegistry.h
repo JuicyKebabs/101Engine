@@ -45,6 +45,11 @@ struct GeometryContent
 class GeometryRegistry
 {
 public:
+    std::string DescribeUnavailable(GeometryHandle handle) const
+    {
+        return DescribeResourceIdentity(handle, m_slots.ValidateForNewUse(handle));
+    }
+
 	explicit GeometryRegistry(std::uint32_t ownerId)
 		: m_slots(ownerId)
 	{}
@@ -136,6 +141,27 @@ public:
 
 		return content;
 	}
+
+    // Query one accepted Content without exposing its address or GPU resources.
+    // Failed lookup leaves the caller's previous snapshot untouched.
+    Result GetData(GeometryHandle handle, GeometryData& output) const
+    {
+        const GeometryContent* content = FindForNewUse(handle);
+        if (!content)
+        {
+            Result failure;
+            failure.succeeded = false;
+            failure.message = "GeometryData target is invalid, destroyed, failed, or belongs to another Renderer.";
+            return failure;
+        }
+
+        GeometryData snapshot;
+        snapshot.boundsCenter = content->cpuData.boundsCenter;
+        snapshot.boundsRadius = content->cpuData.boundsRadius;
+        snapshot.revision = content->revision;
+        output = snapshot;
+        return {};
+    }
 
 	// Caller has successfully submitted upload work and signaled this renderer's Graphics Queue. 
 	// This does not wait for GPU completion.

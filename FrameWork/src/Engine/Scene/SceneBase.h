@@ -39,7 +39,6 @@ enum class SceneStructurePolicy
 class SceneBase
 {
 public:
-	static constexpr DirectX::XMFLOAT3 SKY_BOX_SIZE = { 50.0f, 50.0f, 50.0f }; // Skybox size
 public:
 	SceneBase();	// Constructor
 	~SceneBase();	// Destructor
@@ -49,11 +48,9 @@ public:
 	void PreUpdate(float deltaTime);			// Pre-update
 	void Update(float deltaTime);				// Update
 	void LateUpdate(float deltaTime);			// Late update
-	void OnRender(								// Render
-		EngineContext& context,
-		const CameraInfo* overrideCameraInfo = nullptr,
-		RenderViewPolicy viewPolicy = {}
-		);
+    bool AppendRenderData(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
+        const CameraInfo* overrideCameraInfo = nullptr, RenderViewPolicy viewPolicy = {},
+        rendering::ViewId sceneViewId = 1, rendering::ViewId overlayViewId = 2);
 	void Finalize();							// Finalize
 	void EditorUpdate(float deltaTime);		// Update limited elements for editor
 
@@ -228,6 +225,9 @@ private:
 		SceneBase* m_scene;
 		bool m_previous;
 	};
+    // SceneManager can defer the logical release until the old Scene instance
+    // is completely gone. Ordinary Editor/candidate destruction releases here.
+    bool m_deferAssetRelease = false;
 	bool m_unpublishedCandidate = false;
 	std::vector<Actor*> m_unpublishedCommitActors;
 	// SceneActorBatch alone may install a read-only destination fallback while
@@ -251,6 +251,7 @@ private:
 
 private:
 	friend class SceneLoader;
+    friend class SceneManager;
 	friend class Actor;
 	friend class ActorSubtreeRestorer;
 	friend class ActorImprintSystem;
@@ -321,6 +322,7 @@ private:
 	// Finish every allocation that Actor::AttachComponents would otherwise perform
 	// before the first lifecycle callback is allowed to run.
 	const std::vector<Actor*>& PrepareUnpublishedCandidateForCommit();
+    void PrepareComponentPublication(const std::vector<Actor*>& actors);
 	// Publish a fully prepared candidate. All recoverable work and allocation must
 	// finish before this non-failing lifecycle commit begins.
 	void PublishUnpublishedCandidate() noexcept;

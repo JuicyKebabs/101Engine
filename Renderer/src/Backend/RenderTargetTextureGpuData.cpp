@@ -7,6 +7,8 @@
 #include "ApiResult.h"
 #include "Failure.h"
 
+#include <cmath>
+
 namespace rendering::backend
 {
 
@@ -33,10 +35,31 @@ Result RenderTargetTextureGpuData::Initialize(
 		return detail::Fail("RenderTargetTexture: dimensions exceed the supported 2D limit.");
 	}
 
-	if (description.format != TextureFormat::RGBA8_UNorm)
-	{
-		return detail::Fail("RenderTargetTexture: R7 supports RGBA8_UNorm only.");
-	}
+    // Reject invalid CPU input before any allocation. HDR values may exceed
+    // [0,1], so finite validation is intentional; clamping would change policy.
+    for (float channel : description.optimizedClearColor)
+    {
+        if (!std::isfinite(channel))
+        {
+            return detail::Fail("RenderTargetTexture: optimized Clear color must be finite.");
+        }
+    }
+
+    DXGI_FORMAT nativeFormat = DXGI_FORMAT_UNKNOWN;
+    switch (description.format)
+    {
+    case TextureFormat::RGBA8_UNorm:
+        nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        break;
+    case TextureFormat::RGBA8_sRGB:
+        nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        break;
+    case TextureFormat::RGBA16_Float:
+        nativeFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        break;
+    default:
+        return detail::Fail("RenderTargetTexture: unsupported generated color format.");
+    }
 
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -47,7 +70,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	colorDescription.Height = description.height;
 	colorDescription.DepthOrArraySize = 1;
 	colorDescription.MipLevels = 1;
-	colorDescription.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	colorDescription.Format = nativeFormat;
 	colorDescription.SampleDesc.Count = 1;
 	colorDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
@@ -57,10 +80,12 @@ Result RenderTargetTextureGpuData::Initialize(
 	// The actual initialization is a later Graph attachment Clear on the GPU.
 	D3D12_CLEAR_VALUE optimizedClear{};
 	optimizedClear.Format = colorDescription.Format;
-	optimizedClear.Color[0] = 0.05f;
-	optimizedClear.Color[1] = 0.10f;
-	optimizedClear.Color[2] = 0.25f;
-	optimizedClear.Color[3] = 1.0f;
+    // Use the same typed Format as the RTV. The caller supplies ordinary
+    // values, not D3D12 types or an Editor-specific resource classification.
+    for (std::size_t channel = 0; channel < description.optimizedClearColor.size(); ++channel)
+    {
+        optimizedClear.Color[channel] = description.optimizedClearColor[channel];
+    }
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> color;
 	HRESULT created = device->CreateCommittedResource(
@@ -139,6 +164,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	m_depth = std::move(depth);
 	m_rtv = rtv;
 	m_srv = srv;
+	viewFormat = nativeFormat;
 	width = description.width;
 	height = description.height;
 	return {};

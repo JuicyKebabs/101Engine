@@ -8,6 +8,7 @@
 #include "ResourceHandle.h"
 #include "TextureDesc.h"
 
+#include <array>
 #include <cstdint>
 
 namespace rendering
@@ -15,12 +16,17 @@ namespace rendering
 
 // GPU-generated color output. CPU pixels and upload requests belong to TextureDesc.
 // Allocate GPU-generated output storage. No CPU pixel span or upload mip array belongs here.
-// R7 deliberately supports RGBA8_UNorm, one mip and one sample only.
+// R8 supports RGBA8_UNorm, RGBA8_sRGB and RGBA16_Float, one mip and one sample.
 struct RenderTargetTextureDesc
 {
 	std::uint32_t width = 0;
 	std::uint32_t height = 0;
 	TextureFormat format = TextureFormat::RGBA8_UNorm;
+
+    // Creation-time optimization information, not initialized pixels or a Pass Clear.
+    // A different actual Clear remains valid. Resize preserves this representative
+    // value; changing a View's clearColor does not implicitly replace this resource.
+    std::array<float, 4> optimizedClearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
 };
 
 // A value snapshot. It neither owns a GPU image nor pins a particular revision.

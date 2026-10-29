@@ -19,6 +19,10 @@ namespace rendering::detail
 // lastDrawFenceValue includes attachment-only writes such as Clear, not only Material reads.
 struct RenderTargetTextureContent
 {
+    // Owned value describing this physical revision's allocation policy.
+    // Reconstructing only Format/extent from native views would lose the Mask's
+    // optimized Clear on Resize. This contains no borrowed spans or GPU owners.
+    RenderTargetTextureDesc creationDescription;
 	std::uint64_t revision = 1;
 	std::uint64_t lastDrawFenceValue = 0;
 	std::unique_ptr<backend::RenderTargetTextureGpuData> gpuData;
@@ -28,6 +32,11 @@ struct RenderTargetTextureContent
 class RenderTargetTextureRegistry
 {
 public:
+    std::string DescribeUnavailable(RenderTargetTextureHandle handle) const
+    {
+        return DescribeResourceIdentity(handle, m_slots.ValidateForNewUse(handle));
+    }
+
 	explicit RenderTargetTextureRegistry(std::uint32_t ownerId) : m_slots(ownerId) {}
 
 	ResourceRegistrationResult<RenderTargetTextureHandle> Create(

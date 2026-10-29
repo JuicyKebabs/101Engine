@@ -1,10 +1,8 @@
 #include "SceneBase.h"
 #include "SceneLoader.h"
 #include "Engine/ActorImprint/ActorImprintSystem.h"
-#include "Engine/Graphics/Renderer.h"
 #include "Engine/Input/InputManager.h"
-#include "Engine/Resource/TextureManager.h"
-#include "Engine/Resource/MeshManager.h"
+#include "Engine/Resource/AssetManager.h"
 #include "Engine/Scene/SceneManager.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Actor/ActorFactory.h"
@@ -25,15 +23,22 @@ SceneBase::SceneBase()
 SceneBase::~SceneBase()
 {
 	// Imprint records pin App-owned definitions until their Actors are gone.
-	// Preserve the existing explicit-Finalize contract for ordinary Scenes.
+	// Complete ordinary lifecycle teardown even when a host relies on RAII.
 	if (m_unpublishedCandidate)
 	{
 		DiscardUnpublishedCandidate();
 	}
-	else if (!m_imprintInstances.GetInstances().empty())
-	{
-		Finalize();
-	}
+    else if (!m_isFinalized)
+    {
+        Finalize();
+    }
+
+    if (!m_deferAssetRelease && m_pEngineContext && m_pEngineContext->pAssetManager)
+    {
+        // Component instances are already destroyed. A copied Handle never
+        // kept these registrations alive; the Scene record did.
+        m_pEngineContext->pAssetManager->ReleaseScene(this);
+    }
 }
 
 // Initialization
@@ -147,28 +152,17 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-void SceneBase::OnRender(
-	EngineContext& context,
-	const CameraInfo* overrideCameraInfo,
-	RenderViewPolicy viewPolicy
-)
+bool SceneBase::AppendRenderData(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
+    const CameraInfo* overrideCameraInfo, RenderViewPolicy viewPolicy,
+    rendering::ViewId sceneViewId, rendering::ViewId overlayViewId)
 {
-	const auto* pCameraInfo = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
-
-	// Check if main camera exists before rendering.
-	if (!pCameraInfo)
-	{
-		DBG("SceneBase::OnRender: No main camera set, skipping render.");
-		return;
-	}
-
-	auto cameraInfo = *pCameraInfo;	// Make a copy of the camera info to pass to the render system (in case the render system needs to modify it for sorting or other purposes)
-
-	m_pRenderSystem->FlushRegisters();
-	m_pRenderSystem->BuildFrameRenderData(cameraInfo, viewPolicy);
-	context.pRenderer->SubmitFrameRenderData(m_pRenderSystem->GetFrameRenderData());
-	context.pRenderer->SubmitCameraInfo(cameraInfo);
-	context.pRenderer->SubmitDirectionalLight(m_directionalLight);
+    const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
+    m_pRenderSystem->FlushRegisters();
+    // No Camera is still a valid background + Screen UI Frame. Only World and
+    // Shadow are omitted by extraction; Renderer owns final Render/Present.
+    return m_pRenderSystem->AppendFrame(frame, output, camera, viewPolicy, sceneViewId,
+        overlayViewId, static_cast<std::uint32_t>(m_viewportSize.x),
+        static_cast<std::uint32_t>(m_viewportSize.y), m_directionalLight);
 }
 
 // Finalization
@@ -237,6 +231,7 @@ const std::vector<Actor*>& SceneBase::PrepareUnpublishedCandidateForCommit()
 	}
 
 	m_unpublishedCommitActors = GetAllActors();
+    PrepareComponentPublication(m_unpublishedCommitActors);
 
 	for (Actor* actor : m_unpublishedCommitActors)
 	{
@@ -1233,4 +1228,29 @@ bool SceneBase::RollbackRestoredActors(const std::vector<ActorHandle>& restoredH
 	}
 
 	return succeeded;
+}
+
+void SceneBase::PrepareComponentPublication(const std::vector<Actor*>& actors)
+{
+    std::size_t componentCount = 0;
+    for (Actor* actor : actors)
+    {
+        if (actor)
+        {
+            componentCount += actor->GetAllComponents().size();
+        }
+    }
+
+    m_pRenderSystem->PrepareRegistrationCapacity(componentCount);
+    m_pCollisionSystem->PrepareRegistrationCapacity(componentCount);
+    for (Actor* actor : actors)
+    {
+        if (actor)
+        {
+            if (Canvas* canvas = actor->GetComponentByClass<Canvas>())
+            {
+                canvas->PrepareRegistrationCapacity(componentCount);
+            }
+        }
+    }
 }

@@ -70,6 +70,11 @@ namespace
 			return { false, "ValidatePipelineDesc: unsupported cull mode." };
 		}
 
+        if (desc.fill != FillMode::Solid && desc.fill != FillMode::Wireframe)
+        {
+            return Fail("ValidatePipelineDesc: unsupported fill mode.");
+        }
+
 		if (desc.blend == BlendMode::Alpha && desc.depth == DepthMode::ReadWrite)
 		{
 			return { false, "ValidatePipelineDesc: Transparent Pipeline must disable Depth writes." };
@@ -363,6 +368,9 @@ namespace
 		case graph::GraphTextureFormat::RGBA8_sRGB:
 			return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 
+		case graph::GraphTextureFormat::RGBA16_Float:
+            return DXGI_FORMAT_R16G16B16A16_FLOAT;
+
 		case graph::GraphTextureFormat::D32_Float:
 			return DXGI_FORMAT_D32_FLOAT;
 
@@ -390,8 +398,12 @@ Result ValidateFrameInputs(const FrameRenderData& data)
 		}
 	}
 
-	for (const auto& view : data.views)
-	{
+    for (const auto& view : data.views)
+    {
+        if (!std::isfinite(view.exposure) || view.exposure < 0)
+        {
+            return Fail("Exposure must be a finite nonnegative multiplier.");
+        }
 		if (!Finite(view.view) || !Finite(view.projection) ||
 			!Finite(Vector4{ view.cameraPosition.x, view.cameraPosition.y, view.cameraPosition.z, 0 }))
 		{
@@ -550,13 +562,19 @@ Result DrawResources::ResolveTextureInput(
 	}
 
 	const TextureHandle selectedHandle = std::get<TextureHandle>(parameter->value);
-	if (!textures.FindForNewUse(selectedHandle))
-	{
-		return { false, "Texture unavailable: " + requirement.name };
-	}
+    // Invalid identity remains invalid. Only this draw's sampling source changes;
+    // the caller's Material and registration table retain their original values.
+    handle = selectedHandle;
+    if (!textures.FindForNewUse(selectedHandle))
+    {
+        handle = fallbackTexture;
+    }
 
-	handle = selectedHandle;
-	content = textures.FindRegisteredContent(selectedHandle);
+    content = textures.FindRegisteredContent(handle);
+    if (!content || !textures.FindForNewUse(handle))
+    {
+        return Fail("Texture and resident substitute unavailable: " + requirement.name);
+    }
 	return {};
 }
 
@@ -585,10 +603,19 @@ Result DrawResources::ResolveSampledTexture(
 	{
 		selected.targetHandle = *targetHandle;
 		selected.target = targets.FindForNewUse(*targetHandle);
-		if (!selected.target || !selected.target->gpuData)
-		{
-			return Fail("RenderTargetTexture unavailable: " + requirement.name);
-		}
+        if (!selected.target || !selected.target->gpuData)
+        {
+            // A failed sample must not turn into a failed output attachment.
+            // The output API still rejects an unavailable render destination.
+            selected.target = nullptr;
+            selected.targetHandle = RenderTargetTextureHandle{};
+            selected.textureHandle = fallbackTexture;
+            selected.texture = textures.FindRegisteredContent(fallbackTexture);
+            if (!selected.texture || !textures.FindForNewUse(fallbackTexture))
+            {
+                return Fail("RenderTargetTexture and resident substitute unavailable: " + requirement.name);
+            }
+        }
 	}
 	else
 	{
@@ -605,7 +632,8 @@ Result DrawResources::ResolveSampledTexture(
 
 // Resolve the final Pipeline after applying View overrides, then validate its complete input contract.
 // Vertex deformation and Texture Alpha inputs must remain available in a compatible override.
-// A failed Object resolution produces a diagnostic/skip; it is not converted to a fallback draw.
+// This strict leaf resolver never changes caller identities. FrameDrawContext
+// may retry with a scoped substitute after retaining the original failure cause.
 Result DrawResources::ResolveDrawInputs(
 	const RenderObject& object,
 	std::size_t objectIndex,
@@ -620,12 +648,23 @@ Result DrawResources::ResolveDrawInputs(
 	diagnostic.geometry = object.geometry;
 	diagnostic.material = settings.materialOverride.value_or(object.material);
 
-	DrawInputs selected;
-	if (!object.procedural)
+    DrawInputs selected;
+    selected.depthOverride = settings.depthOverride;
+    if (selected.depthOverride)
+    {
+        const DepthMode mode = *selected.depthOverride;
+        const bool supported = mode == DepthMode::Disabled || mode == DepthMode::ReadOnly || mode == DepthMode::ReadWrite;
+        if (!supported)
+        {
+            return Fail("Unsupported draw Depth override.");
+        }
+    }
+
+    if (!object.procedural)
 	{
 		if (!geometries.FindForNewUse(object.geometry))
 		{
-			return Fail("Geometry unavailable.");
+			return Fail("Geometry unavailable: " + geometries.DescribeUnavailable(object.geometry));
 		}
 
 		selected.geometry = geometries.FindRegisteredContent(object.geometry);
@@ -635,7 +674,7 @@ Result DrawResources::ResolveDrawInputs(
 	selected.material = materials.FindForNewUse(diagnostic.material);
 	if (!selected.material)
 	{
-		return { false, "Material unavailable." };
+		return { false, "Material unavailable: " + materials.DescribeUnavailable(diagnostic.material) };
 	}
 	diagnostic.materialRevision = selected.material->revision;
 
@@ -643,8 +682,14 @@ Result DrawResources::ResolveDrawInputs(
 	selected.pipeline = pipelines.FindForNewUse(diagnostic.pipeline);
 	if (!selected.pipeline)
 	{
-		return { false, "Pipeline unavailable." };
+		return { false, "Pipeline unavailable: " + pipelines.DescribeUnavailable(diagnostic.pipeline) };
 	}
+
+    const DepthMode effectiveDepth = settings.depthOverride.value_or(selected.pipeline->desc.depth);
+    if (selected.pipeline->desc.blend == BlendMode::Alpha && effectiveDepth == DepthMode::ReadWrite)
+    {
+        return Fail("Alpha draws cannot write Depth, including View overrides.");
+    }
 
 	diagnostic.vertexShader = selected.pipeline->desc.vertexShader;
 	diagnostic.pixelShader = selected.pipeline->desc.pixelShader;
@@ -653,7 +698,7 @@ Result DrawResources::ResolveDrawInputs(
 	const bool requiredPixelMissing = diagnostic.pixelShader != ShaderHandle{} && !selected.pixelShader;
 	if (!selected.vertexShader || requiredPixelMissing)
 	{
-		return { false, "Dependent Shader unavailable." };
+		return { false, "Dependent Shader unavailable: VS " + shaders.DescribeUnavailable(diagnostic.vertexShader) + "; PS " + shaders.DescribeUnavailable(diagnostic.pixelShader) };
 	}
 	diagnostic.vertexRevision = selected.vertexShader->revision;
 	diagnostic.pixelRevision = selected.pixelShader ? selected.pixelShader->revision : 0;
@@ -724,9 +769,16 @@ Result DrawResources::ResolveDrawInputs(
 		}
 	}
 
-	for (const auto& requirement : selected.pipeline->layout.resources)
-	{
-		if (requirement.sampler)
+    for (const auto& requirement : selected.pipeline->layout.resources)
+    {
+        // Reserved View-common data is supplied by FrameDrawContext, never a
+        // Material parameter. Reflection already verified its exclusive slot.
+        if (requirement.name == "RendererShadowMap")
+        {
+            continue;
+        }
+
+        if (requirement.sampler)
 		{
 			continue;
 		}
@@ -762,7 +814,7 @@ Result DrawResources::PrepareConstantBindings(
 	const RenderView& view,
 	const RenderObject& object,
 	const DrawInputs& inputs,
-	backend::Backend& backend,
+	FrameDrawContext& drawContext,
 	std::array<backend::ConstantAllocation, 4>& commonAllocations,
 	DrawCommand& command)
 {
@@ -771,6 +823,8 @@ Result DrawResources::PrepareConstantBindings(
 		Matrix4x4 view;
 		Matrix4x4 projection;
 		Vector4 cameraPosition;
+        Matrix4x4 shadowViewProjection;
+        Vector4 shadowInformation;
 	};
 
 	struct ObjectConstants
@@ -780,7 +834,7 @@ Result DrawResources::PrepareConstantBindings(
 		Vector4 tint;
 	};
 
-	static_assert(sizeof(ViewConstants) == 144);
+	static_assert(sizeof(ViewConstants) == 224);
 	static_assert(sizeof(ObjectConstants) == 144);
 	static_assert(sizeof(DirectionalLight) == 48);
 
@@ -790,10 +844,15 @@ Result DrawResources::PrepareConstantBindings(
 	viewConstants.cameraPosition.x = view.cameraPosition.x;
 	viewConstants.cameraPosition.y = view.cameraPosition.y;
 	viewConstants.cameraPosition.z = view.cameraPosition.z;
-	viewConstants.cameraPosition.w = 0;
+    viewConstants.cameraPosition.w = 0;
+    viewConstants.shadowViewProjection = drawContext.m_shadowViewProjection;
+    viewConstants.shadowInformation.x = drawContext.m_shadowEnabled ? 1.0f : 0.0f;
+    viewConstants.shadowInformation.y = 0.001f;
+    viewConstants.shadowInformation.z = 0;
+    viewConstants.shadowInformation.w = 0;
 
 	ObjectConstants objectConstants;
-	Result worldPrepared = DeriveObjectWorld(object, view, objectConstants.world);
+	Result worldPrepared = DeriveObjectWorld(object, drawContext.m_billboardSource ? *drawContext.m_billboardSource : view, objectConstants.world);
 	if (!worldPrepared.IsSuccess())
 	{
 		return worldPrepared;
@@ -802,7 +861,16 @@ Result DrawResources::PrepareConstantBindings(
 	// Normals must use the same derived World as positions.
 	// Leaving the original normal matrix after Billboard rotation would produce inconsistent lighting.
 	objectConstants.normalMatrix = objectConstants.world.Inverse().Transpose();
-	objectConstants.tint = object.tint;
+    objectConstants.tint = object.tint;
+    if (inputs.geometrySubstituted)
+    {
+        Vector4 neutralTint;
+        neutralTint.x = 1;
+        neutralTint.y = 1;
+        neutralTint.z = 1;
+        neutralTint.w = 1;
+        objectConstants.tint = neutralTint;
+    }
 
 	DirectionalLight lightConstants;
 	if (frame.directionalLight.has_value())
@@ -871,7 +939,7 @@ Result DrawResources::PrepareConstantBindings(
 		}
 		else
 		{
-			Result result = backend.AllocateConstants(constantBytes, allocation);
+			Result result = drawContext.m_backend.AllocateConstants(constantBytes, allocation);
 			if (!result.IsSuccess())
 			{
 				return result;
@@ -908,18 +976,8 @@ Result DrawResources::PrepareTextureBindings(
 			continue;
 		}
 
-		SampledTexture sampled;
-		Result resolved;
-		if (drawContext.m_renderTargets)
-		{
-			resolved = ResolveSampledTexture(inputs.material->desc, requirement,
-				drawContext.m_textures, *drawContext.m_renderTargets, sampled);
-		}
-		else
-		{
-			resolved = ResolveTextureInput(inputs.material->desc, requirement,
-				drawContext.m_textures, sampled.textureHandle, sampled.texture);
-		}
+        SampledTexture sampled;
+        Result resolved = drawContext.ResolveSample(inputs.material->desc, requirement, sampled);
 
 		if (!resolved.IsSuccess())
 		{
@@ -937,9 +995,15 @@ Result DrawResources::PrepareTextureBindings(
 			nativeResource = sampled.target->gpuData->Resource();
 			drawFence = &sampled.target->lastDrawFenceValue;
 		}
-		else
-		{
-			resolved = drawContext.m_bindings.FindImportedTexture(*sampled.texture, graphTexture);
+        else if (sampled.depth)
+        {
+            resolved = drawContext.m_bindings.FindImportedDepth(*sampled.depth, graphTexture);
+            sourceDescriptor = sampled.depth->Srv();
+            nativeResource = sampled.depth->Resource();
+        }
+        else
+        {
+            resolved = drawContext.m_bindings.FindImportedTexture(*sampled.texture, graphTexture);
 			sourceDescriptor = sampled.texture->gpuData->GetSrvHandle();
 			nativeResource = sampled.texture->gpuData->texture.Get();
 			drawFence = &sampled.texture->lastDrawFenceValue;
@@ -969,7 +1033,10 @@ Result DrawResources::PrepareTextureBindings(
 		read.use.stages = static_cast<graph::ShaderStage>(static_cast<unsigned>(requirement.stages));
 		read.requiresValidContents = true;
 		command.m_reads.push_back(read);
-		command.m_fences.push_back(drawFence);
+        if (drawFence)
+        {
+            command.m_fences.push_back(drawFence);
+        }
 
 		Result retained = drawContext.m_backend.KeepFrameObjectAlive(nativeResource);
 		if (!retained.IsSuccess())
@@ -1064,7 +1131,7 @@ Result DrawResources::PrepareCommands(
 
 		const bool colorCountMismatch = inputs.pixelShader && inputs.pixelShader->metadata.colorOutputs != output.colorFormats.size();
 		const bool missingPixelShader = !inputs.pixelShader && !output.colorFormats.empty();
-		const bool missingDepth = inputs.pipeline->desc.depth != DepthMode::Disabled && !output.depthFormat;
+		const bool missingDepth = inputs.depthOverride.value_or(inputs.pipeline->desc.depth) != DepthMode::Disabled && !output.depthFormat;
 		if (colorCountMismatch || missingPixelShader || missingDepth)
 		{
 			drawContext.AddDiagnostic(diagnostic, "DrawResolve", "Pipeline does not match the OutputLayout.");
@@ -1095,9 +1162,20 @@ Result DrawResources::PrepareCommands(
 			const bool indexed = inputs.geometry->gpuData->indexCount != 0;
 			command.m_packet.kind = indexed ? backend::DrawKind::Indexed : backend::DrawKind::Vertices;
 			const UINT availableCount = indexed ? inputs.geometry->gpuData->indexCount : inputs.geometry->gpuData->vertexCount;
+            // The original range may describe a completely different mesh.
+            // Applying it to the resident cube would hide it or access past VB.
+            if (inputs.geometrySubstituted)
+            {
+                command.m_packet.first = 0;
+                command.m_packet.baseVertex = 0;
+                command.m_packet.count = availableCount;
+            }
+            else
+            {
 			command.m_packet.first = object.drawRange.first;
 			command.m_packet.baseVertex = object.drawRange.baseVertex;
 			command.m_packet.count = object.drawRange.count == 0 ? availableCount - object.drawRange.first : object.drawRange.count;
+            }
 		}
 
 		// Resolve clipping before allocating constants/descriptors or retaining native objects.
@@ -1109,7 +1187,7 @@ Result DrawResources::PrepareCommands(
 		{
 			continue;
 		}
-		result = PrepareConstantBindings(drawContext.m_frame, view, object, inputs, drawContext.m_backend, commonAllocations, command);
+		result = PrepareConstantBindings(drawContext.m_frame, view, object, inputs, drawContext, commonAllocations, command);
 		if (!result.IsSuccess())
 		{
 			return result;
@@ -1140,13 +1218,14 @@ Result DrawResources::ResolvePipeline(
 	PipelineVariant*& result)
 {
 	auto& pipeline = *inputs.pipeline;
+    const DepthMode effectiveDepth = inputs.depthOverride.value_or(pipeline.desc.depth);
 
 	if (output.colorFormats.size() > 1 || output.sampleCount != 1 || output.sampleQuality)
 	{
 		return { false, "ResolvePipeline: Multi-sample and multi-render target pipelines are not supported." };
 	}
 
-	if (pipeline.desc.depth != DepthMode::Disabled && !output.depthFormat)
+	if (effectiveDepth != DepthMode::Disabled && !output.depthFormat)
 	{
 		return { false, "ResolvePipeline: Depth mode is enabled but no depth format is provided in the output layout." };
 	}
@@ -1168,6 +1247,7 @@ Result DrawResources::ResolvePipeline(
 	key.colors = output.colorFormats;
 	key.depth = output.depthFormat;
 	key.sampleCount = output.sampleCount;
+    key.effectiveDepth = effectiveDepth;
 	key.sampleQuality = output.sampleQuality;
 
 	for (auto& variant : pipeline.variants)
@@ -1248,7 +1328,18 @@ Result DrawResources::ResolvePipeline(
 		staticSampler.AddressV = addressMode;
 		staticSampler.AddressW = addressMode;
 
-		staticSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+        staticSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+        if (sampler.binding == 2)
+        {
+            // Comparison is part of the reserved Shadow sampler contract.
+            // Ordinary s0/s1 retain their existing wrap/clamp interpretation.
+            staticSampler.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+            staticSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+            staticSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+            staticSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+            staticSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+            staticSampler.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+        }
 		staticSampler.MaxAnisotropy = 1;
 		staticSampler.MaxLOD = D3D12_FLOAT32_MAX;
 		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1308,7 +1399,7 @@ Result DrawResources::ResolvePipeline(
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.SampleDesc.Count = output.sampleCount;
 	psoDesc.SampleDesc.Quality = output.sampleQuality;
-	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState.FillMode = pipeline.desc.fill == FillMode::Wireframe ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
 
 	auto cullMode = pipeline.desc.cull == CullMode::None
 		? D3D12_CULL_MODE_NONE
@@ -1316,9 +1407,9 @@ Result DrawResources::ResolvePipeline(
 
 	psoDesc.RasterizerState.CullMode = cullMode;
 	psoDesc.RasterizerState.DepthClipEnable = TRUE;
-	psoDesc.DepthStencilState.DepthEnable = pipeline.desc.depth != DepthMode::Disabled;
+	psoDesc.DepthStencilState.DepthEnable = effectiveDepth != DepthMode::Disabled;
 	
-	auto depthWriteMask = pipeline.desc.depth == DepthMode::ReadWrite
+	auto depthWriteMask = effectiveDepth == DepthMode::ReadWrite
 		? D3D12_DEPTH_WRITE_MASK_ALL
 		: D3D12_DEPTH_WRITE_MASK_ZERO;
 

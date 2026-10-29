@@ -1,32 +1,28 @@
 #pragma once
 
-// Forward declaration of classes used in Context
-class Renderer;					// Renderer
-class TextureManager;			// Texture manager
-class MeshManager;				// Mesh manager
-class AssetManager;				// Asset manager
+namespace rendering { class Renderer; }
+class RenderAssetResources;
+class AssetManager;
 class AudioManager;
 class ActorImprintSystem;
-class CollisionSystem;			// Collision manager
+class CollisionSystem;
 
-// Engine context structure
+// Borrowed App services. Scenes/Components end before these owners are reset.
+// No native Device, CommandList, descriptor allocator or old GPU manager escapes.
 struct EngineContext
 {
-	Renderer* pRenderer = nullptr;				// Pointer to the renderer
-	TextureManager* pTextureManager = nullptr;	// Pointer to the texture manager
-	MeshManager* pMeshManager = nullptr;		// Pointer to the mesh manager
-	AssetManager* pAssetManager = nullptr;		// Pointer to the asset manager
-	ActorImprintSystem* pActorImprintSystem = nullptr; // App-owned, outlives Scenes
-	AudioManager* pAudioManager = nullptr;		// Non-owning runtime audio manager
+    rendering::Renderer* pRenderer = nullptr;
+    RenderAssetResources* pRenderAssets = nullptr;
+    AssetManager* pAssetManager = nullptr;
+    ActorImprintSystem* pActorImprintSystem = nullptr;
+    AudioManager* pAudioManager = nullptr;
 };
 
-// Frame context structure
 struct FrameContext
 {
 };
 
-// Game context structure inheriting from EngineContext
 struct GameContext : public EngineContext
 {
-	CollisionSystem* pCollisionManager = nullptr;	// Pointer to the collision manager
+    CollisionSystem* pCollisionManager = nullptr;
 };

@@ -1,8 +1,6 @@
 #include "Actor.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "ActorPool.h"
-#include "Engine/Engine.h"
-#include "Engine/Graphics/Renderer.h"
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/RectTransform.h"

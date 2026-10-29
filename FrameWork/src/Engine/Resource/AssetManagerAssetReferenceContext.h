@@ -9,8 +9,8 @@ class AssetManagerAssetReferenceContext final
 	  public AssetReferenceRestoreContext
 {
 public:
-	explicit AssetManagerAssetReferenceContext(const AssetManager& assetManager)
-		: m_assetManager(assetManager)
+	explicit AssetManagerAssetReferenceContext(const AssetManager& assetManager, bool preserveMissingRenderAssets = false)
+        : m_assetManager(assetManager), m_preserveMissingRenderAssets(preserveMissingRenderAssets)
 	{}
 
 	bool Validate(
@@ -27,4 +27,5 @@ private:
 		AssetType expectedType) const;
 
 	const AssetManager& m_assetManager;
+    bool m_preserveMissingRenderAssets = false;
 };

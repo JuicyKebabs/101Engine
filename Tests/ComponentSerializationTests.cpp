@@ -12,8 +12,6 @@
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Resource/AssetManager.h"
-#include "Engine/Resource/MeshManager.h"
-#include "Engine/Resource/TextureManager.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
@@ -30,6 +28,17 @@
 namespace
 {
 	int g_failures = 0;
+
+    template<class Handle>
+    Handle SyntheticHandle(std::uint32_t slot)
+    {
+        Handle handle;
+        handle.ownerId = 100;
+        handle.slotIndex = slot;
+        handle.generation = 1;
+        return handle;
+    }
+
 
 	void Check(bool condition, const std::string& name)
 	{
@@ -78,7 +87,6 @@ namespace
 		void LateUpdateOverride(float) override {}
 		void OnDetachOverride() override {}
 		void OnDestroyOverride() override {}
-		void ApplyBlendModeToRenderTemplates() override {}
 	};
 
 	std::unique_ptr<TypeMetadata> BuildTestRendererMetadata()
@@ -159,7 +167,7 @@ namespace
 	{
 		const std::vector<std::string> typeNames{
 			"Transform", "RectTransform", "Camera", "Collider", "MeshRenderer",
-			"SpriteRenderer", "SkyRenderer", "UIRenderer", "UIImage", "Canvas"
+			"SpriteRenderer", "UIRenderer", "UIImage", "Canvas"
 		};
 		bool allRegistered = true;
 		bool optionalRequirementsAreLimited = true;
@@ -174,8 +182,7 @@ namespace
 				if (property.GetSerializationMetadata()->requirement != PropertyRequirement::Optional) continue;
 				const std::string& path = property.GetPath().ToString();
 				optionalRequirementsAreLimited = optionalRequirementsAreLimited &&
-					(path == "/sortOrderInCanvas" || path == "/blendMode" ||
-					path == "/textureOverrideAssetId" ||
+					(path == "/sortOrderInCanvas" || path == "/castShadow" ||
 					(typeName == "Canvas" &&
 						(path == "/scaleMode" || path == "/matchWidthOrHeight")));
 			}
@@ -201,118 +208,32 @@ namespace
 		Check(target && target->GetLogicalType() == PropertyLogicalType::ActorReference &&
 			lens && lens->GetLogicalType() == PropertyLogicalType::Enum &&
 			meshAsset && meshAsset->GetLogicalType() == PropertyLogicalType::AssetReference &&
-			blendMode && blendMode->GetLogicalType() == PropertyLogicalType::Enum &&
-			textureOverride && textureOverride->GetLogicalType() == PropertyLogicalType::AssetReference,
+			!blendMode && !textureOverride,
 			"Nested, Actor, Enum, and Asset properties keep their logical metadata types");
 	}
 
-	void TestRendererBlendModePersistenceAndTemplateApplication()
-	{
-		MeshRenderer mesh;
-		SubmeshRenderTemplate first;
-		SubmeshRenderTemplate second;
-		first.materialDesc.psoKey.blend = BlendMode::Add;
-		second.materialDesc.psoKey.blend = BlendMode::Opaque;
-		mesh.SetParams({.templates = {first, second}});
-		Check(mesh.GetBlendMode() == BlendMode::Add &&
-			mesh.GetRenderTemplates()[0].materialDesc.psoKey.blend == BlendMode::Add &&
-			mesh.GetRenderTemplates()[1].materialDesc.psoKey.blend == BlendMode::Add,
-			"MeshRenderer adopts the first template BlendMode and applies it to every submesh");
+    void TestRendererFixedMaterialContract()
+    {
+        MeshRenderer mesh;
+        SpriteRenderer sprite;
+        UIImage image;
+        nlohmann::json meshRecord;
+        nlohmann::json spriteRecord;
+        nlohmann::json imageRecord;
+        Check(mesh.Serialize(meshRecord) && sprite.Serialize(spriteRecord) && image.Serialize(imageRecord),
+            "Renderer schemas serialize");
+        Check(!meshRecord.contains("blendMode") && !spriteRecord.contains("blendMode") && !imageRecord.contains("blendMode"),
+            "R8 Components no longer persist Pipeline BlendMode");
+        Check(meshRecord["castShadow"] == true && spriteRecord["castShadow"] == false,
+            "Mesh and Sprite persist their distinct Shadow defaults");
+        Check(!meshRecord.contains("textureOverrideAssetId"), "Mesh TextureOverride was removed");
+        meshRecord["blendMode"] = 0;
+        Check(!mesh.Deserialize(meshRecord), "Old BlendMode requires explicit data migration");
+    }
 
-		mesh.SetBlendMode(BlendMode::Multiply);
-		nlohmann::json serialized;
-		Check(mesh.Serialize(serialized) &&
-			serialized["blendMode"] == static_cast<int>(BlendMode::Multiply),
-			"Renderer BlendMode serializes as an integer enum");
 
-		MeshRenderer restored;
-		Check(restored.Deserialize(serialized) && restored.GetBlendMode() == BlendMode::Multiply,
-			"Renderer BlendMode survives a round trip");
 
-		serialized.erase("blendMode");
-		MeshRenderer legacy;
-		Check(legacy.Deserialize(serialized) && legacy.GetBlendMode() == BlendMode::Opaque,
-			"Renderer data without BlendMode retains the renderer default");
 
-		nlohmann::json invalid;
-		mesh.Serialize(invalid);
-		invalid["name"] = "MustNotApply";
-		invalid["blendMode"] = 999;
-		const std::string previousName = mesh.GetName();
-		Check(!mesh.Deserialize(invalid) && mesh.GetName() == previousName &&
-			mesh.GetBlendMode() == BlendMode::Multiply,
-			"Invalid BlendMode is rejected without partially mutating the renderer");
-
-		SpriteRenderer sprite;
-		Check(sprite.GetBlendMode() == BlendMode::Alpha,
-			"SpriteRenderer retains its transparent default BlendMode");
-		sprite.SetBlendMode(BlendMode::AddAlpha);
-		Check(sprite.GetRenderTemplate().materialDesc.psoKey.blend == BlendMode::AddAlpha,
-			"SpriteRenderer applies BlendMode to its render template");
-
-		UIImage image;
-		UIRenderElement uiElement;
-		uiElement.materialDesc.psoKey.blend = BlendMode::Add;
-		image.SetParams({.renderTemplate = {uiElement}});
-		image.SetBlendMode(BlendMode::Multiply);
-		Check(image.GetRenderTemplate().front().materialDesc.psoKey.blend == BlendMode::Multiply,
-			"UIRenderer applies BlendMode to every UI render element");
-	}
-
-	void TestRenderSystemNormalizesMultiplyShaderDefine()
-	{
-		SceneBase scene;
-		auto actor = ActorFactory::CreateEmptyActor(
-			Actor::InitDesc(true, TAG_NONE, "BlendNormalization"));
-		SpriteRenderer* sprite = actor ? actor->AddComponent<SpriteRenderer>() : nullptr;
-		SpriteRenderTemplate renderTemplate;
-		renderTemplate.materialDesc.textureHandle = 1;
-		renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::SPRITE_TRANSPARENT;
-		renderTemplate.materialDesc.psoKey.psKey.defines |=
-			static_cast<uint64_t>(PS_DEFINE::UseMask);
-		if (sprite)
-		{
-			sprite->SetParams({.renderTemplate = renderTemplate});
-			sprite->SetBlendMode(BlendMode::Multiply);
-		}
-		scene.AddRootActor(std::move(actor));
-		scene.GetRenderSystem()->BuildFrameRenderData(CameraInfo{}, {});
-
-		FrameRenderData& multiplyFrame = scene.GetRenderSystem()->GetFrameRenderData();
-		const uint64_t multiplyBit = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll);
-		const uint64_t maskBit = static_cast<uint64_t>(PS_DEFINE::UseMask);
-		Check(multiplyFrame.GetSpriteCount() == 1 &&
-			(multiplyFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & multiplyBit) != 0 &&
-			(multiplyFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & maskBit) != 0,
-			"RenderSystem adds Multiply alpha control without removing unrelated defines");
-
-		if (sprite) sprite->SetBlendMode(BlendMode::Alpha);
-		scene.GetRenderSystem()->BuildFrameRenderData(CameraInfo{}, {});
-		FrameRenderData& alphaFrame = scene.GetRenderSystem()->GetFrameRenderData();
-		Check(alphaFrame.GetSpriteCount() == 1 &&
-			(alphaFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & multiplyBit) == 0 &&
-			(alphaFrame.sprites.front().common.materialDesc.psoKey.psKey.defines & maskBit) != 0,
-			"RenderSystem removes stale Multiply alpha control without removing unrelated defines");
-	}
-
-	void TestMeshTextureOverrideIsAppliedAtRenderItemCreation()
-	{
-		SubmeshRenderTemplate renderTemplate;
-		renderTemplate.materialDesc.textureHandle = 11;
-		MeshRendererProxy proxy;
-
-		const MeshRenderItem inherited =
-			RenderSystem::CreateMeshRenderItem(renderTemplate, proxy);
-		proxy.textureOverrideHandle = 22;
-		const MeshRenderItem overridden =
-			RenderSystem::CreateMeshRenderItem(renderTemplate, proxy);
-
-		Check(inherited.common.materialDesc.textureHandle == 11 &&
-			overridden.common.materialDesc.textureHandle == 22,
-			"Mesh render items use the source texture unless an override is present");
-		Check(renderTemplate.materialDesc.textureHandle == 11,
-			"Texture override does not mutate the source mesh material");
-	}
 
 	void TestTransformRoundTrip()
 	{
@@ -1353,7 +1274,6 @@ namespace
 	void TestMeshRendererPendingAssetRoundTrip()
 	{
 		const Guid assetId = GuidGenerator::Generate();
-		const Guid textureOverrideId = GuidGenerator::Generate();
 		MeshRenderer source;
 		nlohmann::json serialized;
 		source.Serialize(serialized);
@@ -1361,19 +1281,17 @@ namespace
 		serialized["color"] = {1.5f, 0.25f, 0.5f, 0.75f};
 		serialized["visible"] = false;
 		serialized["meshAssetId"] = assetId.ToString();
-		serialized["textureOverrideAssetId"] = textureOverrideId.ToString();
 
 		MeshRenderer restored;
 		Check(restored.Deserialize(serialized),
 			"MeshRenderer accepts a valid deferred asset Guid");
 		Check(restored.GetAssetId() == assetId &&
-			restored.GetTextureOverrideAssetId() == textureOverrideId && !restored.IsConfigured(),
+			!restored.IsConfigured(),
 			"MeshRenderer exposes pending mesh and texture override assets without creating runtime resources");
 
 		nlohmann::json restoredJson;
 		restored.Serialize(restoredJson);
 		Check(restoredJson["meshAssetId"] == assetId.ToString() &&
-			restoredJson["textureOverrideAssetId"] == textureOverrideId.ToString() &&
 			restoredJson["name"] == "SavedMeshRenderer" &&
 			!restoredJson["visible"].get<bool>() &&
 			Near(restored.GetColor(), {1.5f, 0.25f, 0.5f, 0.75f}),
@@ -1409,7 +1327,6 @@ namespace
 	void TestMeshRendererResolveWithoutContextFailsSafely()
 	{
 		const Guid assetId = GuidGenerator::Generate();
-		const Guid textureOverrideId = GuidGenerator::Generate();
 		SceneBase scene;
 		auto actorOwned = ActorFactory::CreateEmptyActor(
 			Actor::InitDesc(true, TAG_NONE, "MeshOwner"));
@@ -1419,7 +1336,6 @@ namespace
 		nlohmann::json serialized;
 		renderer->Serialize(serialized);
 		serialized["meshAssetId"] = assetId.ToString();
-		serialized["textureOverrideAssetId"] = textureOverrideId.ToString();
 		Check(renderer->Deserialize(serialized),
 			"Owned MeshRenderer stores a pending asset Guid");
 		Check(!renderer->ResolveReferences(scene),
@@ -1429,21 +1345,14 @@ namespace
 		renderer->Serialize(unresolvedJson);
 		Check(unresolvedJson["meshAssetId"] == assetId.ToString(),
 			"Failed MeshRenderer resolution retains the pending asset Guid");
-		Check(unresolvedJson["textureOverrideAssetId"] == textureOverrideId.ToString(),
-			"Failed MeshRenderer resolution retains the pending texture override Guid");
 	}
 
 	void TestMeshRendererMissingAssetIsRecoverable()
 	{
 		const Guid missingAssetId = GuidGenerator::Generate();
-		const Guid missingTextureOverrideId = GuidGenerator::Generate();
 
 		AssetManager assetManager;
-		MeshManager meshManager;
-		TextureManager textureManager;
 		EngineContext context{
-			.pTextureManager = &textureManager,
-			.pMeshManager = &meshManager,
 			.pAssetManager = &assetManager
 		};
 
@@ -1458,63 +1367,43 @@ namespace
 		nlohmann::json serialized;
 		renderer->Serialize(serialized);
 		serialized["meshAssetId"] = missingAssetId.ToString();
-		serialized["textureOverrideAssetId"] = missingTextureOverrideId.ToString();
 
 		Check(renderer->Deserialize(serialized),
 			"MeshRenderer accepts a missing asset Guid as a deferred reference");
 		Check(renderer->ResolveReferences(scene),
 			"Missing mesh asset does not fail scene reference restoration");
 		Check(renderer->GetAssetId() == missingAssetId &&
-			renderer->GetTextureOverrideAssetId() == missingTextureOverrideId &&
-			!renderer->IsConfigured(),
+			renderer->IsConfigured(),
 			"Missing mesh and texture override assets remain visible without runtime templates");
 
 		nlohmann::json unresolvedJson;
 		renderer->Serialize(unresolvedJson);
 		Check(unresolvedJson["meshAssetId"] == missingAssetId.ToString(),
 			"Recoverable missing mesh reference survives serialization");
-		Check(unresolvedJson["textureOverrideAssetId"] == missingTextureOverrideId.ToString(),
-			"Recoverable missing texture override reference survives serialization");
 	}
 
-	void TestMeshRendererLiveAssetFailurePreservesRuntimeState()
-	{
-		AssetManager assetManager;
-		MeshManager meshManager;
-		TextureManager textureManager;
-		EngineContext context{
-			.pTextureManager = &textureManager,
-			.pMeshManager = &meshManager,
-			.pAssetManager = &assetManager
-		};
-		SceneBase scene;
-		scene.Initialize(context);
-
-		auto actorOwned = ActorFactory::CreateEmptyActor(
-			Actor::InitDesc(true, TAG_NONE, "ConfiguredMeshOwner"));
-		MeshRenderer* renderer = actorOwned->AddComponent<MeshRenderer>();
-		SubmeshRenderTemplate originalTemplate;
-		originalTemplate.meshDesc.meshHandle = 17;
-		renderer->SetParams({.templates = {originalTemplate}});
-		scene.AddRootActor(std::move(actorOwned));
-
-		AssetReference<MeshAsset> missingReference;
-		missingReference.SetValue({ GuidGenerator::Generate(), AssetType::Mesh, true });
-		Check(!renderer->TrySetMeshAssetReference(missingReference),
-			"Live MeshRenderer rejects an asset that cannot be prepared");
-		Check(renderer->IsConfigured() &&
-			renderer->GetRenderTemplates().front().meshDesc.meshHandle == 17 &&
-			!renderer->GetAssetId().IsValid(),
-			"Failed live MeshRenderer edit preserves its runtime template and asset identity");
-
-		AssetReference<TextureAsset> missingTextureOverride;
-		missingTextureOverride.SetValue({ GuidGenerator::Generate(), AssetType::Texture, true });
-		Check(!renderer->TrySetTextureOverrideAssetReference(missingTextureOverride),
-			"Live MeshRenderer rejects a texture override that cannot be prepared");
-		Check(renderer->GetRenderTemplates().front().meshDesc.meshHandle == 17 &&
-			!renderer->GetTextureOverrideAssetId().IsValid(),
-			"Failed texture override edit preserves the source mesh material state");
-	}
+    void TestMeshRendererLiveMissingAssetKeepsIdentity()
+    {
+        AssetManager assets;
+        EngineContext context;
+        context.pAssetManager = &assets;
+        SceneBase scene;
+        scene.Initialize(context);
+        Actor::InitDesc description;
+        description.name = "Missing Asset";
+        auto actor = ActorFactory::CreateEmptyActor(description);
+        auto* renderer = actor->AddComponent<MeshRenderer>();
+        scene.AddRootActor(std::move(actor));
+        AssetReference<MeshAsset> reference;
+        AssetReferenceValue value;
+        value.guid = GuidGenerator::Generate();
+        value.expectedType = AssetType::Mesh;
+        value.resolved = true;
+        reference.SetValue(value);
+        Check(renderer->TrySetMeshAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
+        Check(renderer->GetAssetId() == value.guid && renderer->IsConfigured(),
+            "Missing visual Asset retains persistent identity and drawable intent");
+    }
 
 	void TestMeshRendererSetParamsClearsAssetAssociation()
 	{
@@ -1523,7 +1412,6 @@ namespace
 		nlohmann::json serialized;
 		renderer.Serialize(serialized);
 		serialized["meshAssetId"] = assetId.ToString();
-		serialized["textureOverrideAssetId"] = GuidGenerator::Generate().ToString();
 		renderer.Deserialize(serialized);
 
 		SubmeshRenderTemplate runtimeTemplate;
@@ -1532,7 +1420,6 @@ namespace
 		nlohmann::json afterSetParams;
 		renderer.Serialize(afterSetParams);
 		Check(afterSetParams["meshAssetId"].is_null() &&
-			afterSetParams["textureOverrideAssetId"].is_null() &&
 			renderer.IsConfigured(),
 			"Direct MeshRenderer templates clear old mesh and texture override associations");
 	}
@@ -1542,8 +1429,7 @@ namespace
 		MeshRenderer source;
 		nlohmann::json serialized;
 		source.Serialize(serialized);
-		Check(serialized["meshAssetId"].is_null() &&
-			serialized["textureOverrideAssetId"].is_null(),
+		Check(serialized["meshAssetId"].is_null() && !serialized.contains("textureOverrideAssetId"),
 			"Default MeshRenderer serializes null mesh and texture override assets");
 
 		MeshRenderer restored;
@@ -1640,7 +1526,8 @@ namespace
 		SpriteRenderer restored;
 		Check(restored.Deserialize(serialized),
 			"SpriteRenderer accepts a valid deferred texture Guid");
-		Check(restored.GetTextureAssetId() == textureAssetId && !restored.IsConfigured(),
+		Check(restored.GetTextureAssetId() == textureAssetId &&
+            restored.GetRenderTemplate().materialDesc.textureHandle == InvalidTextureHandle,
 			"SpriteRenderer exposes its pending texture without creating runtime resources");
 
 		nlohmann::json restoredJson;
@@ -1661,7 +1548,7 @@ namespace
 	{
 		SpriteRenderer renderer;
 		SpriteRenderTemplate runtimeTemplate;
-		runtimeTemplate.materialDesc.textureHandle = 1;
+		runtimeTemplate.materialDesc.textureHandle = SyntheticHandle<rendering::TextureHandle>(1);
 		renderer.SetParams({
 			.renderTemplate = runtimeTemplate,
 			.uvScale = {2.0f, 2.0f},
@@ -1734,9 +1621,7 @@ namespace
 	{
 		const Guid missingTextureId = GuidGenerator::Generate();
 		AssetManager assetManager;
-		TextureManager textureManager;
 		EngineContext context{
-			.pTextureManager = &textureManager,
 			.pAssetManager = &assetManager
 		};
 
@@ -1756,38 +1641,32 @@ namespace
 			renderer->ResolveReferences(scene),
 			"Missing sprite texture does not fail scene reference restoration");
 		Check(renderer->GetTextureAssetId() == missingTextureId &&
-			!renderer->IsConfigured(),
+			renderer->IsConfigured(),
 			"Missing sprite texture remains visible without runtime resources");
 	}
 
-	void TestSpriteRendererLiveAssetFailurePreservesRuntimeState()
-	{
-		AssetManager assetManager;
-		TextureManager textureManager;
-		EngineContext context{
-			.pTextureManager = &textureManager,
-			.pAssetManager = &assetManager
-		};
-		SceneBase scene;
-		scene.Initialize(context);
-
-		auto actorOwned = ActorFactory::CreateEmptyActor(
-			Actor::InitDesc(true, TAG_NONE, "ConfiguredSpriteOwner"));
-		SpriteRenderer* renderer = actorOwned->AddComponent<SpriteRenderer>();
-		SpriteRenderTemplate originalTemplate;
-		originalTemplate.materialDesc.textureHandle = 23;
-		renderer->SetParams({.renderTemplate = originalTemplate});
-		scene.AddRootActor(std::move(actorOwned));
-
-		AssetReference<TextureAsset> missingReference;
-		missingReference.SetValue({ GuidGenerator::Generate(), AssetType::Texture, true });
-		Check(!renderer->TrySetTextureAssetReference(missingReference),
-			"Live SpriteRenderer rejects a texture that cannot be prepared");
-		Check(renderer->IsConfigured() &&
-			renderer->GetRenderTemplate().materialDesc.textureHandle == 23 &&
-			!renderer->GetTextureAssetId().IsValid(),
-			"Failed live SpriteRenderer edit preserves its runtime template and asset identity");
-	}
+    void TestSpriteRendererLiveMissingAssetKeepsIdentity()
+    {
+        AssetManager assets;
+        EngineContext context;
+        context.pAssetManager = &assets;
+        SceneBase scene;
+        scene.Initialize(context);
+        Actor::InitDesc description;
+        description.name = "Missing Asset";
+        auto actor = ActorFactory::CreateEmptyActor(description);
+        auto* renderer = actor->AddComponent<SpriteRenderer>();
+        scene.AddRootActor(std::move(actor));
+        AssetReference<TextureAsset> reference;
+        AssetReferenceValue value;
+        value.guid = GuidGenerator::Generate();
+        value.expectedType = AssetType::Texture;
+        value.resolved = true;
+        reference.SetValue(value);
+        Check(renderer->TrySetTextureAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
+        Check(renderer->GetTextureAssetId() == value.guid && renderer->IsConfigured(),
+            "Missing visual Asset retains persistent identity and drawable intent");
+    }
 
 	void TestSpriteRendererSetParamsClearsAssetAssociation()
 	{
@@ -1799,7 +1678,7 @@ namespace
 		renderer.Deserialize(serialized);
 
 		SpriteRenderTemplate runtimeTemplate;
-		runtimeTemplate.materialDesc.textureHandle = 1;
+		runtimeTemplate.materialDesc.textureHandle = SyntheticHandle<rendering::TextureHandle>(1);
 		renderer.SetParams({.renderTemplate = runtimeTemplate});
 
 		nlohmann::json afterSetParams;
@@ -2161,7 +2040,7 @@ namespace
 	{
 		UIImage image;
 		UIRenderElement element;
-		element.materialDesc.textureHandle = 1;
+		element.materialDesc.textureHandle = SyntheticHandle<rendering::TextureHandle>(1);
 		image.SetParams({
 			.renderTemplate = {element},
 			.order = 3,
@@ -2241,9 +2120,7 @@ namespace
 	{
 		const Guid missingTextureId = GuidGenerator::Generate();
 		AssetManager assetManager;
-		TextureManager textureManager;
 		EngineContext context{
-			.pTextureManager = &textureManager,
 			.pAssetManager = &assetManager
 		};
 
@@ -2263,38 +2140,32 @@ namespace
 			image->ResolveReferences(scene),
 			"Missing UIImage texture does not fail scene reference restoration");
 		Check(image->GetTextureAssetId() == missingTextureId &&
-			!image->IsConfigured(),
+			image->IsConfigured(),
 			"Missing UIImage texture remains visible without runtime resources");
 	}
 
-	void TestUIImageLiveAssetFailurePreservesRuntimeState()
-	{
-		AssetManager assetManager;
-		TextureManager textureManager;
-		EngineContext context{
-			.pTextureManager = &textureManager,
-			.pAssetManager = &assetManager
-		};
-		SceneBase scene;
-		scene.Initialize(context);
-
-		auto actorOwned = ActorFactory::CreateEmptyActor(
-			Actor::InitDesc(true, TAG_NONE, "ConfiguredImageOwner"));
-		UIImage* image = actorOwned->AddComponent<UIImage>();
-		UIRenderElement originalElement;
-		originalElement.materialDesc.textureHandle = 31;
-		image->SetParams({.renderTemplate = {originalElement}});
-		scene.AddRootActor(std::move(actorOwned));
-
-		AssetReference<TextureAsset> missingReference;
-		missingReference.SetValue({ GuidGenerator::Generate(), AssetType::Texture, true });
-		Check(!image->TrySetTextureAssetReference(missingReference),
-			"Live UIImage rejects a texture that cannot be prepared");
-		Check(image->IsConfigured() &&
-			image->GetRenderTemplate().front().materialDesc.textureHandle == 31 &&
-			!image->GetTextureAssetId().IsValid(),
-			"Failed live UIImage edit preserves its runtime template and asset identity");
-	}
+    void TestUIImageLiveMissingAssetKeepsIdentity()
+    {
+        AssetManager assets;
+        EngineContext context;
+        context.pAssetManager = &assets;
+        SceneBase scene;
+        scene.Initialize(context);
+        Actor::InitDesc description;
+        description.name = "Missing Asset";
+        auto actor = ActorFactory::CreateEmptyActor(description);
+        auto* renderer = actor->AddComponent<UIImage>();
+        scene.AddRootActor(std::move(actor));
+        AssetReference<TextureAsset> reference;
+        AssetReferenceValue value;
+        value.guid = GuidGenerator::Generate();
+        value.expectedType = AssetType::Texture;
+        value.resolved = true;
+        reference.SetValue(value);
+        Check(renderer->TrySetTextureAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
+        Check(renderer->GetTextureAssetId() == value.guid && renderer->IsConfigured(),
+            "Missing visual Asset retains persistent identity and drawable intent");
+    }
 
 	void TestUIImageSetParamsClearsTextureAssociation()
 	{
@@ -2306,7 +2177,7 @@ namespace
 		image.Deserialize(serialized);
 
 		UIRenderElement element;
-		element.materialDesc.textureHandle = 1;
+		element.materialDesc.textureHandle = SyntheticHandle<rendering::TextureHandle>(1);
 		image.SetParams({.renderTemplate = {element}});
 
 		nlohmann::json afterSetParams;
@@ -2335,9 +2206,7 @@ int main()
 	RegisterTestRendererMetadata();
 	TestComponentContract();
 	TestPersistentComponentMetadataRegistration();
-	TestRendererBlendModePersistenceAndTemplateApplication();
-	TestRenderSystemNormalizesMultiplyShaderDefine();
-	TestMeshTextureOverrideIsAppliedAtRenderItemCreation();
+	TestRendererFixedMaterialContract();
 	TestTransformRoundTrip();
 	TestInvalidJsonDoesNotPartiallyMutate();
 	TestSetParamsPropagatesDirtyToChildren();
@@ -2376,7 +2245,7 @@ int main()
 	TestInvalidMeshRendererGuidDoesNotPartiallyMutate();
 	TestMeshRendererResolveWithoutContextFailsSafely();
 	TestMeshRendererMissingAssetIsRecoverable();
-	TestMeshRendererLiveAssetFailurePreservesRuntimeState();
+	TestMeshRendererLiveMissingAssetKeepsIdentity();
 	TestMeshRendererSetParamsClearsAssetAssociation();
 	TestDefaultMeshRendererRoundTrip();
 	TestRendererCanvasSortOrderRoundTrip();
@@ -2386,7 +2255,7 @@ int main()
 	TestSpriteRendererValidationBoundaries();
 	TestSpriteRendererResolveWithoutContextFailsSafely();
 	TestSpriteRendererMissingTextureIsRecoverable();
-	TestSpriteRendererLiveAssetFailurePreservesRuntimeState();
+	TestSpriteRendererLiveMissingAssetKeepsIdentity();
 	TestSpriteRendererSetParamsClearsAssetAssociation();
 	TestDefaultSpriteRendererRoundTrip();
 	TestCanvasRoundTrip();
@@ -2406,7 +2275,7 @@ int main()
 	TestUIImageTextureFailureDoesNotApplyCanvas();
 	TestUIImageCanvasOnlyResolution();
 	TestUIImageMissingTextureIsRecoverable();
-	TestUIImageLiveAssetFailurePreservesRuntimeState();
+	TestUIImageLiveMissingAssetKeepsIdentity();
 	TestUIImageSetParamsClearsTextureAssociation();
 	TestDefaultUIImageRoundTrip();
 

@@ -114,7 +114,9 @@ Result CommonSchema(const ShaderConstantBuffer& buffer)
 	const std::vector<std::vector<Field>> fields{ { { "time", ValueType::Float, 0 } },
 													{ { "view", ValueType::Matrix4x4, 0 },
 													{ "projection", ValueType::Matrix4x4, 64 },
-													{ "cameraPosition", ValueType::Float4, 128 } },
+													{ "cameraPosition", ValueType::Float4, 128 },
+                                                    { "shadowViewProjection", ValueType::Matrix4x4, 144 },
+                                                    { "shadowInformation", ValueType::Float4, 208 } },
 													{ { "lightDirection", ValueType::Float4, 0 },
 													{ "lightColor", ValueType::Float4, 16 },
 													{ "ambient", ValueType::Float4, 32 } },
@@ -125,7 +127,7 @@ Result CommonSchema(const ShaderConstantBuffer& buffer)
 
 	// Reserved names and sizes for the common schema buffers which Renderer expects.
 	const char* names[]{ "RendererFrame", "RendererView", "RendererLight", "RendererPass", "RendererObject" };
-	const UINT size[]{ 16, 144, 48, 16, 144 };
+	const UINT size[]{ 16, 224, 48, 16, 144 };
 
 	if (buffer.binding == 5)
 	{
@@ -363,9 +365,21 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 				 bindDesc.ReturnType == D3D_RETURN_TYPE_FLOAT)
 		{
 			ShaderResourceBinding resource;
-			resource.name = bindDesc.Name;
-			resource.binding = bindDesc.BindPoint;
-			resource.sampler = false;
+            resource.name = bindDesc.Name;
+            resource.binding = bindDesc.BindPoint;
+            const bool shadowName = resource.name == "RendererShadowMap";
+            const bool shadowSlot = resource.binding == 15;
+            if (shadowName != shadowSlot)
+            {
+                return Fail("RendererShadowMap requires exclusive t15 ownership.");
+            }
+
+            if (resource.name.starts_with("Renderer") && !shadowName)
+            {
+                return Fail("Unknown reserved Renderer texture name.");
+            }
+
+            resource.sampler = false;
 			resource.stages = stages;
 			candidate.metadata.resources.push_back(std::move(resource));
 		}
@@ -373,8 +387,9 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 		// Sampler reflection
 		//----------------------------
 		else if (bindDesc.Type == D3D_SIT_SAMPLER &&
-				 bindDesc.BindPoint <= 1 &&
-				 !(bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER))
+				 ((bindDesc.BindPoint <= 1 && !(bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER)) ||
+                  (bindDesc.BindPoint == 2 && std::string(bindDesc.Name) == "RendererShadowSampler" &&
+                   (bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER))))
 		{
 			ShaderResourceBinding resource;
 			resource.name = bindDesc.Name;
@@ -586,7 +601,7 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 	// Detect duplicate resource names in the common schema (binding 5) and resource names.
 	for (const auto& bind: candidate.resources)
 	{
-		if (!bind.sampler && (bind.name.starts_with("Renderer") || !names.insert(bind.name).second))
+		if (!bind.sampler && ((bind.name.starts_with("Renderer") && bind.name != "RendererShadowMap") || !names.insert(bind.name).second))
 		{
 			return { false, "MergeMetadata: duplicate resource name '" + bind.name + "' in common schema." };
 		}

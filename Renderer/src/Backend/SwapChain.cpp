@@ -117,7 +117,7 @@ Result SwapChain::Initialize(
 	}
 
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-	rtvDesc.Format = BackBufferFormat;
+	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	rtvDesc.Texture2D.MipSlice = 0;
 	rtvDesc.Texture2D.PlaneSlice = 0;
@@ -195,7 +195,7 @@ Result SwapChain::RebuildBackBuffers(ID3D12Device* device)
 	}
 
 	D3D12_RENDER_TARGET_VIEW_DESC renderTargetView{};
-	renderTargetView.Format = BackBufferFormat;
+	renderTargetView.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	renderTargetView.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	for (UINT index = 0; index < BufferCount; ++index)
 	{
@@ -342,7 +342,7 @@ Result SwapChain::GetCurrentTexture(BackBufferInfo& output) const
 	BackBufferInfo info{};
 	info.resource = backBuffer.resource.Get();
 	info.rtv = rtv;
-	info.viewFormat = BackBufferFormat;
+	info.viewFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	info.submittedState = backBuffer.submittedState;
 
 	output = info;	

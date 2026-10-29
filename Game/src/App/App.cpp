@@ -1,392 +1,326 @@
-#include <windows.h>
-#include <algorithm>
-#include <mmsystem.h>
 #include "App.h"
-#include <tchar.h>
-#include "Engine/EngineComponentrRegistration.h"
+
+#include <cstdlib>
+#include <mmsystem.h>
+#include "Renderer/Win32WindowOutputDesc.h"
+#include "Engine/Core/Debug/Debug.h"
+#include "Engine/Core/Path/ExecutablePath.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Engine/Project/ProjectSettings.h"
+#include "Engine/Actor/ActorTag.h"
 #include "Engine/Scene/ComponentRegistry.h"
 
 #pragma comment(lib, "winmm.lib")
 
-// Get singleton instance
 App* App::GetInstance()
 {
-	static App instance; // Singleton instance
-	return &instance;
+    static App instance;
+    return &instance;
 }
 
-// Initialization
+bool App::CheckRenderingResult(const rendering::Result& result)
+{
+    if (result.IsSuccess())
+    {
+        return true;
+    }
+
+    DBG("Game Renderer: %s", result.message.c_str());
+
+    if (result.failureKind == rendering::FailureKind::GpuCompletionUnknown)
+    {
+        // No destructor may release resources whose GPU completion is unknown.
+        // OS process teardown is the only safe final owner in this fatal case.
+        ExitProcess(EXIT_FAILURE);
+    }
+
+    // Once this session fails, a later WM_QUIT must not turn it into success.
+    // Known-completion failures unwind normally; the fatal path above does not.
+    m_renderingStopped = true;
+    m_running = false;
+    return false;
+}
+
 bool App::Initialize()
 {
-	LoadGameCode();	// Load game code DLL
+    const auto executableDirectory = GetExecutableDirectory();
+    m_gameCode = LoadLibraryW((executableDirectory / L"GameCode.dll").c_str());
 
-	Window::InitDesc windowDesc{};
-	windowDesc.className = L"101EngineGameWindow";
-	windowDesc.title = L"101Engine";
-	windowDesc.clientWidth = WINDOW_WIDTH;
-	windowDesc.clientHeight = WINDOW_HEIGHT;
-	windowDesc.allowFullscreenToggle = true;
-	windowDesc.messageCallback = [](
-		HWND hwnd,
-		UINT message,
-		WPARAM wParam,
-		LPARAM lParam,
-		LRESULT& outResult)
-		{
-			InputManager::GetInstance().ProcessWindowMessage(message, wParam, lParam);
+    if (!m_gameCode)
+    {
+        DBG("GameCode.dll could not be loaded.");
+        return false;
+    }
 
-			switch (message)
-			{
-			case WM_KEYDOWN:
-				if (wParam == VK_ESCAPE)
-				{
-					SendMessage(hwnd, WM_CLOSE, 0, 0);
-				}
-				break;
-			}
+    Window::InitDesc windowDescription{};
+    windowDescription.className = L"101EngineGameWindow";
+    windowDescription.title = L"101Engine";
+    windowDescription.clientWidth = WINDOW_WIDTH;
+    windowDescription.clientHeight = WINDOW_HEIGHT;
+    windowDescription.allowFullscreenToggle = true;
+    windowDescription.messageCallback = [](HWND window, UINT message, WPARAM key, LPARAM parameter, LRESULT&)
+    {
+        InputManager::GetInstance().ProcessWindowMessage(message, key, parameter);
 
-			return false;
-		};
+        if (message == WM_KEYDOWN && key == VK_ESCAPE)
+        {
+            SendMessageW(window, WM_CLOSE, 0, 0);
+        }
 
-	if (!m_window.Initialize(windowDesc))
-	{
-		DBG("App: Failed to initialize the main window.");
-		return false;
-	}
+        return false;
+    };
 
-	PrepareInstance(); // Prepare instance
+    if (!m_window.Initialize(windowDescription))
+    {
+        return false;
+    }
 
-	if (!InitInstance()) return false;
+    m_renderer = std::make_unique<rendering::Renderer>();
+    rendering::RendererConfiguration rendererConfiguration{};
+#ifdef _DEBUG
+    rendererConfiguration.enableDebugLayer = true;
+#endif
 
-	// Only the standalone game requests relative mouse movement. Editor Play mode
-	// keeps using cursor movement through the same lookDelta input field.
-	RAWINPUTDEVICE mouseDevice{ 0x01, 0x02, 0, m_window.GetHandle() };
-	if (RegisterRawInputDevices(&mouseDevice, 1, sizeof(mouseDevice)))
-	{
-		m_inputManager.SetRawMouseLookEnabled(true);
-	}
-	else
-	{
-		DBG("App: Raw mouse input registration failed (error %lu).", GetLastError());
-	}
+    if (!CheckRenderingResult(m_renderer->Initialize(rendererConfiguration)))
+    {
+        return false;
+    }
 
-	return true;
+    rendering::Win32WindowOutputDesc windowOutputDescription{};
+    windowOutputDescription.window = m_window.GetHandle();
+    windowOutputDescription.width = WINDOW_WIDTH;
+    windowOutputDescription.height = WINDOW_HEIGHT;
+    auto outputCreation = m_renderer->CreateWindowOutput(windowOutputDescription);
+
+    if (!CheckRenderingResult(outputCreation.status))
+    {
+        return false;
+    }
+
+    m_windowOutput = outputCreation.handle;
+    m_renderAssets = std::make_unique<RenderAssetResources>();
+
+    if (!m_renderAssets->Initialize(*m_renderer, executableDirectory / L"shaders"))
+    {
+        return false;
+    }
+
+    // Audio absence is recoverable; visual assets still require Renderer setup.
+    if (!m_audio.Initialize())
+    {
+        DBG("Game: audio unavailable; continuing without audio.");
+    }
+
+    m_assets = std::make_unique<AssetManager>();
+
+    if (!m_assets->Initialize(PathManager::Resolve("asset"), m_renderer.get(), m_renderAssets.get(), &m_audio))
+    {
+        return false;
+    }
+
+    m_imprints = std::make_unique<ActorImprintSystem>(*m_assets);
+    m_scenes = std::make_unique<SceneManager>();
+    m_context.pRenderer = m_renderer.get();
+    m_context.pRenderAssets = m_renderAssets.get();
+    m_context.pAssetManager = m_assets.get();
+    m_context.pActorImprintSystem = m_imprints.get();
+    m_context.pAudioManager = &m_audio;
+    m_input.Initialize();
+
+    if (!InitSceneManager())
+    {
+        return false;
+    }
+
+    RAWINPUTDEVICE mouseDevice{};
+    mouseDevice.usUsagePage = 0x01;
+    mouseDevice.usUsage = 0x02;
+    mouseDevice.hwndTarget = m_window.GetHandle();
+    m_input.SetRawMouseLookEnabled(RegisterRawInputDevices(&mouseDevice, 1, sizeof(mouseDevice)) != FALSE);
+    return true;
 }
 
-// Execution
-void App::Run()
+bool App::InitSceneManager()
 {
-	// Show window
-	m_window.Show();
+    ProjectSettings settings;
+    std::string error;
 
-	// Message loop
-	MSG msg = {};	// Message
+    if (!ProjectSettings::Load(PathManager::Resolve("project.101"), settings, &error))
+    {
+        DBG("Game project settings: %s", error.c_str());
+        return false;
+    }
 
-	// Frame rate measurement variables
-	DWORD	dwExecLastTime;	// Last execution time
-	DWORD	dwFPSLastTime;	// Last FPS measurement time
-	DWORD	dwCurrentTime;	// Current time
-	DWORD	dwFrameCount;	// Frame count
+    for (const auto& tag : settings.GetUserTags())
+    {
+        if (!TagRegistry::Get().RegisterUserTag(tag, nullptr, &error))
+        {
+            DBG("Game project tag: %s", error.c_str());
+            return false;
+        }
+    }
 
-#ifdef _DEBUG	// Debug build only FPS display
-	int		countFPS = {};		// FPS counter
-	wchar_t debugStr[64]{};		// FPS display string
-#endif
+    if (!m_scenes->SetInitialScene(settings.GetGameStartupSceneGuid()))
+    {
+        DBG("Game startup Scene GUID is missing.");
+        return false;
+    }
 
-	// Frame rate measurement initialization
-	timeBeginPeriod(1);								// Set timer resolution
-	dwExecLastTime = dwFPSLastTime = timeGetTime();	// Get current timer value
-	dwCurrentTime = dwFrameCount = 0;				// Initialize
-
-	do 
-	{
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-		{// Message is available
-			TranslateMessage(&msg);	// Translate message
-			DispatchMessage(&msg);	// Dispatch message
-		}
-		else
-		{// Message is not available
-			dwCurrentTime = timeGetTime();	// Get current timer value
-
-			if ((dwCurrentTime - dwFPSLastTime) >= 1000)
-			{
-#ifdef _DEBUG
-				countFPS = dwFrameCount;	// FPS count save
-#endif
-				dwFPSLastTime = dwCurrentTime;	// Save current timer value
-				dwFrameCount = 0;				// Initialize frame count
-			}
-
-			if ((dwCurrentTime - dwExecLastTime) >= ((float)1000 / 60))
-			{// Time to execute next frame
-				dwExecLastTime = dwCurrentTime;	// Save current timer value
-				dwFrameCount++;					// Increment frame count
-#ifdef _DEBUG
-				// Update window title with FPS
-				swprintf_s(debugStr, L"101Engine FPS : %d", countFPS);
-				SetWindowTextW(m_window.GetHandle(), debugStr);
-#endif
-				if (!m_window.ApplyPendingModeChange())
-				{
-					DBG("App: Failed to apply the pending window mode change.");
-				}
-
-				if (m_window.IsMinimized())
-				{
-					m_time.Update();
-					continue;
-				}
-
-				if (!ApplyWindowResizeRequest())
-				{
-					continue;
-				}
-
-				Update();
-				Render();
-
-				// Input update
-				m_inputManager.Copy(); // Copy key information from input manager
-
-			}
-		}
-	} while (msg.message != WM_QUIT);	// Continue until quit message is received
+    m_scenes->SetViewportSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+    m_scenes->Initialize(m_context);
+    return m_scenes->GetCurrentScene() != nullptr;
 }
 
-// Termination
-void App::Terminate()
+int App::Run()
 {
-	m_pSceneManager->Finalize();
-	m_pSceneManager.reset();
-	m_pActorImprintSystem.reset();
-	m_engineContext.pActorImprintSystem = nullptr;
-	m_pAssetManager.reset();
-	m_engineContext.pAssetManager = nullptr;
-	ComponentRegistry::Get().UnregisterAllGameComponents();
+    m_window.Show();
+    timeBeginPeriod(1);
+    MSG message{};
+    DWORD lastFrame = timeGetTime();
 
-	if (m_hGameCodeDll)
-	{
-		FreeLibrary(m_hGameCodeDll);
-		m_hGameCodeDll = nullptr;
-	}
+    while (m_running && message.message != WM_QUIT)
+    {
+        if (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+            continue;
+        }
 
-	m_pEngine->Terminate();		// DirectX12 engine termination
-	m_audioManager.Terminate();	// Audio manager termination
-	m_engineContext.pAudioManager = nullptr;
+        const DWORD now = timeGetTime();
 
-	m_window.Terminate();
+        if (now - lastFrame < 16)
+        {
+            Sleep(1);
+            continue;
+        }
+
+        lastFrame = now;
+
+        if (!m_window.ApplyPendingModeChange())
+        {
+            DBG("Game window mode change failed.");
+        }
+
+        if (m_window.IsMinimized())
+        {
+            m_time.Update();
+            continue;
+        }
+
+        if (!ApplyWindowResizeRequest())
+        {
+            continue;
+        }
+
+        Update();
+        Render();
+        m_input.Copy();
+    }
+
+    timeEndPeriod(1);
+
+    if (m_renderingStopped)
+    {
+        return EXIT_FAILURE;
+    }
+
+    return static_cast<int>(message.wParam);
 }
 
 bool App::ApplyWindowResizeRequest()
 {
-	Window::Size requestedSize{};
+    Window::Size requestedSize{};
 
-	// Check if there is a pending resize request
-	if (!m_window.GetResizeRequest(requestedSize))
-	{
-		return true; // No resize request pending
-	}
+    if (!m_window.GetResizeRequest(requestedSize))
+    {
+        return true;
+    }
 
-	// Resize the engine output to match the requested window size
-	if (!m_pEngine->ResizeOutput(requestedSize.width, requestedSize.height))
-	{
-		DBG("App: Failed to resize engine output to %ux%u", requestedSize.width, requestedSize.height);
-		return false;
-	}
+    if (!CheckRenderingResult(m_renderer->ResizeWindowOutput(m_windowOutput, requestedSize.width, requestedSize.height)))
+    {
+        return false;
+    }
 
-	// Resize the scene render targets to match the requested window size
-	if (!m_pEngine->ResizeSceneRenderTargets(requestedSize.width, requestedSize.height))
-	{
-		return false;
-	}
-
-	// Update the scene manager's viewport size to match the requested window size
-	m_pSceneManager->SetViewportSize(requestedSize.width, requestedSize.height);
-
-	m_window.CommitResize();
-
-	return true;
+    m_scenes->SetViewportSize(requestedSize.width, requestedSize.height);
+    m_window.CommitResize();
+    return true;
 }
 
-// Load game code DLL
-void App::LoadGameCode()
-{
-	m_hGameCodeDll = LoadLibrary(_T("GameCode.dll"));	// Load GameCode.dll
-
-	if (!m_hGameCodeDll)
-	{
-		DBG("Failed to load GameCode.dll");
-	}
-	else
-	{
-		DBG("Successfully loaded GameCode.dll");
-	}
-}
-
-void App::PrepareInstance()
-{
-	// Get singleton instances of various classes
-	m_pEngine = std::make_unique<Engine>();
-	m_pRenderer = std::make_unique<Renderer>();
-	m_pSceneManager = std::make_unique<SceneManager>();
-	m_pTextureManager = std::make_unique<TextureManager>();
-	m_pMeshManager = std::make_unique<MeshManager>();	
-	m_pAssetManager = std::make_unique<AssetManager>();
-	m_pActorImprintSystem = std::make_unique<ActorImprintSystem>(*m_pAssetManager);
-
-	// Set up engine context structure
-	m_engineContext = {
-		m_pRenderer.get(),
-		m_pTextureManager.get(),
-		m_pMeshManager.get(),
-		m_pAssetManager.get(),
-		m_pActorImprintSystem.get(),
-		&m_audioManager
-	};
-}
-
-// Initialize instance
-bool App::InitInstance()
-{
-	// Initialize DirectX12 engine
-	m_pEngine->InitCore(
-		m_window.GetHandle(),	// Window handle
-		WINDOW_WIDTH,	// Framebuffer width
-		WINDOW_HEIGHT	// Framebuffer height
-	);
-
-	// Get device
-	auto pDevice = m_pEngine->GetDevice();
-
-	// Initialize texture management class
-	m_pTextureManager->Initialize(
-		pDevice,								// Device
-		m_pEngine->GetDescriptorHeapAllocator()	// Descriptor heap allocator
-	);
-
-	// Initialize mesh management class
-	m_pMeshManager->Initialize(
-		pDevice,				// Device
-		m_pTextureManager.get()	// Texture manager
-	);
-
-	// Initialize audio before AssetManager can lazily load audio assets.
-	if (!m_audioManager.Initialize())
-	{
-		DBG("App: Audio initialization failed; continuing without audio.");
-	}
-
-	// Initialize asset manager
-	if (!m_pAssetManager->Initialize(
-		PathManager::Resolve("asset"),
-		m_pTextureManager.get(),
-		m_pMeshManager.get(),
-		&m_audioManager
-		))
-	{
-		m_audioManager.Terminate();
-		return false;
-	}
-
-	// Initialize engine bindings
-	m_pEngine->InitBindings(m_pTextureManager.get());
-
-	// Initialize renderer
-	m_pRenderer->Initialize(
-		pDevice,									// Device
-		m_pEngine->GetDescriptorHeapAllocator(),	// Descriptor heap allocator
-		m_pTextureManager.get(),					// Texture manager
-		m_pMeshManager.get()						// Mesh manager
-	);
-
-	// Initialize rendering
-	m_pEngine->BeginFrame();
-
-	// Initialize rendering
-	m_pEngine->EndFrame();
-
-	// Initialize input management class
-	m_inputManager.Initialize();
-	return true;
-}
-
-// Update
 void App::Update()
 {
-	// Update time manager and get delta time
-	m_time.Update();
-	float deltaTime = m_time.GetDeltaTime();
-
-	// Update various systems
-	m_inputManager.Update();				// Update input management class
-	m_audioManager.Update();				// Update audio management class
-	m_pSceneManager->PreUpdate(deltaTime);	// Pre-update scene management class (for late update)
-	m_pSceneManager->Update(deltaTime);		// Update scene management class
-	m_pSceneManager->LateUpdate(deltaTime);	// Post-update scene management class (for late update)
-	if (const CameraInfo* cameraInfo = m_pSceneManager->GetCameraInfo())
-	{
-		m_pRenderer->Update(					// Update renderer
-			m_pEngine->GetCurrentBufferIndex(),
-			*cameraInfo
-		);
-	}
+    m_time.Update();
+    const float deltaTime = m_time.GetDeltaTime();
+    m_input.Update();
+    m_audio.Update();
+    m_scenes->PreUpdate(deltaTime);
+    m_scenes->Update(deltaTime);
+    m_scenes->LateUpdate(deltaTime);
 }
 
-// Draw
 void App::Render()
 {
-	// Start rendering
-	m_pEngine->BeginFrame();
-	m_pRenderer->BeginFrame(m_pEngine->GetCommandList());
+    rendering::FrameRenderData frame{};
+    frame.time = static_cast<float>(timeGetTime()) / 1000.0f;
+    rendering::ViewOutput output = m_windowOutput;
 
-	// Upload pending textures
-	m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
+    if (SceneBase* scene = m_scenes->GetCurrentScene())
+    {
+        if (!scene->AppendRenderData(frame, output))
+        {
+            return;
+        }
+    }
+    else
+    {
+        // A valid frame without Camera/Scene must still clear/present the host.
+        rendering::RenderView background{};
+        background.id = 2;
+        background.output = output;
+        background.kind = rendering::ViewKind::Overlay;
+        frame.views.push_back(background);
+    }
 
-	// Submit draw requests for the game scene
-	m_pSceneManager->OnRender();
+    if (!CheckRenderingResult(m_renderer->SubmitFrameRenderData(std::move(frame))))
+    {
+        return;
+    }
 
-	// Render the scene depth into the shadow map
-	RenderPassTarget shadowTarget
-	{
-		RenderPassTargetType::DepthOnly,
-		RenderPassTarget::InvalidIndex,
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
-	};	
-	m_pEngine->BeginPass(shadowTarget);
-	m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
-	m_pEngine->EndPass(shadowTarget);
+    const auto result = m_renderer->Render();
+    CheckRenderingResult(result.status);
 
-	// Render the scene to the main render target
-	RenderPassTarget sceneTarget
-	{
-		RenderPassTargetType::ColorDepth,
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
-	};
-	m_pEngine->BeginPass(sceneTarget);
-	uint32_t shadowMapSrvIndex = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap)->GetSrvIndex();
-	m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMapSrvIndex);
-	m_pEngine->EndPass(sceneTarget);
+    for (const auto& diagnostic : result.diagnostics)
+    {
+        DBG("Game draw: %s", diagnostic.message.c_str());
+    }
+}
 
-	// Draw for back buffer
-	RenderPassTarget backBufferTarget
-	{
-		RenderPassTargetType::BackBuffer,
-		m_pEngine->GetCurrentBufferIndex(),
-		RenderPassTarget::InvalidIndex
-	};	
-	m_pEngine->BeginPass(backBufferTarget);
-	m_pRenderer->RenderFullScreenPass(m_pEngine->GetCommandList(), m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor));
-	m_pRenderer->RenderScreenSpace(
-		m_pEngine->GetCommandList(),
-		m_pEngine->GetFrameBufferWidth(),
-		m_pEngine->GetFrameBufferHeight(),
-		RenderTargetFormat::LDR
-		);
-	m_pEngine->EndPass(backBufferTarget);
+void App::Terminate()
+{
+    // Scenes/Components go first while their AssetManager and Renderer are live.
+    if (m_scenes)
+    {
+        m_scenes->Finalize();
+        m_scenes.reset();
+    }
 
-	// End rendering
-	m_pEngine->EndFrame();
+    m_imprints.reset();
+    m_context.pActorImprintSystem = nullptr;
+    m_assets.reset();
+    m_context.pAssetManager = nullptr;
+    ComponentRegistry::Get().UnregisterAllGameComponents();
+
+    if (m_gameCode)
+    {
+        FreeLibrary(m_gameCode);
+        m_gameCode = nullptr;
+    }
+
+    m_audio.Terminate();
+    m_context.pAudioManager = nullptr;
+    m_renderAssets.reset();
+    m_context.pRenderAssets = nullptr;
+    m_renderer.reset();
+    m_context.pRenderer = nullptr;
+    m_window.Terminate();
 }

@@ -161,6 +161,13 @@ enum class CullMode
 	Front
 };
 
+// Rasterizer intent is generic; Renderer never needs a Collider/Editor type.
+enum class FillMode
+{
+    Solid,
+    Wireframe
+};
+
 struct PipelineDesc
 {
 	ShaderHandle vertexShader;
@@ -168,11 +175,13 @@ struct PipelineDesc
 	BlendMode blend = BlendMode::Opaque;
 	DepthMode depth = DepthMode::ReadWrite;
 	CullMode cull = CullMode::Back;
+    FillMode fill = FillMode::Solid;
 };
 
 //----------------------------------------------------------------
 // Material description
-// One on one relation with RenderObject in FrameRenderData.
+// One registered Material can be referenced by several submitted Objects.
+// Engine automatic Sprite/UIImage Materials are individually owned by their Scene.
 //----------------------------------------------------------------
 
 struct MaterialDesc
@@ -190,6 +199,9 @@ struct DrawSettings
 {
 	std::optional<MaterialHandle> materialOverride;
 	std::optional<PipelineHandle> pipelineOverride;
+    // A View can disable attachment testing without replacing every Material's
+    // Shader/blend intent, e.g. Canvas preview of mixed Mesh/Sprite renderers.
+    std::optional<DepthMode> depthOverride;
 };
 
 struct DrawDiagnostic

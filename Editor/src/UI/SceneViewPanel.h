@@ -1,5 +1,4 @@
 #pragma once
-#include <d3d12.h>
 #include <vector>
 #include <string>
 #include <span>
@@ -93,7 +92,7 @@ class SceneViewPanel
 {
 public:
 	void Render(
-		D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
+		ImTextureID sceneTextureHandle,
 		UINT textureWidth,
 		UINT textureHeight,
 		EditorViewportContext* viewportContext,

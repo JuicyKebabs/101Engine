@@ -28,21 +28,6 @@ set_tests_properties(MouseInputTests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-add_executable(SkyRendererTests
-    SkyRendererTests.cpp
-)
-
-target_include_directories(SkyRendererTests PRIVATE
-    ${CMAKE_SOURCE_DIR}/Framework/src
-)
-
-target_link_libraries(SkyRendererTests PRIVATE 101Framework)
-
-add_test(NAME SkyRendererTests COMMAND SkyRendererTests)
-set_tests_properties(SkyRendererTests PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-
 add_executable(PropertyMetadataTests
     PropertyMetadataTests.cpp
 )
@@ -142,6 +127,7 @@ target_include_directories(SceneLoaderTests PRIVATE
 )
 
 target_link_libraries(SceneLoaderTests PRIVATE 101Framework)
+add_dependencies(SceneLoaderTests GameCode)
 
 add_test(NAME SceneLoaderTests COMMAND SceneLoaderTests)
 set_tests_properties(SceneLoaderTests PROPERTIES
@@ -801,3 +787,10 @@ target_include_directories(AudioAssetTests PRIVATE ${CMAKE_SOURCE_DIR}/Framework
 target_link_libraries(AudioAssetTests PRIVATE 101Framework)
 add_test(NAME AudioAssetTests COMMAND AudioAssetTests)
 set_tests_properties(AudioAssetTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+# Collider registrations and all system-owned contact/history pointers must end
+# while the Scene-owned Component is still alive, including immediate removal.
+add_executable(ColliderLifetimeTests ColliderLifetimeTests.cpp)
+target_link_libraries(ColliderLifetimeTests PRIVATE 101Framework)
+add_test(NAME ColliderLifetimeTests COMMAND ColliderLifetimeTests)
+set_tests_properties(ColliderLifetimeTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

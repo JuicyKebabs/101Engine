@@ -3,51 +3,113 @@
 #include <unordered_set>
 #include <cfloat>
 #include "Engine/Actor/Actor.h"
-#include "Engine/Graphics/Renderer.h"
-#include "Engine/Resource/TextureManager.h"
-#include "Engine/Resource/MeshManager.h"
+#include "Engine/Core/Debug/Debug.h"
 using namespace DirectX;
 
 void CollisionSystem::Register(Collider* collider)
 {
+	if (!collider)
+	{
+		return;
+	}
+
+	if (collider->IsDestroyed() || collider->deleteFlag())
+	{
+		return;
+	}
+
+	// A live Collider is borrowed by one Scene's CollisionSystem at a time.
+	// Do not silently transfer it away from a different system.
+	if (collider->m_registeredCollisionSystem && collider->m_registeredCollisionSystem != this)
+	{
+		DBG("CollisionSystem::Register: Collider is already registered with another system.");
+		return;
+	}
+
 	if (std::find(m_pCollidersList.begin(), m_pCollidersList.end(), collider) == m_pCollidersList.end())
 	{
+		// Publish the backlink only after push_back succeeds. A failed allocation
+		// leaves both the old membership and the Collider's backlink unchanged.
 		m_pCollidersList.push_back(collider);
 	}
+
+	collider->m_registeredCollisionSystem = this;
 }
 
-void CollisionSystem::Unregister(Collider* collider)
+void CollisionSystem::Unregister(Collider* collider) noexcept
 {
-	m_pCollidersList.erase(
-		std::remove(m_pCollidersList.begin(), m_pCollidersList.end(), collider), m_pCollidersList.end());
+	if (!collider || collider->m_registeredCollisionSystem != this)
+	{
+		return;
+	}
+
+	// The target is still alive throughout this operation. Comparisons with it
+	// use identity only; no stored pair needs to dereference either endpoint.
+	std::erase(m_pCollidersList, collider);
+	const auto referencesCollider = [collider](const CollisionPair& pair)
+	{
+		return pair.colliderA == collider || pair.colliderB == collider;
+	};
+
+	std::erase_if(m_pNarrowPhaseColliders, referencesCollider);
+	std::erase_if(m_currentCollisionPairs, referencesCollider);
+	std::erase_if(m_previousCollisionPairs, referencesCollider);
+
+	// CollisionInfo is read by gameplay on the next update. Removing only pairs
+	// would still let Player/Bullet read an already released opponent there.
+	// Keep unrelated contacts, and do not emit EXIT with an invalid opponent.
+	for (Collider* registeredCollider : m_pCollidersList)
+	{
+		auto& collisionInfos = registeredCollider->GetCollisionInfos();
+		std::erase_if(collisionInfos, [collider](const CollisionInfo& information)
+		{
+			return information.opponent == collider;
+		});
+
+		if (collisionInfos.empty())
+		{
+			registeredCollider->SetDetected(false);
+		}
+	}
+
+	collider->ClearCollisionInfos();
+	collider->SetDetected(false);
+	collider->m_registeredCollisionSystem = nullptr;
 }
 
 void CollisionSystem::CheckColliders()
 {
-	for (auto& c : m_pCollidersList)
+	// Unregister can erase the current entry and compact this vector. Advance
+	// only when retaining that entry; no iterator/reference survives an erase.
+	std::size_t colliderIndex = 0;
+	while (colliderIndex < m_pCollidersList.size())
 	{
-		if (c->deleteFlag() || !c->GetOwner())
+		Collider* collider = m_pCollidersList[colliderIndex];
+		if (collider->deleteFlag() || collider->IsDestroyed())
 		{
-			Unregister(c);
+			Unregister(collider);
+			continue;
 		}
-		else if (!c->GetOwner()->IsActive())
+
+		Actor* owner = collider->GetOwner();
+		if (!owner || owner->IsDestroyed())
 		{
-			c->SetActive(false);
+			// Pending Actor destruction already ends participation, even though
+			// ActorPool will release its storage later at the frame boundary.
+			Unregister(collider);
+			continue;
 		}
+
+		if (!owner->IsActive())
+		{
+			collider->SetActive(false);
+		}
+
+		++colliderIndex;
 	}
 
-	//前回の衝突ペアリストを走査してデリートフラグが立っているコライダーを含むペアを削除
-	for (auto it = m_previousCollisionPairs.begin(); it != m_previousCollisionPairs.end();)
-	{
-		if (it->colliderA->deleteFlag() || it->colliderB->deleteFlag())
-		{
-			it = m_previousCollisionPairs.erase(it);
-		}
-		else
-		{
-			it++;
-		}
-	}
+	// Pair cleanup belongs to Unregister, while endpoints are alive. Do not
+	// inspect an old pair's deleteFlag in a later frame after its owner was freed.
 }
 
 //衝突判定処理
@@ -330,9 +392,21 @@ void CollisionSystem::UpdateCollisionState()
 }
 
 //コライダーのクリア
-void CollisionSystem::ClearColliders()
+void CollisionSystem::ClearColliders() noexcept
 {
+	// Also support clearing a still-live Scene: detach every backlink before
+	// dropping membership so a later OnDetach safely becomes a no-op.
+	for (Collider* collider : m_pCollidersList)
+	{
+		collider->ClearCollisionInfos();
+		collider->SetDetected(false);
+		collider->m_registeredCollisionSystem = nullptr;
+	}
+
 	m_pCollidersList.clear();
+	m_pNarrowPhaseColliders.clear();
+	m_currentCollisionPairs.clear();
+	m_previousCollisionPairs.clear();
 }
 
 //レイキャスト

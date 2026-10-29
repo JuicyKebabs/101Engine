@@ -28,7 +28,7 @@ ActorImprintHandle ActorImprintSystem::Load(const Guid& assetGuid)
 		return {};
 	}
 
-	AssetManagerAssetReferenceContext context(m_assets);
+	AssetManagerAssetReferenceContext context(m_assets, true);
 	const auto validation = context.Validate(assetGuid, AssetType::ActorImprint);
 
 	if (!validation)

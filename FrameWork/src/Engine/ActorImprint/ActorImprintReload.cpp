@@ -123,7 +123,7 @@ ActorImprintReloadResult ActorImprintSystem::Reload(
 		return result;
 	}
 
-	AssetManagerAssetReferenceContext assetContext(m_assets);
+	AssetManagerAssetReferenceContext assetContext(m_assets, true);
 	auto candidateDefinition = ActorImprintAssetDeserializer::Load(m_assets.GetAssetPath(change.guid), &assetContext);
 
 	if (!candidateDefinition)

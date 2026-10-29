@@ -1,3 +1,4 @@
+#include "Engine/Graphics/RenderingConversions.h"
 #include "ReflectionInspector.h"
 #include "Engine/Core/Debug/Debug.h"
 
@@ -14,6 +15,7 @@ namespace
 		bool changed = false;
 		bool committed = false;
 		bool canceled = false;
+		bool endedWithoutChange = false;
 	};
 
 	struct DisabledScope
@@ -184,7 +186,18 @@ namespace
 			break;
 		case PropertyEditorKind::Color:
 			DrawValue<Vector4>(result.value, result.changed,
-				[label](Vector4& value) { return ImGui::ColorEdit4(label, &value.x); });
+				[label](Vector4& value)
+                {
+                    Vector4 displayColor = EngineRendering::LinearToSrgb(value);
+                    const bool changed = ImGui::ColorEdit4(label, &displayColor.x);
+
+                    if (changed)
+                    {
+                        value = EngineRendering::SrgbToLinear(displayColor);
+                    }
+
+                    return changed;
+                });
 			break;
 		case PropertyEditorKind::Quaternion:
 			if (Quaternion* value = std::get_if<Quaternion>(&result.value))
@@ -288,6 +301,7 @@ namespace
 			result.began = ImGui::IsItemActivated();
 			result.canceled = ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape);
 			result.committed = ImGui::IsItemDeactivatedAfterEdit() && !result.canceled;
+			result.endedWithoutChange = ImGui::IsItemDeactivated() && !result.committed && !result.canceled;
 		}
 		else
 		{
@@ -425,6 +439,14 @@ bool ReflectionInspector::Draw(
 				succeeded = false;
 				DBG("Reflected property transaction could not be completed.");
 			}
+		}
+		else if (edit.endedWithoutChange && Matches(metadata, objectType, object, *row.property))
+		{
+			// Activation reserves the original value even for a plain click. A
+			// widget that ends without editing has no preview to restore and no
+			// command to record. Release only its matching transaction so the
+			// next property can be edited; never abandon another property's edit.
+			m_transaction.reset();
 		}
 	}
 

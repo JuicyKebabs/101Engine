@@ -2,107 +2,102 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
-#include "Engine/Resource/AssetManager.h" 
-#include "Engine/Resource/MeshManager.h" 
+#include "Engine/Resource/AssetManager.h"
+#include "Engine/Resource/RenderAssetResources.h"
+#include "Engine/Graphics/RenderingConversions.h"
 #include "Engine/Core/Context/Context.h"
-#include "Engine/UI/canvas.h"
+#include "Engine/UI/Canvas.h"
 #include "Engine/Component/RectTransform.h"
 #include <algorithm>
 #include <cmath>
-#include <utility>
 
 bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 {
-	PreparedMeshAssetState prepared;
+    PreparedMeshAssetState prepared;
+    if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+    {
+        return false;
+    }
 
-	if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
-	{
-		return false;
-	}
-
-	CommitMeshAssetState(std::move(prepared));
-	return true;
+    CommitMeshAssetState(std::move(prepared));
+    return true;
 }
 
-bool MeshRenderer::SetTextureOverrideAsset(const Guid& assetId)
+AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, PreparedMeshAssetState& output) const
 {
-	PreparedTextureOverrideState prepared;
+    PreparedMeshAssetState prepared;
+    if (!assetId.IsValid())
+    {
+        output = std::move(prepared);
+        return AssetPrepareResult::Ready;
+    }
 
-	if (PrepareTextureOverrideState(assetId, prepared) != AssetPrepareResult::Ready)
-	{
-		return false;
-	}
+    Actor* actor = GetOwner();
+    SceneBase* scene = actor ? actor->GetOwner() : nullptr;
+    const EngineContext* context = GetEngineContext();
+    if (!scene || !context || !context->pAssetManager)
+    {
+        return AssetPrepareResult::Failed;
+    }
 
-	CommitTextureOverrideState(std::move(prepared));
-	return true;
-}
+    const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
+    if (entry && entry->type != AssetType::Mesh)
+    {
+        return AssetPrepareResult::Failed;
+    }
 
-AssetPrepareResult MeshRenderer::PrepareMeshAssetState(
-	const Guid& assetId,
-	PreparedMeshAssetState& outState) const
-{
-	if (!assetId.IsValid())
-	{
-		outState = {};
-		return AssetPrepareResult::Ready;
-	}
+    // Missing files/individual failed SubMeshes are cached Invalid values.
+    // Holding/copying failure still propagates so Scene preparation can cancel.
+    SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
+    const auto& geometries = context->pAssetManager->GetGeometryInfos(*scene, assetId);
+    prepared.assetId = assetId;
+    prepared.templates.reserve(geometries.size());
+    for (const GeometryInfo& geometry : geometries)
+    {
+        SubmeshRenderTemplate renderTemplate;
+        renderTemplate.meshDesc.meshHandle = geometry.geometry;
+        renderTemplate.localToModel = geometry.localToModel;
+        renderTemplate.materialDesc.textureHandle = geometry.texture;
+        renderTemplate.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
+        if (context->pRenderAssets)
+        {
+            Vector2 uvScale = Vector2::One();
+            Vector2 uvOffset;
+            Vector2 pivot;
+            pivot.x = 0.5f;
+            pivot.y = 0.5f;
+            renderTemplate.materialDesc.description = context->pRenderAssets->MakeMaterial(true,
+                renderTemplate.materialDesc.screen, geometry.texture, uvScale, uvOffset, pivot, false, false);
+            renderTemplate.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene,
+                renderTemplate.materialDesc.description);
+        }
 
-	const EngineContext* context = GetEngineContext();
+        if (context->pRenderer)
+        {
+            rendering::GeometryData snapshot;
+            const auto queried = context->pRenderer->GetGeometryData(geometry.geometry, snapshot);
+            if (queried.IsSuccess())
+            {
+                renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
+                renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
+                renderTemplate.meshDesc.boundsRevision = snapshot.revision;
+            }
+        }
 
-	if (!context || !context->pAssetManager || !context->pMeshManager)
-	{
-		return AssetPrepareResult::Failed;
-	}
+        prepared.templates.push_back(std::move(renderTemplate));
+    }
 
-	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
-
-	if (!assetEntry)
-	{
-		return AssetPrepareResult::MissingAsset;
-	}
-
-	if (assetEntry->type != AssetType::Mesh)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	const MeshHandle meshHandle = context->pAssetManager->GetMeshHandle(assetId);
-
-	if (meshHandle == InvalidMeshHandle)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	const MeshGPU* meshGPU = context->pMeshManager->GetMeshGPU(meshHandle);
-
-	if (!meshGPU)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	const MeshMaterialInfo materialInfo = context->pMeshManager->GetMeshMaterialInfo(meshHandle);
-	SubmeshRenderTemplate renderTemplate;
-	renderTemplate.meshDesc.meshHandle = meshHandle;
-	renderTemplate.meshDesc.boundsCenter = meshGPU->GetBoundsCenter();
-	renderTemplate.meshDesc.boundsRadius = meshGPU->GetBoundsRadius();
-	renderTemplate.materialDesc.textureHandle = materialInfo.textureHandle;
-	renderTemplate.materialDesc.psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE.WithLighting();
-	renderTemplate.materialDesc.psoKey.blend = GetBlendMode();
-	renderTemplate.materialDesc.baseColor = materialInfo.materialColor;
-
-	PreparedMeshAssetState prepared;
-	prepared.assetId = assetId;
-	prepared.templates = { std::move(renderTemplate) };
-	outState = std::move(prepared);
-	return AssetPrepareResult::Ready;
+    acquisition.Commit();
+    output = std::move(prepared);
+    return AssetPrepareResult::Ready;
 }
 
 void MeshRenderer::CommitMeshAssetState(PreparedMeshAssetState&& state)
 {
-	m_meshAssetId = state.assetId;
-	m_templates.swap(state.templates);
-	m_pendingMeshAssetId.reset();
-	m_isProxyDirty = true;
+    m_meshAssetId = state.assetId;
+    m_templates.swap(state.templates);
+    m_pendingMeshAssetId.reset();
+    m_isProxyDirty = true;
 }
 
 Guid MeshRenderer::GetAssetId() const
@@ -232,61 +227,31 @@ void MeshRenderer::RebuildRenderProxy()
 		}
 	}
 
-	m_proxy.textureOverrideHandle = m_textureOverrideHandle;
 }
 
+// Resolve the existing generic SceneLoader route before publication. Asset
+// availability failure is a display fallback; wrong ownership/type remains failure.
 bool MeshRenderer::ResolveReferences(SceneBase& scene)
 {
-	if (!m_pendingMeshAssetId && !m_pendingTextureOverrideAssetId)
-	{
-		return true;
-	}
+    if (!m_pendingMeshAssetId)
+    {
+        return true;
+    }
 
-	// Check if the owner actor is valid and belongs to the given scene
-	Actor* owner = GetOwner();
+    Actor* actor = GetOwner();
+    if (!actor || actor->GetOwner() != &scene)
+    {
+        return false;
+    }
 
-	if (!owner || owner->GetOwner() != &scene)
-	{
-		return false;
-	}
+    PreparedMeshAssetState prepared;
+    if (PrepareMeshAssetState(*m_pendingMeshAssetId, prepared) != AssetPrepareResult::Ready)
+    {
+        return false;
+    }
 
-	PreparedMeshAssetState preparedMesh;
-	AssetPrepareResult meshResult = AssetPrepareResult::Ready;
-
-	if (m_pendingMeshAssetId)
-	{
-		meshResult = PrepareMeshAssetState(*m_pendingMeshAssetId, preparedMesh);
-
-		if (meshResult == AssetPrepareResult::Failed)
-		{
-			return false;
-		}
-	}
-
-	PreparedTextureOverrideState preparedTexture;
-	AssetPrepareResult textureResult = AssetPrepareResult::Ready;
-
-	if (m_pendingTextureOverrideAssetId)
-	{
-		textureResult = PrepareTextureOverrideState(*m_pendingTextureOverrideAssetId, preparedTexture);
-
-		if (textureResult == AssetPrepareResult::Failed)
-		{
-			return false;
-		}
-	}
-
-	if (m_pendingMeshAssetId && meshResult == AssetPrepareResult::Ready)
-	{
-		CommitMeshAssetState(std::move(preparedMesh));
-	}
-
-	if (m_pendingTextureOverrideAssetId && textureResult == AssetPrepareResult::Ready)
-	{
-		CommitTextureOverrideState(std::move(preparedTexture));
-	}
-
-	return true;
+    CommitMeshAssetState(std::move(prepared));
+    return true;
 }
 
 Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
@@ -306,9 +271,12 @@ Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 		{
 			const MeshDesc& meshDesc = renderTemplate.meshDesc;
 
-			// Build a sphere around the Actor origin that contains
-			// the submesh's own bounding sphere.
-			const float radiusFromOrigin = meshDesc.boundsCenter.Length() + meshDesc.boundsRadius;
+            // Include each model node placement without changing the legacy
+            // unit-transform fit scale. The norm bound also covers node shear.
+            const Matrix4x4& placement = renderTemplate.localToModel;
+            const Vector3 centerInModel = placement.TransformPoint(meshDesc.boundsCenter);
+            const float radiusFromOrigin = centerInModel.Length()
+                + meshDesc.boundsRadius * EngineRendering::ConservativeLinearScale(placement);
 
 			modelRadius = (std::max)(modelRadius, radiusFromOrigin);
 		}
@@ -339,7 +307,11 @@ Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 AssetReference<MeshAsset> MeshRenderer::GetMeshAssetReference() const
 {
 	AssetReference<MeshAsset> value;
-	value.SetValue({ GetAssetId(), AssetType::Mesh, m_meshAssetId.IsValid() });
+	AssetReferenceValue reference;
+    reference.guid = GetAssetId();
+    reference.expectedType = AssetType::Mesh;
+    reference.resolved = m_meshAssetId.IsValid();
+    value.SetValue(reference);
 	return value;
 }
 
@@ -380,115 +352,47 @@ bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& val
 	return true;
 }
 
-AssetPrepareResult MeshRenderer::PrepareTextureOverrideState(
-	const Guid& assetId,
-	PreparedTextureOverrideState& outState) const
+// Called inside the existing extraction walk immediately before Submit.
+// This is not a second whole-Scene scan or a GPU readiness polling operation.
+bool MeshRenderer::SynchronizeRenderResources()
 {
-	if (!assetId.IsValid())
-	{
-		outState = {};
-		return AssetPrepareResult::Ready;
-	}
+    const EngineContext* context = GetEngineContext();
+    if (!context || !context->pRenderer)
+    {
+        return true;
+    }
 
-	const EngineContext* context = GetEngineContext();
+    const bool screen = GetRenderSpace() == RenderSpace::Screen;
+    for (SubmeshRenderTemplate& renderTemplate : m_templates)
+    {
+        rendering::GeometryData snapshot;
+        const auto queried = context->pRenderer->GetGeometryData(renderTemplate.meshDesc.meshHandle, snapshot);
+        if (queried.IsSuccess() && snapshot.revision != renderTemplate.meshDesc.boundsRevision)
+        {
+            renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
+            renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
+            renderTemplate.meshDesc.boundsRevision = snapshot.revision;
+            m_isProxyDirty = true;
+        }
+        else if (!queried.IsSuccess())
+        {
+            renderTemplate.meshDesc.boundsRevision = 0;
+        }
 
-	if (!context || !context->pAssetManager || !context->pTextureManager)
-	{
-		return AssetPrepareResult::Failed;
-	}
+        if (context->pRenderAssets && renderTemplate.materialDesc.screen != screen)
+        {
+            auto description = renderTemplate.materialDesc.description;
+            description.pipeline = context->pRenderAssets->MeshPipeline(screen);
+            const auto updated = context->pRenderer->UpdateMaterial(renderTemplate.materialDesc.handle, description);
+            if (!updated.IsSuccess())
+            {
+                return false;
+            }
 
-	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
+            renderTemplate.materialDesc.description = std::move(description);
+            renderTemplate.materialDesc.screen = screen;
+        }
+    }
 
-	if (!assetEntry)
-	{
-		return AssetPrepareResult::MissingAsset;
-	}
-
-	if (assetEntry->type != AssetType::Texture)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
-
-	if (textureHandle == InvalidTextureHandle)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	outState.assetId = assetId;
-	outState.textureHandle = textureHandle;
-	return AssetPrepareResult::Ready;
-}
-
-void MeshRenderer::CommitTextureOverrideState(PreparedTextureOverrideState&& state)
-{
-	m_textureOverrideAssetId = state.assetId;
-	m_textureOverrideHandle = state.textureHandle;
-	m_pendingTextureOverrideAssetId.reset();
-	m_isProxyDirty = true;
-}
-
-Guid MeshRenderer::GetTextureOverrideAssetId() const
-{
-	if (m_textureOverrideAssetId.IsValid())
-	{
-		return m_textureOverrideAssetId;
-	}
-
-	return m_pendingTextureOverrideAssetId.value_or(Guid{});
-}
-
-AssetReference<TextureAsset> MeshRenderer::GetTextureOverrideAssetReference() const
-{
-	AssetReference<TextureAsset> value;
-	value.SetValue({ GetTextureOverrideAssetId(), AssetType::Texture,
-		m_textureOverrideAssetId.IsValid() });
-	return value;
-}
-
-bool MeshRenderer::SetPendingTextureOverrideAssetReference(
-	const AssetReference<TextureAsset>& value)
-{
-	m_textureOverrideAssetId = {};
-	m_textureOverrideHandle = InvalidTextureHandle;
-	m_pendingTextureOverrideAssetId.reset();
-
-	if (value.HasValue())
-	{
-		m_pendingTextureOverrideAssetId = value.GetGuid();
-	}
-
-	m_isProxyDirty = true;
-	return true;
-}
-
-bool MeshRenderer::TrySetTextureOverrideAssetReference(
-	const AssetReference<TextureAsset>& value)
-{
-	Actor* owner = GetOwner();
-
-	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
-	{
-		return SetPendingTextureOverrideAssetReference(value);
-	}
-
-	PreparedTextureOverrideState prepared;
-	const Guid assetId = value.HasValue() ? value.GetGuid() : Guid{};
-
-	if (PrepareTextureOverrideState(assetId, prepared) != AssetPrepareResult::Ready)
-	{
-		return false;
-	}
-
-	CommitTextureOverrideState(std::move(prepared));
-	return true;
-}
-
-void MeshRenderer::ApplyBlendModeToRenderTemplates()
-{
-	for (SubmeshRenderTemplate& renderTemplate : m_templates)
-	{
-		renderTemplate.materialDesc.psoKey.blend = GetBlendMode();
-	}
+    return true;
 }

@@ -1,11 +1,10 @@
 # GameCode
 
+# Source additions/removals are collected during configure. Configure and
+# rebuild after those changes so MSBuild reloads sources and generated exports.
+# A directory is not an input file; registering it causes MSB8064 warnings.
 file(GLOB_RECURSE GAMECODE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
-)
-
-set_property(DIRECTORY APPEND PROPERTY
-    CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 add_library(GameCode SHARED ${GAMECODE_SOURCES})

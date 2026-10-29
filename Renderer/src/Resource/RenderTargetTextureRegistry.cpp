@@ -38,6 +38,7 @@ ResourceRegistrationResult<RenderTargetTextureHandle> RenderTargetTextureRegistr
 	try
 	{
 		auto candidate = std::make_unique<RenderTargetTextureContent>();
+        candidate->creationDescription = description;
 		candidate->gpuData = std::make_unique<backend::RenderTargetTextureGpuData>();
 		registration.result = candidate->gpuData->Initialize(device, description);
 		if (!registration.result.IsSuccess())
@@ -113,12 +114,15 @@ Result RenderTargetTextureRegistry::Resize(
 
 	try
 	{
-		RenderTargetTextureDesc description;
-		description.width = width;
-		description.height = height;
+        // Copy the complete policy before touching the live owner. In particular,
+        // a numeric Mask must not silently inherit the normal background hint.
+        RenderTargetTextureDesc description = current->creationDescription;
+        description.width = width;
+        description.height = height;
 
 		auto candidate = std::make_unique<RenderTargetTextureContent>();
 		candidate->revision = current->revision + 1;
+        candidate->creationDescription = description;
 		candidate->gpuData = std::make_unique<backend::RenderTargetTextureGpuData>();
 		Result prepared = candidate->gpuData->Initialize(device, description);
 		if (!prepared.IsSuccess())
@@ -188,6 +192,18 @@ Result RenderTargetTextureRegistry::QueryInfo(RenderTargetTextureHandle handle, 
 	RenderTargetTextureInfo information;
 	information.width = current->gpuData->width;
 	information.height = current->gpuData->height;
+    switch (current->gpuData->viewFormat)
+    {
+    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+        information.format = TextureFormat::RGBA8_sRGB;
+        break;
+    case DXGI_FORMAT_R16G16B16A16_FLOAT:
+        information.format = TextureFormat::RGBA16_Float;
+        break;
+    default:
+        information.format = TextureFormat::RGBA8_UNorm;
+        break;
+    }
 	information.revision = current->revision;
 	information.contentsValid = current->gpuData->contentsValid;
 	output = information;

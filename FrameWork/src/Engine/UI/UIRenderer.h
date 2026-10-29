@@ -19,7 +19,7 @@ struct UIRendererProxy
 class UIRenderer : public RendererComponent
 {
 public:
-	UIRenderer() : RendererComponent(BlendMode::Alpha) {}
+	UIRenderer() = default;
 	~UIRenderer() = default;
 
 	void InvalidateRenderProxy() { m_isProxyDirty = true; }	// Mark the render proxy as dirty
@@ -29,21 +29,25 @@ public:
 	{
 		m_uvScale = uvScale;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetUVOffset(const Vector2& uvOffset)
 	{
 		m_uvOffset = uvOffset;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetFlipX(bool flip)
 	{
 		m_flipX = flip;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetFlipY(bool flip)
 	{
 		m_flipY = flip;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 
 	// Getters
@@ -66,6 +70,7 @@ public:
 	{
 		SetSortOrderInCanvas(order);
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 
 	Canvas* GetCanvas() const { return GetGoverningCanvas(); }
@@ -75,8 +80,10 @@ public:
 
 	// Serialization and deserialization methods
 	bool ResolveReferences(SceneBase& scene) override;
+    bool SynchronizeRenderResources() override;
 
 protected:
+    bool m_materialDirty = false;
 	UIRenderTemplate m_renderTemplate;	// Render template containing static rendering information for this UI element
 	UIRendererProxy m_renderProxy;		// Render proxy containing dynamic rendering information for this UI element
 
@@ -96,7 +103,6 @@ private:
 	void LateUpdateOverride(float deltaTime) override;
 	void OnDetachOverride() override;
 	void OnDestroyOverride() override;
-	void ApplyBlendModeToRenderTemplates() override;
 
 	void RebuildRenderProxy();		// Rebuild the render proxy based on the current state of the component (e.g., transform, color, UV settings)
 	void InitialRegistration();		// Register this UI renderer with the canvas for sorting and rendering

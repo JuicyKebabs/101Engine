@@ -14,6 +14,11 @@ template <class Handle, class Content>
 class VersionedRegistry
 {
 public:
+    std::string DescribeUnavailable(Handle handle) const
+    {
+        return DescribeResourceIdentity(handle, m_slots.ValidateForNewUse(handle));
+    }
+
 	explicit VersionedRegistry(std::uint32_t owner) : m_slots(owner) {}
 
 	ResourceRegistrationResult<Handle> Register(std::unique_ptr<Content> candidate)

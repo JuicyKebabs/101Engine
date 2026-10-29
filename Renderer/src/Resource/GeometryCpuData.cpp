@@ -1,6 +1,8 @@
 #include "GeometryCpuData.h"
 
 #include <cmath>
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -12,6 +14,62 @@ namespace rendering::detail
 
 namespace
 {
+
+// A conservative sphere around the local-space AABB also encloses every
+// indexed/unindexed vertex. Use double intermediates to avoid float addition
+// overflow when individually finite positions are close to FLT_MAX.
+Result CalculateBounds(GeometryCpuData& data)
+{
+    std::array<double, 3> minimum;
+    std::array<double, 3> maximum;
+    minimum.fill((std::numeric_limits<double>::max)());
+    maximum.fill((std::numeric_limits<double>::lowest)());
+
+    for (const MeshVertex& vertex : data.vertices)
+    {
+        const std::array<double, 3> position{ vertex.position.x, vertex.position.y, vertex.position.z };
+        for (std::size_t axis = 0; axis < position.size(); ++axis)
+        {
+            minimum[axis] = (std::min)(minimum[axis], position[axis]);
+            maximum[axis] = (std::max)(maximum[axis], position[axis]);
+        }
+    }
+
+    Vector3 center;
+    center.x = static_cast<float>((minimum[0] + maximum[0]) * 0.5);
+    center.y = static_cast<float>((minimum[1] + maximum[1]) * 0.5);
+    center.z = static_cast<float>((minimum[2] + maximum[2]) * 0.5);
+
+    // Calculate from the rounded center that the caller will actually receive.
+    // This includes the center's float conversion error in the radius.
+    double radius = 0;
+    for (const MeshVertex& vertex : data.vertices)
+    {
+        const double horizontal = static_cast<double>(vertex.position.x) - center.x;
+        const double vertical = static_cast<double>(vertex.position.y) - center.y;
+        const double depth = static_cast<double>(vertex.position.z) - center.z;
+        const double distance = std::hypot(horizontal, vertical, depth);
+        radius = (std::max)(radius, distance);
+    }
+
+    float roundedRadius = static_cast<float>(radius);
+    if (static_cast<double>(roundedRadius) < radius)
+    {
+        roundedRadius = std::nextafter(roundedRadius, (std::numeric_limits<float>::infinity)());
+    }
+
+    if (!std::isfinite(roundedRadius))
+    {
+        Result failure;
+        failure.succeeded = false;
+        failure.message = "Geometry local Bounds cannot be represented by a finite float sphere.";
+        return failure;
+    }
+
+    data.boundsCenter = center;
+    data.boundsRadius = roundedRadius;
+    return {};
+}
 
 Result ValidateGeometryDesc(const GeometryDesc& desc)
 {
@@ -89,7 +147,15 @@ Result CopyGeometryCpuData(const GeometryDesc& desc, GeometryCpuData& output)
 			copied.indices.assign(desc.indices.begin(), desc.indices.end());
 		}
 
-		// Commit only after the copy to temporary storage is successful.
+        Result boundsResult = CalculateBounds(copied);
+        if (!boundsResult.IsSuccess())
+        {
+            return boundsResult;
+        }
+
+        // Commit only after CPU copy and matching Bounds are both complete.
+        output.boundsCenter = copied.boundsCenter;
+        output.boundsRadius = copied.boundsRadius;
 		output.vertices.swap(copied.vertices);
 		output.indices.swap(copied.indices);
 		output.topology = copied.topology;

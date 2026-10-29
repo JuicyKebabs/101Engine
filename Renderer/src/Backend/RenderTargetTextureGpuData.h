@@ -30,6 +30,7 @@ public:
 	// contentsValid independently tracks whether Clear/Draw has established readable pixel contents.
 	D3D12_RESOURCE_STATES submittedState = D3D12_RESOURCE_STATE_COMMON;
 	bool contentsValid = false;
+	DXGI_FORMAT viewFormat = DXGI_FORMAT_UNKNOWN;
 	std::uint32_t width = 0;
 	std::uint32_t height = 0;
 

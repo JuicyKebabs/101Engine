@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <span>
+#include <string>
 
 //--------------------------------------------------------------------------------------------------------
 // Resource handle validation
@@ -27,6 +28,32 @@ enum class ResourceHandleValidationResult
 	DestroyRequested,
 	DestroyNotRequested
 };
+
+// A diagnostic describes the rejected public identity; substitution never
+// rewrites that identity into a valid registration or hides its failure cause.
+inline const char* ResourceValidationName(ResourceHandleValidationResult result) noexcept
+{
+    switch (result)
+    {
+    case ResourceHandleValidationResult::Success: return "identity valid; Content unavailable";
+    case ResourceHandleValidationResult::InvalidHandle: return "initial Invalid handle";
+    case ResourceHandleValidationResult::OwnerMismatch: return "different Renderer owner";
+    case ResourceHandleValidationResult::SlotOutOfRange: return "slot out of range";
+    case ResourceHandleValidationResult::SlotNotRegistered: return "registration released";
+    case ResourceHandleValidationResult::GenerationMismatch: return "stale generation";
+    case ResourceHandleValidationResult::DestroyRequested: return "Destroy requested";
+    case ResourceHandleValidationResult::DestroyNotRequested: return "Destroy not requested";
+    }
+
+    return "unknown identity state";
+}
+
+template<class Handle>
+std::string DescribeResourceIdentity(Handle handle, ResourceHandleValidationResult result)
+{
+    return std::string(ResourceValidationName(result)) + " (owner=" + std::to_string(handle.ownerId)
+        + ", slot=" + std::to_string(handle.slotIndex) + ", generation=" + std::to_string(handle.generation) + ")";
+}
 
 template<class Tag>
 [[nodiscard]]

@@ -26,6 +26,8 @@ add_library(101Renderer SHARED
     src/FrameDrawContext.cpp
     src/Resource/ShaderData.cpp
     src/DrawSystem.cpp
+    src/FallbackResources.cpp
+    src/SceneFrameResources.cpp
     src/Graph/FrameTextureResolver.cpp
     src/Graph/FrameResourceBindings.cpp
     src/Backend/RenderTargetTextureGpuData.cpp
@@ -43,6 +45,7 @@ target_include_directories(101Renderer
     # Renderer内部でのみ使用
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated"
         "${CMAKE_CURRENT_SOURCE_DIR}/third_party/directX/d3dx12"
 )
 
@@ -86,8 +89,8 @@ endif()
 set(R4_SHADER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 set(R4_SHADER_OUTPUTS "")
 
-foreach(R4_SHADER MeshVS ColorPS TexturePS ExtraPS LitPS)
-    if(R4_SHADER STREQUAL "MeshVS")
+foreach(R4_SHADER MeshVS FullscreenVS ColorPS TexturePS ExtraPS LitPS DisplayPS)
+    if(R4_SHADER STREQUAL "MeshVS" OR R4_SHADER STREQUAL "FullscreenVS")
         set(R4_PROFILE vs_5_0)
     else()
         set(R4_PROFILE ps_5_0)
@@ -99,7 +102,7 @@ foreach(R4_SHADER MeshVS ColorPS TexturePS ExtraPS LitPS)
         OUTPUT "${R4_OUTPUT}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${R4_SHADER_DIRECTORY}"
         COMMAND "${RENDERER_FXC}" /nologo /T ${R4_PROFILE} /E main /Fo "${R4_OUTPUT}" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${R4_SHADER}.hlsl"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${R4_SHADER}.hlsl" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${R4_SHADER}.hlsl" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MaterialParams.hlsli"
         VERBATIM)
 
     list(APPEND R4_SHADER_OUTPUTS "${R4_OUTPUT}")
@@ -107,3 +110,25 @@ foreach(R4_SHADER MeshVS ColorPS TexturePS ExtraPS LitPS)
 endforeach()
 
 add_custom_target(RendererShaderAssets DEPENDS ${R4_SHADER_OUTPUTS})
+# R8 CPU contract check: use the exported API without relying on upload readiness.
+if(BUILD_TESTING)
+    add_executable(RendererGeometryDataTests tests/GeometryDataTests.cpp)
+    target_compile_definitions(RendererGeometryDataTests PRIVATE NOMINMAX)
+    target_link_libraries(RendererGeometryDataTests PRIVATE 101Renderer)
+    add_test(NAME Renderer.GeometryData COMMAND RendererGeometryDataTests)
+endif()
+
+# Embed the private GPU programs so Renderer initialization has no asset path.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli" R8_COMMON)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MaterialParams.hlsli" R8_MATERIAL_PARAMS)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MeshVS.hlsl" R8_BUILTIN_MESH)
+string(REPLACE "#include \"Common.hlsli\"" "${R8_COMMON}" R8_BUILTIN_MESH "${R8_BUILTIN_MESH}")
+string(REPLACE "#include \"MaterialParams.hlsli\"" "${R8_MATERIAL_PARAMS}" R8_BUILTIN_MESH "${R8_BUILTIN_MESH}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/FullscreenVS.hlsl" R8_BUILTIN_FULLSCREEN)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" R8_DISPLAY_FUNCTIONS)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayPS.hlsl" R8_BUILTIN_DISPLAY)
+string(REPLACE "#include \"DisplayTransform.hlsli\"" "${R8_DISPLAY_FUNCTIONS}" R8_BUILTIN_DISPLAY "${R8_BUILTIN_DISPLAY}")
+configure_file(src/BuiltinShaderSources.h.in generated/BuiltinShaderSources.h @ONLY)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    shaders/Common.hlsli shaders/MaterialParams.hlsli shaders/MeshVS.hlsl shaders/FullscreenVS.hlsl
+    shaders/DisplayTransform.hlsli shaders/DisplayPS.hlsl)

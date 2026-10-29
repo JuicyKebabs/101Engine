@@ -1,5 +1,6 @@
 #pragma once
 #include "SceneBase.h"
+#include "Engine/Resource/SceneAssetUsage.h"
 
 // Internal construction transaction. The candidate uses the ordinary Scene's
 // pool, hierarchy and reference lookup. No candidate callback may retain its
@@ -27,6 +28,7 @@ private:
 
 	SceneBase& m_destination;
 	SceneBase m_candidate;
+    std::unique_ptr<PreparedSceneAssetTransfer> m_assetTransfer;
 	std::vector<ActorHandle> m_handles;
 	std::unordered_map<Guid, ActorHandle> m_guidMap;
 	std::unordered_map<ActorHandle, Guid> m_handleMap;

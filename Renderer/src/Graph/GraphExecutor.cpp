@@ -32,7 +32,12 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 	}
 
 	// Resource description validation
-	const auto native = resource->GetDesc();
+    const auto native = resource->GetDesc();
+    const bool srgbBackBufferView = native.Format == DXGI_FORMAT_R8G8B8A8_UNORM &&
+        texture.ViewFormat() == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    const bool typelessDepthView = native.Format == DXGI_FORMAT_R32_TYPELESS &&
+        texture.ViewFormat() == DXGI_FORMAT_D32_FLOAT;
+    const bool compatibleViewFormat = native.Format == texture.ViewFormat() || srgbBackBufferView || typelessDepthView;
 
 	if (native.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D || native.Width == 0 ||
 		native.Height == 0 || native.Width > static_cast<UINT64>(D3D12_VIEWPORT_BOUNDS_MAX) ||
@@ -44,7 +49,7 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 		(texture.srv.ptr && (native.Flags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE)) ||
 		((texture.Rtv().ptr || texture.dsv.ptr) && native.MipLevels != 1) ||
 		(native.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) ||
-		native.Format != texture.ViewFormat())
+        !compatibleViewFormat)
 	{
 		return { false, "DescribeTexture: unsupported native texture extent, flags, format or sample conditions." };
 	}
@@ -56,6 +61,10 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 
 	case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
 		desc.format = GraphTextureFormat::RGBA8_sRGB; break;
+
+	case DXGI_FORMAT_R16G16B16A16_FLOAT:
+        desc.format = GraphTextureFormat::RGBA16_Float;
+        break;
 
 	case DXGI_FORMAT_D32_FLOAT:
 		desc.format = GraphTextureFormat::D32_Float;

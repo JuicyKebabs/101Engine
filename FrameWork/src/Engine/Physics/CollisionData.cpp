@@ -4,69 +4,69 @@
 
 using namespace DirectX;
 
-//ƒRƒŠƒWƒ‡ƒ“ƒŒƒCƒ„[‚ğƒrƒbƒgƒ}ƒXƒN‚É•ÏŠ·‚·‚éŠÖ”
+//ã‚³ãƒªã‚¸ãƒ§ãƒ³ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‚’ãƒ“ãƒƒãƒˆãƒã‚¹ã‚¯ã«å¤‰æ›ã™ã‚‹é–¢æ•°
 LayerMask LayerToBit(CollisionLayer layer)
 {
 	return static_cast<LayerMask>(1 << static_cast<uint32_t>(layer));
 }
 
-//ƒRƒŠƒWƒ‡ƒ“ƒŒƒCƒ„[‚©‚çƒŒƒCƒ„[ƒ}ƒXƒN‚ğæ“¾‚·‚éŠÖ”
+//ã‚³ãƒªã‚¸ãƒ§ãƒ³ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‹ã‚‰ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒã‚¹ã‚¯ã‚’å–å¾—ã™ã‚‹é–¢æ•°
 LayerMask MakeLayerMask(CollisionLayer layer)
 {
 	switch (layer)
-	{//ƒRƒŠƒWƒ‡ƒ“ƒŒƒCƒ„[‚²‚Æ‚É“–‚½‚è”»’è‚ğs‚¤ƒŒƒCƒ„[ƒ}ƒXƒN‚ğİ’è
+	{//ã‚³ãƒªã‚¸ãƒ§ãƒ³ãƒ¬ã‚¤ãƒ¤ãƒ¼ã”ã¨ã«å½“ãŸã‚Šåˆ¤å®šã‚’è¡Œã†ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒã‚¹ã‚¯ã‚’è¨­å®š
 	case CollisionLayer::Default:
 		return MakeMask({
-			CollisionLayer::Default,		//ƒfƒtƒHƒ‹ƒgƒŒƒCƒ„[
-			CollisionLayer::PLAYER,			//ƒvƒŒƒCƒ„[ƒŒƒCƒ„[
-			CollisionLayer::ENEMY,			//ƒGƒlƒ~[ƒŒƒCƒ„[
-			CollisionLayer::WALL,			//•ÇƒŒƒCƒ„[
-			CollisionLayer::PLAYER_BULLET,	//ƒvƒŒƒCƒ„[ƒuƒŒƒbƒgƒŒƒCƒ„[
-			CollisionLayer::PLAYER_RAY,		//ƒvƒŒƒCƒ„[ƒŒƒCƒLƒƒƒXƒgƒŒƒCƒ„[
-			CollisionLayer::ENEMY_BULLET	//ƒGƒlƒ~[ƒuƒŒƒbƒgƒŒƒCƒ„[
+			CollisionLayer::Default,		//ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER,			//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::ENEMY,			//ã‚¨ãƒãƒŸãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::WALL,			//å£ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER_BULLET,	//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ–ãƒ¬ãƒƒãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER_RAY,		//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::ENEMY_BULLET	//ã‚¨ãƒãƒŸãƒ¼ãƒ–ãƒ¬ãƒƒãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 	case CollisionLayer::PLAYER:
 		return MakeMask({
-			CollisionLayer::ENEMY,				//ƒGƒlƒ~[ƒŒƒCƒ„[
-			CollisionLayer::WALL,				//•ÇƒŒƒCƒ„[
-			CollisionLayer::ENEMY_BULLET		//ƒGƒlƒ~[ƒuƒŒƒbƒgƒŒƒCƒ„[
+			CollisionLayer::ENEMY,				//ã‚¨ãƒãƒŸãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::WALL,				//å£ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::ENEMY_BULLET		//ã‚¨ãƒãƒŸãƒ¼ãƒ–ãƒ¬ãƒƒãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 
 	case CollisionLayer::ENEMY:
 		return MakeMask({
-			CollisionLayer::PLAYER,			//ƒvƒŒƒCƒ„[ƒŒƒCƒ„[
-			CollisionLayer::PLAYER_BULLET,		//ƒvƒŒƒCƒ„[ƒuƒŒƒbƒgƒŒƒCƒ„[
-			CollisionLayer::PLAYER_RAY			//ƒvƒŒƒCƒ„[ƒŒƒCƒLƒƒƒXƒgƒŒƒCƒ„[
+			CollisionLayer::PLAYER,			//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER_BULLET,		//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ–ãƒ¬ãƒƒãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER_RAY			//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 
 	case CollisionLayer::WALL:
 		return MakeMask({
-			CollisionLayer::PLAYER,			//ƒvƒŒƒCƒ„[ƒŒƒCƒ„[
-			CollisionLayer::PLAYER_BULLET,		//ƒvƒŒƒCƒ„[ƒuƒŒƒbƒgƒŒƒCƒ„[
-			CollisionLayer::PLAYER_RAY			//ƒvƒŒƒCƒ„[ƒŒƒCƒLƒƒƒXƒgƒŒƒCƒ„[
+			CollisionLayer::PLAYER,			//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER_BULLET,		//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ–ãƒ¬ãƒƒãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::PLAYER_RAY			//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 
 	case CollisionLayer::PLAYER_BULLET:
 		return MakeMask({
-			CollisionLayer::ENEMY,				//ƒGƒlƒ~[ƒŒƒCƒ„[
-			CollisionLayer::WALL				//•ÇƒŒƒCƒ„[
+			CollisionLayer::ENEMY,				//ã‚¨ãƒãƒŸãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::WALL				//å£ãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 
 	case CollisionLayer::PLAYER_RAY:
 		return MakeMask({
-			CollisionLayer::ENEMY,				//ƒGƒlƒ~[ƒŒƒCƒ„[
-			CollisionLayer::WALL				//•ÇƒŒƒCƒ„[
+			CollisionLayer::ENEMY,				//ã‚¨ãƒãƒŸãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
+			CollisionLayer::WALL				//å£ãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 
 	case CollisionLayer::ENEMY_BULLET:
 		return MakeMask({
-			CollisionLayer::PLAYER,			//ƒvƒŒƒCƒ„[ƒŒƒCƒ„[
+			CollisionLayer::PLAYER,			//ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒ¬ã‚¤ãƒ¤ãƒ¼
 			});
 		break;
 
@@ -78,55 +78,55 @@ LayerMask MakeLayerMask(CollisionLayer layer)
 	}
 }
 
-//•¡”‚ÌƒRƒŠƒWƒ‡ƒ“ƒŒƒCƒ„[‚©‚çƒŒƒCƒ„[ƒ}ƒXƒN‚ğì¬‚·‚éŠÖ”
+//è¤‡æ•°ã®ã‚³ãƒªã‚¸ãƒ§ãƒ³ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‹ã‚‰ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒã‚¹ã‚¯ã‚’ä½œæˆã™ã‚‹é–¢æ•°
 LayerMask MakeMask(std::initializer_list<CollisionLayer> layers)
 {
-	LayerMask mask = 0; //ƒŒƒCƒ„[ƒ}ƒXƒN
+	LayerMask mask = 0; //ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒã‚¹ã‚¯
 
 	for (auto layer : layers)
 	{
-		mask |= LayerToBit(layer); //ƒrƒbƒgƒ}ƒXƒN‚ğ‡¬
+		mask |= LayerToBit(layer); //ãƒ“ãƒƒãƒˆãƒã‚¹ã‚¯ã‚’åˆæˆ
 	}
 
-	return mask;	//ƒŒƒCƒ„[ƒ}ƒXƒN‚ğ•Ô‚·
+	return mask;	//ãƒ¬ã‚¤ãƒ¤ãƒ¼ãƒã‚¹ã‚¯ã‚’è¿”ã™
 }
 
-//ŠÑ“ü[‚³‚©‚ç‰Ÿ‚µo‚µƒxƒNƒgƒ‹‚ğæ“¾‚·‚éŠÖ”
+//è²«å…¥æ·±ã•ã‹ã‚‰æŠ¼ã—å‡ºã—ãƒ™ã‚¯ãƒˆãƒ«ã‚’å–å¾—ã™ã‚‹é–¢æ•°
 DirectX::XMFLOAT3 GetPushOutVector(
-	std::vector<ObjectCollisionInfo>& infos,	//Õ“Ëî•ñ”z—ñ
-	const std::initializer_list<TagId>& tagList	//‰Ÿ‚µo‚µƒxƒNƒgƒ‹‚ğŒvZ‚·‚é‘ÎÛ‚Ìƒ^ƒOƒŠƒXƒg
+	std::vector<ObjectCollisionInfo>& infos,	//è¡çªæƒ…å ±é…åˆ—
+	const std::initializer_list<TagId>& tagList	//æŠ¼ã—å‡ºã—ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨ˆç®—ã™ã‚‹å¯¾è±¡ã®ã‚¿ã‚°ãƒªã‚¹ãƒˆ
 )
 {
 	using namespace DirectX;
 
-	XMFLOAT3 total{ 0,0,0 };	//Å‘å‰Ÿ‚µo‚µƒxƒNƒgƒ‹
-	float epsilon = 0.0001f;	//Œë·‹–—e’l
+	XMFLOAT3 total{ 0,0,0 };	//æœ€å¤§æŠ¼ã—å‡ºã—ãƒ™ã‚¯ãƒˆãƒ«
+	float epsilon = 0.0001f;	//èª¤å·®è¨±å®¹å€¤
 
-	std::vector<ObjectCollisionInfo*> cands;	//Õ“Ëî•ñ”z—ñ‚ğƒ‹[ƒv
+	std::vector<ObjectCollisionInfo*> cands;	//è¡çªæƒ…å ±é…åˆ—ã‚’ãƒ«ãƒ¼ãƒ—
 
 	for (auto& info : infos)
 	{
-		//Õ“ËI—¹‚Í–³‹
+		//è¡çªçµ‚äº†ã¯ç„¡è¦–
 		if (info.state == COLLISION_STATE::COLLISION_EXIT)
 		{
 			continue;
 		}
 
-		TagId opponentTag = info.opponent->GetTag();	//Õ“Ë‘Šè‚Ìƒ^ƒOæ“¾
+		TagId opponentTag = info.opponent->GetTag();	//è¡çªç›¸æ‰‹ã®ã‚¿ã‚°å–å¾—
 
-		//Õ“Ë‘Šè‚Ìƒ^ƒO‚ªƒŠƒXƒg‚ÉŠÜ‚Ü‚ê‚Ä‚¢‚é‚©Šm”F
+		//è¡çªç›¸æ‰‹ã®ã‚¿ã‚°ãŒãƒªã‚¹ãƒˆã«å«ã¾ã‚Œã¦ã„ã‚‹ã‹ç¢ºèª
 		if (std::find(tagList.begin(), tagList.end(), opponentTag) == tagList.end())
 		{
 			continue;
 		}
 
-		cands.push_back(&info);	//Œó•âƒŠƒXƒg‚É’Ç‰Á
+		cands.push_back(&info);	//å€™è£œãƒªã‚¹ãƒˆã«è¿½åŠ 
 	}
 
 	auto begin = cands.begin();
 	auto end = cands.end();
 
-	//ŠÑ“ü[‚³‚Ì‘å‚«‚¢‡‚Éƒ\[ƒg
+	//è²«å…¥æ·±ã•ã®å¤§ãã„é †ã«ã‚½ãƒ¼ãƒˆ
 	std::sort(cands.begin(), cands.end(),
 		[](const ObjectCollisionInfo* a, const ObjectCollisionInfo* b)
 		{
@@ -134,11 +134,11 @@ DirectX::XMFLOAT3 GetPushOutVector(
 		}
 	);
 
-	const int REPEAT_MAX = 5;	//Å‘åŒJ‚è•Ô‚µ‰ñ”
+	const int REPEAT_MAX = 5;	//æœ€å¤§ç¹°ã‚Šè¿”ã—å›æ•°
 
 	for (int i = 0; i < REPEAT_MAX; i++)
 	{
-		bool any = false;	//‰Ÿ‚µo‚µ‚ª”­¶‚µ‚½‚©‚Ç‚¤‚©
+		bool any = false;	//æŠ¼ã—å‡ºã—ãŒç™ºç”Ÿã—ãŸã‹ã©ã†ã‹
 
 		for (auto pInfo : cands)
 		{
@@ -156,27 +156,27 @@ DirectX::XMFLOAT3 GetPushOutVector(
 				continue;
 			}
 
-			// ‰Ÿ‚µo‚µ•ûŒü‚¾‚¯æ‚èo‚·
-			XMFLOAT3 dir = Normalize(mtv);   // ’PˆÊƒxƒNƒgƒ‹
+			// æŠ¼ã—å‡ºã—æ–¹å‘ã ã‘å–ã‚Šå‡ºã™
+			XMFLOAT3 dir = Normalize(mtv);   // å˜ä½ãƒ™ã‚¯ãƒˆãƒ«
 
-			float resolved = (std::max)(0.0f, Dot(total, dir)); //Šù‚É‰Ÿ‚µo‚³‚ê‚½•ª
-			float remain = depth - resolved;					//c‚è‚Ì‰Ÿ‚µo‚µ•ª
+			float resolved = (std::max)(0.0f, Dot(total, dir)); //æ—¢ã«æŠ¼ã—å‡ºã•ã‚ŒãŸåˆ†
+			float remain = depth - resolved;					//æ®‹ã‚Šã®æŠ¼ã—å‡ºã—åˆ†
 
 			if (remain > epsilon)
-			{//‰Ÿ‚µo‚µ‚ª”­¶‚·‚éê‡
-				//‰Ÿ‚µo‚µƒxƒNƒgƒ‹‚Ì‰ÁZ
+			{//æŠ¼ã—å‡ºã—ãŒç™ºç”Ÿã™ã‚‹å ´åˆ
+				//æŠ¼ã—å‡ºã—ãƒ™ã‚¯ãƒˆãƒ«ã®åŠ ç®—
 				total.x += dir.x * remain;
 				total.y += dir.y * remain;
 				total.z += dir.z * remain;
-				any = true;	//‰Ÿ‚µo‚µ‚ª”­¶‚µ‚½ƒtƒ‰ƒO‚ğ—§‚Ä‚é
+				any = true;	//æŠ¼ã—å‡ºã—ãŒç™ºç”Ÿã—ãŸãƒ•ãƒ©ã‚°ã‚’ç«‹ã¦ã‚‹
 			}
 		}
 
 		if (!any)
 		{
-			break; //‰Ÿ‚µo‚µ‚ª”­¶‚µ‚È‚©‚Á‚½‚çI—¹
+			break; //æŠ¼ã—å‡ºã—ãŒç™ºç”Ÿã—ãªã‹ã£ãŸã‚‰çµ‚äº†
 		}
 	}
 
-	return total;	//‰Ÿ‚µo‚µƒxƒNƒgƒ‹‚ğ•Ô‚·
+	return total;	//æŠ¼ã—å‡ºã—ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¿”ã™
 }

@@ -16,6 +16,17 @@ SceneEditorDocument::SceneEditorDocument(
 	, m_filePath(std::move(filePath))
 	, m_sourceAssetGuid(sourceAssetGuid)
 {
+	// A loaded Scene has attached Components but may still have cold World
+	// caches. Document creation can happen inside RenderImGui, after the normal
+	// EditorUpdate. Synchronize the new hierarchy before exposing it to drawing.
+	// EditorUpdate only flushes Transform/Collider/Camera and deferred deletion;
+	// it does not Start or advance gameplay. Ordinary per-Frame edit timing stays
+	// in EditorApp::Update and is deliberately not moved here.
+	if (m_scene)
+	{
+		m_scene->EditorUpdate(0.0f);
+	}
+
 	UpdateDisplayName();
 }
 
@@ -46,6 +57,16 @@ void SceneEditorDocument::ReplaceScene(
 	bool markDirty,
 	Guid sourceAssetGuid)
 {
+	// Complete the incoming Scene's initial drawing state while the previous
+	// document is still intact. An exception during this preparation leaves its
+	// Scene, history and selection owned by this document. The caller supplies a
+	// published Scene (the normal SceneLoader::LoadCandidate path), not a deferred
+	// unpublished candidate, whose EditorUpdate intentionally does nothing.
+	if (scene)
+	{
+		scene->EditorUpdate(0.0f);
+	}
+
 	ClearCommandHistory();
 	GetSelection().Clear();
 	GetViewportContext().ResetSceneTargets();

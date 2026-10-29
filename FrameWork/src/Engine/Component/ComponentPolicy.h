@@ -7,7 +7,6 @@ class Behaviour;
 class Camera;
 class MeshRenderer;
 class SpriteRenderer;
-class SkyRenderer;
 class UIRenderer;
 class UIImage;
 
@@ -85,13 +84,6 @@ struct ComponentPolicy<MeshRenderer>
 
 template<>
 struct ComponentPolicy<SpriteRenderer>
-{
-	static constexpr ComponentCardinality cardinality = ComponentCardinality::UniqueOptional;
-	static constexpr ComponentFamily family = ComponentFamily::Renderer;
-};
-
-template<>
-struct ComponentPolicy<SkyRenderer>
 {
 	static constexpr ComponentCardinality cardinality = ComponentCardinality::UniqueOptional;
 	static constexpr ComponentFamily family = ComponentFamily::Renderer;

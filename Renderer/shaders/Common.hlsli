@@ -14,6 +14,9 @@ cbuffer RendererView : register(b1)
     row_major float4x4 view;
     row_major float4x4 projection;
     float4 cameraPosition;
+    // Renderer supplies these per source Scene View, never from Material b5.
+    row_major float4x4 shadowViewProjection;
+    float4 shadowInformation; // x: enabled, y: receiver bias; zw reserved zero
 };
 
 cbuffer RendererLight : register(b2)
@@ -50,4 +53,12 @@ struct PixelInput
     float3 normal : NORMAL;
     float2 uv : TEXCOORD0;
     float4 color : COLOR0;
+    float3 worldPosition : TEXCOORD1;
 };
+
+// Shared by visible textured draws and selection-alpha masks. Keep UV out of
+// RenderObject: Material owns the logical parameters used by these shaders.
+float2 ApplyMaterialUV(float2 inputUV, float4 transform)
+{
+    return inputUV * transform.xy + transform.zw;
+}

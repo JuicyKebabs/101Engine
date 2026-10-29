@@ -1,9 +1,6 @@
 #include "Common.hlsli"
 
-cbuffer MaterialParams : register(b5)
-{
-    float4 BaseColor;
-};
+#include "MaterialParams.hlsli"
 
 float4 main(PixelInput input) : SV_TARGET
 {

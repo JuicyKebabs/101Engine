@@ -1,10 +1,7 @@
 #pragma once
-#include <cstdint>
+#include "Renderer/ResourceHandle.h"
 
-//--------------------------------------
-// MeshHandle
-// A handle type for identifying meshes
-//--------------------------------------
-
-using MeshHandle = uint32_t;
-constexpr MeshHandle InvalidMeshHandle = UINT32_MAX;
+// Engine code may retain this familiar type name, but identities are now checked
+// by the independent Renderer owner/slot/generation registry.
+using MeshHandle = rendering::GeometryHandle;
+inline constexpr MeshHandle InvalidMeshHandle;

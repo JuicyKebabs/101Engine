@@ -102,6 +102,11 @@ struct RenderObject
     // No persistent Content pointers are stored with Object membership.
     // Each resource handle is resolved against its owner during Render.
     std::optional<BoundingSphere> bounds;
+    // Zero means unknown provenance, so registered Geometry Bounds cannot cull.
+    // Content revision is separate from owner/slot/generation identity.
+    std::uint64_t boundsGeometryRevision = 0;
+    // Opt-in projection. Engine defaults differ by Component type.
+    bool castShadow = false;
     BillboardMode billboard = BillboardMode::None;
     std::optional<ProceduralGeometry> procedural;
     DrawRange drawRange;
@@ -117,6 +122,9 @@ struct RenderView
     Matrix4x4 view = Matrix4x4::Identity();
     Matrix4x4 projection = Matrix4x4::Identity();
     Vector3 cameraPosition;
+    // Multiplicative exposure in linear HDR space; Engine currently uses 1.0.
+    // This numeric default is an implementation proposal, not a user-specified value.
+    float exposure = 1.0f;
     DrawSettings drawSettings;
     ViewId id = 0;
     ViewKind kind = ViewKind::Scene;
@@ -125,6 +133,42 @@ struct RenderView
     // The default matches the output allocation's optimized-clear hint.
     // Other clear colors remain valid, but the DX12 debug layer may report a performance warning.
     std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
+};
+
+// An auxiliary draw refers to the original Object, preserving one owning array.
+// A per-draw Material substitution changes only that execution's resolution.
+struct AuxiliaryDraw
+{
+    std::size_t objectIndex = 0;
+    std::optional<MaterialHandle> materialOverride;
+};
+
+enum class AuxiliaryStage
+{
+    BeforeDisplayTransform,
+    AfterOverlay
+};
+
+enum class AuxiliaryColorLoad
+{
+    Clear,
+    Load
+};
+
+// A value-only request. The host knows selection/Collider meaning; Renderer
+// owns attachment resolution, Graph ordering, commands and GPU lifetime.
+struct AuxiliaryPass
+{
+    ViewId id = 0;
+    ViewId sourceViewId = 0;
+    std::string name;
+    AuxiliaryStage stage = AuxiliaryStage::BeforeDisplayTransform;
+    // nullopt means the source View's current color (private HDR for Scene).
+    std::optional<RenderTargetTextureHandle> colorOutput;
+    AuxiliaryColorLoad colorLoad = AuxiliaryColorLoad::Load;
+    std::array<float, 4> clearColor{};
+    bool useSourceDepth = false;
+    std::vector<AuxiliaryDraw> draws;
 };
 
 // Submit owns these values. Resource contents are selected during Render.
@@ -136,6 +180,7 @@ struct FrameRenderData
 {
     std::vector<RenderObject> objects;
     std::vector<RenderView> views;
+    std::vector<AuxiliaryPass> auxiliaryPasses;
     std::optional<DirectionalLight> directionalLight;
     float time = 0;
 

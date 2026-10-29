@@ -4,7 +4,7 @@
 #include "imgui.h"
 
 void SceneViewPanel::Render(
-	D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle,
+	ImTextureID sceneTextureHandle,
 	UINT textureWidth,
 	UINT textureHeight,
 	EditorViewportContext* viewportContext,
@@ -128,7 +128,7 @@ void SceneViewPanel::Render(
 
 	if (availableSize.x <= 0.0f		||
 		availableSize.y <= 0.0f		||
-		sceneTextureHandle.ptr == 0	||
+		sceneTextureHandle == ImTextureID_Invalid	||
 		textureWidth == 0			||
 		textureHeight == 0
 		)
@@ -180,7 +180,7 @@ void SceneViewPanel::Render(
 
 	// Render the image using the ImGui::Image function, passing in the texture handle and the calculated size
 	ImGui::Image(
-		static_cast<ImTextureID>(sceneTextureHandle.ptr),
+		sceneTextureHandle,
 		{ imageWidth, imageHeight },
 		{ 0.0f, 0.0f },
 		{ 1.0f, 1.0f });

@@ -5,9 +5,9 @@
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/Component/SpriteRenderer.h"
-#include "Engine/Component/SkyRenderer.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
+#include "Engine/Core/Path/ExecutablePath.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/Resource/AssetManager.h"
 #include "Engine/Scene/ComponentRegistry.h"
@@ -220,10 +220,10 @@ namespace
 
 	void TestRepositorySceneCompatibility()
 	{
-		std::ifstream stream("asset/scenes/test.scene");
+		std::ifstream stream("asset/scenes/Title.scene");
 		if (!stream)
 		{
-			Check(false, "Repository compatibility fixture asset/scenes/test.scene exists");
+			Check(false, "Repository compatibility fixture asset/scenes/Title.scene exists");
 			return;
 		}
 		json repositoryScene = json::parse(stream);
@@ -237,11 +237,15 @@ namespace
 				if (data.contains("meshAssetId")) data["meshAssetId"] = nullptr;
 				if (data.contains("textureAssetId")) data["textureAssetId"] = nullptr;
 				if (data.contains("actorImprint")) data["actorImprint"] = nullptr;
+                if (data.contains("nextScene"))
+                {
+                    data["nextScene"] = nullptr;
+                }
 			}
 		}
 
 		SceneLoadResult load = SceneLoader::LoadCandidate(
-			repositoryScene, TestEngineContext(), "asset/scenes/test.scene");
+			repositoryScene, TestEngineContext(), "asset/scenes/Title.scene");
 		bool tagsPreserved = static_cast<bool>(load);
 		if (load)
 		{
@@ -1026,67 +1030,15 @@ namespace
 		}
 	}
 
-	void TestInitialSkySelection()
-	{
-		Transform transform;
-		SkyRenderer sky;
-		json transformData;
-		json skyData;
-		transform.Serialize(transformData);
-		sky.Serialize(skyData);
-
-		const Guid invalidTaggedId = GuidGenerator::Generate();
-		const Guid firstSkyId = GuidGenerator::Generate();
-		const Guid secondSkyId = GuidGenerator::Generate();
-		json invalidTagged = MakeVersion3Actor(invalidTaggedId, "TaggedWithoutSky",
-			json::array({ MakeComponentRecord("Transform", transformData) }));
-		json firstSky = MakeVersion3Actor(firstSkyId, "FirstInitialSky",
-			json::array({ MakeComponentRecord("Transform", transformData),
-				MakeComponentRecord("SkyRenderer", skyData) }));
-		json secondSky = MakeVersion3Actor(secondSkyId, "SecondInitialSky",
-			json::array({ MakeComponentRecord("Transform", transformData),
-				MakeComponentRecord("SkyRenderer", skyData) }));
-		invalidTagged["tag"] = "InitialSky";
-		firstSky["tag"] = "InitialSky";
-		secondSky["tag"] = "InitialSky";
-
-		TemporarySceneFile taggedFile(MakeVersion4Scene(
-			json::array({ invalidTagged, firstSky, secondSky })));
-		SceneLoadResult taggedLoad = SceneLoader::LoadCandidate(
-			taggedFile.String(), TestEngineContext());
-		SkyRenderer* active = taggedLoad.scene
-			? taggedLoad.scene->GetRenderSystem()->GetActiveSkyRenderer() : nullptr;
-		SkyRenderer* expected = nullptr;
-		if (taggedLoad)
-		{
-			for (Actor* actor : taggedLoad.scene->GetAllActors())
-			{
-				if (actor->GetTag() != ActorTags::InitialSky) continue;
-				expected = actor->GetComponentByClass<SkyRenderer>();
-				if (expected) break;
-			}
-		}
-		Check(taggedLoad &&
-			active &&
-			active == expected &&
-			active->GetOwner()->GetGuid() != invalidTaggedId,
-			"InitialSky skips invalid candidates and deterministically selects the first valid SkyRenderer");
-		if (!taggedLoad) std::cerr << "[DIAG] " << taggedLoad.error.path << ": " << taggedLoad.error.message << '\n';
-		else if (!active) std::cerr << "[DIAG] InitialSky load has no active SkyRenderer\n";
-
-		json ordinarySky = firstSky;
-		ordinarySky["tag"] = "None";
-		TemporarySceneFile untaggedFile(MakeVersion4Scene(json::array({ ordinarySky })));
-		SceneLoadResult untaggedLoad = SceneLoader::LoadCandidate(
-			untaggedFile.String(), TestEngineContext());
-		Check(untaggedLoad &&
-			untaggedLoad.scene->GetRenderSystem()->GetActiveSkyRenderer() == nullptr,
-			"A Scene without InitialSky loads without selecting an arbitrary SkyRenderer");
-	}
 }
 
 int main()
 {
+    // The current repository fixture includes real GameCode Component types.
+    // Keep their DLL loaded until every Scene and registry factory is gone.
+    const auto gameCodePath = GetExecutableDirectory() / L"GameCode.dll";
+    HMODULE gameCode = LoadLibraryW(gameCodePath.c_str());
+    Check(gameCode != nullptr, "Repository fixture GameCode DLL loads");
 	RegisterVersion3TestBehavior();
 	TestVersion3ChildBeforeParent();
 	TestRepositorySceneCompatibility();
@@ -1103,8 +1055,11 @@ int main()
 	TestVersion3InvalidComponentRejection();
 	TestVersion3ComponentReferencesAndRendererRoundTrip();
 	TestVersion3ReferenceResolutionFailures();
-	TestInitialSkySelection();
 	ComponentRegistry::Get().UnregisterAllGameComponents();
+    if (gameCode)
+    {
+        FreeLibrary(gameCode);
+    }
 
 	if (g_failures != 0)
 	{

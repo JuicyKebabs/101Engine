@@ -8,6 +8,7 @@
 #include "Backend/Backend.h"
 #include "Backend/DepthTexture.h"
 #include "FrameRenderer.h"
+#include "SceneFrameResources.h"
 #include "Resource/ResourceSlotTable.h"
 #include "Resource/GeometryRegistry.h"
 #include "Resource/TextureRegistry.h"
@@ -79,6 +80,7 @@ struct Renderer::impl
 	std::optional<detail::RenderTargetTextureRegistry> renderTargetResources;
 	std::optional<detail::DrawResources> drawResources;
 	std::optional<backend::DepthTexture> sceneDepth;
+    std::optional<detail::SceneFrameResources> sceneFrameResources;
 	uint32_t resourceOwnerId = InvalidResourceOwnerId;
 	std::optional<FrameRenderData> submittedFrame;
 
@@ -161,10 +163,38 @@ Result Renderer::Initialize(const RendererConfiguration& configuration)
 	m_pImpl->renderTargetResources.emplace(ownerId);
 	m_pImpl->drawResources.emplace(ownerId);
 	m_pImpl->sceneDepth.emplace();
+    m_pImpl->sceneFrameResources.emplace();
 	m_pImpl->resourceOwnerId = ownerId;
-	m_pImpl->initialized = true;
+    m_pImpl->initialized = true;
 
-	return {};
+    // Do not expose a usable Renderer that cannot display missing project data.
+    // All provisional resident registrations are released by Finalize on failure.
+    Result residentResult = m_pImpl->drawResources->InitializeFallbacks(
+        *m_pImpl->geometryResources, *m_pImpl->textureResources);
+    if (residentResult.IsSuccess())
+    {
+        GeometryUploadTarget geometryTarget;
+        geometryTarget.handle = m_pImpl->drawResources->fallbackGeometry;
+        geometryTarget.content = m_pImpl->geometryResources->FindRegisteredContent(geometryTarget.handle);
+        TextureUploadTarget textureTarget;
+        textureTarget.handle = m_pImpl->drawResources->fallbackTexture;
+        textureTarget.content = m_pImpl->textureResources->FindRegisteredContent(textureTarget.handle);
+        residentResult = m_pImpl->UploadSelectedResources(std::span(&geometryTarget, 1), std::span(&textureTarget, 1));
+    }
+
+    if (residentResult.IsSuccess())
+    {
+        residentResult = m_pImpl->sceneFrameResources->Initialize(m_pImpl->backend, *m_pImpl->drawResources);
+    }
+
+    if (!residentResult.IsSuccess())
+    {
+        residentResult = m_pImpl->ObserveFailure(std::move(residentResult));
+        Finalize();
+        return residentResult;
+    }
+
+    return {};
 }
 
 void Renderer::Finalize()
@@ -197,6 +227,7 @@ void Renderer::Finalize()
 	m_pImpl->renderTargetResources.reset();
 	m_pImpl->drawResources.reset();
 	m_pImpl->sceneDepth.reset();
+    m_pImpl->sceneFrameResources.reset();
 
 	m_pImpl->resourceOwnerId = InvalidResourceOwnerId;
 	m_pImpl->stoppedFailure = FailureKind::General;
@@ -313,12 +344,19 @@ RenderResult Renderer::Render()
 		// This encapsulates the rendering logic.
         const auto process = [&]() -> Result
             {
+                Result pruned = state.sceneFrameResources->Prune(state.backend,
+                    *state.renderTargetResources, *state.drawResources);
+                if (!pruned.IsSuccess())
+                {
+                    return pruned;
+                }
+
                 graph::RenderGraph graph;
                 graph::GraphExecutor executor(graph, state.backend);
                 graph::FrameResourceBindings bindings(state.backend, graph, executor);
                 detail::FrameDrawContext context(current, *state.drawResources,
                     *state.geometryResources, *state.textureResources, state.backend,
-                    *state.sceneDepth, bindings, diagnostics, drawn, &*state.renderTargetResources);
+                    *state.sceneDepth, bindings, diagnostics, drawn, &*state.renderTargetResources, &*state.sceneFrameResources);
                 FrameRenderer frameRenderer;
                 // Each View receives its own source-index list; Object values remain in current.
                 // Selection occurs before Upload so shared resources can be deduplicated across Views.
@@ -348,11 +386,18 @@ RenderResult Renderer::Render()
                 }
                 for (const auto& list : lists)
                 {
-                    const auto& view = current.views[list.viewIndex];
-                    selected = context.CollectUploadTargets(list.objectIndices, view.drawSettings, geometries, textures);
-                    if (!selected.IsSuccess())
+                    context.SetActiveView(list.effectiveView.id);
+                    context.SetSceneInputs(&current.views[list.viewIndex], list.sampledShadow,
+                        list.shadowViewProjection, list.shadowEnabled);
+                    for (std::size_t drawIndex = 0; drawIndex < list.objectIndices.size(); ++drawIndex)
                     {
-                        return selected;
+                        detail::RenderList singleDraw;
+                        singleDraw.push_back(list.objectIndices[drawIndex]);
+                        selected = context.CollectUploadTargets(singleDraw, list.SettingsFor(drawIndex), geometries, textures);
+                        if (!selected.IsSuccess())
+                        {
+                            return selected;
+                        }
                     }
                 }
                 // Upload is independent work and may already reach the GPU.
@@ -371,22 +416,44 @@ RenderResult Renderer::Render()
                 std::uint64_t descriptorCount = 0;
                 // Include View attachment holds plus each selected draw's conservative requirements.
                 // This is bounded before conversion to UINT and before BeginFrameResources hands out any addresses.
-                std::uint64_t retainedCount = lists.size() * 3;
+                std::uint64_t retainedCount = lists.size() * 3 + 1;
                 for (auto& list : lists)
                 {
-                    const auto& view = current.views[list.viewIndex];
-                    context.SetActiveView(view.id);
-                    Result prepared = context.CheckPreparedDraws(list.objectIndices, view.drawSettings);
-                    if (!prepared.IsSuccess())
+                    context.SetActiveView(list.effectiveView.id);
+                    context.SetSceneInputs(&current.views[list.viewIndex], list.sampledShadow,
+                        list.shadowViewProjection, list.shadowEnabled);
+                    detail::RenderList preparedIndices;
+                    std::vector<DrawSettings> preparedSettings;
+                    for (std::size_t drawIndex = 0; drawIndex < list.objectIndices.size(); ++drawIndex)
                     {
-                        return prepared;
+                        detail::RenderList singleDraw;
+                        singleDraw.push_back(list.objectIndices[drawIndex]);
+                        const DrawSettings& settings = list.SettingsFor(drawIndex);
+                        Result prepared = context.CheckPreparedDraws(singleDraw, settings);
+                        if (!prepared.IsSuccess())
+                        {
+                            return prepared;
+                        }
+
+                        prepared = context.EstimateRequirements(singleDraw, settings,
+                            constantBytes, descriptorCount, retainedCount);
+                        if (!prepared.IsSuccess())
+                        {
+                            return prepared;
+                        }
+
+                        if (!singleDraw.empty())
+                        {
+                            preparedIndices.push_back(singleDraw.front());
+                            if (!list.perDrawSettings.empty())
+                            {
+                                preparedSettings.push_back(settings);
+                            }
+                        }
                     }
-                    prepared = context.EstimateRequirements(list.objectIndices, view.drawSettings,
-                        constantBytes, descriptorCount, retainedCount);
-                    if (!prepared.IsSuccess())
-                    {
-                        return prepared;
-                    }
+
+                    list.objectIndices.swap(preparedIndices);
+                    list.perDrawSettings.swap(preparedSettings);
                 }
                 Result capacity = state.backend.EnsureFrameCapacity(static_cast<UINT>(constantBytes),
                     static_cast<UINT>(descriptorCount), static_cast<UINT>(retainedCount));
@@ -1049,6 +1116,17 @@ Result Renderer::UpdateTexture(TextureHandle handle, const TextureDesc& desc)
 
 			return m_pImpl->textureResources->Update(handle, desc);
 		});
+}
+
+Result Renderer::GetGeometryData(GeometryHandle handle, GeometryData& output) const
+{
+    Result available = m_pImpl->CheckPublicCall();
+    if (!available.IsSuccess())
+    {
+        return available;
+    }
+
+    return m_pImpl->geometryResources->GetData(handle, output);
 }
 
 Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) const

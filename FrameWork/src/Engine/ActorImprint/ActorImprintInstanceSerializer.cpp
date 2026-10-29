@@ -87,7 +87,7 @@ bool ActorImprintInstanceSerializer::Capture(
 		ActorImprintReferenceCodec actorCodec(std::move(localGuids), ActorImprintReferenceMode::Instance);
 		SceneActorReferenceContext actorContext(scene);
 		AssetReferenceCodec assetCodec;
-		AssetManagerAssetReferenceContext assetContext(*context->pAssetManager);
+		AssetManagerAssetReferenceContext assetContext(*context->pAssetManager, true);
 		ReflectionSaveContext save{
 			.actorReferenceCodec = &actorCodec,
 			.actorReferenceContext = &actorContext,

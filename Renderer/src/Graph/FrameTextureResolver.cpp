@@ -71,7 +71,7 @@ Result QueryBinding(
 		output.srv = gpu.Srv();
 		output.dsv = {};
 		output.presentable = false;
-		output.viewFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		output.viewFormat = gpu.viewFormat;
 		output.initialState = gpu.submittedState;
 		output.contentsValid = gpu.contentsValid;
 	}
@@ -87,7 +87,7 @@ Result QueryBinding(
 		output.resource = depth->Resource();
 		output.dsv = depth->Dsv();
 		output.rtv = {};
-		output.srv = {};
+		output.srv = depth->Srv();
 		output.presentable = false;
 		output.viewFormat = DXGI_FORMAT_D32_FLOAT;
 		output.initialState = depth->submittedState;

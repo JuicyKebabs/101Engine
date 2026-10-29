@@ -33,8 +33,7 @@ struct CommonRendererProxy
 class RendererComponent : public Component
 {
 public:
-	explicit RendererComponent(BlendMode blendMode = BlendMode::Opaque)
-		: m_blendMode(blendMode) {}
+	RendererComponent() = default;
 	~RendererComponent() = default;
 
 	// Flush function to be called before rendering
@@ -65,12 +64,11 @@ public:
 		m_sortOrderInCanvas = order;
 		m_isProxyDirty = true;
 	}
-	void SetBlendMode(BlendMode blendMode)
-	{
-		m_blendMode = blendMode;
-		ApplyBlendModeToRenderTemplates();
-	}
-	
+    // Shadow intent is an Engine Component value; Renderer defaults false.
+    void SetCastShadow(bool value) { m_castShadow = value; }
+    bool GetCastShadow() const { return m_castShadow; }
+    virtual bool SynchronizeRenderResources() { return true; }
+
 	// Getters
 	bool GetVisible() const { return m_isVisible; }
 	Vector4 GetColor() const { return m_color; }
@@ -78,7 +76,6 @@ public:
 	virtual bool IsConfigured() const { return false; }	// Check if the renderer has been configured with necessary resources
 	Canvas* GetGoverningCanvas() const { return m_pGoverningCanvas; }
 	uint32_t GetSortOrderInCanvas() const { return m_sortOrderInCanvas; }
-	BlendMode GetBlendMode() const { return m_blendMode; }
 
 	RenderSpace GetRenderSpace() const;
 
@@ -99,7 +96,6 @@ protected:
 
 	// Function to check if the transform has changed and mark the proxy as dirty if needed
 	void CheckIfTransformChanged();
-	virtual void ApplyBlendModeToRenderTemplates() = 0;
 
 private:
 	// Pointer to the governing Canvas component (if any) for this renderer
@@ -109,9 +105,7 @@ private:
 	// Sort order for this renderer (used for sorting in the render queue)
 	uint32_t m_sortOrderInCanvas = 0;
 
-	// Authoring value applied to renderer-specific PSO keys whenever their
-	// render templates are created or replaced.
-	BlendMode m_blendMode = BlendMode::Opaque;
+    bool m_castShadow = false;
 
 private:
 	virtual void OnAttachOverride() = 0;

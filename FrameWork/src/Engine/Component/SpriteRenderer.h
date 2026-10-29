@@ -41,11 +41,10 @@ public:
 	};
 
 public:
-	SpriteRenderer() : RendererComponent(BlendMode::Alpha) {}
+	SpriteRenderer() = default;
 	~SpriteRenderer() = default;
 	void SetParams(const ParamDesc& desc) {
 		m_template = desc.renderTemplate;
-		SetBlendMode(m_template.materialDesc.psoKey.blend);
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
 		SetUVScale(desc.uvScale);
@@ -58,6 +57,7 @@ public:
 		SetVisible(desc.visible);
 		SetName(desc.name);
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 
 	bool SetTextureAsset(const Guid& assetId);							// Set the texture asset for this sprite through AssetManager
@@ -77,32 +77,38 @@ public:
 	{
 		m_uvScale = uvScale;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetUVOffset(const Vector2& uvOffset)
 	{
 		m_uvOffset = uvOffset;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetPivot(const Vector2& pivot)
 	{
 		m_pivot = pivot;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetBillboardType(BillboardType type) 
 	{
 		m_billboardType = type;
 		m_template.billboardType = type;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetFlipX(bool flip)
 	{
 		m_flipX = flip;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 	void SetFlipY(bool flip)
 	{
 		m_flipY = flip;
 		m_isProxyDirty = true;
+        m_materialDirty = true;
 	}
 
 	// Getters
@@ -114,10 +120,11 @@ public:
 	BillboardType GetBillboardType() const { return m_billboardType; }
 	bool IsFlipX() const { return m_flipX; }
 	bool IsFlipY() const { return m_flipY; }
-	bool IsConfigured() const override { return m_template.materialDesc.textureHandle != InvalidTextureHandle; }	// Check if the render template is valid (has a texture)
+	bool IsConfigured() const override { return GetTextureAssetId().IsValid() || m_template.materialDesc.textureHandle != InvalidTextureHandle; }	// Check if the render template is valid (has a texture)
 
 	// Serialization and deserialization methods
 	bool ResolveReferences(SceneBase& scene) override;
+    bool SynchronizeRenderResources() override;
 
 private:
 	struct PreparedTextureAssetState
@@ -126,6 +133,7 @@ private:
 		SpriteRenderTemplate renderTemplate;
 	};
 
+    bool m_materialDirty = false;
 	Vector2 m_uvScale{ 1,1 };								// UV scale for texture mapping
 	Vector2 m_uvOffset{ 0,0 };								// UV offset for texture mapping
 	Vector2 m_pivot{ 0.5f, 0.5f };							// Pivot point for the sprite
@@ -154,7 +162,6 @@ private:
 	void LateUpdateOverride(float deltaTime) override;
 	void OnDetachOverride() override;
 	void OnDestroyOverride() override;
-	void ApplyBlendModeToRenderTemplates() override;
 
 	void RebuildRenderProxy(const CameraInfo& cameraInfo);	// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)
 };

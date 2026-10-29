@@ -1,9 +1,6 @@
 #include "Common.hlsli"
 
-cbuffer MaterialParams : register(b5)
-{
-    float4 BaseColor;
-};
+#include "MaterialParams.hlsli"
 
 Texture2D ExtraTexture : register(t3);
 SamplerState LinearClamp : register(s1);

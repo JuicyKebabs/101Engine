@@ -44,6 +44,11 @@ struct TextureContent
 class TextureRegistry
 {
 public:
+    std::string DescribeUnavailable(TextureHandle handle) const
+    {
+        return DescribeResourceIdentity(handle, m_slots.ValidateForNewUse(handle));
+    }
+
 	explicit TextureRegistry(std::uint32_t ownerId)
 		: m_slots(ownerId)
 	{}

@@ -207,8 +207,8 @@ int WINAPI wWinMain(
 	}
 
 	// Calculate the client area size and check if it is valid.
-	const LONG clientWidth = clientRect.right - clientRect.left;
-	const LONG clientHeight = clientRect.bottom - clientRect.top;
+    LONG clientWidth = clientRect.right - clientRect.left;
+    LONG clientHeight = clientRect.bottom - clientRect.top;
 
 	// Client area must be bigger than zero,
 	if (clientWidth <= 0 || clientHeight <= 0)
@@ -388,12 +388,34 @@ int WINAPI wWinMain(
 					{
 						rendering::MaterialDesc material;
 						material.pipeline = pipeline.handle;
-						material.parameters =
-						{
-							{ "BaseColor", rendering::Vector4{ 1, 0.3f, 0.15f, 1 } },
-							{ "BaseTexture", textureHandle },
-							{ "ExtraTexture", textureHandle }
-						};
+						rendering::Vector4 baseColor{};
+                    baseColor.x = 1;
+                    baseColor.y = 0.3f;
+                    baseColor.z = 0.15f;
+                    baseColor.w = 1;
+                    rendering::MaterialParameter colorParameter{};
+                    colorParameter.name = "BaseColor";
+                    colorParameter.value = baseColor;
+                    rendering::Vector4 identityTransform{};
+                    identityTransform.x = 1;
+                    identityTransform.y = 1;
+                    rendering::MaterialParameter uvParameter{};
+                    uvParameter.name = "UVTransform";
+                    uvParameter.value = identityTransform;
+                    rendering::MaterialParameter localParameter{};
+                    localParameter.name = "LocalQuadTransform";
+                    localParameter.value = identityTransform;
+                    rendering::MaterialParameter textureParameter{};
+                    textureParameter.name = "BaseTexture";
+                    textureParameter.value = textureHandle;
+                    rendering::MaterialParameter extraParameter{};
+                    extraParameter.name = "ExtraTexture";
+                    extraParameter.value = textureHandle;
+                    material.parameters.push_back(colorParameter);
+                    material.parameters.push_back(uvParameter);
+                    material.parameters.push_back(localParameter);
+                    material.parameters.push_back(textureParameter);
+                    material.parameters.push_back(extraParameter);
 
 						auto registered = renderer.RegisterMaterial(material);
 						result = registered.result;
@@ -460,6 +482,49 @@ int WINAPI wWinMain(
 					continue;
 				}
 
+                // Window size belongs to this host. Resolve it outside Render,
+                // then replace the output before publishing the new projection.
+                RECT currentClientRect{};
+                if (!GetClientRect(window, &currentClientRect))
+                {
+                    ShowWin32Error(L"GetClientRect");
+                    exitCode = 1;
+                    break;
+                }
+
+                const LONG requestedWidth = currentClientRect.right - currentClientRect.left;
+                const LONG requestedHeight = currentClientRect.bottom - currentClientRect.top;
+                if (requestedWidth <= 0 || requestedHeight <= 0)
+                {
+                    // Do not submit a zero extent or overwrite the last valid
+                    // projection. Resume after a later positive-size message.
+                    if (!WaitMessage())
+                    {
+                        ShowWin32Error(L"WaitMessage");
+                        exitCode = 1;
+                        break;
+                    }
+                    continue;
+                }
+
+                if (requestedWidth != clientWidth || requestedHeight != clientHeight)
+                {
+                    result = renderer.ResizeWindowOutput(windowOutput,
+                        static_cast<std::uint32_t>(requestedWidth),
+                        static_cast<std::uint32_t>(requestedHeight));
+                    if (!result.IsSuccess())
+                    {
+                        // A partial native replacement may be unavailable.
+                        // Stop before Submit; do not render with mixed extents.
+                        ShowRendererFailure(window, result);
+                        exitCode = 1;
+                        break;
+                    }
+
+                    clientWidth = requestedWidth;
+                    clientHeight = requestedHeight;
+                }
+
 				const float seconds =
 					std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
 
@@ -477,12 +542,34 @@ int WINAPI wWinMain(
 				{
 					rendering::MaterialDesc material;
 					material.pipeline = extraPipeline;
-					material.parameters =
-					{
-						{ "BaseColor", rendering::Vector4{ 0.4f, 1, 0.2f, 1 } },
-						{ "BaseTexture", textureHandle },
-						{ "ExtraTexture", textureHandle }
-					};
+					rendering::Vector4 baseColor{};
+                    baseColor.x = 0.4f;
+                    baseColor.y = 1;
+                    baseColor.z = 0.2f;
+                    baseColor.w = 1;
+                    rendering::MaterialParameter colorParameter{};
+                    colorParameter.name = "BaseColor";
+                    colorParameter.value = baseColor;
+                    rendering::Vector4 identityTransform{};
+                    identityTransform.x = 1;
+                    identityTransform.y = 1;
+                    rendering::MaterialParameter uvParameter{};
+                    uvParameter.name = "UVTransform";
+                    uvParameter.value = identityTransform;
+                    rendering::MaterialParameter localParameter{};
+                    localParameter.name = "LocalQuadTransform";
+                    localParameter.value = identityTransform;
+                    rendering::MaterialParameter textureParameter{};
+                    textureParameter.name = "BaseTexture";
+                    textureParameter.value = textureHandle;
+                    rendering::MaterialParameter extraParameter{};
+                    extraParameter.name = "ExtraTexture";
+                    extraParameter.value = textureHandle;
+                    material.parameters.push_back(colorParameter);
+                    material.parameters.push_back(uvParameter);
+                    material.parameters.push_back(localParameter);
+                    material.parameters.push_back(textureParameter);
+                    material.parameters.push_back(extraParameter);
 
 					result = renderer.UpdateMaterial(materialHandle, material);
 					if (!result.IsSuccess())

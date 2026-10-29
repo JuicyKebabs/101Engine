@@ -89,11 +89,29 @@ Result FrameResourceBindings::ImportDepth(backend::DepthTexture& depth, GraphTex
 	GraphTextureBinding binding;
 	binding.resource = depth.Resource();
 	binding.dsv = depth.Dsv();
+    binding.srv = depth.Srv();
 	binding.viewFormat = DXGI_FORMAT_D32_FLOAT;
 	binding.initialState = depth.submittedState;
 	binding.contentsValid = depth.contentsValid;
 	binding.owner = &depth;
-	return ImportBinding(binding, "SceneDepth", texture);
+    Result imported = ImportBinding(binding, "SceneDepth", texture);
+    if (!imported.IsSuccess())
+    {
+        return imported;
+    }
+
+    // Every import has an explicit final usage, including a depth-only Shadow
+    // writer and the resident disabled binding. Capability controls which final
+    // state is legal; a DSV-only Scene depth is never made shader-readable.
+    TextureUse finalUse;
+    finalUse.usage = TextureUsage::DepthAttachment;
+    if (depth.AllowsSampling())
+    {
+        finalUse.usage = TextureUsage::ShaderRead;
+        finalUse.stages = ShaderStage::Pixel;
+    }
+
+    return m_graph.SetFinalUsage(texture, finalUse);
 }
 
 Result FrameResourceBindings::PrepareViewTargets(
@@ -212,7 +230,7 @@ Result FrameResourceBindings::ImportRenderTarget(
 	binding.resource = gpu.Resource();
 	binding.rtv = gpu.Rtv();
 	binding.srv = gpu.Srv();
-	binding.viewFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+	binding.viewFormat = gpu.viewFormat;
 	binding.initialState = gpu.submittedState;
 	binding.contentsValid = gpu.contentsValid;
 	binding.owner = &content;
@@ -279,6 +297,23 @@ Result FrameResourceBindings::ImportTexture(
 	finalTextureUse.usage = TextureUsage::ShaderRead;
 	finalTextureUse.stages = ShaderStage::Vertex | ShaderStage::Pixel;
 	return m_graph.SetFinalUsage(texture, finalTextureUse);
+}
+
+Result FrameResourceBindings::FindImportedDepth(const backend::DepthTexture& depth, GraphTextureHandle& texture) const
+{
+    const auto existing = std::find_if(m_importedBindings.begin(), m_importedBindings.end(),
+        [&depth](const GraphTextureBinding& binding)
+        {
+            const auto owner = std::get_if<backend::DepthTexture*>(&binding.owner);
+            return owner && *owner == &depth;
+        });
+    if (existing == m_importedBindings.end())
+    {
+        return detail::Fail("Depth sample was not declared before execution.");
+    }
+
+    texture = existing->handle;
+    return {};
 }
 
 Result FrameResourceBindings::FindImportedTexture(

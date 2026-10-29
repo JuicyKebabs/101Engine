@@ -40,13 +40,13 @@ public:
 	Result ImportTexture(detail::TextureContent& content, const std::string& name, GraphTextureHandle& texture);
 	Result FindImportedTexture(const detail::TextureContent& content, GraphTextureHandle& texture) const;
 	Result ImportRenderTarget(detail::RenderTargetTextureContent& content, const std::string& name, GraphTextureHandle& texture);
+	Result ImportDepth(backend::DepthTexture& depth, GraphTextureHandle& texture);
+    Result FindImportedDepth(const backend::DepthTexture& depth, GraphTextureHandle& texture) const;
 	Result FindImportedRenderTarget(const detail::RenderTargetTextureContent& content, GraphTextureHandle& texture) const;
 
 private:
 	Result ImportBinding(const GraphTextureBinding& binding, const std::string& name, GraphTextureHandle& texture);
 	Result ImportWindowOutput(WindowOutputHandle output, GraphTextureHandle& texture, ViewTargets& targets);
-	Result ImportDepth(backend::DepthTexture& depth, GraphTextureHandle& texture);
-
 	backend::Backend& m_backend;
 	RenderGraph& m_graph;
 	GraphExecutor& m_executor;

@@ -34,6 +34,7 @@ struct Pipelinekey
 	std::vector<graph::GraphTextureFormat> colors;
 	std::optional<graph::GraphTextureFormat> depth;
 	std::uint32_t sampleCount = 1;
+    DepthMode effectiveDepth = DepthMode::Disabled;
 	std::uint32_t sampleQuality = 0;
 	bool operator==(const Pipelinekey& other) const noexcept = default;
 };
@@ -64,6 +65,9 @@ struct MaterialContent
 // One lookup's borrowed results. Never stored as a second array of RenderObjects.
 struct DrawInputs
 {
+    // Temporary resolution metadata. It never rewrites the submitted Object.
+    bool geometrySubstituted = false;
+    std::optional<DepthMode> depthOverride;
 	GeometryContent* geometry = nullptr;
 	MaterialContent* material = nullptr;
 	PipelineContent* pipeline = nullptr;
@@ -77,6 +81,7 @@ struct DrawInputs
 // These pointers are temporary borrows and must not be retained across Render or Resize.
 struct SampledTexture
 {
+    backend::DepthTexture* depth = nullptr;
 	TextureHandle textureHandle;
 	TextureContent* texture = nullptr;
 	RenderTargetTextureHandle targetHandle;
@@ -89,6 +94,13 @@ class DrawResources
 {
 public:
 	explicit DrawResources(std::uint32_t owner) : shaders(owner), pipelines(owner), materials(owner) {}
+
+    // Private resident resources have the Renderer lifetime, outside Scene sets.
+    // Initialization must fail if the emergency display itself cannot be built.
+    Result InitializeFallbacks(GeometryRegistry& geometries, TextureRegistry& textures);
+    GeometryHandle fallbackGeometry;
+    TextureHandle fallbackTexture;
+    MaterialHandle fallbackMaterial;
 
 	ResourceRegistrationResult<ShaderHandle> RegisterShader(const ShaderDesc& desc);
 	ResourceRegistrationResult<PipelineHandle> RegisterPipeline(const PipelineDesc& desc);
@@ -151,7 +163,7 @@ private:
 		const RenderView& view,
 		const RenderObject& object,
 		const DrawInputs& inputs,
-		backend::Backend& backend,
+		FrameDrawContext& drawContext,
 		std::array<backend::ConstantAllocation, 4>& commonAllocations,
 		DrawCommand& command);
 

@@ -58,7 +58,8 @@ public:
 
 	// Submit takes ownership of Frame values only after acceptance. Render consumes one submission.
 	// Resource contents are resolved during Render: intervening Updates affect that submission.
-	// Destroyed dependencies exclude the affected Object with a diagnostic.
+	// Unavailable draw dependencies use scoped error substitutions with diagnostics;
+    // incompatible draws and unavailable output attachments still fail validation.
 	// Call from one thread; public API reentry during Render is prohibited.
 	RENDERER_API Result SubmitFrameRenderData(FrameRenderData&& frame);
 	RENDERER_API RenderResult Render();
@@ -81,6 +82,10 @@ public:
 	RENDERER_API Result UpdateGeometry(GeometryHandle handle,const GeometryDesc& desc);
 	RENDERER_API Result UpdateTexture(TextureHandle handle, const TextureDesc& desc);
 	RENDERER_API Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
+
+    // Query accepted local Bounds and matching Content revision as an owned value.
+    // Destroy-requested registrations reject new queries; upload readiness is unrelated.
+    RENDERER_API Result GetGeometryData(GeometryHandle handle, GeometryData& output) const;
 
 	// Query APIs for resources
 	RENDERER_API Result GetShaderMetadata(ShaderHandle handle,ShaderMetadata& output) const;

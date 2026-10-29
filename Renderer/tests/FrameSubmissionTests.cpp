@@ -82,20 +82,29 @@ void VerifyFrameSubmission()
 	using namespace rendering;
 	TestWindow window;
 	Renderer renderer;
+    RendererConfiguration configuration{};
+    configuration.enableDebugLayer = true;
+    configuration.enableGpuValidation = true;
 	FrameRenderData uninitialized;
 	Require(!renderer.SubmitFrameRenderData(std::move(uninitialized)).IsSuccess(), "Uninitialized Submit was accepted.");
 	const auto uninitializedRender = renderer.Render();
 	Require(!uninitializedRender.status.IsSuccess() && uninitializedRender.disposition == RenderDisposition::NotProcessed, "Uninitialized Render was accepted.");
 
-	Check(renderer.Initialize({ true, true }));
+	Check(renderer.Initialize(configuration));
 	CheckSkipped(renderer);
 
-	const auto output = renderer.CreateWindowOutput({ window.window, 320, 200 });
+	Win32WindowOutputDesc outputDescription{};
+    outputDescription.window = window.window;
+    outputDescription.width = 320;
+    outputDescription.height = 200;
+    const auto output = renderer.CreateWindowOutput(outputDescription);
 	Check(output.status);
 
 	FrameRenderData invalidView;
-	invalidView.objects.push_back({});
-	invalidView.views.push_back({});
+	RenderObject unavailableObject{};
+    RenderView unavailableView{};
+    invalidView.objects.push_back(unavailableObject);
+    invalidView.views.push_back(unavailableView);
 	auto* invalidStorage = invalidView.objects.data();
 	Require(!renderer.SubmitFrameRenderData(std::move(invalidView)).IsSuccess(), "Invalid WindowOutput was accepted.");
 	Require(invalidView.objects.data() == invalidStorage && invalidView.objects.size() == 1, "Rejected input was moved.");
@@ -119,18 +128,29 @@ void VerifyFrameSubmission()
 	Check(geometry.status);
 
 	const std::array<std::byte, 4> pixels{ std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255} };
-	const std::array<TextureMipDesc, 1> mips{ { { pixels, 4 } } };
-	const auto texture = renderer.RegisterTexture({ 1, 1, TextureFormat::RGBA8_UNorm, mips });
+	std::array<TextureMipDesc, 1> mips{};
+    mips[0].pixels = pixels;
+    mips[0].rowPitch = 4;
+    TextureDesc textureDescription{};
+    textureDescription.width = 1;
+    textureDescription.height = 1;
+    textureDescription.format = TextureFormat::RGBA8_UNorm;
+    textureDescription.mips = mips;
+    const auto texture = renderer.RegisterTexture(textureDescription);
 	Check(texture.status);
 
 	FrameRenderData frame;
-	frame.objects.push_back({geometry.handle, {}});
-	frame.objects.push_back({geometry.handle, {}});
-	frame.views.push_back({ output.handle });
-	Check(renderer.SubmitFrameRenderData(std::move(frame)));
+	RenderObject registeredObject{};
+    registeredObject.geometry = geometry.handle;
+    RenderView outputView{};
+    outputView.output = output.handle;
+    frame.objects.push_back(registeredObject);
+    frame.objects.push_back(registeredObject);
+    frame.views.push_back(outputView);
+    Check(renderer.SubmitFrameRenderData(std::move(frame)));
 
 	FrameRenderData duplicate;
-	duplicate.objects.push_back({geometry.handle, {}});
+	duplicate.objects.push_back(registeredObject);
 	auto* duplicateStorage = duplicate.objects.data();
 	Require(!renderer.SubmitFrameRenderData(std::move(duplicate)).IsSuccess(), "Duplicate Submit was accepted.");
 	Require(duplicate.objects.data() == duplicateStorage && duplicate.objects.size() == 1, "Duplicate Submit took its input.");
@@ -139,7 +159,9 @@ void VerifyFrameSubmission()
 	Check(renderer.DestroyTexture(texture.handle));
 	const auto destroyedDependencies = renderer.Render();
 	CheckProcessed(destroyedDependencies);
-	Require(destroyedDependencies.drawnObjects == 0, "Destroyed Geometry was drawn.");
+	// R8 replaces both destroyed Geometry references with resident error cubes.
+    // The third actual draw is the private HDR display transform.
+	Require(destroyedDependencies.drawnObjects == 3, "R8 fallback/display draws were not recorded.");
 	Require(destroyedDependencies.diagnostics.size() == 2, "Destroyed Geometry was not diagnosed per Object.");
 	CheckSkipped(renderer);
 
@@ -156,24 +178,26 @@ void VerifyFrameSubmission()
 	const auto secondGeometry = renderer.RegisterGeometry(geometryDesc);
 	Check(secondGeometry.status);
 	FrameRenderData uploadOnly;
-	uploadOnly.objects.push_back({ secondGeometry.handle, {} });
+	RenderObject uploadObject{};
+    uploadObject.geometry = secondGeometry.handle;
+    uploadOnly.objects.push_back(uploadObject);
 	Check(renderer.SubmitFrameRenderData(std::move(uploadOnly)));
 	CheckProcessed(renderer.Render());
 	renderer.Finalize();
 	renderer.Finalize();
 
-	Check(renderer.Initialize({ true, true }));
+	Check(renderer.Initialize(configuration));
 	FrameRenderData staleOutput;
-	staleOutput.views.push_back({ output.handle });
+	staleOutput.views.push_back(outputView);
 	Require(!renderer.SubmitFrameRenderData(std::move(staleOutput)).IsSuccess(), "Old output survived reinitialization.");
 
 	// Finalize must also discard an accepted, unconsumed CPU submission.
 	FrameRenderData pending;
-	pending.objects.push_back({ secondGeometry.handle, {} });
+	pending.objects.push_back(uploadObject);
 	Check(renderer.SubmitFrameRenderData(std::move(pending)));
 	renderer.Finalize();
 
-	Check(renderer.Initialize({ true, true }));
+	Check(renderer.Initialize(configuration));
 	CheckSkipped(renderer);
 	renderer.Finalize();
 }
