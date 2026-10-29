@@ -1,4 +1,5 @@
 #include "Renderer/Math.h"
+
 #include <algorithm>
 #include <cassert>
 

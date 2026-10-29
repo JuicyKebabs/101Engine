@@ -6,6 +6,10 @@
 #include <cassert>
 #include <cstddef>
 #include <utility>
+#include <vector>
+#include <chrono>
+
+#include "ShaderFile.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Math.h"
@@ -169,16 +173,16 @@ int WINAPI wWinMain(
 		return 1;
 	}
 
-	// Create a registerd window
+	// Create a registered window
 	const HWND window = CreateWindowExW(
 		0,
 		WindowClassName,
-		L"RendererSandbox",
+		L"R4: M shared color / O material override / P pipeline override",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
-		1280,
-		720,
+		1920,
+		1080,
 		nullptr,
 		nullptr,
 		instance,
@@ -267,15 +271,56 @@ int WINAPI wWinMain(
 
 		rendering::GeometryHandle geometryHandle;
 		rendering::TextureHandle textureHandle;
+		rendering::MaterialHandle materialHandle;
+		rendering::MaterialHandle alternateMaterial;
+		rendering::PipelineHandle extraPipeline;
 
 		if (result.IsSuccess())
 		{
-			std::array<rendering::MeshVertex, 3> vertices{};
-			vertices[0].position = { -0.5f, -0.5f, 0.0f };
-			vertices[1].position = { 0.0f, 0.5f, 0.0f };
-			vertices[2].position = { 0.5f, -0.5f, 0.0f };
-			rendering::GeometryDesc geometryDesc{};
-			geometryDesc.vertices = vertices;
+			// Build an indexed cube with independent normals and UVs for each face.
+			std::vector<rendering::MeshVertex> vertices;
+			std::vector<std::uint32_t> indices;
+
+			const rendering::Vector3 normals[] =
+			{
+				{ 0, 0, -1 },
+				{ 0, 0, 1 },
+				{ -1, 0, 0 },
+				{ 1, 0, 0 },
+				{ 0, 1, 0 },
+				{ 0, -1, 0 }
+			};
+
+			const rendering::Vector3 corners[][4] =
+			{
+			    {{-1, -1, -1}, {-1, 1, -1}, {1, 1, -1}, {1, -1, -1}},
+			    {{1, -1, 1}, {1, 1, 1}, {-1, 1, 1}, {-1, -1, 1}},
+			    {{-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}, {-1, -1, -1}},
+			    {{1, -1, -1}, {1, 1, -1}, {1, 1, 1}, {1, -1, 1}},
+			    {{-1, 1, -1}, {-1, 1, 1}, {1, 1, 1}, {1, 1, -1}},
+			    {{-1, -1, 1}, {-1, -1, -1}, {1, -1, -1}, {1, -1, 1}}
+			};
+
+			for (std::uint32_t face = 0; face < 6; ++face)
+			{
+				const rendering::Vector2 uv[] = {{0, 1}, {0, 0}, {1, 0}, {1, 1}};
+
+				for (std::uint32_t v = 0; v < 4; ++v)
+				{
+					rendering::MeshVertex vertex;
+					vertex.position = corners[face][v] * 0.35f;
+					vertex.normal = normals[face];
+					vertex.uv = uv[v];
+					vertices.push_back(vertex);
+				}
+
+				for (auto i : {0u, 1u, 2u, 0u, 2u, 3u})
+				{
+					indices.push_back(face * 4 + i);
+				}
+			}
+
+			rendering::GeometryDesc geometryDesc{ vertices, indices };
 
 			const auto geometry = renderer.RegisterGeometry(geometryDesc);
 			result = geometry.status;
@@ -286,6 +331,7 @@ int WINAPI wWinMain(
 		{
 			const std::array<std::byte, 4> pixels{ std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255} };
 			const std::array<rendering::TextureMipDesc, 1> mips{ { { pixels, 4 } } };
+
 			rendering::TextureDesc textureDesc{};
 			textureDesc.width = 1;
 			textureDesc.height = 1;
@@ -294,6 +340,81 @@ int WINAPI wWinMain(
 			const auto texture = renderer.RegisterTexture(textureDesc);
 			result = texture.status;
 			textureHandle = texture.handle;
+		}
+
+		if (result.IsSuccess())
+		{
+			try
+			{
+				const auto vsBytes = sandbox::ReadShader("MeshVS.cso");
+				const auto psBytes = sandbox::ReadShader("LitPS.cso");
+				const auto extraBytes = sandbox::ReadShader("ExtraPS.cso");
+
+				auto vs = renderer.RegisterShader({rendering::ShaderStage::Vertex, vsBytes});
+				auto ps = renderer.RegisterShader({rendering::ShaderStage::Pixel, psBytes});
+				auto extra = renderer.RegisterShader({rendering::ShaderStage::Pixel, extraBytes});
+
+				result = vs.result;
+
+				if (result.IsSuccess())
+				{
+					result = ps.result;
+				}
+
+				if (result.IsSuccess())
+				{
+					result = extra.result;
+				}
+
+				if (result.IsSuccess())
+				{
+					rendering::PipelineDesc pipelineDesc{ vs.handle, ps.handle };
+					pipelineDesc.cull = rendering::CullMode::None;
+
+					// Register the regular and override pipelines.
+					const auto pipeline = renderer.RegisterPipeline(pipelineDesc);
+					result = pipeline.result;
+
+					pipelineDesc.pixelShader = extra.handle;
+					const auto overridePipeline = renderer.RegisterPipeline(pipelineDesc);
+					if (result.IsSuccess())
+					{
+						result = overridePipeline.result;
+					}
+
+					extraPipeline = overridePipeline.handle;
+
+					if (result.IsSuccess())
+					{
+						rendering::MaterialDesc material;
+						material.pipeline = pipeline.handle;
+						material.parameters =
+						{
+							{ "BaseColor", rendering::Vector4{ 1, 0.3f, 0.15f, 1 } },
+							{ "BaseTexture", textureHandle },
+							{ "ExtraTexture", textureHandle }
+						};
+
+						auto registered = renderer.RegisterMaterial(material);
+						result = registered.result;
+						materialHandle = registered.handle;
+
+						// Keep a second material for the per-view override.
+						material.parameters[0].value = rendering::Vector4{ 0.15f, 0.5f, 1, 1 };
+						auto other = renderer.RegisterMaterial(material);
+						if (result.IsSuccess())
+						{
+							result = other.result;
+						}
+
+						alternateMaterial = other.handle;
+					}
+				}
+			}
+			catch (const std::exception& e)
+			{
+				result = {false, e.what()};
+			}
 		}
 
 		if (!result.IsSuccess())
@@ -307,6 +428,10 @@ int WINAPI wWinMain(
 
 			MSG message{};
 			bool firstFramePresented = false;
+			bool useMaterialOverride = false;
+			bool usePipelineOverride = false;
+
+			const auto startTime = std::chrono::steady_clock::now();
 
 			for (;;)
 			{
@@ -335,10 +460,75 @@ int WINAPI wWinMain(
 					continue;
 				}
 
-				// Objects currently exercise registration and upload; Render displays a clear color.
+				const float seconds =
+					std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
+
+				if (GetAsyncKeyState('O') & 1)
+				{
+					useMaterialOverride = !useMaterialOverride;
+				}
+
+				if (GetAsyncKeyState('P') & 1)
+				{
+					usePipelineOverride = !usePipelineOverride;
+				}
+
+				if (GetAsyncKeyState('M') & 1)
+				{
+					rendering::MaterialDesc material;
+					material.pipeline = extraPipeline;
+					material.parameters =
+					{
+						{ "BaseColor", rendering::Vector4{ 0.4f, 1, 0.2f, 1 } },
+						{ "BaseTexture", textureHandle },
+						{ "ExtraTexture", textureHandle }
+					};
+
+					result = renderer.UpdateMaterial(materialHandle, material);
+					if (!result.IsSuccess())
+					{
+						ShowRendererFailure(window, result);
+						exitCode = 1;
+						break;
+					}
+				}
+
+				// Submit two animated cubes through the shared draw path.
 				rendering::FrameRenderData frame;
-				frame.objects.push_back({ geometryHandle, textureHandle });
-				frame.views.push_back({ windowOutput });
+				frame.time = seconds;
+				frame.directionalLight = rendering::DirectionalLight{};
+
+				rendering::RenderObject object{ geometryHandle, materialHandle };
+				object.world = rendering::Matrix4x4::CreateRotationY(seconds) *
+					rendering::Matrix4x4::CreateTranslation({ -0.45f, 0, 0 });
+				frame.objects.push_back(object);
+
+				object.world = rendering::Matrix4x4::CreateRotationX(seconds) *
+					rendering::Matrix4x4::CreateTranslation({ 0.45f, 0, 0.25f });
+				object.material = alternateMaterial;
+				frame.objects.push_back(object);
+
+				// Move the camera and apply the selected per-view overrides.
+				rendering::RenderView view;
+				view.output = windowOutput;
+				view.cameraPosition = { std::sin(seconds * 0.2f) * 0.6f, 0.7f, -2.5f };
+				view.view =
+					rendering::Matrix4x4::CreateLookAt(view.cameraPosition, { 0, 0, 0 }, { 0, 1, 0 });
+				view.projection = rendering::Matrix4x4::CreatePerspectiveFov(
+					rendering::PI / 3, static_cast<float>(clientWidth) / clientHeight, 0.1f, 100);
+
+				if (useMaterialOverride)
+				{
+					view.drawSettings.materialOverride = alternateMaterial;
+				}
+
+				if (usePipelineOverride)
+				{
+					view.drawSettings.pipelineOverride = extraPipeline;
+				}
+
+				frame.views.push_back(view);
+
 				result = renderer.SubmitFrameRenderData(std::move(frame));
 
 				rendering::RenderResult rendered;

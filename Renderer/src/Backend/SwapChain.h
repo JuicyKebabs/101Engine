@@ -1,3 +1,8 @@
+// R7 implementation guide: section 4.11.
+// Window identity survives a partially failed resize, but usable BackBuffers may not.
+// IsInitialized answers identity; buffer-ready state answers whether drawing/Present is possible.
+// Borrowed BackBuffer information must not outlive Resize or Finalize.
+
 #pragma once
 
 #include "Renderer/Result.h"
@@ -53,7 +58,12 @@ public:
 
 	void Finalize() noexcept;
 
-	// Borrowed until owner finalization. Only the current buffer may start new work.
+	// Caller has completed submitted work and discarded lists borrowing the buffers.
+	Result Resize(ID3D12Device* device, std::uint32_t width, std::uint32_t height);
+	Result GetSize(std::uint32_t& width, std::uint32_t& height) const;
+	bool IsReady() const noexcept { return m_buffersReady; }
+
+	// Borrowed until Resize or Finalize. Only the current buffer may start new work.
 	Result GetCurrentTexture(BackBufferInfo& output) const;
 
 	// Caller has validated identity before submission; owner storage stays stable.
@@ -83,6 +93,9 @@ private:
 	std::array<BackBuffer, BufferCount> m_backBuffers;
 
 	DescriptorHeap m_rtvHeap;
+	bool m_buffersReady = false;
+
+	Result RebuildBackBuffers(ID3D12Device* device);
 };
 
 }

@@ -117,10 +117,22 @@ namespace
 		}
 
 		// Valid texture settings.
-		if (desc.dimension != TextureDimension::Texture2D || !desc.width || !desc.height ||
-			desc.mipLevels != 1 || desc.arraySize != 1 || desc.sampleCount != 1 || desc.sampleQuality != 0)
+		if (desc.dimension != TextureDimension::Texture2D)
 		{
-			return { false, "ValidateImport: unsupported texture settings." };
+			return { false, "ValidateImport: only 2D textures are supported." };
+		}
+
+		if (desc.width == 0 || desc.height == 0 || desc.mipLevels == 0 || desc.mipLevels > 32 ||
+			desc.arraySize != 1 || desc.sampleCount != 1 || desc.sampleQuality != 0)
+		{
+			return { false, "ValidateImport: invalid texture dimensions, mip levels, array size, or sample count." };
+		}
+
+		if (desc.mipLevels != 1 &&
+			(HasCapability(desc.capabilities, TextureCapability::ColorAttachment) ||
+			HasCapability(desc.capabilities, TextureCapability::DepthAttachment)))
+		{
+			return { false, "ValidateImport: color/depth attachments do not support mip levels." };
 		}
 
 		// Supported texture formats.

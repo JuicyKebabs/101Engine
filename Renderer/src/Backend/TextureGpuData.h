@@ -8,12 +8,19 @@
 #include <memory>
 #include <vector>
 
+//-----------------------------------------------------------------------------------------------------
+// TextureGpuData
+// Represents a GPU texture resource and its associated state, including a shader resource view (SRV).
+//-----------------------------------------------------------------------------------------------------
+
 namespace rendering::backend
 {
 
 struct TextureGpuData
 {
 	Microsoft::WRL::ComPtr<ID3D12Resource> texture;
+	D3D12_RESOURCE_STATES submittedState = D3D12_RESOURCE_STATE_COPY_DEST;
+	bool contentsValid = false;
 
 	[[nodiscard]] Result InitializeSrv(ID3D12Device* device);
 	[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetSrvHandle() const noexcept { return m_srv; }

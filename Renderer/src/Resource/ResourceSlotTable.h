@@ -28,9 +28,7 @@ public:
 		Handle handle;
 	};
 
-	explicit ResourceSlotTable(uint32_t ownerId) noexcept
-		: m_ownerId(ownerId)
-	{}
+	explicit ResourceSlotTable(uint32_t ownerId) noexcept : m_ownerId(ownerId) {}
 
 	ResourceSlotTable(const ResourceSlotTable&) = delete;
 	ResourceSlotTable& operator=(const ResourceSlotTable&) = delete;

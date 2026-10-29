@@ -97,7 +97,7 @@ private:
 	std::vector<AssetChange> m_pendingChanges;
 
 	// Lazy-load cache for each asset type
-	std::unordered_map<Guid, MeshHandle>    m_loadedMeshes;	// Lazy-load cache
+	std::unordered_map<Guid, MeshHandle>    m_loadedMeshes;		// Lazy-load cache
 	std::unordered_map<Guid, TextureHandle> m_loadedTextures;	// Lazy-load cache
 	std::unordered_map<Guid, AudioHandle>   m_loadedAudio;		// Lazy-load cache
 

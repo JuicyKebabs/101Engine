@@ -1,6 +1,12 @@
+// R7 implementation guide: section 4.27.
+// Native command-list operations consume validated Renderer-owned input values.
+// A View establishes its viewport; each Draw establishes its scissor.
+// These are different rasterizer states and must not leak across Views or Objects.
+
 #pragma once
 
 #include "Renderer/Result.h"
+#include "DrawPacket.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -12,6 +18,8 @@
 // CommandContext class
 // Represents a DirectX 12 command allocator and command list for recording commands.
 //------------------------------------------------------------------------------------
+
+namespace rendering { struct Viewport; }
 
 namespace rendering::backend
 {
@@ -43,11 +51,18 @@ public:
 		D3D12_RESOURCE_STATES stateAfter,
 		UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 
-	// Record a 
+	// Records a set of render targets and viewport/scissor for rasterization.
 	Result SetRasterOutput(
 		std::span<const D3D12_CPU_DESCRIPTOR_HANDLE> colors,
 		UINT width,
-		UINT height);
+		UINT height,
+		D3D12_CPU_DESCRIPTOR_HANDLE depth = {});
+
+	Result SetViewport(const Viewport& viewport, UINT outputWidth, UINT outputHeight);
+
+	Result ClearDepth(D3D12_CPU_DESCRIPTOR_HANDLE depth, float value);
+
+	Result RecordDraw(const DrawPacket& packet);
 
 	// Records a clear of the entire RTV.
 	// The referenced subresources must already be in RENDER_TARGET state.

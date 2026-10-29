@@ -1,6 +1,16 @@
 #pragma once
 
 #include "RenderGraph.h"
+#include <span>
+namespace rendering { class DrawCommand; }
+namespace rendering::backend { class CommandContext; }
+
+//---------------------------------------------------------------------------------------------------------------
+// RenderPassContext
+// This class provides the context for executing a single render pass within the render graph.
+// It allows the render pass to access information about the textures used in the pass and their intended usage.
+// It also provides access to the output layout of the pass.
+//---------------------------------------------------------------------------------------------------------------
 
 namespace rendering::graph
 {
@@ -29,13 +39,21 @@ public:
 	// Returns the texture info from temporary storage in the graph if execution requires the texture with registrered usage.
 	Result GetTextureInfo(GraphTextureHandle texture, TextureUse intendedUse, PassTextureInfo& output);
 
-private:
-	RenderPassContext(const RenderGraph& graph, const CompiledPass& pass) noexcept
-		: m_graph(graph), m_pass(pass) {}
+	Result RecordDrawCommands(std::span<const rendering::DrawCommand> commands);
 
-	// Not changed during the execution of a render pass.
+private:
+	RenderPassContext(
+		const RenderGraph& graph,
+		const CompiledPass& pass,
+		backend::CommandContext* commands = nullptr,
+		std::vector<std::uint64_t*>* fences = nullptr) noexcept
+		: m_graph(graph), m_pass(pass), m_commands(commands), m_drawFences(fences)
+	{}
+
 	const RenderGraph& m_graph;
 	const CompiledPass& m_pass;
+	backend::CommandContext* m_commands = nullptr;
+	std::vector<std::uint64_t*>* m_drawFences = nullptr;
 
 	Result m_status;
 

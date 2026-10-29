@@ -1,5 +1,11 @@
+// R7 implementation guide: section 4.12.
+// DXGI requires old BackBuffer references to be released before ResizeBuffers.
+// Unlike an ordinary output image, Window replacement cannot retain the old complete set.
+// A failed replacement pauses this Window until an explicit positive-size retry succeeds.
+
 #include "SwapChain.h"
 #include "ApiResult.h"
+#include "Failure.h"
 
 #include <utility>
 
@@ -148,6 +154,7 @@ Result SwapChain::Initialize(
 		m_backBuffers[index].resource = std::move(backBuffers[index]);
 		m_backBuffers[index].submittedState = D3D12_RESOURCE_STATE_PRESENT;
 	}
+	m_buffersReady = true;
 
 	OutputDebugStringA("[101Renderer] SwapChain initialized.\n");
 
@@ -156,6 +163,7 @@ Result SwapChain::Initialize(
 
 void SwapChain::Finalize() noexcept
 {
+	m_buffersReady = false;
 	for (auto& backBuffer : m_backBuffers)
 	{
 		backBuffer.resource.Reset();
@@ -166,6 +174,135 @@ void SwapChain::Finalize() noexcept
 	m_swapChain.Reset();
 }
 
+// Acquire all replacement buffers and their RTVs before publishing the ready state.
+// An incomplete replacement stays unavailable; logical Window identity is preserved for retry.
+Result SwapChain::RebuildBackBuffers(ID3D12Device* device)
+{
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, BufferCount> resources;
+	for (UINT index = 0; index < BufferCount; ++index)
+	{
+		const HRESULT acquired = m_swapChain->GetBuffer(index, IID_PPV_ARGS(resources[index].GetAddressOf()));
+		if (FAILED(acquired))
+		{
+			return MakeApiFailure("ResizeWindowOutput: GetBuffer", acquired);
+		}
+	}
+
+	Result prepared = m_rtvHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, BufferCount, false);
+	if (!prepared.IsSuccess())
+	{
+		return prepared;
+	}
+
+	D3D12_RENDER_TARGET_VIEW_DESC renderTargetView{};
+	renderTargetView.Format = BackBufferFormat;
+	renderTargetView.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+	for (UINT index = 0; index < BufferCount; ++index)
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE descriptor{};
+		prepared = m_rtvHeap.GetCpuHandle(index, descriptor);
+		if (!prepared.IsSuccess())
+		{
+			return prepared;
+		}
+
+		device->CreateRenderTargetView(resources[index].Get(), &renderTargetView, descriptor);
+	}
+
+	const HRESULT descriptorStatus = device->GetDeviceRemovedReason();
+	if (FAILED(descriptorStatus))
+	{
+		return MakeApiFailure("ResizeWindowOutput: CreateRenderTargetView", descriptorStatus);
+	}
+
+	for (UINT index = 0; index < BufferCount; ++index)
+	{
+		m_backBuffers[index].resource = std::move(resources[index]);
+		m_backBuffers[index].submittedState = D3D12_RESOURCE_STATE_PRESENT;
+	}
+	m_buffersReady = true;
+	return {};
+}
+
+// The Backend has already waited for GPU idle and discarded old command-list references.
+// DXGI requires the old BackBuffer references to be released before replacement.
+// Therefore failure is a paused Window, unlike transactional ordinary render-target Resize.
+Result SwapChain::Resize(ID3D12Device* device, std::uint32_t width, std::uint32_t height)
+{
+	if (!device || !IsInitialized())
+	{
+		return detail::Fail("ResizeWindowOutput: initialized swap chain and device are required.");
+	}
+
+	if (width == 0 || height == 0)
+	{
+		return detail::Fail("ResizeWindowOutput: dimensions must be non-zero.");
+	}
+
+	const bool extentSupported = width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
+		height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+	if (!extentSupported)
+	{
+		return detail::Fail("ResizeWindowOutput: dimensions exceed the supported 2D limit.");
+	}
+
+	if (m_buffersReady)
+	{
+		std::uint32_t currentWidth = 0;
+		std::uint32_t currentHeight = 0;
+		Result queried = GetSize(currentWidth, currentHeight);
+		if (!queried.IsSuccess())
+		{
+			return queried;
+		}
+
+		if (currentWidth == width && currentHeight == height)
+		{
+			return {};
+		}
+	}
+
+	// From here onward callers must not retrieve or Present old buffers.
+	// Only successful reconstruction of the complete replacement restores drawing readiness.
+	// DXGI requires all back-buffer references to be released before ResizeBuffers.
+	// The logical Window handle survives even when replacement is incomplete.
+	m_buffersReady = false;
+	for (auto& buffer : m_backBuffers)
+	{
+		buffer.resource.Reset();
+		buffer.submittedState = D3D12_RESOURCE_STATE_PRESENT;
+	}
+	m_rtvHeap.Finalize();
+
+	const HRESULT resized = m_swapChain->ResizeBuffers(BufferCount, width, height, BackBufferFormat, 0);
+	if (FAILED(resized))
+	{
+		return MakeApiFailure("ResizeWindowOutput: ResizeBuffers", resized);
+	}
+
+	return RebuildBackBuffers(device);
+}
+
+// Query the actual usable BackBuffer extent; a paused Window has no usable size to report.
+// Logical identity alone is insufficient evidence that a physical output is ready.
+Result SwapChain::GetSize(std::uint32_t& width, std::uint32_t& height) const
+{
+	width = 0;
+	height = 0;
+
+	BackBufferInfo current;
+	Result queried = GetCurrentTexture(current);
+	if (!queried.IsSuccess())
+	{
+		return queried;
+	}
+
+	const auto description = current.Resource()->GetDesc();
+	width = static_cast<std::uint32_t>(description.Width);
+	height = description.Height;
+	return {};
+}
+
 Result SwapChain::GetCurrentTexture(BackBufferInfo& output) const
 {
 	output = {};
@@ -173,6 +310,11 @@ Result SwapChain::GetCurrentTexture(BackBufferInfo& output) const
 	if (!IsInitialized())
 	{
 		return { false, "SwapChain: not initialized." };
+	}
+
+	if (!m_buffersReady)
+	{
+		return detail::Fail("SwapChain: buffers are unavailable; retry ResizeWindowOutput before drawing.");
 	}
 
 	const UINT index = m_swapChain->GetCurrentBackBufferIndex();
@@ -226,6 +368,11 @@ Result SwapChain::Present(UINT syncInterval, UINT flags)
 	if (!IsInitialized())
 	{
 		return { false, "SwapChain is not initialized." };
+	}
+
+	if (!m_buffersReady)
+	{
+		return detail::Fail("Present: Window buffers are unavailable after Resize.");
 	}
 
 	const HRESULT hr = m_swapChain->Present(syncInterval, flags);

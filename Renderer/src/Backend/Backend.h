@@ -1,3 +1,8 @@
+// R7 implementation guide: section 4.13.
+// Owns GPU execution and the existing linear per-frame allocation window.
+// Output replacement and capacity growth are legal only outside active or uncertain GPU use.
+// The Renderer remains responsible for public sequencing and resource registries.
+
 #pragma once
 
 #include "Renderer/RendererConfiguration.h"
@@ -32,6 +37,11 @@ public:
 	Result Initialize(const RendererConfiguration& configuration);
 	void Finalize() noexcept;
 
+	[[nodiscard]] ID3D12Device* GetNativeDevice() const noexcept
+	{
+		return m_device.GetNativeDevice();
+	}
+
 	//-------------------------------
 	// Command related operations
 	//-------------------------------
@@ -50,6 +60,11 @@ public:
 
 	// Create the swapchain and reserve the handle for the given Win32 window output description.
 	WindowOutputCreationResult CreateWindowOutput(const Win32WindowOutputDesc& outputDesc);
+	Result ResizeWindowOutput(WindowOutputHandle handle, std::uint32_t width, std::uint32_t height);
+	Result GetWindowOutputSize(WindowOutputHandle handle, std::uint32_t& width, std::uint32_t& height) const;
+
+	// Synchronous boundary for output replacement. Does not permit API reentry.
+	Result WaitIdle();
 
 	Result GetCurrentWindowTexture(WindowOutputHandle handle, BackBufferInfo& output) const;
 	Result QueryTextureInfo(ID3D12Resource* resource, BackBufferInfo& output) const;
@@ -65,6 +80,7 @@ public:
 	//-------------------------------
 	// Frame resource management
 	//-------------------------------
+	Result EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount, UINT retainedCount);
 	Result BeginFrameResources();
 	Result EndFrameResources();
 

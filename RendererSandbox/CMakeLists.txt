@@ -14,3 +14,6 @@ target_link_libraries(RendererSandbox
         101Renderer
         user32
 )
+
+add_dependencies(RendererSandbox RendererShaderAssets)
+target_compile_definitions(RendererSandbox PRIVATE R4_SHADER_DIRECTORY="${CMAKE_BINARY_DIR}/Renderer/shaders")

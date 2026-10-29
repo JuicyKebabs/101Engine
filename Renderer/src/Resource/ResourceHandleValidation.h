@@ -65,7 +65,7 @@ ResourceHandleValidationResult ValidateRegisteredHandle(
 		return ResourceHandleValidationResult::SlotNotRegistered;
 	}
 
-	// Handle is indicating a slot that has a dufferet generation
+	// Handle is indicating a slot that has a defferet generation
 	if (handle.generation != slot.generation)
 	{
 		return ResourceHandleValidationResult::GenerationMismatch;

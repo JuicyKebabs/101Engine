@@ -7,6 +7,7 @@
 #include "Backend/TextureGpuData.h"
 
 #include <cstddef>
+#include <algorithm>
 #include <exception>
 #include <cstdint>
 #include <memory>
@@ -29,6 +30,7 @@ namespace rendering::detail
 struct TextureContent
 {
 	ResourceContentState state;
+	std::uint64_t revision = 1;
 	TextureCpuData cpuData;
 	std::unique_ptr<backend::TextureGpuData> gpuData;
 
@@ -139,20 +141,31 @@ public:
 	// Caller guarantees successful upload/transition Execute + Signal on this
 	// renderer's Graphics Queue. Ready does not imply CPU-observed completion.
 	[[nodiscard]]
-	bool MarkReadyAfterUploadSubmission(TextureHandle handle, TextureContent& content, std::uint64_t fenceValue) noexcept
+	bool MarkReadyAfterUploadSubmission(
+		TextureHandle handle,
+		TextureContent& content,
+		std::uint64_t fenceValue) noexcept
 	{
-		if (FindRegisteredContent(handle) != &content ||
+		if (!OwnsContent(handle, &content) ||
 			content.state.preparationState != ResourcePreparationState::Pending ||
-			!content.gpuData || !content.gpuData->texture || !content.gpuData->GetSrvHandle().ptr ||
-			fenceValue == 0 || fenceValue == (std::numeric_limits<std::uint64_t>::max)())
+			!content.gpuData ||
+			!content.gpuData->texture ||
+			!content.gpuData->GetSrvHandle().ptr ||
+			fenceValue == 0 ||
+			fenceValue == (std::numeric_limits<std::uint64_t>::max)())
 		{
 			return false;
 		}
 
+		content.gpuData->submittedState =
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+		content.gpuData->contentsValid = true;
 		content.uploadFenceValue = fenceValue;
 		content.state.preparationState = ResourcePreparationState::Ready;
 
-		return true; // Does not clear Destroy requested after selection.
+		return true;
 	}
 
 	// Log first. Only ordinary preparation failures; fatal GPU errors use Backend policy.
@@ -160,14 +173,15 @@ public:
 	[[nodiscard]]
 	bool MarkPreparationFailed(TextureHandle handle, TextureContent& content) noexcept
 	{
-		if (FindRegisteredContent(handle) != &content ||
+		if (!OwnsContent(handle, &content) ||
 			(content.state.preparationState != ResourcePreparationState::Pending &&
 				content.state.preparationState != ResourcePreparationState::Failed))
 		{
 			return false;
 		}
 
-		if (m_slots.RequestDestroy(handle) != ResourceHandleValidationResult::Success)
+		if (FindRegisteredContent(handle) == &content &&
+			m_slots.RequestDestroy(handle) != ResourceHandleValidationResult::Success)
 		{
 			return false;
 		}
@@ -175,6 +189,76 @@ public:
 		content.state.preparationState = ResourcePreparationState::Failed;
 
 		return true;
+	}
+
+	// Update the content for the given handle with a new texture description.
+	Result Update(TextureHandle handle, const TextureDesc& desc)
+	{
+		if (!FindForNewUse(handle))
+		{
+			return { false, "update target unavailable" };
+		}
+
+		// Get current content for the given handle
+		auto& current = m_contents[handle.slotIndex];
+
+		if (current->revision == (std::numeric_limits<std::uint64_t>::max)())
+		{
+			return { false, "update target revision is unavailable" };
+		}
+
+		// Generate a new content and copy the given texture description to it.
+		auto candidate = std::make_unique<TextureContent>();
+		Result copied = CopyTextureCpuData(desc, candidate->cpuData);
+
+		if (!copied.IsSuccess())
+		{
+			return copied;
+		}
+
+		// Increment the revision number for the new candidate content.
+		candidate->revision = current->revision + 1;
+
+		// Swap the current content with the candidate
+		// and move the current content to the retired list.
+		m_retired.emplace_back();
+		m_retired.back().handle = handle;
+		m_retired.back().content = std::move(current);
+		current = std::move(candidate);
+
+		return {};
+	}
+
+	// Check if the registry owns the given content for the specified handle.
+	// (search in both registered and retired contents)
+	bool OwnsContent(TextureHandle handle, const TextureContent* content) const noexcept
+	{
+		if (!content)
+		{
+			return false;
+		}
+
+		if (m_slots.ValidateRegistered(handle) == ResourceHandleValidationResult::Success &&
+			m_contents[handle.slotIndex].get() == content)
+		{
+			return true;
+		}
+
+		return std::any_of(m_retired.begin(), m_retired.end(), [&](const auto& x)
+			{
+				return x.handle == handle && x.content.get() == content;
+			}
+		);
+	}
+
+	void CollectRetired(std::uint64_t completed)
+	{
+		// Erase the retired handles if it's no more used by GPU (lastDrawFenceValue <= completed).
+		std::erase_if(m_retired, [&](const auto& x)
+			{
+				return x.content->uploadFenceValue <= completed && x.content->lastDrawFenceValue <= completed;
+			}
+		);
 	}
 
 	void CollectDestroyed(std::uint64_t completedGraphicsFence)
@@ -214,6 +298,14 @@ public:
 private:
 	TextureSlotTable m_slots;									// State management for Texture resources.
 	std::vector<std::unique_ptr<TextureContent>> m_contents;	// Actual Texture data.
+
+	struct Retired
+	{
+		TextureHandle handle;
+		std::unique_ptr<TextureContent> content;
+	};
+
+	std::vector<Retired> m_retired; // Retired Texture resources pending collection after GPU completion.
 };
 
 }

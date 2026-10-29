@@ -1,4 +1,12 @@
+// R7 implementation guide: section 4.28.
+// Record native state only while the command list is in its recording window.
+// Viewport coordinates are validated against the current output extent, not a cached Window size.
+// This file does not decide Engine Canvas coordinates, DPI semantics or Sky ownership.
+
 #include "CommandContext.h"
+#include "Renderer/FrameRenderData.h"
+#include "Failure.h"
+#include <cmath>
 #include "ApiResult.h"
 
 #include <utility>
@@ -164,7 +172,8 @@ Result CommandContext::TransitionResource(
 Result CommandContext::SetRasterOutput(
 	std::span<const D3D12_CPU_DESCRIPTOR_HANDLE> colors,
 	UINT width,
-	UINT height)
+	UINT height,
+	D3D12_CPU_DESCRIPTOR_HANDLE depth)
 {
 	if (!IsRecording() || m_commandList->GetType() != D3D12_COMMAND_LIST_TYPE_DIRECT)
 	{
@@ -176,17 +185,26 @@ Result CommandContext::SetRasterOutput(
 		return { false, "SetRasterOutput: A direct command list is required." };
 	}
 
-	// Invalid format
-	if (colors.empty() || colors.size() > 1 || !colors.front().ptr 
-		|| width == 0 || height == 0 ||
+	if (colors.empty() && !depth.ptr)
+	{
+		return { false, "SetRasterOutput: At least one color or depth descriptor is required." };
+	}
+
+	if (colors.size() > 1 || (!colors.empty() && !colors.front().ptr))
+	{
+		return { false, "SetRasterOutput: unsupported color count or descriptor." };
+	}
+
+	if (width == 0 ||
+		height == 0 ||
 		width > static_cast<UINT>(D3D12_VIEWPORT_BOUNDS_MAX) ||
 		height > static_cast<UINT>(D3D12_VIEWPORT_BOUNDS_MAX))
 	{
-		return { false, "SetRasterOutput: unsupported color count, descriptor or extent." };
+		return { false, "SetRasterOutput: unsupported extent." };
 	}
 
 	// Set the viewport and scissor rectangle to cover the entire render target.
-	m_commandList->OMSetRenderTargets(static_cast<UINT>(colors.size()), colors.data(), FALSE, nullptr);
+	m_commandList->OMSetRenderTargets(static_cast<UINT>(colors.size()), colors.data(), FALSE, depth.ptr ? &depth : nullptr);
 
 	const D3D12_VIEWPORT viewport{
 		0.0f, 0.0f,
@@ -205,6 +223,45 @@ Result CommandContext::SetRasterOutput(
 	m_commandList->RSSetScissorRects(1, &scissorRect);
 
 	return {};
+}
+
+// Viewport belongs to the active View and current output extent.
+// Validate finite positive dimensions and containment before converting to the native rasterizer state.
+// Scissor is separate and will be set per Draw rather than inherited from this operation.
+Result CommandContext::SetViewport(const Viewport& viewport, UINT outputWidth, UINT outputHeight)
+{
+    if (!IsRecording())
+    {
+        return detail::Fail("Viewport requires an active recording.");
+    }
+    const bool finitePosition = std::isfinite(viewport.x) && std::isfinite(viewport.y);
+    const bool finiteSize = std::isfinite(viewport.width) && std::isfinite(viewport.height);
+    if (!finitePosition || !finiteSize)
+    {
+        return detail::Fail("Viewport must be finite.");
+    }
+    const bool validPosition = viewport.x >= 0 && viewport.y >= 0;
+    const bool validSize = viewport.width > 0 && viewport.height > 0;
+    if (!validPosition || !validSize)
+    {
+        return detail::Fail("Viewport position and dimensions are invalid.");
+    }
+    const bool insideWidth = viewport.x + viewport.width <= static_cast<float>(outputWidth);
+    const bool insideHeight = viewport.y + viewport.height <= static_cast<float>(outputHeight);
+    if (!insideWidth || !insideHeight)
+    {
+        return detail::Fail("Viewport exceeds current output dimensions (possibly after Resize).");
+    }
+
+    D3D12_VIEWPORT native;
+    native.TopLeftX = viewport.x;
+    native.TopLeftY = viewport.y;
+    native.Width = viewport.width;
+    native.Height = viewport.height;
+    native.MinDepth = 0;
+    native.MaxDepth = 1;
+    m_commandList->RSSetViewports(1, &native);
+    return {};
 }
 
 Result CommandContext::ClearRenderTarget(

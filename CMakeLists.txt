@@ -1,3 +1,8 @@
+# R7 implementation guide: section 4.41.
+# Register the guide's limited client integration probes.
+# The guide's sibling ../validation addition is external-candidate infrastructure only.
+# Production validation is injected from the implementation workspace instead of adding that dependency here.
+
 cmake_minimum_required(VERSION 3.20)
 project(101Engine)
 
@@ -36,3 +41,4 @@ if(ENGINE101_BUILD_ENGINE)
         add_subdirectory(Tests)
     endif()
 endif()
+add_subdirectory(RendererProbes)

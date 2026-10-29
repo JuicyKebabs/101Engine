@@ -1,5 +1,12 @@
+// R7 implementation guide: section 4.14.
+// Bridge to the existing Queue, Upload and FrameResources implementation.
+// R7 adds idle output replacement and pre-record growth, not a ring or concurrent frames.
+// Signal success, GPU completion and safe CPU reuse remain distinct checkpoints.
+
 #include "Backend.h"
+#include "Failure.h"
 #include "UploadBatch.h"
+#include "Failure.h"
 
 #include <array>
 #include <cassert>
@@ -371,6 +378,107 @@ WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDe
 	return { {}, handle };
 }
 
+// Synchronous replacement boundary, not an additional in-flight-frame mechanism.
+// Refuse active or uncertain execution; only a known Fence completion permits physical replacement.
+// Collect Upload storage after the Queue is known idle.
+Result Backend::WaitIdle()
+{
+	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+	{
+		return detail::Fail("WaitIdle: Backend is not initialized.");
+	}
+
+	if (m_frameActive || m_frameCompletionUnknown)
+	{
+		return detail::Fail("WaitIdle: output replacement requires an inactive healthy frame.");
+	}
+
+	if (m_uploadBatch.IsRecording())
+	{
+		return detail::Fail("WaitIdle: unsubmitted uploads are still recording.");
+	}
+
+	Result completed = m_graphicsQueue.Flush();
+	if (!completed.IsSuccess())
+	{
+		return HandleSubmissionFailure(std::move(completed));
+	}
+
+	completed = CollectUploads();
+	if (!completed.IsSuccess())
+	{
+		return completed;
+	}
+
+	if (m_uploadBatch.IsInFlight())
+	{
+		Result inconsistent = detail::Fail("WaitIdle: upload completion remained unconfirmed after Flush.");
+		return HandleSubmissionFailure(std::move(inconsistent));
+	}
+
+	return {};
+}
+
+// Keep Window identity separate from BackBuffer readiness.
+// Finalize the old graphics context before DXGI releases buffers, because recorded lists can retain references.
+// Re-check device removal after a failure so DeviceLost is not mistaken for an ordinary retry.
+Result Backend::ResizeWindowOutput(
+	WindowOutputHandle handle,
+	std::uint32_t width,
+	std::uint32_t height)
+{
+	if (!IsWindowOutputValid(handle))
+	{
+		return detail::Fail("ResizeWindowOutput: invalid Window handle.");
+	}
+
+	if (width == 0 || height == 0)
+	{
+		return detail::Fail("ResizeWindowOutput: dimensions must be non-zero.");
+	}
+
+	const bool extentSupported = width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
+		height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+	if (!extentSupported)
+	{
+		return detail::Fail("ResizeWindowOutput: dimensions exceed the supported 2D limit.");
+	}
+
+	Result completed = WaitIdle();
+	if (!completed.IsSuccess())
+	{
+		return completed;
+	}
+
+	// This completed list may still refer to the old back buffers. Recreate lazily
+	// in BeginFrameResources after DXGI releases/replaces its resources.
+	m_graphicsContext.Finalize();
+	Result resized = m_windowSwapChain.Resize(m_device.GetNativeDevice(), width, height);
+	if (!resized.IsSuccess())
+	{
+		const Result deviceStatus = m_device.CheckStatus();
+		if (!deviceStatus.IsSuccess())
+		{
+			return HandleSubmissionFailure(std::move(resized));
+		}
+	}
+	return resized;
+}
+
+Result Backend::GetWindowOutputSize(
+	WindowOutputHandle handle,
+	std::uint32_t& width,
+	std::uint32_t& height) const
+{
+	width = 0;
+	height = 0;
+	if (!IsWindowOutputValid(handle))
+	{
+		return detail::Fail("GetWindowOutputSize: invalid Window handle.");
+	}
+	return m_windowSwapChain.GetSize(width, height);
+}
+
 Result Backend::GetCurrentWindowTexture(WindowOutputHandle handle, BackBufferInfo& output) const
 {
 	output = {};
@@ -536,6 +644,19 @@ Result Backend::PrepareTexture(
 	return result;
 }
 
+// Estimate and grow storage before BeginFrameResources/any address allocation.
+// Changing a buffer or descriptor heap after recording begins would invalidate already-issued GPU addresses.
+Result Backend::EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount, UINT retainedCount)
+{
+    if (m_frameActive || m_frameCompletionUnknown)
+    {
+        return detail::Fail("Frame capacity may change only outside an active Frame.");
+    }
+    return m_frameResources.EnsureCapacity(constantBytes, descriptorCount, retainedCount);
+}
+
+// Open the existing single-frame linear allocation window after prior use has completed.
+// This does not rotate through a ring or permit multiple simultaneous submitted frames.
 Result Backend::BeginFrameResources()
 {
 	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
@@ -568,6 +689,8 @@ Result Backend::BeginFrameResources()
 	return {};
 }
 
+// End CPU allocation/borrowing, then reclaim only after the frame Fence is known complete.
+// Unknown completion must retain the buffers, descriptors and COM references rather than resetting them.
 Result Backend::EndFrameResources()
 {
 	if (!m_frameActive)

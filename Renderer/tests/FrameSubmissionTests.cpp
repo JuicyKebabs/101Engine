@@ -1,3 +1,7 @@
+// R7 implementation guide: section 4.35.
+// Follow the new submission contract without weakening value-ownership checks.
+// Multiple Views are supported; two Scene Views writing the same color output are still rejected.
+
 #include "Renderer/Renderer.h"
 #include "Renderer/Win32WindowOutputDesc.h"
 
@@ -97,11 +101,16 @@ void VerifyFrameSubmission()
 	Require(invalidView.objects.data() == invalidStorage && invalidView.objects.size() == 1, "Rejected input was moved.");
 	CheckSkipped(renderer);
 
-	FrameRenderData tooManyViews;
-	tooManyViews.views.push_back({ output.handle });
-	tooManyViews.views.push_back({ output.handle });
-	Require(!renderer.SubmitFrameRenderData(std::move(tooManyViews)).IsSuccess(), "Unsupported multiple Views were accepted.");
-	Require(tooManyViews.views.size() == 2, "Rejected Views were moved.");
+    FrameRenderData duplicateSceneOutput;
+    RenderView firstView;
+    firstView.output = output.handle;
+    firstView.id = 1;
+    duplicateSceneOutput.views.push_back(firstView);
+    RenderView secondView = firstView;
+    secondView.id = 2;
+    duplicateSceneOutput.views.push_back(secondView);
+    Require(!renderer.SubmitFrameRenderData(std::move(duplicateSceneOutput)).IsSuccess(), "Duplicate Scene output was accepted.");
+    Require(duplicateSceneOutput.views.size() == 2, "Rejected Views were moved.");
 
 	const std::array<MeshVertex, 3> vertices{};
 	GeometryDesc geometryDesc{};
@@ -115,20 +124,23 @@ void VerifyFrameSubmission()
 	Check(texture.status);
 
 	FrameRenderData frame;
-	frame.objects.push_back({ geometry.handle, texture.handle });
-	frame.objects.push_back({ geometry.handle, texture.handle });
+	frame.objects.push_back({geometry.handle, {}});
+	frame.objects.push_back({geometry.handle, {}});
 	frame.views.push_back({ output.handle });
 	Check(renderer.SubmitFrameRenderData(std::move(frame)));
 
 	FrameRenderData duplicate;
-	duplicate.objects.push_back({ geometry.handle, texture.handle });
+	duplicate.objects.push_back({geometry.handle, {}});
 	auto* duplicateStorage = duplicate.objects.data();
 	Require(!renderer.SubmitFrameRenderData(std::move(duplicate)).IsSuccess(), "Duplicate Submit was accepted.");
 	Require(duplicate.objects.data() == duplicateStorage && duplicate.objects.size() == 1, "Duplicate Submit took its input.");
 
 	Check(renderer.DestroyGeometry(geometry.handle));
 	Check(renderer.DestroyTexture(texture.handle));
-	CheckProcessed(renderer.Render());
+	const auto destroyedDependencies = renderer.Render();
+	CheckProcessed(destroyedDependencies);
+	Require(destroyedDependencies.drawnObjects == 0, "Destroyed Geometry was drawn.");
+	Require(destroyedDependencies.diagnostics.size() == 2, "Destroyed Geometry was not diagnosed per Object.");
 	CheckSkipped(renderer);
 
 	// The same now-destroyed handles are unavailable for a new submission.

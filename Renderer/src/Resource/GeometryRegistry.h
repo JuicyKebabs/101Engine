@@ -7,6 +7,7 @@
 #include "Backend/GeometryGpuData.h"
 
 #include <cstddef>
+#include <algorithm>
 #include <exception>
 #include <cstdint>
 #include <memory>
@@ -29,6 +30,7 @@ namespace rendering::detail
 struct GeometryContent
 {
 	ResourceContentState state;
+	std::uint64_t revision = 1;
 	GeometryCpuData cpuData;
 	std::unique_ptr<backend::GeometryGpuData> gpuData;
 
@@ -143,12 +145,12 @@ public:
 		GeometryContent& content,
 		std::uint64_t fenceValue) noexcept
 	{
-		bool finded = FindRegisteredContent(handle) == &content;
+		bool finded = OwnsContent(handle, &content);
 		bool validState = content.state.preparationState == ResourcePreparationState::Pending;
 		bool validResource = content.gpuData && content.gpuData->vertices.GetNativeResource();
 		bool validIndices = !!content.cpuData.indices.empty() ? true : (content.gpuData && content.gpuData->indices.GetNativeResource());
 		bool validFence = fenceValue != 0 && fenceValue != (std::numeric_limits<std::uint64_t>::max)();
-		
+
 		if (!finded || !validState || !validResource || !validIndices || !validFence)
 		{
 			return false;
@@ -166,7 +168,7 @@ public:
 		GeometryHandle handle,
 		GeometryContent& content) noexcept
 	{
-		bool finded = FindRegisteredContent(handle) == &content;
+		bool finded = OwnsContent(handle, &content);	// Include retired contents.
 		bool validState = 
 			content.state.preparationState == ResourcePreparationState::Pending ||
 			content.state.preparationState == ResourcePreparationState::Failed;
@@ -176,13 +178,85 @@ public:
 			return false;
 		}
 
-		if (m_slots.RequestDestroy(handle) != ResourceHandleValidationResult::Success)
+		if (FindRegisteredContent(handle) == &content &&
+			m_slots.RequestDestroy(handle) != ResourceHandleValidationResult::Success)
 		{
 			return false;
 		}
 
 		content.state.preparationState = ResourcePreparationState::Failed;
 		return true;
+	}
+
+	// Update the CPU data of the geometry resource for the given handle with the new geometry description.
+	Result Update(GeometryHandle handle, const GeometryDesc& desc)
+	{
+		if (!FindForNewUse(handle))
+		{
+			return { false, "update target unavailable" };
+		}
+
+		// Get current content for the given handle
+		auto& current = m_contents[handle.slotIndex];
+
+		if (current->revision == (std::numeric_limits<std::uint64_t>::max)())
+		{
+			return { false, "update target revision is unavailable" };
+		}
+
+		// Generate a new content and copy the given geometry description to it.
+		auto candidate = std::make_unique<GeometryContent>();
+		Result copied = CopyGeometryCpuData(desc, candidate->cpuData);
+
+		if (!copied.IsSuccess())
+		{
+			return copied;
+		}
+
+		// Increment the revision number for the new candidate content.
+		candidate->revision = current->revision + 1;
+
+		// Swap the current content with the candidate
+		// and move the current content to the retired list.
+		m_retired.emplace_back();
+		m_retired.back().handle = handle;
+		m_retired.back().content = std::move(current);
+		current = std::move(candidate);
+
+		return {};
+	}
+
+	// Check if the registry owns the given content for the specified handle.
+	// (search in both registered and retired contents)
+	bool OwnsContent(GeometryHandle handle, const GeometryContent* content) const noexcept
+	{
+		if (!content)
+		{
+			return false;
+		}
+
+		if (m_slots.ValidateRegistered(handle) == ResourceHandleValidationResult::Success &&
+			m_contents[handle.slotIndex].get() == content)
+		{
+			return true;
+		}
+
+		// Check if the content is in the retired list.
+		return std::any_of(m_retired.begin(), m_retired.end(), [&](const auto& x)
+			{
+				return x.handle == handle && x.content.get() == content;
+			}
+		);
+	}
+
+	void CollectRetired(std::uint64_t completed)
+	{
+		// Erase the retired handles if it's no more used by GPU (lastDrawFenceValue <= completed).
+		std::erase_if(m_retired, [&](const auto& x)
+			{
+				return x.content->uploadFenceValue <= completed && x.content->lastDrawFenceValue <= completed;
+			}
+		);
 	}
 
 	void CollectDestroyed(std::uint64_t completedGraphicsFence)
@@ -224,6 +298,14 @@ public:
 private:
 	GeometrySlotTable m_slots;									// State management for geometry resources.
 	std::vector<std::unique_ptr<GeometryContent>> m_contents;	// Actual geometry data (CPU data and GPU resources).
+
+	struct Retired
+	{
+		GeometryHandle handle;
+		std::unique_ptr<GeometryContent> content;
+	};
+
+	std::vector<Retired> m_retired;	// Store replaced contents for GPU completion before collection.
 };
 
 }

@@ -39,6 +39,8 @@ private:
 	{
 		ID3D12Resource* resource = nullptr;
 		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
+		const GraphTextureBinding* binding = nullptr;
+		bool contentsValid = false;
 	};
 
 	RenderGraph& m_graph;
