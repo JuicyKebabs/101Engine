@@ -7,6 +7,7 @@
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/UI/Canvas.h"
+#include "Engine/Resource/RenderAssetResources.h"
 #include "Engine/Core/Serialization/JsonMath.h"
 
 void UIRenderer::OnAttachOverride()
@@ -248,10 +249,44 @@ void UIRenderer::SetCanvasActorReference(const ActorReference& value)
 	}
 }
 
-void UIRenderer::ApplyBlendModeToRenderTemplates()
+bool UIRenderer::SynchronizeRenderResources()
 {
-	for (UIRenderElement& element : m_renderTemplate)
-	{
-		element.materialDesc.psoKey.blend = GetBlendMode();
-	}
+    const EngineContext* context = GetEngineContext();
+    if (!context || !context->pRenderer || !context->pRenderAssets)
+    {
+        return true;
+    }
+
+    const bool screen = GetRenderSpace() == RenderSpace::Screen;
+    for (UIRenderElement& element : m_renderTemplate)
+    {
+        auto& material = element.materialDesc;
+        if (!m_materialDirty && material.screen == screen)
+        {
+            continue;
+        }
+
+        if (material.handle == rendering::MaterialHandle{})
+        {
+            continue;
+        }
+
+        Vector2 centerPivot;
+        centerPivot.x = 0.5f;
+        centerPivot.y = 0.5f;
+        auto description = context->pRenderAssets->MakeMaterial(false, screen, material.textureHandle,
+            m_uvScale, m_uvOffset, centerPivot, m_flipX, m_flipY);
+        const auto updated = context->pRenderer->UpdateMaterial(material.handle, description);
+        if (!updated.IsSuccess())
+        {
+            DBG("UIImage Material update: %s", updated.message.c_str());
+            return false;
+        }
+
+        material.description = std::move(description);
+        material.screen = screen;
+    }
+
+    m_materialDirty = false;
+    return true;
 }

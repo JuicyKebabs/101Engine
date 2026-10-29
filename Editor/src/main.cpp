@@ -1,35 +1,44 @@
 #include "Core/EditorApp.h"
 #include "Engine/Core/Path/PathManager.h"
+#include "Engine/Core/Path/ExecutablePath.h"
 #include <objbase.h>
-#include <windows.h>
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+    const auto executablePath = GetExecutableDirectory() / L"101Editor.exe";
 
-    if (!PathManager::Initialize(exePath))
+    if (!PathManager::Initialize(executablePath.string()))
     {
-        return -1;
+        MessageBoxW(nullptr, L"project.101 is not found", L"101Engine", MB_OK);
+        return EXIT_FAILURE;
     }
 
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const HRESULT comStatus = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
-    if (FAILED(hr))
+    if (FAILED(comStatus))
     {
-        return -1;
+        return EXIT_FAILURE;
     }
 
+    int exitCode = EXIT_FAILURE;
     EditorApp* app = EditorApp::GetInstance();
 
-    if (!app->Initialize())
+    try
     {
-        return -1;
+        if (app->Initialize())
+        {
+            // Run owns the loop outcome; a renderer failure must survive the
+            // common cleanup below instead of being overwritten with success.
+            exitCode = app->Run();
+        }
+    }
+    catch (const std::exception& error)
+    {
+        MessageBoxA(nullptr, error.what(), "101Engine", MB_OK);
     }
 
-    app->Run();
+    // Partial initialization follows the same reverse ownership order.
     app->Terminate();
-
     CoUninitialize();
-    return 0;
+    return exitCode;
 }

@@ -1,8 +1,7 @@
 #include "AssetManager.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Resource/MetaFile.h"
-#include "Engine/Resource/MeshManager.h"
-#include "Engine/Resource/TextureManager.h"
+#include "Engine/Resource/RenderAssetResources.h"
 #include "Engine/Resource/BuiltinMeshAssets.h"
 #include "Engine/Audio/AudioManager.h"
 #include "Engine/Core/Debug/Debug.h"
@@ -28,29 +27,37 @@ namespace
 
 bool AssetManager::Initialize(
 	const std::string& projectDir,
-	TextureManager* pTextureManager,
-	MeshManager* pMeshManager,
+	rendering::Renderer* renderer,
+    RenderAssetResources* renderAssets,
 	AssetCatalogError* outError)
 {
-	return Initialize(projectDir, pTextureManager, pMeshManager, nullptr, outError);
+	return Initialize(projectDir, renderer, renderAssets, nullptr, outError);
 }
 
 bool AssetManager::Initialize(
 	const std::string& projectDir,
-	TextureManager* pTextureManager,
-	MeshManager* pMeshManager,
+	rendering::Renderer* renderer,
+    RenderAssetResources* renderAssets,
 	AudioManager* pAudioManager,
 	AssetCatalogError* outError)
 {
+    if (!m_sceneUsage.empty())
+    {
+        return FailCatalog(outError, AssetCatalogErrorCode::IoError, projectDir,
+            "Cannot reinitialize AssetManager while Scene resource ownership is live.");
+    }
+
 	if (!ScanAssetDirectory(projectDir, "", outError))
 	{
 		return false;
 	}
 
-	m_pTextureManager = pTextureManager;
-	m_pMeshManager = pMeshManager;
+	m_renderer = renderer;
+    m_renderAssets = renderAssets;
 	m_pAudioManager = pAudioManager;
-	m_loadedMeshes.clear();
+	m_loadedModels.clear();
+    m_dependencyTextures.clear();
+    m_sceneUsage.clear();
 	m_loadedTextures.clear();
 	m_loadedAudio.clear();
 	return true;
@@ -393,73 +400,6 @@ std::vector<AssetEntry> AssetManager::GetAssetEntries(AssetType type) const
 
 	return entries;
 }	
-
-MeshHandle AssetManager::GetMeshHandle(const Guid& guid)
-{
-	auto cashed = m_loadedMeshes.find(guid);
-
-	if (cashed != m_loadedMeshes.end())
-	{
-		return cashed->second; // Return cached handle if already loaded
-	}
-
-	// Lookup the asset entry for the given GUID
-	const AssetEntry* entryPtr = GetAssetEntry(guid);
-
-	// Return error mesh handle if the asset is unknown or not a mesh
-	if (!entryPtr || entryPtr->type != AssetType::Mesh)
-	{
-		DBG("AssetManager: GetMeshHandle - unknown or non-mesh asset, using error mesh.");
-		return m_pMeshManager->GetErrorMeshHandle();
-	}
-
-	if (const BuiltinMeshAsset* builtin = FindBuiltinMeshAsset(guid))
-	{
-		const MeshHandle handle = m_pMeshManager->LoadDefaultMesh(builtin->mesh);
-		m_loadedMeshes[guid] = handle;
-		return handle;
-	}
-
-	// Load mesh
-	const std::wstring fullPath =
-		(fs::path(m_assetRoot) / fs::path(entryPtr->relativePath)).wstring();
-	auto& handles = m_pMeshManager->LoadModel(fullPath);
-
-	// If no handles were returned, use the error mesh handle; otherwise, use the first handle
-	MeshHandle handle = handles.empty()
-		? m_pMeshManager->GetErrorMeshHandle() 
-		: handles[0];
-
-	// Cache the loaded mesh handle
-	m_loadedMeshes[guid] = handle;
-	return handle;
-}
-
-TextureHandle AssetManager::GetTextureHandle(const Guid& guid)
-{
-	// Return cached handle if the texture has already been loaded
-	auto cashed = m_loadedTextures.find(guid);
-
-	if (cashed != m_loadedTextures.end())
-	{
-		return cashed->second;
-	}
-
-	const AssetEntry* entryPtr = GetAssetEntry(guid);
-
-	if (!entryPtr || entryPtr->type != AssetType::Texture)
-	{
-		DBG("AssetManager: GetTextureHandle - unknown or non-texture asset, using error texture.");
-		return m_pTextureManager->GetErrorTextureHandle();
-	}
-
-	// If the texture has not been loaded yet, load it and cache the handle and return it
-	const std::wstring fullPath =
-		(fs::path(m_assetRoot) / fs::path(entryPtr->relativePath)).wstring();
-	TextureHandle handle = m_pTextureManager->LoadTexture(fullPath);
-	m_loadedTextures[guid] = handle;
-	return handle;
-}
 
 AudioHandle AssetManager::GetAudioHandle(const Guid& guid)
 {

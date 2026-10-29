@@ -5,12 +5,11 @@
 #include <string>
 #include <string_view>
 
-#include "Engine/Engine.h"
-#include "Engine/Graphics/Renderer.h"
 #include "Engine/Resource/AssetManager.h"
+#include "Engine/Resource/RenderAssetResources.h"
+#include "Rendering/EditorRenderAssets.h"
+#include "Rendering/EditorImGuiAdapter.h"
 #include "Engine/ActorImprint/ActorImprintSystem.h"
-#include "Engine/Resource/TextureManager.h"
-#include "Engine/Resource/MeshManager.h"
 #include "Engine/Input/InputManager.h"
 #include "Engine/Core/Time/Time.h"
 #include "Engine/Core/Context/Context.h"
@@ -64,7 +63,9 @@ public:
     }
 
     bool Initialize();
-    void Run();
+    // Return the actual loop outcome so a rendering failure is not reported
+    // as a successful process exit. Terminate remains the single cleanup path.
+    int Run();
     void Terminate();
 
 private:
@@ -77,10 +78,17 @@ private:
 
     Window m_window;
 
-    std::unique_ptr<Engine> m_pEngine;
-    std::unique_ptr<Renderer> m_pRenderer;
-    std::unique_ptr<TextureManager> m_pTextureManager;
-    std::unique_ptr<MeshManager> m_pMeshManager;
+    // Sticky for one application run. Posting WM_QUIT alone does not unwind
+    // Update/Render, so every frame boundary also observes this stop condition.
+    // It does not own resources and does not change Edit synchronization timing.
+    bool m_renderingStopped = false;
+
+    std::unique_ptr<rendering::Renderer> m_pRenderer;
+    rendering::WindowOutputHandle m_windowOutput;
+    std::unique_ptr<RenderAssetResources> m_renderAssets;
+    std::unique_ptr<EditorRenderAssets> m_editorRenderAssets;
+    std::unique_ptr<rendering::editor::EditorImGuiAdapter> m_imguiAdapter;
+    ImTextureID m_sceneImage = ImTextureID_Invalid;
     std::unique_ptr<AssetManager> m_pAssetManager;
     std::unique_ptr<ActorImprintSystem> m_pActorImprintSystem;
 
@@ -124,8 +132,6 @@ private:
     HMODULE m_hGameCodeDll = nullptr;    // Handle to the loaded game code DLL (for hot-reloading)
 
     // Render data for rendering the outline of a selected object in the scene view
-	FrameRenderData m_selectionRenderData;
-	FrameRenderData m_colliderDebugRenderData;
 	bool m_showColliders = false;
 
 private:
@@ -197,13 +203,8 @@ private:
     void Update(float deltaTime);
     void Render();
 
-    void RenderEditViewport(SceneBase* activeScene, GpuTexture* sceneColor);
-    void RenderPlayViewport(SceneBase* activeScene, GpuTexture* sceneColor);
-
-    void RenderShadowPass();
-	void RenderWorldPass();
-	void RenderSelectionPass();
-	void RenderColliderDebugPass();
+    void AppendEditorViewport(rendering::FrameRenderData& frame, SceneBase* activeScene);
+    bool CheckRenderingResult(const rendering::Result& result);
 
     void RenderImGui();
     void RenderMainDockSpace();
@@ -231,15 +232,6 @@ private:
 
     void ApplySceneViewResizeRequest();
     void ApplySceneRenderTargetSizeToScene(SceneBase& scene);
-
-    // Build render data for the selected object in the scene view
-    // (used to render an outline around the selected object)
-	void BuildSelectionRenderData(
-        RenderSpace targetRenderSpace,
-        const CameraInfo& viewportCameraInfo,
-        const Canvas* canvasViewRoot
-	);
-	void BuildColliderDebugRenderData(SceneBase* scene);
 
     // Helper function to build CameraInfo for the current viewport size
     // Camera matrix is built based on the current viewport mode (Scene or Canvas)

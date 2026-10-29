@@ -1,321 +1,18 @@
 #pragma once
-#include <vector>
-#include "Engine/Component/AssimpNodeTransformAnim.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Graphics/VertexTypes.h"
+#include <vector>
+#include <string>
+#include <unordered_map>
 
-// Forward declarations
-class Renderer;
-class TextureManager;
-class MeshManager;
-class MeshGPU;
-struct NodeAnimationAsset;
-
-//=======================================================================================================
-// Pipeline State Object (PSO) key structure,
-// and related enumerations for shader management and rendering configurations
-//=======================================================================================================
-
-//-------------------------------------------------------------------------------------
-// File IDs for shaders (used to identify which shader file to use)
-//-------------------------------------------------------------------------------------
-// Enumeration for vertex shader IDs
-enum class VS_FILE_ID
-{
-	Mesh = 0,
-	Sprite,
-	Wave,
-	UI,
-	ShadowMap,
-	PostEffect,
-};
-// Enumeration for pixel shader IDs
-enum class PS_FILE_ID
-{
-	Mesh = 0,
-	Sprite,
-	Wave,
-	UI,
-	PostEffect,
-	SelectionMask,
-	SelectionOutline,
-	SelectionSpriteMask,
-};
-
-//-------------------------------------------------------------------------------------
-// Entry point IDs for shaders (used to identify which entry point in the shader file to use)
-//-------------------------------------------------------------------------------------
-// Enumeration for vertex shader entry points
-enum class VS_ENTRY_ID : uint16_t
-{
-	Main = 0,
-};
-// Enumeration for pixel shader entry points
-enum class PS_ENTRY_ID : uint16_t
-{
-	Main = 0,
-};
-
-//-------------------------------------------------------------------------------------
-// Defines for shaders (used to specify shader variants based on compile-time options)
-//-------------------------------------------------------------------------------------
-// Vertex shader defines (using bit flags)
-enum class VS_DEFINE : uint64_t
-{
-	None = 0,
-	Test = 1ull << 1,
-};
-// Pixel shader defines (using bit flags)
-enum class PS_DEFINE : uint64_t
-{
-	None = 0,
-	UseMask = 1ull << 1,
-	MultiplyAlphaControll = 1ull << 2,
-	UseLighting = 1ull << 3,
-};
-// Common shader defines (using bit flags)
-enum class COMMON_SHADER_DEFINE : uint64_t
-{
-	None = 0,
-	Test = 1ull << 1,
-};
-
-//-------------------------------------------------------------------------------------
-// Shader key structure for caching compiled shaders, 
-// combining file ID, entry point, and defines
-//-------------------------------------------------------------------------------------
-struct VS_KEY
-{
-	VS_FILE_ID fileID = VS_FILE_ID::Mesh;		//Vertex shader file ID
-	VS_ENTRY_ID entryID = VS_ENTRY_ID::Main;	//Vertex shader entry point
-	uint64_t defines = 0;						//Vertex shader defines
-
-	bool operator == (const VS_KEY& other) const
-	{
-		return 
-			fileID == other.fileID &&
-			entryID == other.entryID &&
-			defines == other.defines;
-	}
-};
-struct PS_KEY
-{
-	PS_FILE_ID fileID = PS_FILE_ID::Mesh;		//Pixel shader file ID
-	PS_ENTRY_ID entryID = PS_ENTRY_ID::Main;	//Pixel shader entry point
-	uint64_t defines = 0;						//Pixel shader defines
-
-	bool operator == (const PS_KEY& other) const
-	{
-		return 
-			fileID == other.fileID &&
-			entryID == other.entryID &&
-			defines == other.defines;
-	}
-};
-
-//-------------------------------------------------------------------------------------
-// Enumerations for rendering states (blend modes, depth stencil modes, culling modes)
-//-------------------------------------------------------------------------------------
-// Blend modes
-enum class BlendMode
-{
-	Opaque,
-	Alpha,
-	AddAlpha,
-	Add,
-	Multiply,
-};
-// Depth stencil modes
-enum class DepthMode
-{
-	Disable,
-	TestWrite,
-	TestNoWrite,
-};
-// Culling modes
-enum class CullMode
-{
-	None,
-	Front,
-	Back,
-};
-
-enum class FillMode
-{
-	Solid,
-	Wireframe,
-};
-
-// Render target formats
-enum class RenderTargetFormat
-{
-	LDR,
-	HDR,
-};
-
-// Pipeline State Object (PSO) key structure
-struct PSOKey
-{
-	VS_KEY vsKey;											// Vertex shader key
-	PS_KEY psKey;											// Pixel shader key
-	uint64_t commonDefines = 0;								// Common shader defines
-	BlendMode  blend = BlendMode::Opaque;					// Blend mode
-	DepthMode  depth = DepthMode::Disable;					// Depth stencil mode
-	CullMode  cull = CullMode::None;						// Culling mode
-	RenderTargetFormat rtvFormat = RenderTargetFormat::LDR;	// Render target format
-	bool indexFree = false;									// Whether to use index-free drawing (e.g., for sprites)
-	bool depthOnly = false;									// Whether this PSO is for depth-only rendering (e.g., shadow maps)
-	FillMode fill = FillMode::Solid;						// Rasterizer fill mode
-
-	// Equality operators for PSOKey
-	bool operator == (const PSOKey& other) const
-	{
-		return 
-			vsKey == other.vsKey &&
-			psKey == other.psKey &&
-			commonDefines == other.commonDefines &&
-			blend == other.blend &&
-			depth == other.depth &&
-			cull == other.cull &&
-			rtvFormat == other.rtvFormat &&
-			indexFree == other.indexFree &&
-			depthOnly == other.depthOnly &&
-			fill == other.fill;
-	}
-	bool operator != (const PSOKey& other) const
-	{
-		return !(*this == other);
-	}
-
-	// Helper functions to create modified PSOKeys with additional defines
-	PSOKey WithLighting() const {
-		PSOKey k = *this;
-		k.psKey.defines |= static_cast<uint64_t>(PS_DEFINE::UseLighting);
-		return k;
-	}
-
-	// Add multiple vertex shader defines at once
-	PSOKey AddVSDefines(std::initializer_list<VS_DEFINE> defines) const
-	{
-		PSOKey k = *this;
-
-		for (auto d : defines) {
-			k.vsKey.defines |= static_cast<uint64_t>(d);
-		}
-
-		return k;
-	}
-	// Add multiple pixel shader defines at once
-	PSOKey AddPSDefines(std::initializer_list<PS_DEFINE> defines) const
-	{
-		PSOKey k = *this;
-
-		for (auto d : defines) {
-			k.psKey.defines |= static_cast<uint64_t>(d);
-		}
-
-		return k;
-	}
-	// Add multiple common shader defines at once
-	PSOKey AddCommonDefines(std::initializer_list<COMMON_SHADER_DEFINE> defines) const
-	{
-		PSOKey k = *this;
-
-		for (auto d : defines) {
-			k.commonDefines |= static_cast<uint64_t>(d);
-		}
-
-		return k;
-	}
-
-	// Get combined defines for vertex shader (common + specific)
-	uint64_t GetCombinedDefinesVS() const {
-		return vsKey.defines | commonDefines;
-	}
-	// Get combined defines for pixel shader (common + specific)
-	uint64_t GetCombinedDefinesPS() const {
-		return psKey.defines | commonDefines;
-	}
-};
-
-namespace PSO_KEY_DEFAULT
-{
-// Predefined PSO keys for common rendering configurations
-inline constexpr PSOKey MESH_OPAQUE{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
-	BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR};
-inline constexpr PSOKey MESH_TRANSPARENT{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
-	BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
-inline constexpr PSOKey MESH_MASKED{VS_KEY{.fileID = VS_FILE_ID::Mesh},
-	PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque,
-	DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR};
-inline constexpr PSOKey MESH_ADDITIVE{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
-	BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
-inline constexpr PSOKey MESH_MULTIPLY{VS_KEY{.fileID = VS_FILE_ID::Mesh},
-	PS_KEY{.fileID = PS_FILE_ID::Mesh, .defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0,
-	BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
-inline constexpr PSOKey MESH_SKY{VS_KEY{.fileID = VS_FILE_ID::Mesh}, PS_KEY{.fileID = PS_FILE_ID::Mesh}, 0,
-	BlendMode::Opaque, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR};
-
-inline constexpr PSOKey SPRITE_OPAQUE{VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0,
-	BlendMode::Opaque, DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true};
-inline constexpr PSOKey SPRITE_TRANSPARENT{VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite},
-	0, BlendMode::Alpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true};
-inline constexpr PSOKey SPRITE_MASKED{VS_KEY{.fileID = VS_FILE_ID::Sprite},
-	PS_KEY{.fileID = PS_FILE_ID::Sprite, .defines = static_cast<uint64_t>(PS_DEFINE::UseMask)}, 0, BlendMode::Opaque,
-	DepthMode::TestWrite, CullMode::None, RenderTargetFormat::LDR, true};
-inline constexpr PSOKey SPRITE_ADDITIVE{VS_KEY{.fileID = VS_FILE_ID::Sprite}, PS_KEY{.fileID = PS_FILE_ID::Sprite}, 0,
-	BlendMode::AddAlpha, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true};
-inline constexpr PSOKey SPRITE_MULTIPLY{VS_KEY{.fileID = VS_FILE_ID::Sprite},
-	PS_KEY{.fileID = PS_FILE_ID::Sprite, .defines = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll)}, 0,
-	BlendMode::Multiply, DepthMode::TestNoWrite, CullMode::None, RenderTargetFormat::LDR, true};
-
-inline constexpr PSOKey UI{VS_KEY{.fileID = VS_FILE_ID::UI}, PS_KEY{.fileID = PS_FILE_ID::UI}, 0, BlendMode::Alpha,
-	DepthMode::Disable, CullMode::Front, RenderTargetFormat::LDR, true};
-}
-
-// Hash function for PSOKey to be used in unordered_map
-struct PSOKeyHash
-{
-	size_t operator()(const PSOKey& k) const noexcept
-	{
-		size_t h1 = std::hash<VS_FILE_ID>{}(k.vsKey.fileID) ^ std::hash<PS_FILE_ID>{}(k.psKey.fileID);
-		size_t h2 = std::hash<VS_ENTRY_ID>{}(k.vsKey.entryID) ^ std::hash<PS_ENTRY_ID>{}(k.psKey.entryID);
-		size_t h3 = std::hash<int>{}(static_cast<int>(k.blend)) ^ std::hash<int>{}(static_cast<int>(k.depth)) ^
-					std::hash<int>{}(static_cast<int>(k.cull)) ^ std::hash<int>{}(static_cast<int>(k.rtvFormat));
-		size_t h4 = std::hash<bool>{}(k.indexFree) ^ std::hash<bool>{}(k.depthOnly);
-		size_t h5 = std::hash<uint64_t>{}(k.commonDefines) ^ std::hash<uint64_t>{}(k.vsKey.defines) ^
-					std::hash<uint64_t>{}(k.psKey.defines);
-		size_t h6 = std::hash<int>{}(static_cast<int>(k.fill));
-		return ((((h1 ^ (h2 << 1)) ^ (h3 << 2)) ^ (h4 << 3)) ^ (h5 << 4)) ^ (h6 << 5);
-	}
-};
-
-// Render queue enumeration
-enum class RenderQueue
-{
-	Invalied = -1,
-	Opaque = 0,
-	Additive = 1,
-	Transparent = 2,
-	Screenspace = 3,
-};
-
-// Helper function to determine render queue based on blend mode
-static inline RenderQueue GetRenderQueueFromBlendMode(BlendMode blendMode)
-{
-	return (blendMode == BlendMode::Opaque) ? RenderQueue::Opaque : RenderQueue::Transparent;
-}
-
-//=======================================================================================================
-//•`‰æî•ñ\‘¢‘ÌŒQ
-//=======================================================================================================
-
+// CPU primitive/model vocabulary. Native PSO keys and old render queues were
+// removed; file import is supplied separately by RendererAssets.
 // Type of Billboard
 enum class BillboardType
 {
-	None,			//ƒrƒ‹ƒ{[ƒh‚È‚µ
-	Spherical,		//‘S²ƒrƒ‹ƒ{[ƒh
-	Cylindrical,	//‰~’Œƒrƒ‹ƒ{[ƒh
+	None,			//ãƒ“ãƒ«ãƒœãƒ¼ãƒ‰ãªã—
+	Spherical,		//å…¨è»¸ãƒ“ãƒ«ãƒœãƒ¼ãƒ‰
+	Cylindrical,	//å††æŸ±ãƒ“ãƒ«ãƒœãƒ¼ãƒ‰
 };
 
 //=======================================================================================================
@@ -338,7 +35,6 @@ struct Mesh
 	};
 	Vector3 boundsCenter{};				// Bounding sphere center (for sorting)
 	float boundsRadius = 0.0f;			// Bounding sphere radius (for sorting)
-	NodeAnimationAsset nodeAnimAsset{};	// Node animation asset
 };
 
 // Bone data structure
@@ -378,144 +74,144 @@ enum class DefaultMesh
 };
 
 //=======================
-//lŠp•½–Ê
+//å››è§’å¹³é¢
 //=======================
-//lŠp•½–Ê‚Ì’¸“_ƒf[ƒ^
+//å››è§’å¹³é¢ã®é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 static const Vertex QuadVertices[4] =
 {
-	{{-0.5f, 0.5f, 0.0f}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//’¸“_0
-	{{ 0.5f, 0.5f, 0.0f}, {0,0,1}, {1,0}, {1,0,0}, {1,1,1,1}},	//’¸“_1
-	{{ 0.5f,-0.5f, 0.0f}, {0,0,1}, {1,1}, {1,0,0}, {1,1,1,1}},	//’¸“_2
-	{{-0.5f,-0.5f, 0.0f}, {0,0,1}, {0,1}, {1,0,0}, {1,1,1,1}},	//’¸“_3
+	{{-0.5f, 0.5f, 0.0f}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹0
+	{{ 0.5f, 0.5f, 0.0f}, {0,0,1}, {1,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹1
+	{{ 0.5f,-0.5f, 0.0f}, {0,0,1}, {1,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹2
+	{{-0.5f,-0.5f, 0.0f}, {0,0,1}, {0,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹3
 };
 
-//lŠp•½–Ê‚ÌƒCƒ“ƒfƒbƒNƒXƒf[ƒ^
+//å››è§’å¹³é¢ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿
 inline uint32_t QuadIndices[6] =
 {
-	0,1,2,	//OŠpŒ`1
-	0,2,3	//OŠpŒ`2
+	0,1,2,	//ä¸‰è§’å½¢1
+	0,2,3	//ä¸‰è§’å½¢2
 };
 
-//lŠp•½–Ê‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//å››è§’å¹³é¢ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeQuadModel();
 
 //=======================
-//—§•û‘Ì
+//ç«‹æ–¹ä½“
 //=======================
-//—§•û‘Ì‚Ì’¸“_ƒf[ƒ^(24’¸“_)
+//ç«‹æ–¹ä½“ã®é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿(24é ‚ç‚¹)
 static const Vertex CubeVertices[24] =
 {
 	// +Z
-	{{-0.5,  0.5,  0.5}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//’¸“_0
-	{{ 0.5,  0.5,  0.5}, {0,0,1}, {1,0}, {1,0,0}, {1,1,1,1}},	//’¸“_1
-	{{ 0.5, -0.5,  0.5}, {0,0,1}, {1,1}, {1,0,0}, {1,1,1,1}},	//’¸“_2
-	{{-0.5, -0.5,  0.5}, {0,0,1}, {0,1}, {1,0,0}, {1,1,1,1}},	//’¸“_3
+	{{-0.5,  0.5,  0.5}, {0,0,1}, {0,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹0
+	{{ 0.5,  0.5,  0.5}, {0,0,1}, {1,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹1
+	{{ 0.5, -0.5,  0.5}, {0,0,1}, {1,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹2
+	{{-0.5, -0.5,  0.5}, {0,0,1}, {0,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹3
 
 	// -Z
-	{{ 0.5,  0.5, -0.5}, {0,0,-1}, {0,0}, {-1,0,0}, {1,1,1,1}},	//’¸“_4
-	{{-0.5,  0.5, -0.5}, {0,0,-1}, {1,0}, {-1,0,0}, {1,1,1,1}},	//’¸“_5
-	{{-0.5, -0.5, -0.5}, {0,0,-1}, {1,1}, {-1,0,0}, {1,1,1,1}},	//’¸“_6
-	{{ 0.5, -0.5, -0.5}, {0,0,-1}, {0,1}, {-1,0,0}, {1,1,1,1}},	//’¸“_7
+	{{ 0.5,  0.5, -0.5}, {0,0,-1}, {0,0}, {-1,0,0}, {1,1,1,1}},	//é ‚ç‚¹4
+	{{-0.5,  0.5, -0.5}, {0,0,-1}, {1,0}, {-1,0,0}, {1,1,1,1}},	//é ‚ç‚¹5
+	{{-0.5, -0.5, -0.5}, {0,0,-1}, {1,1}, {-1,0,0}, {1,1,1,1}},	//é ‚ç‚¹6
+	{{ 0.5, -0.5, -0.5}, {0,0,-1}, {0,1}, {-1,0,0}, {1,1,1,1}},	//é ‚ç‚¹7
 
 	// +X
-	{{ 0.5,  0.5,  0.5}, {1,0,0}, {0,0}, {0,0,-1}, {1,1,1,1}},	//’¸“_1
-	{{ 0.5,  0.5, -0.5}, {1,0,0}, {1,0}, {0,0,-1}, {1,1,1,1}},	//’¸“_5
-	{{ 0.5, -0.5, -0.5}, {1,0,0}, {1,1}, {0,0,-1}, {1,1,1,1}},	//’¸“_6
-	{{ 0.5, -0.5,  0.5}, {1,0,0}, {0,1}, {0,0,-1}, {1,1,1,1}},	//’¸“_2
+	{{ 0.5,  0.5,  0.5}, {1,0,0}, {0,0}, {0,0,-1}, {1,1,1,1}},	//é ‚ç‚¹1
+	{{ 0.5,  0.5, -0.5}, {1,0,0}, {1,0}, {0,0,-1}, {1,1,1,1}},	//é ‚ç‚¹5
+	{{ 0.5, -0.5, -0.5}, {1,0,0}, {1,1}, {0,0,-1}, {1,1,1,1}},	//é ‚ç‚¹6
+	{{ 0.5, -0.5,  0.5}, {1,0,0}, {0,1}, {0,0,-1}, {1,1,1,1}},	//é ‚ç‚¹2
 
 	// -X
-	{{-0.5,  0.5, -0.5}, {-1,0,0}, {0,0}, {0,0,1}, {1,1,1,1}},	//’¸“_4
-	{{-0.5,  0.5,  0.5}, {-1,0,0}, {1,0}, {0,0,1}, {1,1,1,1}},	//’¸“_0
-	{{-0.5, -0.5,  0.5}, {-1,0,0}, {1,1}, {0,0,1}, {1,1,1,1}},	//’¸“_3
-	{{-0.5, -0.5, -0.5}, {-1,0,0}, {0,1}, {0,0,1}, {1,1,1,1}},	//’¸“_7
+	{{-0.5,  0.5, -0.5}, {-1,0,0}, {0,0}, {0,0,1}, {1,1,1,1}},	//é ‚ç‚¹4
+	{{-0.5,  0.5,  0.5}, {-1,0,0}, {1,0}, {0,0,1}, {1,1,1,1}},	//é ‚ç‚¹0
+	{{-0.5, -0.5,  0.5}, {-1,0,0}, {1,1}, {0,0,1}, {1,1,1,1}},	//é ‚ç‚¹3
+	{{-0.5, -0.5, -0.5}, {-1,0,0}, {0,1}, {0,0,1}, {1,1,1,1}},	//é ‚ç‚¹7
 
 	// +Y
-	{{-0.5,  0.5, -0.5}, {0,1,0}, {0,0}, {1,0,0}, {1,1,1,1}},	//’¸“_4
-	{{ 0.5,  0.5, -0.5}, {0,1,0}, {1,0}, {1,0,0}, {1,1,1,1}},	//’¸“_5
-	{{ 0.5,  0.5,  0.5}, {0,1,0}, {1,1}, {1,0,0}, {1,1,1,1}},	//’¸“_1
-	{{-0.5,  0.5,  0.5}, {0,1,0}, {0,1}, {1,0,0}, {1,1,1,1}},	//’¸“_0
+	{{-0.5,  0.5, -0.5}, {0,1,0}, {0,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹4
+	{{ 0.5,  0.5, -0.5}, {0,1,0}, {1,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹5
+	{{ 0.5,  0.5,  0.5}, {0,1,0}, {1,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹1
+	{{-0.5,  0.5,  0.5}, {0,1,0}, {0,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹0
 
 	// -Y
-	{{-0.5, -0.5,  0.5}, {0,-1,0}, {0,0}, {1,0,0}, {1,1,1,1}},	//’¸“_3
-	{{ 0.5, -0.5,  0.5}, {0,-1,0}, {1,0}, {1,0,0}, {1,1,1,1}},	//’¸“_2
-	{{ 0.5, -0.5, -0.5}, {0,-1,0}, {1,1}, {1,0,0}, {1,1,1,1}},	//’¸“_6
-	{{-0.5, -0.5, -0.5}, {0,-1,0}, {0,1}, {1,0,0}, {1,1,1,1}},	//’¸“_7
+	{{-0.5, -0.5,  0.5}, {0,-1,0}, {0,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹3
+	{{ 0.5, -0.5,  0.5}, {0,-1,0}, {1,0}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹2
+	{{ 0.5, -0.5, -0.5}, {0,-1,0}, {1,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹6
+	{{-0.5, -0.5, -0.5}, {0,-1,0}, {0,1}, {1,0,0}, {1,1,1,1}},	//é ‚ç‚¹7
 };
 
-//—§•û‘Ì‚ÌƒCƒ“ƒfƒbƒNƒXƒf[ƒ^
-inline constexpr uint32_t CubeIndices[42] =
+//ç«‹æ–¹ä½“ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿
+inline constexpr uint32_t CubeIndices[36] =
 {
 	// +Z
-	0,1,2,  0,2,3,			//OŠpŒ`1A2
+	0,1,2,  0,2,3,			//ä¸‰è§’å½¢1ã€2
 	// -Z
-	4,6,5,  4,7,6,			//OŠpŒ`3A4
+	4,6,5,  4,7,6,			//ä¸‰è§’å½¢3ã€4
 	// +X
-	8,9,10,  8,10,11,		//OŠpŒ`5A6
+	8,9,10,  8,10,11,		//ä¸‰è§’å½¢5ã€6
 	// -X
-	12,13,14,  12,14,15,	//OŠpŒ`7A8
+	12,13,14,  12,14,15,	//ä¸‰è§’å½¢7ã€8
 	// +Y
-	16,17,18,  16,18,19,	//OŠpŒ`9A10
+	16,17,18,  16,18,19,	//ä¸‰è§’å½¢9ã€10
 	// -Y
-	20,21,22,  20,22,23		//OŠpŒ`11A12
+	20,21,22,  20,22,23		//ä¸‰è§’å½¢11ã€12
 };
 
-//—§•û‘Ì‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//ç«‹æ–¹ä½“ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCubeModel();
 
 //=======================
-//‰~Œ`•½–Ê
+//å††å½¢å¹³é¢
 //=======================
-//‰~Œ`•½–Ê‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//å††å½¢å¹³é¢ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCircleModel(int slice = 32);
 
 //=======================
-//‹…‘Ì
+//çƒä½“
 //=======================
-//‹…‘Ì‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//çƒä½“ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeSphereModel(int slice = 32, int stacks = 16);
 
 //=======================
-//ƒJƒvƒZƒ‹
+//ã‚«ãƒ—ã‚»ãƒ«
 //=======================
-//ƒJƒvƒZƒ‹‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//ã‚«ãƒ—ã‚»ãƒ«ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCapsuleModel(int slice = 32, int stacks = 16);
 
-//ƒJƒvƒZƒ‹‚ÌƒrƒWƒ…ƒAƒ‹‹Lq\‘¢‘Ì
+//ã‚«ãƒ—ã‚»ãƒ«ã®ãƒ“ã‚¸ãƒ¥ã‚¢ãƒ«è¨˜è¿°æ§‹é€ ä½“
 struct CapsuleVisualDesc
 {
-	float baseRadius = 0.5f;		//’ê–Ê”¼Œa
-	float basehalfHeight = 0.5f;	//”¼•ª‚Ì‚‚³
+	float baseRadius = 0.5f;		//åº•é¢åŠå¾„
+	float basehalfHeight = 0.5f;	//åŠåˆ†ã®é«˜ã•
 };
 
-////ƒJƒvƒZƒ‹‚Ì•`‰æî•ñ’Ç‰ÁŠÖ”
+////ã‚«ãƒ—ã‚»ãƒ«ã®æç”»æƒ…å ±è¿½åŠ é–¢æ•°
 //void AppendCapsuleRenderInfos(
-//	const CapsuleVisualDesc& desc,				//ƒJƒvƒZƒ‹•`‰æî•ñ‹Lqq
-//	const DirectX::XMFLOAT3& position,			//ˆÊ’u
-//	const DirectX::XMFLOAT3& scale,				//ƒXƒP[ƒ‹
-//	const DirectX::XMFLOAT3& rotEuler,			//‰ñ“]EulerŠp
-//	const DirectX::XMFLOAT4& color,				//F
-//	std::vector<WorldRenderInfo>& infos,	//“ü—ÍŒ³•`‰æî•ñ”z—ñ
-//	std::vector<WorldRenderInfo>& out	//o—Íæ•`‰æî•ñ”z—ñ
+//	const CapsuleVisualDesc& desc,				//ã‚«ãƒ—ã‚»ãƒ«æç”»æƒ…å ±è¨˜è¿°å­
+//	const DirectX::XMFLOAT3& position,			//ä½ç½®
+//	const DirectX::XMFLOAT3& scale,				//ã‚¹ã‚±ãƒ¼ãƒ«
+//	const DirectX::XMFLOAT3& rotEuler,			//å›è»¢Eulerè§’
+//	const DirectX::XMFLOAT4& color,				//è‰²
+//	std::vector<WorldRenderInfo>& infos,	//å…¥åŠ›å…ƒæç”»æƒ…å ±é…åˆ—
+//	std::vector<WorldRenderInfo>& out	//å‡ºåŠ›å…ˆæç”»æƒ…å ±é…åˆ—
 //);
 
 //=======================
-//‰~’Œ
+//å††æŸ±
 //=======================
-//‰~’Œ‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//å††æŸ±ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCylinderModel(int slice = 32, int stacks = 16);
 
-//ƒƒbƒVƒ…ƒf[ƒ^æ“¾ŠÖ”
+//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿å–å¾—é–¢æ•°
 inline Model GetDefaultModel(DefaultMesh type)
 {
-	//ƒƒbƒVƒ…ƒ^ƒCƒv‚É‰‚¶‚½ƒƒbƒVƒ…ƒf[ƒ^‚ğ•Ô‚·
+	//ãƒ¡ãƒƒã‚·ãƒ¥ã‚¿ã‚¤ãƒ—ã«å¿œã˜ãŸãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’è¿”ã™
 	switch (type)
 	{
-	case DefaultMesh::Quad: return MakeQuadModel();			//lŠp•½–Ê
-	case DefaultMesh::Cube: return MakeCubeModel();			//—§•û‘Ì
-	case DefaultMesh::Sphere: return MakeSphereModel();		//‹…‘Ì
-	case DefaultMesh::Circle: return MakeCircleModel();		//‰~Œ`•½–Ê
-	case DefaultMesh::Capsule: return MakeCapsuleModel();	//ƒJƒvƒZƒ‹
-	case DefaultMesh::Cylinder: return MakeCylinderModel();	//‰~’Œ
-	default:   return {};						//‚»‚Ì‘¼
+	case DefaultMesh::Quad: return MakeQuadModel();			//å››è§’å¹³é¢
+	case DefaultMesh::Cube: return MakeCubeModel();			//ç«‹æ–¹ä½“
+	case DefaultMesh::Sphere: return MakeSphereModel();		//çƒä½“
+	case DefaultMesh::Circle: return MakeCircleModel();		//å††å½¢å¹³é¢
+	case DefaultMesh::Capsule: return MakeCapsuleModel();	//ã‚«ãƒ—ã‚»ãƒ«
+	case DefaultMesh::Cylinder: return MakeCylinderModel();	//å††æŸ±
+	default:   return {};						//ãã®ä»–
 	}
 }

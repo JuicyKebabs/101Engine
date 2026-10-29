@@ -2,7 +2,7 @@
 #include "Engine/Actor/Actor.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Resource/AssetManager.h"
-#include "Engine/Resource/TextureManager.h"
+#include "Engine/Resource/RenderAssetResources.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/UI/Canvas.h"
 #include <utility>
@@ -21,59 +21,56 @@ bool UIImage::SetTextureAsset(const Guid& assetId)
 }
 
 UIImage::AssetPrepareResult UIImage::PrepareTextureAssetState(
-	const Guid& assetId,
-	PreparedTextureAssetState& outState) const
+    const Guid& assetId, PreparedTextureAssetState& output) const
 {
-	if (!assetId.IsValid())
-	{
-		outState = {};
-		return AssetPrepareResult::Ready;
-	}
+    PreparedTextureAssetState prepared;
+    prepared.assetId = assetId;
+    if (!assetId.IsValid())
+    {
+        output = std::move(prepared);
+        return AssetPrepareResult::Ready;
+    }
 
-	const EngineContext* context = GetEngineContext();
+    Actor* actor = GetOwner();
+    SceneBase* scene = actor ? actor->GetOwner() : nullptr;
+    const EngineContext* context = GetEngineContext();
+    if (!scene || !context || !context->pAssetManager)
+    {
+        return AssetPrepareResult::Failed;
+    }
 
-	if (!context || !context->pAssetManager || !context->pTextureManager)
-	{
-		return AssetPrepareResult::Failed;
-	}
+    const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
+    if (entry && entry->type != AssetType::Texture)
+    {
+        return AssetPrepareResult::Failed;
+    }
 
-	const AssetEntry* assetEntry = context->pAssetManager->GetAssetEntry(assetId);
+    SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
+    UIRenderElement element;
+    element.materialDesc.textureHandle = context->pAssetManager->GetTextureHandle(*scene, assetId);
+    element.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
+    if (context->pRenderAssets)
+    {
+        Vector2 centerPivot;
+        centerPivot.x = 0.5f;
+        centerPivot.y = 0.5f;
+        element.materialDesc.description = context->pRenderAssets->MakeMaterial(false,
+            element.materialDesc.screen, element.materialDesc.textureHandle,
+            m_uvScale, m_uvOffset, centerPivot, m_flipX, m_flipY);
+        element.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene, element.materialDesc.description);
+    }
 
-	if (!assetEntry)
-	{
-		return AssetPrepareResult::MissingAsset;
-	}
-
-	if (assetEntry->type != AssetType::Texture)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	const TextureHandle textureHandle = context->pAssetManager->GetTextureHandle(assetId);
-
-	if (textureHandle == InvalidTextureHandle)
-	{
-		return AssetPrepareResult::Failed;
-	}
-
-	UIRenderElement element;
-	element.materialDesc.textureHandle = textureHandle;
-	element.materialDesc.psoKey = PSO_KEY_DEFAULT::UI;
-	element.materialDesc.psoKey.blend = GetBlendMode();
-	element.materialDesc.baseColor = { 1, 1, 1, 1 };
-	element.materialDesc.lightingEnabled = false;
-
-	PreparedTextureAssetState prepared;
-	prepared.assetId = assetId;
-	prepared.renderTemplate = { std::move(element) };
-	outState = std::move(prepared);
-	return AssetPrepareResult::Ready;
+    prepared.renderTemplate.push_back(std::move(element));
+    acquisition.Commit();
+    output = std::move(prepared);
+    return AssetPrepareResult::Ready;
 }
 
 void UIImage::CommitTextureAssetState(PreparedTextureAssetState&& state)
 {
 	m_textureAssetId = state.assetId;
 	m_renderTemplate.swap(state.renderTemplate);
+    m_materialDirty = false;
 	m_pendingTextureAssetId.reset();
 	m_isProxyDirty = true;
 }
@@ -140,7 +137,11 @@ bool UIImage::ResolveReferences(SceneBase& scene)
 AssetReference<TextureAsset> UIImage::GetTextureAssetReference() const
 {
 	AssetReference<TextureAsset> value;
-	value.SetValue({ GetTextureAssetId(), AssetType::Texture, m_textureAssetId.IsValid() });
+	AssetReferenceValue reference;
+    reference.guid = GetTextureAssetId();
+    reference.expectedType = AssetType::Texture;
+    reference.resolved = m_textureAssetId.IsValid();
+    value.SetValue(reference);
 	return value;
 }
 

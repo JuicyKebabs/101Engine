@@ -7,7 +7,6 @@ set(IMGUI_SOURCES
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_widgets.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_demo.cpp
 	${CMAKE_SOURCE_DIR}/third_party/ImGui/misc/cpp/imgui_stdlib.cpp
-    ${CMAKE_SOURCE_DIR}/third_party/ImGui/backends/imgui_impl_dx12.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/backends/imgui_impl_win32.cpp
 )
 
@@ -42,11 +41,18 @@ add_custom_command(TARGET 101Editor POST_BUILD
         $<TARGET_FILE_DIR:101Editor>
 )
 
-target_link_libraries(101Editor PRIVATE 101Framework)
+target_link_libraries(101Editor PRIVATE 101Framework d3dcompiler)
 add_dependencies(101Editor GameCode)
 
 add_custom_command(TARGET 101Editor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:GameCode>
         $<TARGET_FILE_DIR:101Editor>
+)
+
+# Runtime shaders resolve from the executable directory, independent of cwd.
+add_dependencies(101Editor RendererShaderAssets)
+add_custom_command(TARGET 101Editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:101Renderer> $<TARGET_FILE_DIR:101Editor>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Renderer/shaders" "$<TARGET_FILE_DIR:101Editor>/shaders"
 )

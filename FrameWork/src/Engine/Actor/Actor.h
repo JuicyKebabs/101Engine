@@ -19,8 +19,6 @@
 // Forward declaration
 class ActorFactory;
 class Renderer;
-class TextureManager;
-class MeshManager;
 class SceneBase;
 class TransformSubtreeSnapshot;
 

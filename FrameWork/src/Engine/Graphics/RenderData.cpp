@@ -1,84 +1,80 @@
 #include "RenderData.h"
 #include <cmath>
-#include "Engine/Resource/AssimpLoader.h"
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include "Engine/Resource/TextureManager.h"
-#include "Engine/Resource/MeshManager.h"
-#include "Engine/Actor/Actor.h"
+#include <algorithm>
 
 using namespace DirectX;
 
+// The existing primitive generators remain CPU-only. Their owning arrays are
+// converted into Renderer descriptors by AssetManager before registration.
 Model MakeQuadModel()
 {
-	Mesh mesh;		//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-	Model model;	//ƒ‚ƒfƒ‹ƒf[ƒ^\‘¢‘Ì
+	Mesh mesh;		//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+	Model model;	//ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
 
-	//’¸“_ƒf[ƒ^‚Ìİ’è
+	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š
 	mesh.vertices.assign(
-		std::begin(QuadVertices),	//’¸“_ƒf[ƒ^”z—ñ‚Ìæ“ªƒAƒhƒŒƒX
-		std::end(QuadVertices)		//’¸“_ƒf[ƒ^”z—ñ‚ÌI’[ƒAƒhƒŒƒX
+		std::begin(QuadVertices),	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+		std::end(QuadVertices)		//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®çµ‚ç«¯ã‚¢ãƒ‰ãƒ¬ã‚¹
 	);
 
-	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^‚Ìİ’è
+	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š
 	mesh.indices.assign(
-		std::begin(QuadIndices),	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ìæ“ªƒAƒhƒŒƒX
-		std::end(QuadIndices)		//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚ÌI’[ƒAƒhƒŒƒX
+		std::begin(QuadIndices),	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+		std::end(QuadIndices)		//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®çµ‚ç«¯ã‚¢ãƒ‰ãƒ¬ã‚¹
 	);
 
-	//’¸“_”‚Ìİ’è
+	//é ‚ç‚¹æ•°ã®è¨­å®š
 	mesh.vertexCount = mesh.vertices.size();
 
-	//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
+	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
 	mesh.indexCount = mesh.indices.size();
 
-	//ƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
+	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 	model.push_back(mesh);
 
-	return model;	//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì‚ğ•Ô‚·
+	return model;	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“ã‚’è¿”ã™
 }
 
-//—§•û‘Ì‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//ç«‹æ–¹ä½“ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCubeModel()
 {
 	{
-		Mesh mesh;		//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-		Model model;	//ƒ‚ƒfƒ‹ƒf[ƒ^\‘¢‘Ì
+		Mesh mesh;		//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+		Model model;	//ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
 
-		//’¸“_ƒf[ƒ^‚Ìİ’è
+		//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š
 		mesh.vertices.assign(
-			std::begin(CubeVertices),	//’¸“_ƒf[ƒ^”z—ñ‚Ìæ“ªƒAƒhƒŒƒX
-			std::end(CubeVertices)		//’¸“_ƒf[ƒ^”z—ñ‚ÌI’[ƒAƒhƒŒƒX
+			std::begin(CubeVertices),	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+			std::end(CubeVertices)		//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®çµ‚ç«¯ã‚¢ãƒ‰ãƒ¬ã‚¹
 		);
 
-		//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^‚Ìİ’è
+		//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ã®è¨­å®š
 		mesh.indices.assign(
-			std::begin(CubeIndices),	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ìæ“ªƒAƒhƒŒƒX
-			std::end(CubeIndices)		//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚ÌI’[ƒAƒhƒŒƒX
+			std::begin(CubeIndices),	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+			std::end(CubeIndices)		//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®çµ‚ç«¯ã‚¢ãƒ‰ãƒ¬ã‚¹
 		);
 
-		//’¸“_”‚Ìİ’è
+		//é ‚ç‚¹æ•°ã®è¨­å®š
 		mesh.vertexCount = mesh.vertices.size();
 
-		//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
+		//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
 		mesh.indexCount = mesh.indices.size();
 
-		//ƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
+		//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 		model.push_back(mesh);
 
-		return model;	//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì‚ğ•Ô‚·
+		return model;	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“ã‚’è¿”ã™
 	}
 
 }
 
-//‰~Œ`•½–Ê‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//å††å½¢å¹³é¢ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCircleModel(int slice)
 {
 	Model model;
 	Mesh  mesh;
 
-	// •ªŠ„”‚ª­‚È‚·‚¬‚½‚ç‰½‚à‚µ‚È‚¢
+	// åˆ†å‰²æ•°ãŒå°‘ãªã™ããŸã‚‰ä½•ã‚‚ã—ãªã„
 	if (slice < 3)
 	{
 		return model;
@@ -86,26 +82,26 @@ Model MakeCircleModel(int slice)
 
 	using namespace DirectX;
 
-	const float radius = 0.5f;          // Quad ‚Æ“¯‚¶ }0.5 ‚ÌƒXƒP[ƒ‹
+	const float radius = 0.5f;          // Quad ã¨åŒã˜ Â±0.5 ã®ã‚¹ã‚±ãƒ¼ãƒ«
 	const float twoPi = XM_2PI;
 
-	// ’¸“_ / ƒCƒ“ƒfƒbƒNƒX‚Ìƒƒ‚ƒŠ‚ğ–‘OŠm•Û
+	// é ‚ç‚¹ / ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®ãƒ¡ãƒ¢ãƒªã‚’äº‹å‰ç¢ºä¿
 	mesh.vertices.reserve(static_cast<size_t>(slice) + 1);
 	mesh.indices.reserve(static_cast<size_t>(slice) * 3);
 
-	// ‡@ ’†S’¸“_
+	// â‘  ä¸­å¿ƒé ‚ç‚¹
 	{
 		Vertex v{};
-		v.position = Vector3(0.0f, 0.0f, 0.0f);       // Œ´“_
-		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z Œü‚«
-		v.uv = Vector2(0.5f, 0.5f);             // ƒeƒNƒXƒ`ƒƒ’†‰›
-		v.tangent = Vector3(1.0f, 0.0f, 0.0f);       // +X •ûŒü
-		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f); // ”’
+		v.position = Vector3(0.0f, 0.0f, 0.0f);       // åŸç‚¹
+		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z å‘ã
+		v.uv = Vector2(0.5f, 0.5f);             // ãƒ†ã‚¯ã‚¹ãƒãƒ£ä¸­å¤®
+		v.tangent = Vector3(1.0f, 0.0f, 0.0f);       // +X æ–¹å‘
+		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f); // ç™½
 
 		mesh.vertices.push_back(v);
 	}
 
-	// ‡A ŠOü’¸“_
+	// â‘¡ å¤–å‘¨é ‚ç‚¹
 	for (int i = 0; i < slice; ++i)
 	{
 		float t = static_cast<float>(i) / static_cast<float>(slice);
@@ -115,92 +111,92 @@ Model MakeCircleModel(int slice)
 		float y = std::sin(angle) * radius;
 
 		Vertex v{};
-		v.position = Vector3(x, y, 0.0f);             // XY •½–Êã
-		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z Œü‚«
+		v.position = Vector3(x, y, 0.0f);             // XY å¹³é¢ä¸Š
+		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z å‘ã
 
-		// UVF’†S(0.5,0.5) ‚©‚ç”¼Œa 0.5 ‚Ì‰~‚Éƒ}ƒbƒsƒ“ƒO
+		// UVï¼šä¸­å¿ƒ(0.5,0.5) ã‹ã‚‰åŠå¾„ 0.5 ã®å††ã«ãƒãƒƒãƒ”ãƒ³ã‚°
 		float u = 0.5f + 0.5f * std::cos(angle);
-		float vTex = 0.5f - 0.5f * std::sin(angle);    // ƒeƒNƒXƒ`ƒƒÀ•W‚Íã‚ª 0 ‚È‚Ì‚Å -sin
+		float vTex = 0.5f - 0.5f * std::sin(angle);    // ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ã¯ä¸ŠãŒ 0 ãªã®ã§ -sin
 
 		v.uv = Vector2(u, vTex);
-		v.tangent = Vector3(1.0f, 0.0f, 0.0f);        // ˆê—¥ +X
-		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);  // ”’
+		v.tangent = Vector3(1.0f, 0.0f, 0.0f);        // ä¸€å¾‹ +X
+		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);  // ç™½
 
 		mesh.vertices.push_back(v);
 	}
 
-	// ‡B ƒCƒ“ƒfƒbƒNƒXiOŠpŒ`ƒtƒ@ƒ“j
-	// ’†S‚ğ 0AŠOü‚ğ 1..slice ‚Æ‚µ‚Ä
-	// Quad ‚Ì–ÊŒü‚«‚É‡‚í‚¹‚ÄŒv‰ñ‚è‚É‚È‚é‚æ‚¤ center, i1, i0 ‚Ì‡‚Å’Ç‰Á
+	// â‘¢ ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ï¼ˆä¸‰è§’å½¢ãƒ•ã‚¡ãƒ³ï¼‰
+	// ä¸­å¿ƒã‚’ 0ã€å¤–å‘¨ã‚’ 1..slice ã¨ã—ã¦
+	// Quad ã®é¢å‘ãã«åˆã‚ã›ã¦æ™‚è¨ˆå›ã‚Šã«ãªã‚‹ã‚ˆã† center, i1, i0 ã®é †ã§è¿½åŠ 
 	for (int i = 0; i < slice; ++i)
 	{
 		uint32_t center = 0;
 		uint32_t i0 = 1 + static_cast<uint32_t>(i);
-		uint32_t i1 = 1 + static_cast<uint32_t>((i + 1) % slice); // ÅŒã‚Í 1 ‚Éƒ‹[ƒv
+		uint32_t i1 = 1 + static_cast<uint32_t>((i + 1) % slice); // æœ€å¾Œã¯ 1 ã«ãƒ«ãƒ¼ãƒ—
 
 		mesh.indices.push_back(center);
 		mesh.indices.push_back(i1);
 		mesh.indices.push_back(i0);
 	}
 
-	// ‡C ƒJƒEƒ“ƒg‚ğİ’è
+	// â‘£ ã‚«ã‚¦ãƒ³ãƒˆã‚’è¨­å®š
 	mesh.vertexCount = mesh.vertices.size();
 	mesh.indexCount = mesh.indices.size();
 
-	// ‡D ƒ‚ƒfƒ‹‚É’Ç‰Á‚µ‚Ä•Ô‚·
+	// â‘¤ ãƒ¢ãƒ‡ãƒ«ã«è¿½åŠ ã—ã¦è¿”ã™
 	model.push_back(std::move(mesh));
 	return model;
 }
 
-//‹…‘Ì‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//çƒä½“ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeSphereModel(int slices, int stacks)
 {
-	Mesh mesh;		//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-	Model model;	//ƒ‚ƒfƒ‹ƒf[ƒ^\‘¢‘Ì
+	Mesh mesh;		//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+	Model model;	//ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
 
-	//’¸“_ƒf[ƒ^‚Ìì¬
+	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
 	for (int stack = 0; stack <= stacks; stack++)
-	{//ƒXƒ^ƒbƒNƒ‹[ƒv
-		float v = static_cast<float>(stack) / static_cast<float>(stacks);	//VÀ•W
-		float phi = (v - 0.5f) * XM_PI;							//ˆÜ“xŠp
+	{//ã‚¹ã‚¿ãƒƒã‚¯ãƒ«ãƒ¼ãƒ—
+		float v = static_cast<float>(stack) / static_cast<float>(stacks);	//Våº§æ¨™
+		float phi = (v - 0.5f) * XM_PI;							//ç·¯åº¦è§’
 
-		float y = sin(phi);	 //YÀ•W
-		float r = cos(phi);	 //”¼Œa
+		float y = sin(phi);	 //Yåº§æ¨™
+		float r = cos(phi);	 //åŠå¾„
 
 		for (int slice = 0; slice <= slices; slice++)
-		{//ƒXƒ‰ƒCƒXƒ‹[ƒv
-			float u = static_cast<float>(slice) / static_cast<float>(slices);	//UÀ•W
-			float theta = u * XM_2PI;									//Œo“xŠp
+		{//ã‚¹ãƒ©ã‚¤ã‚¹ãƒ«ãƒ¼ãƒ—
+			float u = static_cast<float>(slice) / static_cast<float>(slices);	//Uåº§æ¨™
+			float theta = u * XM_2PI;									//çµŒåº¦è§’
 
-			float x = r * cos(theta);	//XÀ•W
-			float z = r * sin(theta);	//ZÀ•W
+			float x = r * cos(theta);	//Xåº§æ¨™
+			float z = r * sin(theta);	//Zåº§æ¨™
 
-			//’¸“_ƒf[ƒ^‚Ìì¬
+			//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
 			Vertex vertex{};
-			vertex.position = Vector3(x * 0.5f, y * 0.5f, z * 0.5f);	//ˆÊ’u
-			vertex.normal = Vector3(x, y, z);							//–@ü
-			vertex.uv = Vector2(u, 1.0f - v);							//UVÀ•W
-			vertex.tangent = Vector3(-sin(theta), 0.0f, cos(theta));	//Ú‹óŠÔ
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//’¸“_F
+			vertex.position = Vector3(x * 0.5f, y * 0.5f, z * 0.5f);	//ä½ç½®
+			vertex.normal = Vector3(x, y, z);							//æ³•ç·š
+			vertex.uv = Vector2(u, 1.0f - v);							//UVåº§æ¨™
+			vertex.tangent = Vector3(-sin(theta), 0.0f, cos(theta));	//æ¥ç©ºé–“
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//é ‚ç‚¹è‰²
 
-			mesh.vertices.push_back(vertex);	//’¸“_ƒf[ƒ^‚ğ”z—ñ‚É’Ç‰Á
+			mesh.vertices.push_back(vertex);	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã‚’é…åˆ—ã«è¿½åŠ 
 		}
 	}
 
-	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^‚Ìì¬
-	int ringStride = slices + 1; //ƒŠƒ“ƒO‚ ‚½‚è‚Ì’¸“_”
+	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
+	int ringStride = slices + 1; //ãƒªãƒ³ã‚°ã‚ãŸã‚Šã®é ‚ç‚¹æ•°
 
 	for (int stack = 0; stack < stacks; stack++)
-	{//ƒXƒ^ƒbƒNƒ‹[ƒv
+	{//ã‚¹ã‚¿ãƒƒã‚¯ãƒ«ãƒ¼ãƒ—
 		for (int slice = 0; slice < slices; slice++)
-		{//ƒXƒ‰ƒCƒXƒ‹[ƒv
-			//ƒCƒ“ƒfƒbƒNƒX‚ÌŒvZ
+		{//ã‚¹ãƒ©ã‚¤ã‚¹ãƒ«ãƒ¼ãƒ—
+			//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®è¨ˆç®—
 			uint32_t index0 = stack * ringStride + slice;
 			uint32_t index1 = (stack + 1) * ringStride + slice;
 			uint32_t index2 = (stack + 1) * ringStride + (slice + 1);
 			uint32_t index3 = stack * ringStride + (slice + 1);
 
-			//OŠpŒ`‚Ì’Ç‰Á
+			//ä¸‰è§’å½¢ã®è¿½åŠ 
 			mesh.indices.push_back(index0);
 			mesh.indices.push_back(index1);
 			mesh.indices.push_back(index2);
@@ -210,175 +206,175 @@ Model MakeSphereModel(int slices, int stacks)
 		}
 	}
 
-	mesh.vertexCount = mesh.vertices.size();	//’¸“_”‚Ìİ’è
-	mesh.indexCount = mesh.indices.size();		//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
+	mesh.vertexCount = mesh.vertices.size();	//é ‚ç‚¹æ•°ã®è¨­å®š
+	mesh.indexCount = mesh.indices.size();		//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
 
-	model.push_back(mesh);	//ƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
+	model.push_back(mesh);	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 
-	return model;	//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì‚ğ•Ô‚·
+	return model;	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“ã‚’è¿”ã™
 }
 
-//ƒJƒvƒZƒ‹‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//ã‚«ãƒ—ã‚»ãƒ«ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCapsuleModel(int slices, int stacks)
 {
-	//ˆø”‚Ì•â³
+	//å¼•æ•°ã®è£œæ­£
 	if (slices < 3)
 	{
-		slices = 3; //ƒXƒ‰ƒCƒX‚ÍÅ’á3
+		slices = 3; //ã‚¹ãƒ©ã‚¤ã‚¹ã¯æœ€ä½3
 	}
 
 	if (stacks < 4)
 	{
-		stacks = 4; //ƒXƒ^ƒbƒN‚ÍÅ’á4
+		stacks = 4; //ã‚¹ã‚¿ãƒƒã‚¯ã¯æœ€ä½4
 	}
 
-	//•K—v‚È\‘¢‘Ì‚Ì¶¬
-	Mesh cylinder;				//ƒVƒŠƒ“ƒ_[•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-	Mesh halfSphereTop;			//ã”¼‹…‚Ì•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-	Mesh halfSphereBottom;		//‰º”¼‹…•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-	Model model;	//ƒ‚ƒfƒ‹ƒf[ƒ^\‘¢‘Ì
+	//å¿…è¦ãªæ§‹é€ ä½“ã®ç”Ÿæˆ
+	Mesh cylinder;				//ã‚·ãƒªãƒ³ãƒ€ãƒ¼éƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+	Mesh halfSphereTop;			//ä¸ŠåŠçƒã®éƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+	Mesh halfSphereBottom;		//ä¸‹åŠçƒéƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+	Model model;	//ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
 
-	//’PˆÊƒJƒvƒZƒ‹‚Ìƒpƒ‰ƒ[ƒ^
-	const float radius = 0.5f;		//”¼Œa
-	const float halfHeight = 0.5f;	//”¼•ª‚Ì‚‚³
+	//å˜ä½ã‚«ãƒ—ã‚»ãƒ«ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿
+	const float radius = 0.5f;		//åŠå¾„
+	const float halfHeight = 0.5f;	//åŠåˆ†ã®é«˜ã•
 
-	//ƒXƒ^ƒbƒN”‚Ì“à–óŒvZ
-	const int hemiStacks = stacks / 4;			  //”¼‹…‚ÌƒXƒ^ƒbƒN”
-	int cylinderStacks = stacks - hemiStacks * 2; //‰~’Œ‚ÌƒXƒ^ƒbƒN”
+	//ã‚¹ã‚¿ãƒƒã‚¯æ•°ã®å†…è¨³è¨ˆç®—
+	const int hemiStacks = stacks / 4;			  //åŠçƒã®ã‚¹ã‚¿ãƒƒã‚¯æ•°
+	int cylinderStacks = stacks - hemiStacks * 2; //å††æŸ±ã®ã‚¹ã‚¿ãƒƒã‚¯æ•°
 
 	if (cylinderStacks < 1)
 	{
-		cylinderStacks = 1; //‰~’Œ‚ÌƒXƒ^ƒbƒN”‚ÍÅ’á1‚É‚·‚é
+		cylinderStacks = 1; //å††æŸ±ã®ã‚¹ã‚¿ãƒƒã‚¯æ•°ã¯æœ€ä½1ã«ã™ã‚‹
 	}
 
-	//’¸“_EƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ì—\–ñ
-	const int ringStride = slices + 1;					//ƒŠƒ“ƒO‚ ‚½‚è‚Ì’¸“_”	
-	const int cylinderRingCount = cylinderStacks + 1;	//‰~’Œ•”•ª‚ÌƒŠƒ“ƒO”
-	const int topHemiRingCount = hemiStacks + 1;		//ã”¼‹…•”•ª‚ÌƒŠƒ“ƒO”
-	const int bottomHemiRingCount = hemiStacks + 1;		//‰º”¼‹…•”•ª‚ÌƒŠƒ“ƒO”
+	//é ‚ç‚¹ãƒ»ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	const int ringStride = slices + 1;					//ãƒªãƒ³ã‚°ã‚ãŸã‚Šã®é ‚ç‚¹æ•°
+	const int cylinderRingCount = cylinderStacks + 1;	//å††æŸ±éƒ¨åˆ†ã®ãƒªãƒ³ã‚°æ•°
+	const int topHemiRingCount = hemiStacks + 1;		//ä¸ŠåŠçƒéƒ¨åˆ†ã®ãƒªãƒ³ã‚°æ•°
+	const int bottomHemiRingCount = hemiStacks + 1;		//ä¸‹åŠçƒéƒ¨åˆ†ã®ãƒªãƒ³ã‚°æ•°
 
-	int estimatedVertexCount =							//’¸“_”‚ÌŒ©Ï‚à‚è
+	int estimatedVertexCount =							//é ‚ç‚¹æ•°ã®è¦‹ç©ã‚‚ã‚Š
 		(cylinderRingCount + topHemiRingCount + bottomHemiRingCount) * ringStride;
 
-	cylinder.vertices.reserve(estimatedVertexCount);			//’¸“_ƒf[ƒ^”z—ñ‚Ì—\–ñ
-	cylinder.indices.reserve(estimatedVertexCount * 6);			//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ì—\–ñ
-	halfSphereTop.vertices.reserve(estimatedVertexCount);		//’¸“_ƒf[ƒ^”z—ñ‚Ì—\–ñ
-	halfSphereTop.indices.reserve(estimatedVertexCount * 6);	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ì—\–ñ
-	halfSphereBottom.vertices.reserve(estimatedVertexCount);	//’¸“_ƒf[ƒ^”z—ñ‚Ì—\–ñ
-	halfSphereBottom.indices.reserve(estimatedVertexCount * 6);//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ì—\–ñ
+	cylinder.vertices.reserve(estimatedVertexCount);			//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	cylinder.indices.reserve(estimatedVertexCount * 6);			//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	halfSphereTop.vertices.reserve(estimatedVertexCount);		//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	halfSphereTop.indices.reserve(estimatedVertexCount * 6);	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	halfSphereBottom.vertices.reserve(estimatedVertexCount);	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	halfSphereBottom.indices.reserve(estimatedVertexCount * 6);//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
 
-	//’¸“_ƒf[ƒ^‚Ìì¬
-	//ƒVƒŠƒ“ƒ_•”•ª‚Ì’¸“_ƒf[ƒ^ì¬
+	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
+	//ã‚·ãƒªãƒ³ãƒ€éƒ¨åˆ†ã®é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (int stack = 0; stack <= cylinderStacks; stack++)
 	{
-		float t = static_cast<float>(stack) / static_cast<float>(cylinderStacks);	//ƒXƒ^ƒbƒN”ä—¦
-		float y = -halfHeight + t * (halfHeight * 2.0f);							//YÀ•W
+		float t = static_cast<float>(stack) / static_cast<float>(cylinderStacks);	//ã‚¹ã‚¿ãƒƒã‚¯æ¯”ç‡
+		float y = -halfHeight + t * (halfHeight * 2.0f);							//Yåº§æ¨™
 
 		for (int slice = 0; slice <= slices; slice++)
 		{
-			float u = static_cast<float>(slice) / static_cast<float>(slices);	//UÀ•W
-			float theta = u * XM_2PI;											//Œo“xŠp
+			float u = static_cast<float>(slice) / static_cast<float>(slices);	//Uåº§æ¨™
+			float theta = u * XM_2PI;											//çµŒåº¦è§’
 
-			float x = radius * cos(theta);	//XÀ•W
-			float z = radius * sin(theta);	//ZÀ•W
+			float x = radius * cos(theta);	//Xåº§æ¨™
+			float z = radius * sin(theta);	//Zåº§æ¨™
 
 			Vertex vertex{};
-			vertex.position = Vector3(x, y, z);						//ˆÊ’u
-			vertex.normal = Vector3(x / radius, 0.0f, z / radius);		//–@ü
-			vertex.uv = Vector2(u, t);									//UVÀ•W
+			vertex.position = Vector3(x, y, z);						//ä½ç½®
+			vertex.normal = Vector3(x / radius, 0.0f, z / radius);		//æ³•ç·š
+			vertex.uv = Vector2(u, t);									//UVåº§æ¨™
 
-			float tx = -radius * sin(theta);	//Ú‹óŠÔX
-			float tz = radius * cos(theta);		//Ú‹óŠÔZ
-			vertex.tangent = Vector3(tx, 0.0f, tz);					//Ú‹óŠÔ
+			float tx = -radius * sin(theta);	//æ¥ç©ºé–“X
+			float tz = radius * cos(theta);		//æ¥ç©ºé–“Z
+			vertex.tangent = Vector3(tx, 0.0f, tz);					//æ¥ç©ºé–“
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//’¸“_F
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//é ‚ç‚¹è‰²
 
-			cylinder.vertices.push_back(vertex);	//’¸“_ƒf[ƒ^‚ğ”z—ñ‚É’Ç‰Á
+			cylinder.vertices.push_back(vertex);	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã‚’é…åˆ—ã«è¿½åŠ 
 		}
 	}
 
-	//ã”¼‹…•”•ª‚Ì’¸“_ƒf[ƒ^ì¬
+	//ä¸ŠåŠçƒéƒ¨åˆ†ã®é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (int stack = 0; stack <= hemiStacks; stack++)
 	{
-		float v = static_cast<float>(stack) / static_cast<float>(hemiStacks);	//VÀ•W
-		float phi = v * XM_PIDIV2;												//ˆÜ“xŠp
+		float v = static_cast<float>(stack) / static_cast<float>(hemiStacks);	//Våº§æ¨™
+		float phi = v * XM_PIDIV2;												//ç·¯åº¦è§’
 
-		float sinPhi = sin(phi);	//sinƒÓ
-		float cosPhi = cos(phi);	//cosƒÓ
+		float sinPhi = sin(phi);	//sinÏ†
+		float cosPhi = cos(phi);	//cosÏ†
 
-		float y = radius * sinPhi;	//YÀ•W
+		float y = radius * sinPhi;	//Yåº§æ¨™
 
-		float ringR = cosPhi * radius;	//ƒŠƒ“ƒO‚Ì”¼Œa
+		float ringR = cosPhi * radius;	//ãƒªãƒ³ã‚°ã®åŠå¾„
 
 		for (int slice = 0; slice <= slices; slice++)
 		{
-			float u = static_cast<float>(slice) / static_cast<float>(slices);	//UÀ•W
-			float theta = u * XM_2PI;											//Œo“xŠp
+			float u = static_cast<float>(slice) / static_cast<float>(slices);	//Uåº§æ¨™
+			float theta = u * XM_2PI;											//çµŒåº¦è§’
 
-			float x = ringR * cos(theta);	//XÀ•W
-			float z = ringR * sin(theta);	//ZÀ•W
+			float x = ringR * cos(theta);	//Xåº§æ¨™
+			float z = ringR * sin(theta);	//Zåº§æ¨™
 
-			float nx = cosPhi * cos(theta);	//–@üX
-			float ny = sinPhi;				//–@üY
-			float nz = cosPhi * sin(theta);	//–@üZ
+			float nx = cosPhi * cos(theta);	//æ³•ç·šX
+			float ny = sinPhi;				//æ³•ç·šY
+			float nz = cosPhi * sin(theta);	//æ³•ç·šZ
 
 			Vertex vertex{};
-			vertex.position = Vector3(x, y, z);				//ˆÊ’u
-			vertex.normal = Vector3(nx, ny, nz);				//–@ü
-			vertex.uv = Vector2(u, 1.0f - (v * 0.5f + 0.5f));	//UVÀ•W
+			vertex.position = Vector3(x, y, z);				//ä½ç½®
+			vertex.normal = Vector3(nx, ny, nz);				//æ³•ç·š
+			vertex.uv = Vector2(u, 1.0f - (v * 0.5f + 0.5f));	//UVåº§æ¨™
 
-			float tx = -ringR * sin(theta);		//Ú‹óŠÔX
-			float tz = ringR * cos(theta);		//Ú‹óŠÔZ
-			vertex.tangent = Vector3(tx, 0.0f, tz);			//Ú‹óŠÔ
+			float tx = -ringR * sin(theta);		//æ¥ç©ºé–“X
+			float tz = ringR * cos(theta);		//æ¥ç©ºé–“Z
+			vertex.tangent = Vector3(tx, 0.0f, tz);			//æ¥ç©ºé–“
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//’¸“_F
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//é ‚ç‚¹è‰²
 
-			halfSphereTop.vertices.push_back(vertex);	//’¸“_ƒf[ƒ^‚ğ”z—ñ‚É’Ç‰Á
+			halfSphereTop.vertices.push_back(vertex);	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã‚’é…åˆ—ã«è¿½åŠ 
 		}
 	}
 
-	//‰º”¼‹…•”•ª‚Ì’¸“_ƒf[ƒ^ì¬
+	//ä¸‹åŠçƒéƒ¨åˆ†ã®é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (int stack = 0; stack <= hemiStacks; stack++)
 	{
-		float v = static_cast<float>(stack) / static_cast<float>(hemiStacks);	//VÀ•W
-		float phi = v * XM_PIDIV2;												//ˆÜ“xŠp
+		float v = static_cast<float>(stack) / static_cast<float>(hemiStacks);	//Våº§æ¨™
+		float phi = v * XM_PIDIV2;												//ç·¯åº¦è§’
 
-		float sinPhi = sin(phi);	//sinƒÓ
-		float cosPhi = cos(phi);	//cosƒÓ
+		float sinPhi = sin(phi);	//sinÏ†
+		float cosPhi = cos(phi);	//cosÏ†
 
-		float y = -sinPhi * radius;	//YÀ•W
+		float y = -sinPhi * radius;	//Yåº§æ¨™
 
-		float ringR = cosPhi * radius;	//ƒŠƒ“ƒO‚Ì”¼Œa
+		float ringR = cosPhi * radius;	//ãƒªãƒ³ã‚°ã®åŠå¾„
 
 		for (int slice = 0; slice <= slices; slice++)
 		{
-			float u = static_cast<float>(slice) / static_cast<float>(slices);	//UÀ•W
-			float theta = u * XM_2PI;											//Œo“xŠp
+			float u = static_cast<float>(slice) / static_cast<float>(slices);	//Uåº§æ¨™
+			float theta = u * XM_2PI;											//çµŒåº¦è§’
 
-			float x = ringR * cos(theta);	//XÀ•W
-			float z = ringR * sin(theta);	//ZÀ•W
+			float x = ringR * cos(theta);	//Xåº§æ¨™
+			float z = ringR * sin(theta);	//Zåº§æ¨™
 
-			float nx = cosPhi * cos(theta);	//–@üX
-			float ny = -sinPhi;				//–@üY
-			float nz = cosPhi * sin(theta);	//–@üZ
+			float nx = cosPhi * cos(theta);	//æ³•ç·šX
+			float ny = -sinPhi;				//æ³•ç·šY
+			float nz = cosPhi * sin(theta);	//æ³•ç·šZ
 
 			Vertex vertex{};
-			vertex.position = Vector3(x, y, z);				//ˆÊ’u
-			vertex.normal = Vector3(nx, ny, nz);				//–@ü
-			vertex.uv = Vector2(u, (v * 0.5f));				//UVÀ•W
+			vertex.position = Vector3(x, y, z);				//ä½ç½®
+			vertex.normal = Vector3(nx, ny, nz);				//æ³•ç·š
+			vertex.uv = Vector2(u, (v * 0.5f));				//UVåº§æ¨™
 
-			float tx = -ringR * sin(theta);		//Ú‹óŠÔX
-			float tz = ringR * cos(theta);		//Ú‹óŠÔZ
-			vertex.tangent = Vector3(tx, 0.0f, tz);			//Ú‹óŠÔ
+			float tx = -ringR * sin(theta);		//æ¥ç©ºé–“X
+			float tz = ringR * cos(theta);		//æ¥ç©ºé–“Z
+			vertex.tangent = Vector3(tx, 0.0f, tz);			//æ¥ç©ºé–“
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//’¸“_F
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//é ‚ç‚¹è‰²
 
-			halfSphereBottom.vertices.push_back(vertex);	//’¸“_ƒf[ƒ^‚ğ”z—ñ‚É’Ç‰Á
+			halfSphereBottom.vertices.push_back(vertex);	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã‚’é…åˆ—ã«è¿½åŠ 
 		}
 	}
 
-	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^‚Ìì¬
-	//ƒVƒŠƒ“ƒ_•”•ª‚ÌƒCƒ“ƒfƒbƒNƒXƒf[ƒ^ì¬
+	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
+	//ã‚·ãƒªãƒ³ãƒ€éƒ¨åˆ†ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (int stack = 0; stack < cylinderStacks; stack++)
 	{
 		for (int slice = 0; slice < slices; slice++)
@@ -397,7 +393,7 @@ Model MakeCapsuleModel(int slices, int stacks)
 		}
 	}
 
-	//ã”¼‹…•”•ª‚ÌƒCƒ“ƒfƒbƒNƒXƒf[ƒ^ì¬
+	//ä¸ŠåŠçƒéƒ¨åˆ†ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	const int ringCountTop = hemiStacks + 1;
 
 	for (int stack = 0; stack < ringCountTop - 1; stack++)
@@ -417,7 +413,7 @@ Model MakeCapsuleModel(int slices, int stacks)
 		}
 	}
 
-	//‰º”¼‹…•”•ª‚ÌƒCƒ“ƒfƒbƒNƒXƒf[ƒ^ì¬
+	//ä¸‹åŠçƒéƒ¨åˆ†ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	const int ringCountBottom = hemiStacks + 1;
 
 	for (int stack = 0; stack < ringCountBottom - 1; stack++)
@@ -437,79 +433,79 @@ Model MakeCapsuleModel(int slices, int stacks)
 		}
 	}
 
-	//’¸“_”‚ÆƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
-	cylinder.vertexCount = cylinder.vertices.size();					//’¸“_”‚Ìİ’è
-	cylinder.indexCount = cylinder.indices.size();						//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
-	halfSphereTop.vertexCount = halfSphereTop.vertices.size();			//’¸“_”‚Ìİ’è
-	halfSphereTop.indexCount = halfSphereTop.indices.size();			//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
-	halfSphereBottom.vertexCount = halfSphereBottom.vertices.size();	//’¸“_”‚Ìİ’è
-	halfSphereBottom.indexCount = halfSphereBottom.indices.size();		//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
+	//é ‚ç‚¹æ•°ã¨ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
+	cylinder.vertexCount = cylinder.vertices.size();					//é ‚ç‚¹æ•°ã®è¨­å®š
+	cylinder.indexCount = cylinder.indices.size();						//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
+	halfSphereTop.vertexCount = halfSphereTop.vertices.size();			//é ‚ç‚¹æ•°ã®è¨­å®š
+	halfSphereTop.indexCount = halfSphereTop.indices.size();			//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
+	halfSphereBottom.vertexCount = halfSphereBottom.vertices.size();	//é ‚ç‚¹æ•°ã®è¨­å®š
+	halfSphereBottom.indexCount = halfSphereBottom.indices.size();		//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
 
-	//ƒ‚ƒfƒ‹ƒf[ƒ^‚ÉƒƒbƒVƒ…ƒf[ƒ^‚ğ’Ç‰Á
-	model.push_back(cylinder);			//‰~’Œ•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
-	model.push_back(halfSphereTop);		//ã”¼‹…•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
-	model.push_back(halfSphereBottom);	//‰º”¼‹…•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
+	//ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’è¿½åŠ 
+	model.push_back(cylinder);			//å††æŸ±éƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
+	model.push_back(halfSphereTop);		//ä¸ŠåŠçƒéƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
+	model.push_back(halfSphereBottom);	//ä¸‹åŠçƒéƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 
-	return model;	//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì‚ğ•Ô‚·
+	return model;	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“ã‚’è¿”ã™
 }
 
-//‰~’Œ‚ÌƒƒbƒVƒ…ƒf[ƒ^ì¬ŠÖ”
+//å††æŸ±ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ä½œæˆé–¢æ•°
 Model MakeCylinderModel(int slices, int stacks)
 {
-	Mesh mesh;	//ƒVƒŠƒ“ƒ_[•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì
-	Model model;	//ƒ‚ƒfƒ‹ƒf[ƒ^\‘¢‘Ì
+	Mesh mesh;	//ã‚·ãƒªãƒ³ãƒ€ãƒ¼éƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+	Model model;	//ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
 
-	const float radius = 0.5f;		//”¼Œa
-	const float halfHeight = 0.5f;	//”¼•ª‚Ì‚‚³
+	const float radius = 0.5f;		//åŠå¾„
+	const float halfHeight = 0.5f;	//åŠåˆ†ã®é«˜ã•
 
-	const int hemiStacks = stacks / 4;			  //”¼‹…‚ÌƒXƒ^ƒbƒN”
-	int cylinderStacks = stacks - hemiStacks * 2; //‰~’Œ‚ÌƒXƒ^ƒbƒN”
+	const int hemiStacks = stacks / 4;			  //åŠçƒã®ã‚¹ã‚¿ãƒƒã‚¯æ•°
+	int cylinderStacks = stacks - hemiStacks * 2; //å††æŸ±ã®ã‚¹ã‚¿ãƒƒã‚¯æ•°
 
 	if (cylinderStacks < 1)
 	{
-		cylinderStacks = 1; //‰~’Œ‚ÌƒXƒ^ƒbƒN”‚ÍÅ’á1‚É‚·‚é
+		cylinderStacks = 1; //å††æŸ±ã®ã‚¹ã‚¿ãƒƒã‚¯æ•°ã¯æœ€ä½1ã«ã™ã‚‹
 	}
 
-	const int ringStride = slices + 1; //ƒŠƒ“ƒO‚ ‚½‚è‚Ì’¸“_”	
+	const int ringStride = slices + 1; //ãƒªãƒ³ã‚°ã‚ãŸã‚Šã®é ‚ç‚¹æ•°
 
-	const int cylinderRingCount = cylinderStacks + 1;	//‰~’Œ•”•ª‚ÌƒŠƒ“ƒO”
+	const int cylinderRingCount = cylinderStacks + 1;	//å††æŸ±éƒ¨åˆ†ã®ãƒªãƒ³ã‚°æ•°
 
-	int estimatedVertexCount = cylinderRingCount * ringStride;	//’¸“_”‚ÌŒ©Ï‚à‚è
+	int estimatedVertexCount = cylinderRingCount * ringStride;	//é ‚ç‚¹æ•°ã®è¦‹ç©ã‚‚ã‚Š
 
-	mesh.vertices.reserve(estimatedVertexCount);		//’¸“_ƒf[ƒ^”z—ñ‚Ì—\–ñ
-	mesh.indices.reserve(estimatedVertexCount * 6);	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^”z—ñ‚Ì—\–ñ
+	mesh.vertices.reserve(estimatedVertexCount);		//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
+	mesh.indices.reserve(estimatedVertexCount * 6);	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿é…åˆ—ã®äºˆç´„
 
-	//’¸“_ƒf[ƒ^‚Ìì¬
-	//ƒVƒŠƒ“ƒ_•”•ª‚Ì’¸“_ƒf[ƒ^ì¬
+	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
+	//ã‚·ãƒªãƒ³ãƒ€éƒ¨åˆ†ã®é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (int stack = 0; stack <= cylinderStacks; stack++)
 	{
-		float t = static_cast<float>(stack) / static_cast<float>(cylinderStacks);	//ƒXƒ^ƒbƒN”ä—¦
-		float y = -halfHeight + t * (halfHeight * 2.0f);							//YÀ•W
+		float t = static_cast<float>(stack) / static_cast<float>(cylinderStacks);	//ã‚¹ã‚¿ãƒƒã‚¯æ¯”ç‡
+		float y = -halfHeight + t * (halfHeight * 2.0f);							//Yåº§æ¨™
 
 		for (int slice = 0; slice <= slices; slice++)
 		{
-			float u = static_cast<float>(slice) / static_cast<float>(slices);	//UÀ•W
-			float theta = u * XM_2PI;									//Œo“xŠp
+			float u = static_cast<float>(slice) / static_cast<float>(slices);	//Uåº§æ¨™
+			float theta = u * XM_2PI;									//çµŒåº¦è§’
 
-			float x = radius * cos(theta);	//XÀ•W
-			float z = radius * sin(theta);	//ZÀ•W
+			float x = radius * cos(theta);	//Xåº§æ¨™
+			float z = radius * sin(theta);	//Zåº§æ¨™
 
 			Vertex vertex{};
-			vertex.position = Vector3(x, y, z);						//ˆÊ’u
-			vertex.normal = Vector3(x / radius, 0.0f, z / radius);		//–@ü
-			vertex.uv = Vector2(u, t);									//UVÀ•W
+			vertex.position = Vector3(x, y, z);						//ä½ç½®
+			vertex.normal = Vector3(x / radius, 0.0f, z / radius);		//æ³•ç·š
+			vertex.uv = Vector2(u, t);									//UVåº§æ¨™
 
-			float tx = -radius * sin(theta);	//Ú‹óŠÔX
-			float tz = radius * cos(theta);		//Ú‹óŠÔZ
-			vertex.tangent = Vector3(tx, 0.0f, tz);					//Ú‹óŠÔ
+			float tx = -radius * sin(theta);	//æ¥ç©ºé–“X
+			float tz = radius * cos(theta);		//æ¥ç©ºé–“Z
+			vertex.tangent = Vector3(tx, 0.0f, tz);					//æ¥ç©ºé–“
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//’¸“_F
+			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//é ‚ç‚¹è‰²
 
-			mesh.vertices.push_back(vertex);	//’¸“_ƒf[ƒ^‚ğ”z—ñ‚É’Ç‰Á
+			mesh.vertices.push_back(vertex);	//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã‚’é…åˆ—ã«è¿½åŠ 
 		}
 	}
 
-	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^‚Ìì¬
+	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ã®ä½œæˆ
 	for (int stack = 0; stack < cylinderStacks; stack++)
 	{
 		for (int slice = 0; slice < slices; slice++)
@@ -528,11 +524,11 @@ Model MakeCylinderModel(int slices, int stacks)
 		}
 	}
 
-	//’¸“_”‚ÆƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
-	mesh.vertexCount = mesh.vertices.size();					//’¸“_”‚Ìİ’è
-	mesh.indexCount = mesh.indices.size();						//ƒCƒ“ƒfƒbƒNƒX”‚Ìİ’è
+	//é ‚ç‚¹æ•°ã¨ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
+	mesh.vertexCount = mesh.vertices.size();					//é ‚ç‚¹æ•°ã®è¨­å®š
+	mesh.indexCount = mesh.indices.size();						//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°ã®è¨­å®š
 
-	model.push_back(mesh);			//‰~’Œ•”•ª‚ÌƒƒbƒVƒ…ƒf[ƒ^‚ğƒ‚ƒfƒ‹ƒf[ƒ^‚É’Ç‰Á
+	model.push_back(mesh);			//å††æŸ±éƒ¨åˆ†ã®ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã«è¿½åŠ 
 
-	return model;	//ƒƒbƒVƒ…ƒf[ƒ^\‘¢‘Ì‚ğ•Ô‚·
+	return model;	//ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“ã‚’è¿”ã™
 }

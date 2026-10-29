@@ -2486,6 +2486,16 @@
                         ]
                     },
                     "targetLocalObjectId": 2
+                },
+                {
+                    "properties": {
+                        "/position": [
+                            0.0,
+                            0.4000000059604645,
+                            0.0
+                        ]
+                    },
+                    "targetLocalObjectId": 12
                 }
             ],
             "rootActorGuid": "{F9B24336-1F36-4E33-BEFB-8CB99AF4867E}",
@@ -2520,17 +2530,16 @@
                 },
                 {
                     "data": {
-                        "blendMode": 0,
+                        "castShadow": true,
                         "color": [
-                            0.29792147874832153,
-                            0.29792147874832153,
-                            0.29792147874832153,
+                            0.0722140222787857,
+                            0.0722140222787857,
+                            0.0722140222787857,
                             1.0
                         ],
                         "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
                         "name": "",
                         "sortOrderInCanvas": 0,
-                        "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
                         "visible": true
                     },
                     "type": "MeshRenderer"
@@ -2651,7 +2660,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
                         "color": [
                             0.0,
@@ -2710,17 +2718,16 @@
                 },
                 {
                     "data": {
-                        "blendMode": 0,
+                        "castShadow": true,
                         "color": [
-                            0.23529411852359772,
-                            0.5490196347236633,
-                            0.12941177189350128,
+                            0.045186202973127365,
+                            0.262250691652298,
+                            0.015208516269922256,
                             0.772549033164978
                         ],
                         "meshAssetId": "{419762E8-378D-483A-A5E9-147063863C2B}",
                         "name": "",
                         "sortOrderInCanvas": 0,
-                        "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
                         "visible": true
                     },
                     "type": "MeshRenderer"
@@ -2875,7 +2882,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
                         "color": [
                             1.0,
@@ -2978,7 +2984,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
                         "color": [
                             1.0,
@@ -3050,7 +3055,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
                         "color": [
                             1.0,
@@ -3122,7 +3126,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
                         "color": [
                             1.0,
@@ -3253,7 +3256,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
                         "color": [
                             1.0,
@@ -3454,7 +3456,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{525FA8C6-E04E-4027-8300-5B0DC0CB92E7}",
                         "color": [
                             1.0,
@@ -3601,12 +3602,11 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{6A91F5F6-3CE7-4055-B952-F8FD0FCEDCBA}",
                         "color": [
-                            0.3811797499656677,
+                            0.12005805224180222,
                             1.0,
-                            0.15473443269729614,
+                            0.0207110196352005,
                             0.6509804129600525
                         ],
                         "flipX": false,
@@ -3673,12 +3673,11 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
                         "color": [
-                            0.8588235378265381,
-                            0.19607843458652496,
-                            0.9058823585510254,
+                            0.7083758115768433,
+                            0.03189603239297867,
+                            0.7991027235984802,
                             1.0
                         ],
                         "flipX": false,
@@ -3763,17 +3762,16 @@
                 },
                 {
                     "data": {
-                        "blendMode": 0,
+                        "castShadow": true,
                         "color": [
-                            0.23529411852359772,
-                            0.5490196347236633,
-                            0.11764705926179886,
+                            0.045186202973127365,
+                            0.262250691652298,
+                            0.012983032502233982,
                             0.772549033164978
                         ],
                         "meshAssetId": "{419762E8-378D-483A-A5E9-147063863C2B}",
                         "name": "",
                         "sortOrderInCanvas": 0,
-                        "textureOverrideAssetId": "{35B0767D-C8F1-436B-BD9B-B23EE93E808D}",
                         "visible": true
                     },
                     "type": "MeshRenderer"
@@ -3808,24 +3806,6 @@
                         ]
                     },
                     "type": "Transform"
-                },
-                {
-                    "data": {
-                        "blendMode": 0,
-                        "color": [
-                            0.772549033164978,
-                            0.4431372582912445,
-                            0.40784314274787903,
-                            1.0
-                        ],
-                        "followActorId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
-                        "followMode": 2,
-                        "name": "",
-                        "skyTextureAssetId": "{5C383CA1-7D26-4DC4-8225-846075C43E73}",
-                        "sortOrderInCanvas": 0,
-                        "visible": true
-                    },
-                    "type": "SkyRenderer"
                 }
             ],
             "is_active": false,
@@ -3966,7 +3946,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
                         "color": [
                             1.0,
@@ -4069,7 +4048,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
                         "color": [
                             1.0,
@@ -4172,7 +4150,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{36A8C4A4-5AE3-4940-8740-BF805435EEDD}",
                         "color": [
                             0.0,
@@ -4275,7 +4252,6 @@
                 },
                 {
                     "data": {
-                        "blendMode": 1,
                         "canvasActorId": "{2B03ABFA-D606-4FB5-A679-412322D490F5}",
                         "color": [
                             1.0,

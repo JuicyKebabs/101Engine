@@ -2,7 +2,6 @@
 
 #include "SceneLoader.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "Engine/Graphics/Renderer.h"
 #include "Engine/Resource/AssetManager.h"
 #include "Engine/Resource/MetaFile.h"
 #include "Engine/Core/Path/PathManager.h"
@@ -169,14 +168,6 @@ bool SceneManager::ReserveChangeScene(const AssetReference<SceneAsset>& sceneAss
 	return sceneAsset.HasValue() && ReserveChangeScene(sceneAsset.GetGuid());
 }
 
-void SceneManager::OnRender()
-{
-	if (m_pCurrentScene)
-	{
-		m_pCurrentScene->OnRender(m_context);
-	}
-}
-
 void SceneManager::ChangeScene(const std::string& name)
 {
 	SceneElement* element = GetSceneElement(name);
@@ -229,7 +220,9 @@ void SceneManager::ChangeScene(SceneElement& element)
 		}
 
 		const std::string path = m_context.pAssetManager->GetAssetPath(element.sceneAssetGuid);
-		SceneLoadResult load = SceneLoader::LoadCandidate(path, m_context);
+		SceneLoadOptions options;
+        options.deferPublish = true;
+        SceneLoadResult load = SceneLoader::LoadCandidate(path, m_context, options);
 
 		if (!load)
 		{
@@ -253,6 +246,8 @@ void SceneManager::ChangeScene(SceneElement& element)
 	nextScene->SetViewportSize(m_viewportWidth, m_viewportHeight);
 	SceneBase* previousCurrent = m_pCurrentScene;
 	std::unique_ptr<SceneBase> replacedTarget;
+    std::string nextName = element.name;
+    const Guid nextGuid = element.source == SceneElement::Source::Asset ? element.sceneAssetGuid : Guid{};
 
 	if (loadedScene)
 	{
@@ -261,25 +256,49 @@ void SceneManager::ChangeScene(SceneElement& element)
 		nextScene = element.pSceneBase.get();
 	}
 
-	m_pCurrentScene = nullptr;
-	ClearReservation();
+    // All failure-prone load/resolve/validation/storage preparation has ended.
+    // From here, current points to T even while S's ending callbacks run.
+    m_currentSceneName.swap(nextName);
+    m_currentSceneAssetGuid = nextGuid;
+    m_pCurrentScene = nextScene;
+    ClearReservation();
 
-	if (previousCurrent && previousCurrent != nextScene)
+    if (previousCurrent && previousCurrent != nextScene)
 	{
-		previousCurrent->Finalize();
-	}
+        previousCurrent->m_deferAssetRelease = true;
+        previousCurrent->Finalize();
+        for (auto& previousElement : m_sceneElements)
+        {
+            if (previousElement.pSceneBase.get() == previousCurrent)
+            {
+                previousElement.pSceneBase.reset();
+                break;
+            }
+        }
 
-	if (replacedTarget && replacedTarget.get() != previousCurrent)
+        if (replacedTarget.get() == previousCurrent)
+        {
+            replacedTarget.reset();
+        }
+
+        if (m_context.pAssetManager)
+        {
+            // Identity only; the pointer is not dereferenced after destruction.
+            m_context.pAssetManager->ReleaseScene(previousCurrent);
+        }
+    }
+
+    if (replacedTarget && replacedTarget.get() != previousCurrent)
 	{
 		replacedTarget->Finalize();
 	}
 
 	// Finalize hooks must not be able to enqueue an unintended follow-up transition.
 	ClearReservation();
-	m_pCurrentScene = nextScene;
-	m_currentSceneName = element.name;
-	m_currentSceneAssetGuid = element.source == SceneElement::Source::Asset ? element.sceneAssetGuid : Guid{};
-	DBG("SceneManager: Changed to scene '%s'", element.name.c_str());
+    // T's publication does not mean GPU upload completion or OnStart completion.
+    // Never interleave ordinary Update/Render into this transition sequence.
+    nextScene->PublishUnpublishedCandidate();
+	DBG("SceneManager: Changed to scene '%s'", m_currentSceneName.c_str());
 }
 
 void SceneManager::ClearReservation()

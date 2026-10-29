@@ -22,7 +22,6 @@ public:
 	void PreUpdate(float deltaTime);
 	void Update(float deltaTime);
 	void LateUpdate(float deltaTime);
-	void OnRender();
 	void Finalize();
 	void RegisterScene(const std::string& name, std::unique_ptr<SceneBase> scene);
 	bool RegisterSceneAsset(const std::string& name, const Guid& sceneAssetGuid);

@@ -101,7 +101,7 @@ bool SerializeReflectedComponent(
 
 		if (engineContext && engineContext->pAssetManager)
 		{
-			assetContext.emplace(*engineContext->pAssetManager);
+			assetContext.emplace(*engineContext->pAssetManager, true);
 			context.assetReferenceContext = &*assetContext;
 		}
 	}

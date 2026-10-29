@@ -177,7 +177,7 @@ Actor* ActorImprintSystem::Materialize(
 	}
 
 	const auto* definition = ResolveForSceneCandidate(imprint);
-	AssetManagerAssetReferenceContext assetContext(m_assets);
+	AssetManagerAssetReferenceContext assetContext(m_assets, true);
 
 	if (!definition || (!buildingReloadCandidate &&
 		(GetAvailability(imprint) != ActorImprintAvailability::Available ||

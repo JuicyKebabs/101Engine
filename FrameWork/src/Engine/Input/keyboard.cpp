@@ -1,11 +1,11 @@
 //--------------------------------------------------------------------------------------
 // File: Keyboard.cpp
 //
-// ƒL[ƒ{[ƒhƒ‚ƒWƒ…[ƒ‹
+// ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«
 //
 //--------------------------------------------------------------------------------------
 // 2020/06/07
-//     DirectXTK‚æ‚èA‚È‚ñ‚¿‚á‚Á‚ÄCŒ¾Œê—p‚ÉƒVƒFƒCƒvƒAƒbƒv‰ü•Ï
+//     DirectXTKã‚ˆã‚Šã€ãªã‚“ã¡ã‚ƒã£ã¦Cè¨€èªç”¨ã«ã‚·ã‚§ã‚¤ãƒ—ã‚¢ãƒƒãƒ—æ”¹å¤‰
 //
 // Licensed under the MIT License.
 //
@@ -17,14 +17,14 @@
 #include <assert.h>
 //#include "debugPrintf.h"
 
-static_assert(sizeof(Keyboard_State) == 256 / 8, "ƒL[ƒ{[ƒhó‘Ô\‘¢‘Ì‚ÌƒTƒCƒY•sˆê’v");
+static_assert(sizeof(Keyboard_State) == 256 / 8, "ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰çŠ¶æ…‹æ§‹é€ ä½“ã®ã‚µã‚¤ã‚ºä¸ä¸€è‡´");
 
 static Keyboard_State gState = {};
 static Keyboard_State gStateOld = {};
 
 void keycopy()
 {
-    gStateOld = gState; //‘O‰ñ‚ÌƒL[î•ñ‚ğ•Û‘¶
+    gStateOld = gState; //å‰å›ã®ã‚­ãƒ¼æƒ…å ±ã‚’ä¿å­˜
     
 }
 
@@ -70,7 +70,7 @@ bool Keyboard_IsKeyDown(Keyboard_Keys key, const Keyboard_State* pState)
     return false;
 }
 
-//ƒgƒŠƒK[”»’è
+//ãƒˆãƒªã‚¬ãƒ¼åˆ¤å®š
 bool Keyboard_IsKeyDownTrigger(Keyboard_Keys key)
 {
     if (key <= 0xfe)
@@ -108,7 +108,7 @@ bool Keyboard_IsKeyUp(Keyboard_Keys key)
     return Keyboard_IsKeyUp(key, &gState);
 }
 
-// ƒL[ƒ{[ƒh‚ÌŒ»İ‚Ìó‘Ô‚ğæ“¾‚·‚é
+// ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã®ç¾åœ¨ã®çŠ¶æ…‹ã‚’å–å¾—ã™ã‚‹
 const Keyboard_State* Keyboard_GetState(void)
 {
     return &gState;
@@ -124,7 +124,7 @@ void Keyboard_Reset(void)
     ZeroMemory(&gStateOld, sizeof(Keyboard_State));
 }
 
-// ƒL[ƒ{[ƒh§Œä‚Ì‚½‚ß‚ÌƒEƒHƒ“‚Ç‚¤ƒƒbƒZ[ƒWƒvƒƒV[ƒWƒƒƒtƒbƒNŠÖ”
+// ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰åˆ¶å¾¡ã®ãŸã‚ã®ã‚¦ã‚©ãƒ³ã©ã†ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ãƒ—ãƒ­ã‚·ãƒ¼ã‚¸ãƒ£ãƒ•ãƒƒã‚¯é–¢æ•°
 void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
 {
     bool down = false;
@@ -156,7 +156,7 @@ void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
         if (!down)
         {
-            // ¶ƒVƒtƒg‚Æ‰EƒVƒtƒg‚Ì—¼•û‚ª“¯‚É‰Ÿ‚³‚ê‚½ê‡‚ÉƒNƒŠƒA‚³‚ê‚é‚æ‚¤‚É‚·‚é‚½‚ß‚Ì‰ñ”ğô
+            // å·¦ã‚·ãƒ•ãƒˆã¨å³ã‚·ãƒ•ãƒˆã®ä¸¡æ–¹ãŒåŒæ™‚ã«æŠ¼ã•ã‚ŒãŸå ´åˆã«ã‚¯ãƒªã‚¢ã•ã‚Œã‚‹ã‚ˆã†ã«ã™ã‚‹ãŸã‚ã®å›é¿ç­–
             keyUp(VK_LSHIFT);
             keyUp(VK_RSHIFT);
         }

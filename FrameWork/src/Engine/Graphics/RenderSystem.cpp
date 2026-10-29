@@ -1,631 +1,394 @@
-#include "Engine/Graphics/RenderSystem.h"
-#include "Engine/Component/SkyRenderer.h"
-#include "Engine/Resource/MeshGPU.h"
-#include "Engine/Actor/Actor.h"
+#include "Engine/Actor/ActorHierarchyActivity.h"
+#include "RenderSystem.h"
+#include "RenderingConversions.h"
 #include "Engine/Scene/SceneBase.h"
+#include "Engine/Actor/Actor.h"
+#include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/SpriteRenderer.h"
+#include "Engine/UI/UIRenderer.h"
 #include "Engine/UI/Canvas.h"
-#include "Engine/Resource/AssetManager.h"
+#include "Engine/Resource/RenderAssetResources.h"
+#include "Engine/Core/Debug/Debug.h"
 
-bool RenderSystem::SetActiveSkyRenderer(SkyRenderer* renderer)
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+namespace
 {
-	if (!renderer || renderer->IsDestroyed())
-	{
-		return false;
-	}
 
-	Actor* owner = renderer->GetOwner();
-
-	if (!m_scene || !owner || owner->IsDestroyed() || owner->GetOwner() != m_scene)
-	{
-		return false;
-	}
-
-	m_skyRenderer = renderer;
-	return true;
+template<class ComponentType>
+void RegisterOnce(std::vector<ComponentType*>& values, ComponentType* component)
+{
+    if (component && std::find(values.begin(), values.end(), component) == values.end())
+    {
+        values.push_back(component);
+    }
 }
 
-void RenderSystem::ClearActiveSkyRenderer(SkyRenderer* renderer)
+template<class ComponentType>
+void UnregisterValue(std::vector<ComponentType*>& values, ComponentType* component)
 {
-	if (m_skyRenderer == renderer)
-	{
-		m_skyRenderer = nullptr;
-	}
+    std::erase(values, component);
 }
 
-void RenderSystem::Register(MeshRenderer* renderer)
+enum class SourceKind { Mesh, Sprite, UI };
+
+struct SubmissionSource
 {
-	if (std::find(m_meshRenderers.begin(), m_meshRenderers.end(), renderer) == m_meshRenderers.end())
-	{
-		m_meshRenderers.push_back(renderer);
-	}
+    RendererComponent* component = nullptr;
+    SourceKind kind = SourceKind::Mesh;
+    bool screen = false;
+    std::vector<std::uint32_t> orderPath;
+};
+
+rendering::Vector4 LocalQuadTransform(const ComponentMaterialState& material)
+{
+    for (const auto& parameter : material.description.parameters)
+    {
+        if (parameter.name == "LocalQuadTransform")
+        {
+            if (const auto* value = std::get_if<rendering::Vector4>(&parameter.value))
+            {
+                return *value;
+            }
+        }
+    }
+
+    rendering::Vector4 identity;
+    identity.x = 1;
+    identity.y = 1;
+    return identity;
 }
 
-void RenderSystem::Register(SpriteRenderer* renderer)
+// Frobenius norm bounds the maximum stretch, including shear. For Billboard,
+// retain a sphere around the Actor origin so rotating an off-center pivot for
+// Camera A/B cannot move Geometry outside a Camera-independent submitted bound.
+void SetWorldBounds(rendering::RenderObject& object, Vector3 localCenter, float localRadius,
+    std::uint64_t revision, const Matrix4x4& world)
 {
-	if (std::find(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer) == m_spriteRenderers.end())
-	{
-		m_spriteRenderers.push_back(renderer);
-	}
+    double stretchSquared = 0;
+    for (std::size_t row = 0; row < 3; ++row)
+    {
+        for (std::size_t column = 0; column < 3; ++column)
+        {
+            const double value = world.m[row][column];
+            stretchSquared += value * value;
+        }
+    }
+
+    Vector3 center;
+    double radius = localRadius;
+    if (object.billboard == rendering::BillboardMode::None)
+    {
+        center = world.TransformPoint(localCenter);
+    }
+    else
+    {
+        center = world.GetTranslation();
+        radius += localCenter.Length();
+    }
+
+    radius *= std::sqrt(stretchSquared);
+    if (!std::isfinite(radius) || radius > (std::numeric_limits<float>::max)())
+    {
+        return; // Missing Bounds safely disables culling; do not submit infinity.
+    }
+
+    rendering::BoundingSphere bounds;
+    bounds.center = EngineRendering::ToRenderer(center);
+    bounds.radius = std::nextafter(static_cast<float>(radius), (std::numeric_limits<float>::infinity)());
+    if (!std::isfinite(bounds.radius))
+    {
+        return;
+    }
+
+    object.bounds = bounds;
+    object.boundsGeometryRevision = revision;
 }
 
-void RenderSystem::Register(WaveRenderer* renderer)
-{
-	if (std::find(m_waveRenderers.begin(), m_waveRenderers.end(), renderer) == m_waveRenderers.end())
-	{
-		m_waveRenderers.push_back(renderer);
-	}
 }
 
-void RenderSystem::Register(UIRenderer* renderer)
-{
-	if (std::find(m_uiRenderers.begin(), m_uiRenderers.end(), renderer) == m_uiRenderers.end())
-	{
-		m_uiRenderers.push_back(renderer);
-	}
-}
+void RenderSystem::Register(MeshRenderer* value) { RegisterOnce(m_meshRenderers, value); }
+void RenderSystem::Register(SpriteRenderer* value) { RegisterOnce(m_spriteRenderers, value); }
+void RenderSystem::Register(UIRenderer* value) { RegisterOnce(m_uiRenderers, value); }
+void RenderSystem::Unregister(MeshRenderer* value) { UnregisterValue(m_meshRenderers, value); }
+void RenderSystem::Unregister(SpriteRenderer* value) { UnregisterValue(m_spriteRenderers, value); }
+void RenderSystem::Unregister(UIRenderer* value) { UnregisterValue(m_uiRenderers, value); }
 
-void RenderSystem::Unregister(MeshRenderer* renderer)
+void RenderSystem::PrepareRegistrationCapacity(std::size_t additionalComponents)
 {
-	m_meshRenderers.erase(std::remove(m_meshRenderers.begin(), m_meshRenderers.end(), renderer), m_meshRenderers.end());
-}
-
-void RenderSystem::Unregister(SpriteRenderer* renderer)
-{
-	m_spriteRenderers.erase(
-		std::remove(m_spriteRenderers.begin(), m_spriteRenderers.end(), renderer), m_spriteRenderers.end());
-}
-
-void RenderSystem::Unregister(WaveRenderer* renderer)
-{
-	m_waveRenderers.erase(std::remove(m_waveRenderers.begin(), m_waveRenderers.end(), renderer), m_waveRenderers.end());
-}
-
-void RenderSystem::Unregister(UIRenderer* renderer)
-{
-	m_uiRenderers.erase(std::remove(m_uiRenderers.begin(), m_uiRenderers.end(), renderer), m_uiRenderers.end());
+    // Preparation may allocate; OnAttach registration in the commit phase must
+    // fit these capacities. The count includes all new Components conservatively.
+    m_meshRenderers.reserve(m_meshRenderers.size() + additionalComponents);
+    m_spriteRenderers.reserve(m_spriteRenderers.size() + additionalComponents);
+    m_uiRenderers.reserve(m_uiRenderers.size() + additionalComponents);
 }
 
 void RenderSystem::FlushRegisters()
 {
-	if (m_skyRenderer && !m_skyRenderer->IsDestroyed() && m_skyRenderer->GetOwner() && !m_skyRenderer->GetOwner()->IsDestroyed())
-	{
-		m_skyRenderer->Flush();
-	}
+    const auto flush = [](const auto& renderers)
+    {
+        for (auto* renderer : renderers)
+        {
+            Actor* actor = renderer ? renderer->GetOwner() : nullptr;
+            const bool live = IsActorHierarchyActive(actor);
+            if (live && !renderer->IsDestroyed())
+            {
+                renderer->Flush();
+            }
+        }
+    };
 
-	for (auto& renderer : m_meshRenderers)
-	{
-		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
-		{
-			continue;
-		}
-
-		renderer->Flush();
-	}
-
-	for (auto& renderer : m_spriteRenderers)
-	{
-		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
-		{
-			continue;
-		}
-
-		renderer->Flush();
-	}
-
-	for (auto& renderer : m_waveRenderers)
-	{
-		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
-		{
-			continue;
-		}
-
-		renderer->Flush();
-	}
-
-	for (auto& renderer : m_uiRenderers)
-	{
-		if (!renderer->IsDestroyed() && renderer->GetOwner() && !renderer->GetOwner()->IsDestroyed())
-		{
-			continue;
-		}
-
-		renderer->Flush();
-	}
+    flush(m_meshRenderers);
+    flush(m_spriteRenderers);
+    flush(m_uiRenderers);
 }
 
-void RenderSystem::BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy)
+bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
+    const CameraInfo* camera, const RenderViewPolicy& policy, rendering::ViewId sceneViewId,
+    rendering::ViewId overlayViewId, std::uint32_t width, std::uint32_t height,
+    const DirectionalLight& light)
 {
-	// Determine if we are rendering in a canvas view and get the root canvas for the view
-	const Canvas* canvasViewRoot = viewPolicy.canvasViewRoot;
-	const bool isCanvasView = canvasViewRoot != nullptr;
-
-	// Compute the world-to-canvas transformation matrix if we are in a canvas view,
-	// otherwise use the identity matrix
-	const Matrix4x4 worldToCanvas = isCanvasView
-		? canvasViewRoot->GetContentWorldMatrix().Inverse()
-		: Matrix4x4::Identity();
-
-	// Lamda function to determine if a render item should be rendered in screen space based on the view policy
-	const auto shouldRenderAsScreenSpace =
-		[isCanvasView](RenderSpace renderSpace)
-		{
-			return isCanvasView || renderSpace == RenderSpace::Screen;
-		};
-
-	m_cameraInfo = cameraInfo;	// Update cached camera info for this frame
-
-	m_frameRenderData.Clear();	// Clear previous frame's render data
-	m_frameSortData.Clear();	// Clear previous frame's sort data
-
-	if (!isCanvasView)
-	{
-		// If we are not rendering in a canvas view, add the sky renderer to the frame render data if it exists
-		if (m_skyRenderer && !m_skyRenderer->IsDestroyed() && m_skyRenderer->GetOwner() &&
-			!m_skyRenderer->GetOwner()->IsDestroyed() &&
-			m_skyRenderer->IsVisible() && m_skyRenderer->IsConfigured())
-		{
-			const auto& renderTemplate = m_skyRenderer->GetRenderTemplate();
-			const auto& renderProxy = m_skyRenderer->GetRenderProxy();
-			auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
-			auto handle = m_frameRenderData.AddMeshs(item);
-			RenderItemRef ref;
-			ref.renderType = RenderType::Mesh;
-			ref.handle = handle;
-			m_frameRenderData.sky = ref;
-		}
-	}
-
-	// Lamda funtion determine if a render item should be included 
-	// in the current render pass based on the view policy
-	const auto shouldIncludeRenderSpace = [&viewPolicy, isCanvasView](
-											  const RendererComponent* renderer, RenderSpace renderSpace)
-	{
-		// In case of only rendering a elements in a subtree of given Canvas,
-		// check if the renderer is in the subtree of the given Canvas. If not, skip it.
-		if (isCanvasView)
-		{
-			return viewPolicy.canvasViewRoot->ContainsRenderer(renderer);
-		}
-
-		switch (viewPolicy.renderSpaceFilter)
-		{
-		case RenderSpaceFilter::WorldOnly:
-			return renderSpace == RenderSpace::World;
-
-		case RenderSpaceFilter::ScreenOnly:
-			return renderSpace == RenderSpace::Screen;
-
-		case RenderSpaceFilter::All:
-		default:
-			return true;
-		}
-	};
-
-	// Build draw packets for mesh renderers
-	for (const auto& renderer : m_meshRenderers)
-	{
-		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
-		{
-			const auto& renderTemplates = renderer->GetRenderTemplates();
-			const auto& renderProxy = renderer->GetRenderProxy();
-
-			for (const auto& renderTemplate : renderTemplates) 
-			{
-				auto item = CreateMeshRenderItem(renderTemplate, renderProxy);
-
-				// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-				if (isCanvasView)
-				{
-					item.common.worldMatrix *= worldToCanvas;
-				}
-
-				RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
-				NormalizePSOKey(item.common.materialDesc.psoKey, queue);
-
-				// Skip render items that do not match the current render space filter
-				if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
-				{
-					continue;
-				}
-
-				if (shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
-				{
-					// Disable depth testing for screen-space meshes
-					item.common.materialDesc.psoKey.depth = DepthMode::Disable;
-					auto handle = m_frameRenderData.AddMeshs(item);
-
-					SortKeyScreenSpace sortKey;
-					sortKey.psoKey = item.common.materialDesc.psoKey;
-					sortKey.orderPath = renderer->BuildCanvasSortPath();
-
-					RenderItemRef ref;
-					ref.renderType = RenderType::Mesh;
-					ref.handle = handle;
-					ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
-					m_frameRenderData.AddScreenSpace(ref);
-				}
-				else
-				{
-					auto handle = m_frameRenderData.AddMeshs(item);
-					RenderItemRef ref;
-					ref.renderType = RenderType::Mesh;
-					ref.handle = handle;
-
-					if (queue == RenderQueue::Opaque)
-					{
-						SortKeyOpaque opaqueKey;
-						opaqueKey.psoKey = item.common.materialDesc.psoKey;
-						ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
-						m_frameRenderData.AddOpaque(ref);
-					}
-					else
-					{
-						SortKeyTransparent transparentKey;
-						transparentKey.psoKey = item.common.materialDesc.psoKey;
-						transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
-						ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
-						m_frameRenderData.AddTransparent(ref);
-					}
-				}
-			}
-		}
-	}
-
-	// Build draw packets for sprite renderers
-	for(const auto& renderer : m_spriteRenderers)
-	{
-		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
-		{
-			const auto& renderTemplate = renderer->GetRenderTemplate();
-			const auto& renderProxy = renderer->GetRenderProxy(m_cameraInfo);
-
-			auto item = CreateSpriteRenderItem(renderTemplate, renderProxy);
-
-			// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-			if (isCanvasView)
-			{
-				item.common.worldMatrix *= worldToCanvas;
-			}
-
-			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
-			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
-
-			// Skip render items that do not match the current render space filter
-			if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
-			{
-				continue;
-			}
-
-			if (shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
-			{
-				// Disable depth testing for screen-space sprites
-				item.common.materialDesc.psoKey.depth = DepthMode::Disable;
-				auto handle = m_frameRenderData.AddSprites(item);
-
-				SortKeyScreenSpace sortKey;
-				sortKey.psoKey = item.common.materialDesc.psoKey;
-				sortKey.orderPath = renderer->BuildCanvasSortPath();
-
-				RenderItemRef ref;
-				ref.renderType = RenderType::Sprite;
-				ref.handle = handle;
-				ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
-				m_frameRenderData.AddScreenSpace(ref);
-			}
-			else
-			{
-				auto handle = m_frameRenderData.AddSprites(item);
-
-				RenderItemRef ref;
-				ref.renderType = RenderType::Sprite;
-				ref.handle = handle;
-
-				if (queue == RenderQueue::Opaque)
-				{
-					SortKeyOpaque opaqueKey;
-					opaqueKey.psoKey = item.common.materialDesc.psoKey;
-					ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
-					m_frameRenderData.AddOpaque(ref);
-				}
-				else
-				{
-					SortKeyTransparent transparentKey;
-					transparentKey.psoKey = item.common.materialDesc.psoKey;
-					transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
-					ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
-					m_frameRenderData.AddTransparent(ref);
-				}
-			}
-		}
-	}
-
-	// Build draw packets for wave renderers
-	for (const auto& renderer : m_waveRenderers)
-	{
-		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
-		{
-			const auto& renderTemplate = renderer->GetRenderTemplate();
-			const auto& renderProxy = renderer->GetRenderProxy();
-			auto item = CreateWaveRenderItem(renderTemplate, renderProxy);
-
-			// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-			if (isCanvasView)
-			{
-				item.common.worldMatrix *= worldToCanvas;
-			}
-
-			RenderQueue queue = GetRenderQueue(item.common.materialDesc.psoKey);
-			NormalizePSOKey(item.common.materialDesc.psoKey, queue);
-
-			// Skip render items that do not match the current render space filter
-			if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
-			{
-				continue;
-			}
-
-			if (queue == RenderQueue::Opaque)
-			{
-				auto handle = m_frameRenderData.AddWaves(item);
-				RenderItemRef ref;
-				ref.renderType = RenderType::Wave;
-				ref.handle = handle;
-				SortKeyOpaque opaqueKey;
-				opaqueKey.psoKey = item.common.materialDesc.psoKey;
-				ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
-				m_frameRenderData.AddOpaque(ref);
-			}
-			else
-			{
-				auto handle = m_frameRenderData.AddWaves(item);
-				RenderItemRef ref;
-				ref.renderType = RenderType::Wave;
-				ref.handle = handle;
-				SortKeyTransparent transparentKey;
-				transparentKey.psoKey = item.common.materialDesc.psoKey;
-				transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
-				ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
-				m_frameRenderData.AddTransparent(ref);
-			}
-		}
-	}
-
-	// Build draw packets for UI renderers
-	for(const auto& renderer : m_uiRenderers)
-	{
-		if (renderer->IsVisible() && renderer->IsConfigured())	// Skip invisible or unconfigured renderers
-		{
-			const auto& renderTemplate = renderer->GetRenderTemplate();
-			const auto& renderProxy = renderer->GetRenderProxy();
-
-			for (const auto& element : renderTemplate)
-			{
-				auto item = CreateUIRenderItem(element, renderProxy);
-
-				// If we are rendering in a canvas view, transform the world matrix of the render item to canvas space
-				if (isCanvasView)
-				{
-					item.common.worldMatrix *= worldToCanvas;
-				}
-
-				RenderItemRef ref;
-				ref.renderType = RenderType::UI;
-
-				PSOKey& psoKey = item.common.materialDesc.psoKey;
-
-				// Skip render items that do not match the current render space filter
-				if (!shouldIncludeRenderSpace(renderer, renderProxy.common.renderSpace))
-				{
-					continue;
-				}
-
-				if (!shouldRenderAsScreenSpace(renderProxy.common.renderSpace))
-				{// World-space UI elements
-					// Get the render queue based on the PSOKey and normalize it
-					RenderQueue queue = GetRenderQueue(psoKey);
-
-					// UI in world -space have to be as a transparent object, 
-					// so if the depth is disabled, we need to set it to TestNoWrite
-					if (psoKey.depth == DepthMode::Disable)
-					{
-						psoKey.depth = DepthMode::TestNoWrite;
-					}
-
-					NormalizePSOKey(psoKey, queue);
-
-					if (queue == RenderQueue::Opaque)
-					{// Opaque world-space UI elements
-						SortKeyOpaque opaqueKey;
-						opaqueKey.psoKey = psoKey;
-						ref.sortKey = m_frameSortData.AddOpaqueKey(opaqueKey);
-						ref.handle = m_frameRenderData.AddUI(std::move(item));
-						m_frameRenderData.AddOpaque(ref);
-					}
-					else
-					{// Transparent world-space UI elements
-						SortKeyTransparent transparentKey;
-						transparentKey.psoKey = psoKey;
-						transparentKey.depth = CalculateDepth(renderProxy.common.position, m_cameraInfo);
-						ref.sortKey = m_frameSortData.AddTransparentKey(transparentKey);
-						ref.handle = m_frameRenderData.AddUI(std::move(item));
-						m_frameRenderData.AddTransparent(ref);
-					}
-				}
-				else
-				{// Screen-space UI elements
-
-					// Disable depth testing
-					psoKey.depth = DepthMode::Disable;
-
-					SortKeyScreenSpace sortKey;
-					sortKey.psoKey = item.common.materialDesc.psoKey;
-					sortKey.orderPath = renderer->BuildCanvasSortPath();
-					ref.sortKey = m_frameSortData.AddScreenSpaceKey(sortKey);
-					ref.handle = m_frameRenderData.AddUI(std::move(item));
-					m_frameRenderData.AddScreenSpace(ref);
-				}
-			}
-		}
-	}
-
-	SortOpaque();		// Sort opaque draw packets
-	SortTransparent();	// Sort transparent draw packets
-	SortScreenSpace();	// Sort screen-space draw packets (e.g., UI)
-}
-
-MeshRenderItem RenderSystem::CreateMeshRenderItem(
-	const SubmeshRenderTemplate& renderTemplate,
-	const MeshRendererProxy& renderProxy)
-{
-	MeshRenderItem item;
-	item.meshDesc = renderTemplate.meshDesc;
-	item.common.materialDesc = renderTemplate.materialDesc;
-
-	if (renderProxy.textureOverrideHandle != InvalidTextureHandle)
-	{
-		item.common.materialDesc.textureHandle = renderProxy.textureOverrideHandle;
-	}
-
-	item.common.worldMatrix = renderProxy.common.worldMatrix;
-	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
-	return item;
-}
-
-SpriteRenderItem RenderSystem::CreateSpriteRenderItem(
-	const SpriteRenderTemplate& renderTemplate,
-	const SpriteRendererProxy& renderProxy)
-{
-	SpriteRenderItem item;
-	item.common.materialDesc = renderTemplate.materialDesc;
-	item.common.worldMatrix = renderProxy.common.worldMatrix;
-	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
-	item.uvScale = renderProxy.uvScale;
-	item.uvOffset = renderProxy.uvOffset;
-	item.pivot = renderProxy.pivot;
-	item.flip = renderProxy.flip;
-	return item;
-}
-
-WaveRenderItem RenderSystem::CreateWaveRenderItem(
-	const SubmeshRenderTemplate& renderTemplate,
-	const WaveRendererProxy& renderProxy)
-{
-	WaveRenderItem item;
-	item.common.materialDesc = renderTemplate.materialDesc;
-
-	TextureHandle textureHandle = InvalidTextureHandle;
-
-	if (m_skyRenderer 
-		&& !m_skyRenderer->IsDestroyed()
-		&& m_skyRenderer->IsVisible()
-		&& m_skyRenderer->IsConfigured()
-		&& m_skyRenderer->GetOwner() && !m_skyRenderer->GetOwner()->IsDestroyed() && m_skyRenderer->GetOwner()->IsActive())
-	{
-		const auto id = m_skyRenderer->GetSkyTextureAssetId();
-
-		if (id.IsValid())
-		{
-			textureHandle = m_scene->GetEngineContext()->pAssetManager->GetTextureHandle(id);
-		}
-	}
-
-	item.common.materialDesc.textureHandle = textureHandle;
-
-	item.common.worldMatrix = renderProxy.common.worldMatrix;
-	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
-	item.vertexDivisions = renderProxy.vertexDivisions;
-	item.time = renderProxy.time;
-	item.waveAmplitude = renderProxy.waveAmplitude;
-	item.waveFrequency = renderProxy.waveFrequency;
-	item.waveDirection = renderProxy.waveDirection;
-	return item;
-}
-
-UIRenderItem RenderSystem::CreateUIRenderItem(const UIRenderElement& renderTemplate, const UIRendererProxy& renderProxy)
-{
-	UIRenderItem item;
-	item.common.materialDesc = renderTemplate.materialDesc;
-	item.common.worldMatrix = renderProxy.common.worldMatrix;
-	item.common.color = renderProxy.common.color * renderTemplate.materialDesc.baseColor;
-	item.uvScale = renderProxy.uvScale;
-	item.uvOffset = renderProxy.uvOffset;
-	item.flip = renderProxy.flip;
-	return item;
-}
-
-void RenderSystem::SortOpaque()
-{
-	std::stable_sort(m_frameRenderData.opaque.begin(), m_frameRenderData.opaque.end(),
-		[this](const RenderItemRef& a, const RenderItemRef& b)
-		{
-			return OpaqueLess(
-				m_frameSortData.GetOpaqueKey(a.sortKey),
-				m_frameSortData.GetOpaqueKey(b.sortKey)
-			);
-		}
-	);
-}
-
-void RenderSystem::SortTransparent()
-{
-	std::stable_sort(m_frameRenderData.transparent.begin(), m_frameRenderData.transparent.end(),
-		[this](const RenderItemRef& a, const RenderItemRef& b)
-		{
-			return TransparentLess(
-				m_frameSortData.GetTransparentKey(a.sortKey),
-				m_frameSortData.GetTransparentKey(b.sortKey)
-			);
-		}
-	);
-}
-
-void RenderSystem::SortScreenSpace()
-{
-	std::stable_sort(
-		m_frameRenderData.screenspace.begin(),
-		m_frameRenderData.screenspace.end(),
-		[this](const RenderItemRef& a, const RenderItemRef& b)
-		{
-			const auto& ka = m_frameSortData.GetScreenSpaceKey(a.sortKey);
-			const auto& kb = m_frameSortData.GetScreenSpaceKey(b.sortKey);
-
-			if (ka.orderPath != kb.orderPath)
-			{
-				return std::lexicographical_compare(
-					ka.orderPath.begin(), ka.orderPath.end(),
-					kb.orderPath.begin(), kb.orderPath.end()
-				);
-			}
-
-			return false; // If order paths are equal, maintain original order (stable sort)
-		}
-	);
-}
-RenderQueue RenderSystem::GetRenderQueue(const PSOKey& psoKey)
-{
-	RenderQueue queue = RenderQueue::Invalied;
-
-	// Determine render queue based on blend mode
-	queue = GetRenderQueueFromBlendMode(psoKey.blend);
-
-	return queue;
-}
-
-void RenderSystem::NormalizePSOKey(PSOKey& psoKey, RenderQueue queue)
-{
-	// Force transparent objects to disable depth
-	if (queue == RenderQueue::Transparent && psoKey.depth != DepthMode::Disable)
-	{
-		psoKey.depth = DepthMode::TestNoWrite;
-	}
-
-	const uint64_t multiplyAlphaControl = static_cast<uint64_t>(PS_DEFINE::MultiplyAlphaControll);
-
-	if (psoKey.blend == BlendMode::Multiply)
-	{
-		psoKey.psKey.defines |= multiplyAlphaControl;
-	}
-	else
-	{
-		psoKey.psKey.defines &= ~multiplyAlphaControl;
-	}
+    if (!m_scene || width == 0 || height == 0)
+    {
+        return false;
+    }
+
+    const EngineContext* context = m_scene->GetEngineContext();
+    if (!context)
+    {
+        return false;
+    }
+
+    m_records.clear();
+    const bool canvasPreview = policy.canvasPreview || policy.canvasViewRoot;
+    Matrix4x4 worldToCanvas = Matrix4x4::Identity();
+    if (policy.canvasViewRoot)
+    {
+        worldToCanvas = policy.canvasViewRoot->GetContentWorldMatrix().Inverse();
+    }
+
+    std::vector<SubmissionSource> sources;
+    const auto gather = [&](const auto& renderers, SourceKind kind)
+    {
+        for (auto* renderer : renderers)
+        {
+            Actor* actor = renderer ? renderer->GetOwner() : nullptr;
+            const bool liveActor = IsActorHierarchyActive(actor);
+            if (!liveActor || renderer->IsDestroyed())
+            {
+                continue;
+            }
+
+            if (!renderer->IsVisible() || !renderer->IsConfigured())
+            {
+                continue;
+            }
+
+            if (!renderer->SynchronizeRenderResources())
+            {
+                return false;
+            }
+
+            const RenderSpace space = renderer->GetRenderSpace();
+            if (policy.canvasViewRoot)
+            {
+                if (!policy.canvasViewRoot->ContainsRenderer(renderer))
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                const bool excludeWorld = policy.renderSpaceFilter == RenderSpaceFilter::ScreenOnly && space == RenderSpace::World;
+                const bool excludeScreen = policy.renderSpaceFilter == RenderSpaceFilter::WorldOnly && space == RenderSpace::Screen;
+                if (excludeWorld || excludeScreen)
+                {
+                    continue;
+                }
+            }
+
+            SubmissionSource source;
+            source.component = renderer;
+            source.kind = kind;
+            source.screen = canvasPreview || space == RenderSpace::Screen;
+            if (!source.screen && !camera)
+            {
+                continue;
+            }
+
+            if (source.screen)
+            {
+                source.orderPath = renderer->BuildCanvasSortPath();
+            }
+
+            sources.push_back(std::move(source));
+        }
+
+        return true;
+    };
+
+    if (!gather(m_meshRenderers, SourceKind::Mesh) || !gather(m_spriteRenderers, SourceKind::Sprite) ||
+        !gather(m_uiRenderers, SourceKind::UI))
+    {
+        return false;
+    }
+
+    // Sort only submission metadata, not a second World/Screen Object array.
+    // The final single owning array already has the required Overlay order.
+    std::stable_sort(sources.begin(), sources.end(), [](const SubmissionSource& left, const SubmissionSource& right)
+    {
+        if (left.screen != right.screen)
+        {
+            return !left.screen;
+        }
+
+        return left.screen && left.orderPath < right.orderPath;
+    });
+
+    if (camera && !canvasPreview && policy.renderSpaceFilter != RenderSpaceFilter::ScreenOnly)
+    {
+        rendering::RenderView sceneView;
+        sceneView.id = sceneViewId;
+        sceneView.output = output;
+        sceneView.view = EngineRendering::ToRenderer(camera->viewMatrix);
+        sceneView.projection = EngineRendering::ToRenderer(camera->projMatrix);
+        sceneView.cameraPosition = EngineRendering::ToRenderer(camera->position);
+        sceneView.exposure = 1.0f; // R8 implementation default; no editing/auto-exposure API.
+        frame.views.push_back(sceneView);
+
+        if (light.enabled)
+        {
+            rendering::DirectionalLight input;
+            input.lightDirection[0] = light.direction.x;
+            input.lightDirection[1] = light.direction.y;
+            input.lightDirection[2] = light.direction.z;
+            input.lightColor[0] = light.color.x * light.intensity;
+            input.lightColor[1] = light.color.y * light.intensity;
+            input.lightColor[2] = light.color.z * light.intensity;
+            input.ambient[0] = light.ambient;
+            input.ambient[1] = light.ambient;
+            input.ambient[2] = light.ambient;
+            frame.directionalLight = input;
+        }
+    }
+
+    rendering::RenderView overlay;
+    overlay.id = overlayViewId;
+    overlay.kind = rendering::ViewKind::Overlay;
+    overlay.output = output;
+    if (canvasPreview && camera)
+    {
+        overlay.view = EngineRendering::ToRenderer(camera->viewMatrix);
+        overlay.projection = EngineRendering::ToRenderer(camera->projMatrix);
+        overlay.cameraPosition = EngineRendering::ToRenderer(camera->position);
+    }
+    else
+    {
+        overlay.projection = rendering::Matrix4x4::CreateOrthographic(static_cast<float>(width),
+            static_cast<float>(height), -1, 100);
+        if (camera)
+        {
+            overlay.cameraPosition = EngineRendering::ToRenderer(camera->position);
+        }
+    }
+
+    // Always provide a background/Screen View, including no Main Camera.
+    frame.views.push_back(overlay);
+
+    const auto append = [&](rendering::RenderObject object, const SubmissionSource& source,
+                            const ComponentMaterialState& material, bool alphaMask)
+    {
+        object.targetViews.push_back(source.screen ? overlayViewId : sceneViewId);
+        ExtractedObjectRecord record;
+        record.objectIndex = frame.objects.size();
+        record.actorGuid = source.component->GetOwner()->GetGuid();
+        record.material = &material;
+        record.alphaMask = alphaMask;
+        record.viewId = source.screen ? overlayViewId : sceneViewId;
+        frame.objects.push_back(std::move(object));
+        m_records.push_back(record);
+    };
+
+    CameraInfo emptyCamera;
+    const CameraInfo& proxyCamera = camera ? *camera : emptyCamera;
+    for (const SubmissionSource& source : sources)
+    {
+        if (source.kind == SourceKind::Mesh)
+        {
+            auto* renderer = static_cast<MeshRenderer*>(source.component);
+            const auto& proxy = renderer->GetRenderProxy();
+            for (const SubmeshRenderTemplate& renderTemplate : renderer->GetRenderTemplates())
+            {
+                Matrix4x4 world = renderTemplate.localToModel * proxy.common.worldMatrix * worldToCanvas;
+                rendering::RenderObject object;
+                object.geometry = renderTemplate.meshDesc.meshHandle;
+                object.material = renderTemplate.materialDesc.handle;
+                object.world = EngineRendering::ToRenderer(world);
+                object.tint = EngineRendering::ToRenderer(proxy.common.color);
+                object.castShadow = renderer->GetCastShadow() && !source.screen;
+                object.drawRange.first = renderTemplate.meshDesc.startIndex;
+                object.drawRange.baseVertex = renderTemplate.meshDesc.baseVertex;
+                SetWorldBounds(object, renderTemplate.meshDesc.boundsCenter, renderTemplate.meshDesc.boundsRadius,
+                    renderTemplate.meshDesc.boundsRevision, world);
+                append(std::move(object), source, renderTemplate.materialDesc, false);
+            }
+
+            continue;
+        }
+
+        if (!context->pRenderAssets)
+        {
+            continue;
+        }
+
+        const auto appendQuad = [&](const CommonRendererProxy& common, const ComponentMaterialState& material,
+                                    rendering::BillboardMode billboard, bool castShadow)
+        {
+            Matrix4x4 world = common.worldMatrix * worldToCanvas;
+            rendering::RenderObject object;
+            object.geometry = context->pRenderAssets->Quad();
+            object.material = material.handle;
+            object.world = EngineRendering::ToRenderer(world);
+            object.tint = EngineRendering::ToRenderer(common.color);
+            object.billboard = billboard;
+            object.castShadow = castShadow && !source.screen;
+            if (context->pRenderer)
+            {
+                rendering::GeometryData snapshot;
+                const auto queried = context->pRenderer->GetGeometryData(object.geometry, snapshot);
+                if (queried.IsSuccess())
+                {
+                    const rendering::Vector4 local = LocalQuadTransform(material);
+                    Vector3 center = EngineRendering::FromRenderer(snapshot.boundsCenter);
+                    center.x = center.x * local.x + local.z;
+                    center.y = center.y * local.y + local.w;
+                    const float localStretch = (std::max)({ std::abs(local.x), std::abs(local.y), 1.0f });
+                    SetWorldBounds(object, center, snapshot.boundsRadius * localStretch, snapshot.revision, world);
+                }
+            }
+
+            append(std::move(object), source, material, true);
+        };
+
+        if (source.kind == SourceKind::Sprite)
+        {
+            auto* renderer = static_cast<SpriteRenderer*>(source.component);
+            const auto& proxy = renderer->GetRenderProxy(proxyCamera);
+            const auto mode = static_cast<rendering::BillboardMode>(renderer->GetBillboardType());
+            appendQuad(proxy.common, renderer->GetRenderTemplate().materialDesc, mode, renderer->GetCastShadow());
+        }
+        else
+        {
+            auto* renderer = static_cast<UIRenderer*>(source.component);
+            const auto& proxy = renderer->GetRenderProxy();
+            for (const UIRenderElement& element : renderer->GetRenderTemplate())
+            {
+                appendQuad(proxy.common, element.materialDesc, rendering::BillboardMode::None, false);
+            }
+        }
+    }
+
+    return true;
 }

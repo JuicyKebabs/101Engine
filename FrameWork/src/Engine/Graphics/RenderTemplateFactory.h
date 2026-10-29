@@ -1,128 +1,48 @@
 #pragma once
-#include <vector>
 #include "Engine/Graphics/RenderData.h"
-#include "Engine/Resource/Texture.h"
 #include "Engine/Resource/MeshHandle.h"
+#include "Engine/Resource/Texture.h"
+#include "Renderer/DrawTypes.h"
+#include <vector>
 
-//-----------------------------------------------------------------------------------------------------------
-// RenderTemplateFactory.h
-// This class is responsible for creating render templates based on mesh and material descriptions.
-// Render templates are used to store all the necessary static information for rendering each type of object.
-//-----------------------------------------------------------------------------------------------------------
-
-class TextureManager;
-class MeshManager;
-
-// Mesh description structure
+// Each Component owns its CPU draw template and Bounds snapshot. These values
+// neither retain GPU objects nor duplicate the AssetManager's GUID cache.
 struct MeshDesc
 {
-	MeshHandle meshHandle = InvalidMeshHandle;	// Mesh handle
-	UINT startIndex = 0;						// Start index
-	UINT baseVertex = 0;						// Base vertex
-	Vector3 boundsCenter{ 0,0,0 };				// Bounding sphere center for sorting
-	float boundsRadius = 0.0f;					// Bounding sphere radius for sorting
+    MeshHandle meshHandle;
+    std::uint32_t startIndex = 0;
+    std::int32_t baseVertex = 0;
+    Vector3 boundsCenter;
+    float boundsRadius = 0;
+    std::uint64_t boundsRevision = 0;
 };
 
-// Material description structure
-struct MaterialDesc
+// The automatic Material has fixed shader/blend intent. Its owned description
+// lets a Component update its own UV/pivot/flip without editing a shared value.
+struct ComponentMaterialState
 {
-	TextureHandle textureHandle = InvalidTextureHandle;	// Texture handle for the material
-	PSOKey psoKey{};									// Pipeline State Object key
-	Vector4 baseColor{ 1,1,1,1 };						// Base color for rendering (can be used to tint the mesh)
-	bool lightingEnabled = true;						// Lighting enabled flag
+    TextureHandle textureHandle;
+    rendering::MaterialHandle handle;
+    rendering::MaterialDesc description;
+    bool screen = false;
 };
 
-// Render template structure for a single mesh
-// This structure contains all the necessary static information to render
 struct SubmeshRenderTemplate
 {
-	MeshDesc meshDesc;			// Mesh data and rendering settings
-	MaterialDesc materialDesc;	// Material information and rendering settings
+    MeshDesc meshDesc;
+    ComponentMaterialState materialDesc;
+    Matrix4x4 localToModel = Matrix4x4::Identity();
 };
-using MeshRenderTemplate = std::vector<SubmeshRenderTemplate>;	// Alias for a render template consisting of multiple submesh templates
+using MeshRenderTemplate = std::vector<SubmeshRenderTemplate>;
 
-// Render template structure for a sprite
 struct SpriteRenderTemplate
 {
-	MaterialDesc materialDesc;							// Material description for the sprite
-	BillboardType billboardType = BillboardType::None;	// Billboard type for the sprite
+    ComponentMaterialState materialDesc;
+    BillboardType billboardType = BillboardType::None;
 };
 
-// Render template structure for a UI element
 struct UIRenderElement
 {
-	MaterialDesc materialDesc;							// Material description for the UI element
+    ComponentMaterialState materialDesc;
 };
-using UIRenderTemplate = std::vector<UIRenderElement>;	// Alias for a render template consisting of multiple UI elements
-
-// Material input structure for creating material descriptions
-struct MaterialInput
-{
-	std::wstring texturePath;						// Path to the texture to use for this material
-	Vector4 baseColor{ 1,1,1,1 };					// Base color for rendering (can be used to tint the mesh)
-	PSOKey psoKey = PSO_KEY_DEFAULT::MESH_OPAQUE;	// Pipeline State Object key for this material
-	bool lightingEnabled = true;					// Lighting enabled flag
-};
-
-// Mesh input structure for creating render templates
-struct MeshInput
-{
-	std::wstring modelPath;	// Path to the model file
-	bool inverseU = false;	// Whether to invert the U coordinate of the texture (useful for certain model formats)
-	bool inverseV = false;	// Whether to invert the V coordinate of the texture (useful for certain model formats)
-};
-
-// Factory class for creating render templates based on mesh and material descriptions
-class RenderTemplateFactory
-{
-public:
-	static MeshRenderTemplate CreateMeshRenderTemplate(
-		MeshManager& meshManager,
-		TextureManager& textureManager,
-		const MeshInput& meshInput,
-		const MaterialInput& materialInput
-	);
-
-	static MeshRenderTemplate CreateMeshRenderTemplateFromDefaultMesh(
-		MeshManager& meshManager,
-		TextureManager& textureManager,
-		DefaultMesh desc,
-		const MaterialInput& materialInput
-	);
-
-	static SpriteRenderTemplate CreateSpriteRenderTemplate(
-		TextureManager& textureManager,
-		const MaterialInput& materialInput,
-		BillboardType billboardType
-	);
-
-	static UIRenderTemplate CreateUIImageRenderTemplate(
-		TextureManager& textureManager,
-		const MaterialInput& materialInput
-	);
-
-	//static UIRenderTemplate CreateUITextTemplate(
-	//	GpuTexture* fontAtlas,
-	//	const std::vector<GlyphInfo>& glyphs,
-	//	const Vector4& color
-	//);
-
-	static MaterialDesc BuildMaterialDesc(
-		TextureManager& textureManager,
-		const MaterialInput& input
-	);
-
-	static Model LoadModelFromFile(
-		const std::wstring& path,
-		bool inverseU, 
-		bool inverseV
-	);
-
-	static Model LoadDefaultModel(DefaultMesh type);
-
-	static MeshRenderTemplate BuildRenderTemplate(
-		MeshManager& meshManager,
-		Model& model,
-		MaterialDesc& materialDesc
-	);
-};
+using UIRenderTemplate = std::vector<UIRenderElement>;

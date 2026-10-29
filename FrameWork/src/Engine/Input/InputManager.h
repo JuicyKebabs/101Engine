@@ -3,7 +3,7 @@
 #include "Controller.h"
 #include "Mouse.h"
 
-//ƒL[“ü—Íó‘Ô\‘¢‘Ì
+//ã‚­ãƒ¼å…¥åŠ›çŠ¶æ…‹æ§‹é€ ä½“
 struct InputState
 {
 	bool trigger = false;
@@ -46,21 +46,21 @@ struct KeyInputInfo
 
 struct ControllerInputInfo
 {
-	InputState A;			//Aƒ{ƒ^ƒ“orZƒ{ƒ^ƒ“
-	InputState B;			//Bƒ{ƒ^ƒ“or~ƒ{ƒ^ƒ“
-	InputState X;			//Xƒ{ƒ^ƒ“or¢ƒ{ƒ^ƒ“
-	InputState Y;			//Yƒ{ƒ^ƒ“or ƒ{ƒ^ƒ“
-	InputState START;		//STARTƒ{ƒ^ƒ“
-	InputState BACK;		//BACKƒ{ƒ^ƒ“
-	InputState LSHOULDER;	//¶Œ¨ƒ{ƒ^ƒ“
-	InputState RSHOULDER;	//‰EŒ¨ƒ{ƒ^ƒ“
-	InputState LTHUMB;		//¶ƒXƒeƒBƒbƒN‚Ì‰Ÿ‰º
-	InputState RTHUMB;		//‰EƒXƒeƒBƒbƒN‚Ì‰Ÿ‰º
-	InputState UP;			//ãƒ{ƒ^ƒ“
-	InputState DOWN;		//‰ºƒ{ƒ^ƒ“
-	InputState LEFT;		//¶ƒ{ƒ^ƒ“
-	InputState RIGHT;		//‰Eƒ{ƒ^ƒ“
-	InputState anyButton;	//”CˆÓ‚Ìƒ{ƒ^ƒ“
+	InputState A;			//Aãƒœã‚¿ãƒ³orã€‡ãƒœã‚¿ãƒ³
+	InputState B;			//Bãƒœã‚¿ãƒ³orÃ—ãƒœã‚¿ãƒ³
+	InputState X;			//Xãƒœã‚¿ãƒ³orâ–³ãƒœã‚¿ãƒ³
+	InputState Y;			//Yãƒœã‚¿ãƒ³orâ–¡ãƒœã‚¿ãƒ³
+	InputState START;		//STARTãƒœã‚¿ãƒ³
+	InputState BACK;		//BACKãƒœã‚¿ãƒ³
+	InputState LSHOULDER;	//å·¦è‚©ãƒœã‚¿ãƒ³
+	InputState RSHOULDER;	//å³è‚©ãƒœã‚¿ãƒ³
+	InputState LTHUMB;		//å·¦ã‚¹ãƒ†ã‚£ãƒƒã‚¯ã®æŠ¼ä¸‹
+	InputState RTHUMB;		//å³ã‚¹ãƒ†ã‚£ãƒƒã‚¯ã®æŠ¼ä¸‹
+	InputState UP;			//ä¸Šãƒœã‚¿ãƒ³
+	InputState DOWN;		//ä¸‹ãƒœã‚¿ãƒ³
+	InputState LEFT;		//å·¦ãƒœã‚¿ãƒ³
+	InputState RIGHT;		//å³ãƒœã‚¿ãƒ³
+	InputState anyButton;	//ä»»æ„ã®ãƒœã‚¿ãƒ³
 
 	DirectX::XMFLOAT2 leftStick;	//Left stick(normalized)
 	DirectX::XMFLOAT2 rightStick;	//Right stick(normalized)
@@ -81,7 +81,7 @@ struct MouseInputInfo
 	float wheelDelta = 0.0f;
 };
 
-//“ü—Íî•ñ\‘¢‘Ì
+//å…¥åŠ›æƒ…å ±æ§‹é€ ä½“
 struct InputInfo
 {
 	KeyInputInfo key;
@@ -89,36 +89,36 @@ struct InputInfo
 	ControllerInputInfo controller[CONTROLLERS_MAX];
 };
 
-//“ü—ÍŠÇ—ƒNƒ‰ƒX
+//å…¥åŠ›ç®¡ç†ã‚¯ãƒ©ã‚¹
 class InputManager
 {
 public:
-	void Initialize();	//‰Šú‰»
-	void Update();		//XV
-	void Copy();		//ƒL[î•ñƒRƒs[
+	void Initialize();	//åˆæœŸåŒ–
+	void Update();		//æ›´æ–°
+	void Copy();		//ã‚­ãƒ¼æƒ…å ±ã‚³ãƒ”ãƒ¼
 	void ProcessWindowMessage(UINT message, WPARAM wParam, LPARAM lParam);
 	void SetRawMouseLookEnabled(bool enabled);
 
-	//ƒVƒ“ƒOƒ‹ƒgƒ“ƒpƒ^[ƒ“
+	//ã‚·ãƒ³ã‚°ãƒ«ãƒˆãƒ³ãƒ‘ã‚¿ãƒ¼ãƒ³
 	static InputManager& GetInstance();
 
-	//ƒQƒbƒ^[
-	const InputInfo& GetInputInfo() const;	//“ü—Íî•ñ\‘¢‘Ìæ“¾
+	//ã‚²ãƒƒã‚¿ãƒ¼
+	const InputInfo& GetInputInfo() const;	//å…¥åŠ›æƒ…å ±æ§‹é€ ä½“å–å¾—
 
-	void SetControllerVibration(int index, float leftMotor, float rightMotor); //ƒRƒ“ƒgƒ[ƒ‰[U“®ƒZƒbƒg
-	void SetAllControllerVibrations(float leftMotor, float rightMotor); //‘SƒRƒ“ƒgƒ[ƒ‰[U“®ƒZƒbƒg
-	void StopControllerVibration(int index); //ƒRƒ“ƒgƒ[ƒ‰[U“®’â~
-	void StopAllControllerVibrations(); //‘SƒRƒ“ƒgƒ[ƒ‰[U“®’â~
+	void SetControllerVibration(int index, float leftMotor, float rightMotor); //ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼æŒ¯å‹•ã‚»ãƒƒãƒˆ
+	void SetAllControllerVibrations(float leftMotor, float rightMotor); //å…¨ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼æŒ¯å‹•ã‚»ãƒƒãƒˆ
+	void StopControllerVibration(int index); //ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼æŒ¯å‹•åœæ­¢
+	void StopAllControllerVibrations(); //å…¨ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼æŒ¯å‹•åœæ­¢
 
 private:
-	static std::unique_ptr<InputManager> m_instance;	//ƒVƒ“ƒOƒ‹ƒgƒ“ƒCƒ“ƒXƒ^ƒ“ƒX
-	InputInfo m_inputInfo{};	//“ü—Íî•ñ\‘¢‘Ì
-	Controller m_controller;	//ƒRƒ“ƒgƒ[ƒ‰[ŠÇ—ƒNƒ‰ƒX
+	static std::unique_ptr<InputManager> m_instance;	//ã‚·ãƒ³ã‚°ãƒ«ãƒˆãƒ³ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹
+	InputInfo m_inputInfo{};	//å…¥åŠ›æƒ…å ±æ§‹é€ ä½“
+	Controller m_controller;	//ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼ç®¡ç†ã‚¯ãƒ©ã‚¹
 	Mouse m_mouse;
 
 private:
-	InputManager() = default;	//ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	void UpdateTriggerKeyInfo();	//ƒgƒŠƒK[î•ñXV
-	void UpdateDownKeyInfo();		//‰Ÿ‰ºî•ñXV
-	void UpdateUpKeyInfo();			//—£ãî•ñXV
+	InputManager() = default;	//ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	void UpdateTriggerKeyInfo();	//ãƒˆãƒªã‚¬ãƒ¼æƒ…å ±æ›´æ–°
+	void UpdateDownKeyInfo();		//æŠ¼ä¸‹æƒ…å ±æ›´æ–°
+	void UpdateUpKeyInfo();			//é›¢ä¸Šæƒ…å ±æ›´æ–°
 };

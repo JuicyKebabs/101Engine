@@ -337,8 +337,14 @@ namespace
 		for (auto& target : missingAsset["propertyOverrides"])
 			if (target["targetLocalObjectId"] == 12)
 				target["properties"]["/texture"] = GuidGenerator::Generate().ToString();
-		ExpectAtomicRestoreFailure(missingAsset,
-			"Different-revision missing Asset reference fails after staging without partial publication");
+		{
+            SceneBase missingVisualAssetScene;
+            missingVisualAssetScene.Initialize(fixture.context);
+            Actor* restoredMissing = ActorImprintInstanceDeserializer::Restore(
+                missingAsset, missingVisualAssetScene, fixture.system);
+            Check(restoredMissing != nullptr,
+                "Different-revision missing visual Texture preserves GUID and publishes an Instance");
+        }
 		json wrongAssetType = saved;
 		wrongAssetType["sourceDefinitionRevision"] = DefinitionRevision::Generate().ToString();
 		for (auto& target : wrongAssetType["propertyOverrides"])

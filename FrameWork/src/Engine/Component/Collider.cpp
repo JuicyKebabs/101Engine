@@ -48,8 +48,30 @@ void Collider::LateUpdateOverride(float deltaTime)
 
 void Collider::OnDestroyOverride()
 {
+	// Ordinary Actor/Component destruction has already called OnDetach. Keep
+	// this fallback idempotent so destruction never leaves a borrowed pointer
+	// behind, including an explicit call to this existing public override.
+	UnregisterFromCollisionSystem();
+
 	m_isActive = false;
 	m_deleteFlag = true;
+}
+
+void Collider::OnDetachOverride()
+{
+	// Detach runs while this Collider, its Actor and its Scene are still alive.
+	// Remove every system-owned reference before ActorPool releases our storage.
+	UnregisterFromCollisionSystem();
+}
+
+void Collider::UnregisterFromCollisionSystem() noexcept
+{
+	if (m_registeredCollisionSystem)
+	{
+		// Unregister clears the backlink itself. Repeated detach/destroy calls
+		// therefore do not touch a system after registration has already ended.
+		m_registeredCollisionSystem->Unregister(this);
+	}
 }
 
 void Collider::Flush()

@@ -42,6 +42,9 @@ struct SceneLoadOptions
 {
 	// How to behave when encountering unknown properties in the scene JSON.
 	UnknownPropertyPolicy unknownComponentPropertyPolicy = UnknownPropertyPolicy::Reject;
+    // SceneManager requests preparation only. OnAttach is a later non-failing
+    // publication step after current changes and the old Scene is destroyed.
+    bool deferPublish = false;
 };
 
 // Store the result of a scene load operation for outputting.
@@ -193,5 +196,4 @@ private:
 
 	static bool ValidateInstanceRegistry(SceneBase& scene, SceneLoadError& error);
 	static void ConfigureMainCamera(SceneBase& scene, const std::vector<Actor*>& actors);
-	static void ConfigureInitialSky(SceneBase& scene, const std::vector<Actor*>& actors);
 };

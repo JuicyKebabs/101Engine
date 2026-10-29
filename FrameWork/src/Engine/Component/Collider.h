@@ -7,6 +7,7 @@
 
 // Forward declaration
 class Actor;
+class CollisionSystem;
 
 // Enumration for collider types
 enum class ColliderType
@@ -174,6 +175,14 @@ public:
 	// Serialization and deserialization methods
 
 private:
+	friend class CollisionSystem;
+
+	// Borrow the system that actually accepted this registration. Scene teardown
+	// detaches Components before destroying that system; this pointer never owns it.
+	// The system sets/clears the backlink together with its registration vector,
+	// including direct Register/Unregister calls and bulk ClearColliders.
+	CollisionSystem* m_registeredCollisionSystem = nullptr;
+
 	std::vector<CollisionInfo> m_collisionInfos;
 
 	ColliderType m_type = ColliderType::None;			// Collider type
@@ -209,6 +218,9 @@ private:
 	uint64_t m_transformGeneration = 0;	// Generation count of the owner's transform to check for changes
 
 private:
+	void OnDetachOverride() override;
+	void UnregisterFromCollisionSystem() noexcept;
+
 	void ChackIfTransformChanged();	// Check if the owner's transform has changed
 	void RefreshWorldTransform();	// Refresh the world transform based on the owner's transform
 

@@ -23,7 +23,7 @@ static std::string GetVSInstallPath()
 {
     FILE* pipe = _popen(
         "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\""
-        " -latest -property installationPath 2>NUL", "r");
+        " -latest -version \"[18.0,19.0)\" -property installationPath 2>NUL", "r");
 
     if (!pipe)
     {
@@ -74,7 +74,7 @@ bool ProjectBuilder::Reconfigure()
     std::string batPath = projectRoot + "/reconfigure.bat";
     std::ofstream bat(batPath);
     bat << "\"" << kCMakePath << "\" -S \"" << projectRoot << "\" -B \"" << buildDir
-        << "\" -G \"Visual Studio 17 2022\" -A x64 > \"" << projectRoot << "/cmake_reconfigure.log\" 2>&1\n";
+        << "\" -G \"Visual Studio 18 2026\" -A x64 > \"" << projectRoot << "/cmake_reconfigure.log\" 2>&1\n";
     bat.close();
 
     DBG("ProjectBuilder: Running reconfigure via batch file...");

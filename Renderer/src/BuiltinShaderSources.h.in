@@ -1,0 +1,10 @@
+#pragma once
+
+// CMake embeds source into the Renderer DLL; runtime asset paths are irrelevant
+// to its private display/shadow infrastructure. User bytecode is still explicit.
+namespace rendering::detail
+{
+inline constexpr char BuiltinMeshShader[] = R"R8HLSL(@R8_BUILTIN_MESH@)R8HLSL";
+inline constexpr char BuiltinFullscreenShader[] = R"R8HLSL(@R8_BUILTIN_FULLSCREEN@)R8HLSL";
+inline constexpr char BuiltinDisplayShader[] = R"R8HLSL(@R8_BUILTIN_DISPLAY@)R8HLSL";
+}

@@ -70,5 +70,17 @@ bool DeleteActorCommand::Undo()
 	// Restore the actor subtree from the snapshot
 	Actor* restoredRoot = ActorSubtreeRestorer::Restore(m_snapshot, m_scene);
 
-	return restoredRoot != nullptr;
+	if (!restoredRoot)
+	{
+		return false;
+	}
+
+	// Undo runs from an ImGui callback after the ordinary EditorUpdate. Restored
+	// Components are attached, but their World caches have never been flushed.
+	// Complete the existing edit synchronization unit before same-frame drawing:
+	// parent-first Transform, then Collider and Camera. This also handles a dirty
+	// external parent left by cancelling an edit transaction before Undo.
+	// No gameplay Start/Update is run, and the normal per-Frame order is unchanged.
+	m_scene->EditorUpdate(0.0f);
+	return true;
 }

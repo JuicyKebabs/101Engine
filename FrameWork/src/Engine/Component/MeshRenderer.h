@@ -3,125 +3,71 @@
 #include "Engine/Resource/AssetReference.h"
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
-#include "Engine/Core/GUID/Guid.h"
-#include "Engine/Core/Math/Math.h"
 
 class Transform;
 
-//---------------------------------------------------------
-// MeshRenderer class
-// A component for rendering static meshes in the scene
-// ---------------------------------------------------------
-
+// Proxy borrows no resource; all transforms/colors are CPU values. Geometry
+// Bounds/revisions live in this Component's templates, never AssetManager.
 struct MeshRendererProxy
 {
-	CommonRendererProxy common;	// Common render proxy data (position, world matrix, color, visibility)
-	TextureHandle textureOverrideHandle = InvalidTextureHandle;
+    CommonRendererProxy common;
 };
 
-// MeshRendererComponent Class (for static mesh rendering)
 class MeshRenderer : public RendererComponent
 {
-
 public:
-	struct ParamDesc
-	{
-		std::vector<SubmeshRenderTemplate> templates;	// Render templates for each mesh to be drawn
-		Vector4 color{ 1,1,1,1 };						// Color for rendering (can be used to tint the rendered object)
-		bool visible = true;							// Visibility flag for this renderer
-		std::string name = "MeshRenderer";				// Component name (optional, can be used for debugging or identification)
-	};
+    struct ParamDesc
+    {
+        std::vector<SubmeshRenderTemplate> templates;
+        Vector4 color{ 1, 1, 1, 1 };
+        bool visible = true;
+        std::string name = "MeshRenderer";
+    };
 
-public:
-	MeshRenderer() = default;
-	~MeshRenderer() = default;
-	void SetParams(const ParamDesc& desc) {
-		m_templates = desc.templates;
+    MeshRenderer() { SetCastShadow(true); }
+    void SetParams(const ParamDesc& description)
+    {
+        m_templates = description.templates;
+        Guid empty;
+        m_meshAssetId = empty;
+        m_pendingMeshAssetId.reset();
+        SetColor(description.color);
+        SetVisible(description.visible);
+        SetName(description.name);
+        m_isProxyDirty = true;
+    }
 
-		// Enable lighting for all render templates by default when setting parameters
-		for (auto& renderTemplate : m_templates)
-		{
-			renderTemplate.materialDesc.psoKey = renderTemplate.materialDesc.psoKey.WithLighting();
-		}
-
-		if (!m_templates.empty())
-		{
-			SetBlendMode(m_templates.front().materialDesc.psoKey.blend);
-		}
-
-		m_meshAssetId = {};
-		m_pendingMeshAssetId.reset();
-		m_textureOverrideAssetId = {};
-		m_pendingTextureOverrideAssetId.reset();
-		m_textureOverrideHandle = InvalidTextureHandle;
-		SetColor(desc.color);
-		SetVisible(desc.visible);
-		SetName(desc.name);
-		m_isProxyDirty = true;
-	}
-
-	// Set mesh asset for this renderer through AssetManager
-	// For de-serialization and inspector manipulation, this function
-	bool SetMeshAsset(const Guid& assetId);
-	bool SetTextureOverrideAsset(const Guid& assetId);
-
-	// Getters
-	const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
-	const MeshRendererProxy& GetRenderProxy();
-	bool IsConfigured() const override { return !m_templates.empty(); }
-	AssetReference<MeshAsset> GetMeshAssetReference() const;
-	bool TrySetMeshAssetReference(const AssetReference<MeshAsset>& value);
-	Guid GetAssetId() const;
-	AssetReference<TextureAsset> GetTextureOverrideAssetReference() const;
-	bool TrySetTextureOverrideAssetReference(const AssetReference<TextureAsset>& value);
-	Guid GetTextureOverrideAssetId() const;
-
-	// Serialization and deserialization methods
-	bool ResolveReferences(SceneBase& scene) override;
+    bool SetMeshAsset(const Guid& assetId);
+    const std::vector<SubmeshRenderTemplate>& GetRenderTemplates() const { return m_templates; }
+    const MeshRendererProxy& GetRenderProxy();
+    bool IsConfigured() const override { return !m_templates.empty(); }
+    AssetReference<MeshAsset> GetMeshAssetReference() const;
+    bool TrySetMeshAssetReference(const AssetReference<MeshAsset>& value);
+    Guid GetAssetId() const;
+    bool ResolveReferences(SceneBase& scene) override;
+    bool SynchronizeRenderResources() override;
 
 private:
-	struct PreparedMeshAssetState
-	{
-		Guid assetId;
-		std::vector<SubmeshRenderTemplate> templates;
-	};
-	struct PreparedTextureOverrideState
-	{
-		Guid assetId;
-		TextureHandle textureHandle = InvalidTextureHandle;
-	};
+    struct PreparedMeshAssetState
+    {
+        Guid assetId;
+        std::vector<SubmeshRenderTemplate> templates;
+    };
 
-	std::vector<SubmeshRenderTemplate> m_templates;			// Render templates for each mesh to be drawn
-	MeshRendererProxy m_proxy;								// Cached render proxy for this component
-	Guid m_meshAssetId;										// Mesh asset ID for this renderer
-	std::optional<Guid> m_pendingMeshAssetId;				// Optional pending asset ID for deferred loading (used during deserialization)
-	Guid m_textureOverrideAssetId;
-	std::optional<Guid> m_pendingTextureOverrideAssetId;
-	TextureHandle m_textureOverrideHandle = InvalidTextureHandle;
-
-private:
-	AssetPrepareResult PrepareMeshAssetState(
-		const Guid& assetId,
-		PreparedMeshAssetState& outState) const;
-	void CommitMeshAssetState(PreparedMeshAssetState&& state);
-	bool SetPendingMeshAssetReference(const AssetReference<MeshAsset>& value);
-	AssetPrepareResult PrepareTextureOverrideState(
-		const Guid& assetId,
-		PreparedTextureOverrideState& outState) const;
-	void CommitTextureOverrideState(PreparedTextureOverrideState&& state);
-	bool SetPendingTextureOverrideAssetReference(const AssetReference<TextureAsset>& value);
-
-	// Override functions for component lifecycle
-	void OnAttachOverride() override;
-	void OnStartOverride() override;
-	void PreUpdateOverride(float deltaTime) override;
-	void UpdateOverride(float deltaTime) override;
-	void LateUpdateOverride(float deltaTime) override;
-	void OnDetachOverride() override;
-	void OnDestroyOverride() override;
-	void ApplyBlendModeToRenderTemplates() override;
-
-private:
-	void RebuildRenderProxy();		// Rebuild the render proxy (Called when GetRenderProxy is called and the transform is dirty)
-	Matrix4x4 BuildWorldMatrix(Transform* transform) const;	// Build the world matrix for this renderer
+    std::vector<SubmeshRenderTemplate> m_templates;
+    MeshRendererProxy m_proxy;
+    Guid m_meshAssetId;
+    std::optional<Guid> m_pendingMeshAssetId;
+    AssetPrepareResult PrepareMeshAssetState(const Guid& assetId, PreparedMeshAssetState& output) const;
+    void CommitMeshAssetState(PreparedMeshAssetState&& state);
+    bool SetPendingMeshAssetReference(const AssetReference<MeshAsset>& value);
+    void OnAttachOverride() override;
+    void OnStartOverride() override;
+    void PreUpdateOverride(float deltaTime) override;
+    void UpdateOverride(float deltaTime) override;
+    void LateUpdateOverride(float deltaTime) override;
+    void OnDetachOverride() override;
+    void OnDestroyOverride() override;
+    void RebuildRenderProxy();
+    Matrix4x4 BuildWorldMatrix(Transform* transform) const;
 };

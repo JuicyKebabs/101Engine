@@ -34,3 +34,10 @@ target_include_directories(101Game PRIVATE
 )
 
 target_link_libraries(101Game PRIVATE 101Framework)
+
+# Runtime shaders resolve from the executable directory, independent of cwd.
+add_dependencies(101Game RendererShaderAssets)
+add_custom_command(TARGET 101Game POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:101Renderer> $<TARGET_FILE_DIR:101Game>
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Renderer/shaders" "$<TARGET_FILE_DIR:101Game>/shaders"
+)

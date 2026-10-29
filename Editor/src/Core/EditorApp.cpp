@@ -7,10 +7,13 @@
 #include <tchar.h>
 #include <shellapi.h>
 #include "Core/EditorApp.h"
+#include "Renderer/Win32WindowOutputDesc.h"
+#include "Engine/Core/Path/ExecutablePath.h"
+#include "Engine/Graphics/RenderingConversions.h"
+#include <stdexcept>
 #include "Engine/Input/InputManager.h"
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "backends/imgui_impl_dx12.h"
 #include "backends/imgui_impl_win32.h"
 #include "Core/EditorScene.h"
 #include "Document/SceneEditorDocument.h"
@@ -18,7 +21,6 @@
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
-#include "Engine/Graphics/SwapChain.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Component/MeshRenderer.h"
@@ -94,6 +96,7 @@ namespace
 
 bool EditorApp::Initialize()
 {
+    m_renderingStopped = false;
 	m_documentWorkflow.SetSaveCallback(
 		[this](EditorDocumentId id) { return SaveEditorDocument(id); });
 	// Load the game code DLL at startup. This is needed to recognize GameCode-defined
@@ -211,7 +214,7 @@ bool EditorApp::Initialize()
     return true;
 }
 
-void EditorApp::Run()
+int EditorApp::Run()
 {
     m_window.Show();
 
@@ -260,7 +263,6 @@ void EditorApp::Run()
 
                 // ImGui's NewFrame is called before Update so debug ImGui
                 // windows can be drawn from within Update().
-                ImGui_ImplDX12_NewFrame();
                 ImGui_ImplWin32_NewFrame();
                 ImGui::NewFrame();
 
@@ -268,12 +270,28 @@ void EditorApp::Run()
                 m_timeManager.Update();
 
                 Update(deltaTime);
+                if (m_renderingStopped)
+                {
+                    // NewFrame already began, but RenderImGui was never called.
+                    // Close CPU bookkeeping without submitting any GPU work.
+                    ImGui::EndFrame();
+                    continue;
+                }
+
                 Render();
 
                 InputManager::GetInstance().Copy();
             }
         }
     } while (msg.message != WM_QUIT);
+
+    timeEndPeriod(1);
+    if (m_renderingStopped)
+    {
+        return EXIT_FAILURE;
+    }
+
+    return static_cast<int>(msg.wParam);
 }
 
 void EditorApp::Terminate()
@@ -300,30 +318,32 @@ void EditorApp::Terminate()
 
 	// Terminate editor related resources
     ShutdownImGui();
-    m_pEngine->Terminate();
+    m_pAssetManager.reset();
+    m_engineContext.pAssetManager = nullptr;
+    m_editorRenderAssets.reset();
+    m_renderAssets.reset();
+    m_engineContext.pRenderAssets = nullptr;
+    m_pRenderer.reset();
+    m_engineContext.pRenderer = nullptr;
     m_window.Terminate();
 }
 
 bool EditorApp::ApplyWindowResizeRequest()
 {
-    Window::Size requestedSize{};
+    Window::Size requested;
 
-	// Check if there is a pending resize request
-    if (!m_window.GetResizeRequest(requestedSize))
-	{
-		return true; // No resize request pending
-	}
+    if (!m_window.GetResizeRequest(requested))
+    {
+        return true;
+    }
 
-	// Resize the engine output to match the requested window size
-	if (!m_pEngine->ResizeOutput(requestedSize.width, requestedSize.height))
-	{
-		DBG("EditorApp: Failed to resize engine output to %ux%u", requestedSize.width, requestedSize.height);
-		return false;
-	}
+    if (!CheckRenderingResult(m_pRenderer->ResizeWindowOutput(m_windowOutput, requested.width, requested.height)))
+    {
+        return false;
+    }
 
-	m_window.CommitResize();
-	return true;
-
+    m_window.CommitResize();
+    return true;
 }
 
 // Create a new scene with default settings
@@ -972,7 +992,7 @@ void EditorApp::EnterPlayMode()
 	}
 
 	// Resize the scene render targets to the fixed resolution for Play Mode
-    if (!m_pEngine->ResizeSceneRenderTargets(PLAY_VIEWPORT_WIDTH, PLAY_VIEWPORT_HEIGHT))
+    if (!CheckRenderingResult(m_editorRenderAssets->Resize(PLAY_VIEWPORT_WIDTH, PLAY_VIEWPORT_HEIGHT)))
     {
 		DBG("EditorApp: Failed to resize scene render targets for Play mode.");
 		playScene->Finalize();
@@ -1048,17 +1068,18 @@ void EditorApp::ExitPlayMode()
 
     if (width > 0 && height > 0)
     {
-        if (!m_pEngine->ResizeSceneRenderTargets(width, height))
+        if (!CheckRenderingResult(m_editorRenderAssets->Resize(width, height)))
         {
             DBG("EditorApp: Failed to resize scene render targets.");
+            // Color may already have changed. No Camera/layout success state
+            // may be published after this failure, even while WM_QUIT is pending.
+            return;
         }
 
-        GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-
-        if (sceneColor)
+        if (m_editorRenderAssets)
         {
-            const UINT actualWidth = sceneColor->GetWidth();
-            const UINT actualHeight = sceneColor->GetHeight();
+            const UINT actualWidth = m_editorRenderAssets->Width();
+            const UINT actualHeight = m_editorRenderAssets->Height();
 
 			EditorViewportContext* viewport = GetActiveViewportContext();
 
@@ -1129,21 +1150,14 @@ void EditorApp::ApplyPendingModeTransition()
 
 void EditorApp::PrepareInstance()
 {
-    m_pEngine         = std::make_unique<Engine>();
-    m_pRenderer       = std::make_unique<Renderer>();
-    m_pTextureManager = std::make_unique<TextureManager>();
-    m_pMeshManager    = std::make_unique<MeshManager>();
-	m_pAssetManager   = std::make_unique<AssetManager>();
+    m_pRenderer = std::make_unique<rendering::Renderer>();
+    m_renderAssets = std::make_unique<RenderAssetResources>();
+    m_pAssetManager = std::make_unique<AssetManager>();
     m_pActorImprintSystem = std::make_unique<ActorImprintSystem>(*m_pAssetManager);
-
-    m_engineContext = {
-        m_pRenderer.get(),
-        m_pTextureManager.get(),
-        m_pMeshManager.get(),
-        m_pAssetManager.get(),
-        m_pActorImprintSystem.get()
-    };
-
+    m_engineContext.pRenderer = m_pRenderer.get();
+    m_engineContext.pRenderAssets = m_renderAssets.get();
+    m_engineContext.pAssetManager = m_pAssetManager.get();
+    m_engineContext.pActorImprintSystem = m_pActorImprintSystem.get();
 }
 
 std::unique_ptr<SceneBase> EditorApp::CreateDefaultScene()
@@ -1166,30 +1180,49 @@ std::unique_ptr<SceneBase> EditorApp::CreateDefaultScene()
 
 bool EditorApp::InitInstance()
 {
-    m_pEngine->InitCore(m_window.GetHandle(), WINDOW_WIDTH, WINDOW_HEIGHT);
+    rendering::RendererConfiguration configuration;
+#ifdef _DEBUG
+    configuration.enableDebugLayer = true;
+#endif
 
-    auto pDevice = m_pEngine->GetDevice();
+    if (!CheckRenderingResult(m_pRenderer->Initialize(configuration)))
+    {
+        return false;
+    }
 
-	m_pTextureManager->Initialize(pDevice, m_pEngine->GetDescriptorHeapAllocator());
-	m_pMeshManager->Initialize(pDevice, m_pTextureManager.get());
+    rendering::Win32WindowOutputDesc outputDescription;
+    outputDescription.window = m_window.GetHandle();
+    outputDescription.width = WINDOW_WIDTH;
+    outputDescription.height = WINDOW_HEIGHT;
+    const auto output = m_pRenderer->CreateWindowOutput(outputDescription);
 
-	if (!m_pAssetManager->Initialize(
-			PathManager::Resolve("asset"),
-			m_pTextureManager.get(),
-			m_pMeshManager.get()))
-	{
-		return false;
-	}
+    if (!CheckRenderingResult(output.status))
+    {
+        return false;
+    }
 
-	m_pEngine->InitBindings(m_pTextureManager.get());
-	m_pRenderer->Initialize(
-		pDevice, m_pEngine->GetDescriptorHeapAllocator(), m_pTextureManager.get(), m_pMeshManager.get());
+    m_windowOutput = output.handle;
+    const auto shaderDirectory = GetExecutableDirectory() / L"shaders";
 
-	m_pEngine->BeginFrame();
-    m_pEngine->EndFrame();
+    if (!m_renderAssets->Initialize(*m_pRenderer, shaderDirectory))
+    {
+        return false;
+    }
 
-    InputManager::GetInstance().Initialize();
-	return true;
+    m_editorRenderAssets = std::make_unique<EditorRenderAssets>(*m_pRenderer);
+
+    if (!CheckRenderingResult(m_editorRenderAssets->Initialize(shaderDirectory)))
+    {
+        return false;
+    }
+
+    if (!m_pAssetManager->Initialize(PathManager::Resolve("asset"), m_pRenderer.get(), m_renderAssets.get()))
+    {
+        return false;
+    }
+
+    m_inputManager.Initialize();
+    return true;
 }
 
 void EditorApp::InitImGui()
@@ -1245,17 +1278,20 @@ void EditorApp::InitImGui()
 	//-------------------------------------------
     ImGui_ImplWin32_Init(m_window.GetHandle());
 
-    auto descriptorHeapAllocator = m_pEngine->GetDescriptorHeapAllocator();
-    uint32_t imguiIndex = descriptorHeapAllocator->AllocateCbvSrvUav();
+    io.BackendRendererName = "101Engine.Renderer";
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    m_imguiAdapter = std::make_unique<rendering::editor::EditorImGuiAdapter>(*m_pRenderer);
 
-    ImGui_ImplDX12_Init(
-        m_pEngine->GetDevice(),
-        SwapChain::BufferCount,
-        DXGI_FORMAT_R8G8B8A8_UNORM,
-        descriptorHeapAllocator->GetCbvSrvUavHeap().GetHeap(),
-        descriptorHeapAllocator->GetCbvSrvUavCpuHandle(imguiIndex),
-        descriptorHeapAllocator->GetCbvSrvUavGpuHandle(imguiIndex)
-    );
+    if (!CheckRenderingResult(m_imguiAdapter->Initialize()))
+    {
+        throw std::runtime_error("Editor ImGui adapter initialization failed.");
+    }
+
+    if (!CheckRenderingResult(m_imguiAdapter->RegisterImage(m_editorRenderAssets->SceneColor(), m_sceneImage)))
+    {
+        throw std::runtime_error("Scene image registration failed.");
+    }
 
     io.Fonts->Build();
 }
@@ -1267,9 +1303,17 @@ void EditorApp::Update(float deltaTime)
 	// Apply mode transitions before command recording begins. Toolbar callbacks
 	// run while ImGui is being rendered and must not resize GPU resources directly.
     ApplyPendingModeTransition();
+    if (m_renderingStopped)
+    {
+        return;
+    }
 
 	// Handle any pending resize requests for the scene view panel
     ApplySceneViewResizeRequest();
+    if (m_renderingStopped)
+    {
+        return;
+    }
 
 	SceneBase* activeScene = GetActiveScene();
 
@@ -1301,28 +1345,7 @@ void EditorApp::Update(float deltaTime)
 
 	activeScene = GetActiveScene();
 
-	// Get the current camera information based on the editor mode (Play or Edit)
-    const CameraInfo* currentCamera = nullptr;
 
-	if (m_editorMode == EditorMode::Play)
-	{// In case of Play Mode
-		// Use camera from the active scene's CameraSystem in Play Mode
-		CameraSystem* cameraSystem = activeScene ? activeScene->GetCameraSystem() : nullptr;
-		currentCamera = cameraSystem ? cameraSystem->GetCameraInfo() : nullptr;
-	}
-	else if (m_editorMode == EditorMode::Edit)
-	{// In case of Edit Mode
-		// Use the editor camera in Edit Mode
-		EditorViewportContext* viewport = GetActiveViewportContext();
-		currentCamera = viewport
-			? &viewport->GetSceneCamera().GetCamera().GetCameraInfo() : nullptr;
-	}
-
-	// Update the renderer with the current camera information for rendering
-    if (currentCamera)
-    {
-		m_pRenderer->Update(m_pEngine->GetCurrentBufferIndex(), *currentCamera);
-    }
 }
 
 void EditorApp::RefreshAssetCatalog(float deltaTime)
@@ -1428,7 +1451,6 @@ bool EditorApp::ProcessActorImprintAssetChanges(const Guid* requiredAsset)
 			continue;
 		}
 
-		m_selectionRenderData.Clear();
 		result.FinalizeRetiredScenes();
 	}
 
@@ -1478,297 +1500,156 @@ bool EditorApp::SaveEditorDocument(EditorDocumentId id)
 
 void EditorApp::Render()
 {
-    m_pEngine->BeginFrame();
-    m_pRenderer->BeginFrame(m_pEngine->GetCommandList());
-
-    m_pTextureManager->UploadPendingTextures(m_pEngine->GetCommandList());
-
-	SceneBase* activeScene = GetActiveScene();
-
-	// Build CameraInfo based on the current viewport mode and size
-    GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-
-    if (sceneColor)
+    if (m_renderingStopped)
     {
-        if (m_editorMode == EditorMode::Play)
-        {
-            RenderPlayViewport(activeScene, sceneColor);
-        }
-        else
-        {
-            RenderEditViewport(activeScene, sceneColor);
-        }
-    }
-
-	// Render the scene color render target to the back buffer (screen) for display
-    RenderPassTarget backBufferTarget
-    {
-        RenderPassTargetType::BackBuffer,
-        m_pEngine->GetCurrentBufferIndex(),
-        RenderPassTarget::InvalidIndex
-    };
-
-	// Render ImGui on top of the back buffer
-    m_pEngine->BeginPass(backBufferTarget);
-    RenderImGui();
-    m_pEngine->EndPass(backBufferTarget);
-
-    m_pEngine->EndFrame();
-}
-
-void EditorApp::RenderEditViewport(SceneBase* activeScene, GpuTexture* sceneColor)
-{
-	EditorViewportContext* viewport = GetActiveViewportContext();
-	EditorSelection* selection = GetActiveSelection();
-
-	if (!viewport)
-	{
-		return;
-	}
-
-	const EditorViewportMode viewportMode = viewport->GetViewMode();
-    const bool isSceneView = viewportMode == EditorViewportMode::Scene;
-
-    // Set up the render view policy based on the current viewport mode
-    RenderViewPolicy viewPolicy{};
-
-    // CanvasEditContext is a persistent edit scope. Initialize it from the
-    // current selection only when no valid Canvas is already open.
-    Canvas* editingCanvas = nullptr;
-
-    // Canvas View mode requires a valid Canvas
-    if (!isSceneView && activeScene)
-    {
-        // Resolve the currently editing Canvas from the CanvasEditContext
-		CanvasEditContext& canvasContext = viewport->GetCanvasEditContext();
-		editingCanvas = canvasContext.ResolveCanvas(*activeScene);
-
-        // First selection of a Canvas in the hierarchy panel opens the CanvasEditContext for editing.
-        if (!editingCanvas)
-        {
-			Actor* selectedActor = selection ? selection->ResolveActor(activeScene) : nullptr;
-
-			DBG("EditorApp::RenderEditViewport: CanvasEditContext has no valid "
-				"Canvas. Attempting to open from selected Actor.");
-
-			if (canvasContext.OpenFromActor(selectedActor))
-            {
-				editingCanvas = canvasContext.ResolveCanvas(*activeScene);
-            }
-			else
-			{
-				DBG("EditorApp::RenderEditViewport: Failed to open CanvasEditContext from selected Actor.");
-			}
-        }
-
-        // Sync the CanvasViewNavigation state with the currently editing Canvas
-        SyncCanvasViewNavigation(editingCanvas);
-    }
-
-    // Set up the policy
-    if (isSceneView)
-    {
-        // Only render the world-space objects in the scene view (no screen-space objects)
-        viewPolicy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
-    }
-    else
-    {
-        // In canvas view, render all objects (world-space and screen-space) if editing a canvas,
-        viewPolicy.renderSpaceFilter = editingCanvas
-            ? RenderSpaceFilter::All : RenderSpaceFilter::ScreenOnly;
-
-        // Set the root canvas for rendering in canvas view (accepts nullptr if no canvas is selected)
-        viewPolicy.canvasViewRoot = editingCanvas;
-    }
-
-    const CameraInfo viewportCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
-
-    if (activeScene)
-    {
-        activeScene->OnRender(m_engineContext, &viewportCameraInfo, viewPolicy);
-    }
-
-    const RenderSpace targetRenderSpace = isSceneView
-        ? RenderSpace::World : RenderSpace::Screen;
-
-    // Build render data for the selected object in the scene view
-    // (for outline rendering)
-    BuildSelectionRenderData(targetRenderSpace, viewportCameraInfo, editingCanvas);
-
-    // Scene View only requires shadow rendering
-    if (isSceneView)
-    {
-		RenderShadowPass();
-		RenderWorldPass();
-		BuildColliderDebugRenderData(activeScene);
-		RenderColliderDebugPass();
-    }
-    else
-    {
-        RenderPassTarget canvasViewTarget
-		{
-			RenderPassTargetType::ColorDepth,
-			static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-			static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
-		};
-
-		m_pEngine->BeginPass(canvasViewTarget);
-
-        // Render only screen-space objects using the viewport-based
-        // orthographic projection created by RenderScreenSpace()
-        GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-
-        if (sceneColor)
-        {
-            m_pRenderer->RenderScreenSpace(
-                m_pEngine->GetCommandList(),
-                sceneColor->GetWidth(),
-                sceneColor->GetHeight(),
-                RenderTargetFormat::HDR,
-                &viewportCameraInfo
-            );
-        }
-
-		m_pEngine->EndPass(canvasViewTarget);
-    }
-
-	RenderSelectionPass();
-}
-
-void EditorApp::RenderPlayViewport(SceneBase* activeScene, GpuTexture* sceneColor)
-{
-	if (!activeScene)
-	{
-		return;
-	}
-
-	CameraSystem* cameraSystem = activeScene->GetCameraSystem();
-
-    if (!cameraSystem || !cameraSystem->GetMainCamera())
-    {
-        DBG("EditorApp::RenderPlayViewport: " "Play scene has no main camera.");
         return;
     }
 
-    // Don't override camera settings. Use the camera in the runtime scene
-	// No policy for rendering space filter or canvas view root for just playing the game
-    activeScene->OnRender(m_engineContext);
-
-    RenderShadowPass();
-    RenderWorldPass();
-
-    RenderPassTarget sceneTarget
+    // Panels may activate/close a document. Extract only after those changes,
+    // so submitted values never borrow a document destroyed during ImGui work.
+    RenderImGui();
+    if (m_renderingStopped)
     {
-        RenderPassTargetType::ColorDepth,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
-        false,
-        false
-    };
-
-    m_pEngine->BeginPass(sceneTarget);
-
-    m_pRenderer->RenderScreenSpace(
-        m_pEngine->GetCommandList(),
-        sceneColor->GetWidth(),
-        sceneColor->GetHeight(),
-        RenderTargetFormat::HDR
-    );
-
-    m_pEngine->EndPass(sceneTarget);
-}
-
-void EditorApp::RenderShadowPass()
-{
-    RenderPassTarget shadowTarget
-    {
-        RenderPassTargetType::DepthOnly,
-        RenderPassTarget::InvalidIndex,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::ShadowMap)
-    };
-
-    m_pEngine->BeginPass(shadowTarget);
-    m_pRenderer->RenderShadowMap(m_pEngine->GetCommandList());
-    m_pEngine->EndPass(shadowTarget);
-}
-
-void EditorApp::RenderWorldPass()
-{
-	RenderPassTarget sceneTarget
-	{
-		RenderPassTargetType::ColorDepth,
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth)
-	};
-
-    m_pEngine->BeginPass(sceneTarget);
-
-    GpuTexture* shadowMap = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::ShadowMap);
-
-    if (shadowMap)
-    {
-        m_pRenderer->RenderScene(m_pEngine->GetCommandList(), shadowMap->GetSrvIndex());
+        // ImGui::Render has closed the CPU frame. Discard its DrawData rather
+        // than starting resource resolution after a fatal preparation failure.
+        return;
     }
 
-	m_pEngine->EndPass(sceneTarget);
-}
+    SceneBase* activeScene = GetActiveScene();
+    rendering::FrameRenderData frame;
+    frame.time = static_cast<float>(timeGetTime()) / 1000.0f;
+    rendering::ViewOutput sceneOutput = m_editorRenderAssets->SceneColor();
 
-void EditorApp::RenderSelectionPass()
-{
-    // Render the selection mask for the selected object in the scene view
-    RenderPassTarget selectionMaskTarget
+    if (activeScene)
     {
-        RenderPassTargetType::ColorDepth,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SelectionMask),
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
-        true,
-        false
-    };
+        if (m_editorMode == EditorMode::Play)
+        {
+            if (!activeScene->AppendRenderData(frame, sceneOutput))
+            {
+                return;
+            }
+        }
+        else
+        {
+            AppendEditorViewport(frame, activeScene);
+        }
+    }
 
-    m_pEngine->BeginPass(selectionMaskTarget);
-    m_pRenderer->RenderSelectionMask(m_pEngine->GetCommandList(), m_selectionRenderData);
-    m_pEngine->EndPass(selectionMaskTarget);
-
-    // Get the selection mask render target for outline rendering
-    GpuTexture* selectionMask = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SelectionMask);
-
-    // Render the selection outline for the selected object in the scene view
-    RenderPassTarget selectionOutlineTarget
+    if (m_renderingStopped)
     {
-        RenderPassTargetType::ColorDepth,
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-        static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
-        false,	// Preserve the rendered scene color
-        false	// Preserve the scene depth
-    };
+        // Selection preparation can fail after ordinary Scene extraction.
+        // A partly built CPU Frame is safe to discard before Submit.
+        return;
+    }
 
-    m_pEngine->BeginPass(selectionOutlineTarget);
-    m_pRenderer->RenderSelectionOutline(m_pEngine->GetCommandList(), selectionMask);
-    m_pEngine->EndPass(selectionOutlineTarget);
+    if (frame.views.empty())
+    {
+        rendering::RenderView background;
+        background.id = 2;
+        background.output = sceneOutput;
+        background.kind = rendering::ViewKind::Overlay;
+        frame.views.push_back(background);
+    }
 
+    rendering::RenderView editor;
+    editor.id = 100;
+    editor.output = m_windowOutput;
+    editor.kind = rendering::ViewKind::Overlay;
+    frame.views.push_back(editor);
+
+    if (!CheckRenderingResult(m_imguiAdapter->Append(*ImGui::GetDrawData(), editor.id, frame)))
+    {
+        return;
+    }
+
+    if (!CheckRenderingResult(m_pRenderer->SubmitFrameRenderData(std::move(frame))))
+    {
+        return;
+    }
+
+    const auto result = m_pRenderer->Render();
+    CheckRenderingResult(result.status);
+
+    for (const auto& diagnostic : result.diagnostics)
+    {
+        DBG("Editor draw: %s", diagnostic.message.c_str());
+    }
 }
 
-void EditorApp::RenderColliderDebugPass()
+void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBase* activeScene)
 {
-	if (!m_showColliders || m_colliderDebugRenderData.meshs.empty())
-	{
-		return;
-	}
+    EditorViewportContext* viewport = GetActiveViewportContext();
 
-	RenderPassTarget sceneTarget
-	{
-		RenderPassTargetType::ColorDepth,
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneColor),
-		static_cast<uint32_t>(Engine::BuiltinRenderTarget::SceneDepth),
-		false,
-		false
-	};
+    if (!viewport || !activeScene)
+    {
+        return;
+    }
 
-	m_pEngine->BeginPass(sceneTarget);
-	m_pRenderer->RenderColliderDebug(
-		m_pEngine->GetCommandList(), m_colliderDebugRenderData);
-	m_pEngine->EndPass(sceneTarget);
+    const bool canvasPreview = viewport->GetViewMode() == EditorViewportMode::Canvas;
+    RenderViewPolicy policy;
+    policy.canvasPreview = canvasPreview;
+    Canvas* editingCanvas = nullptr;
+
+    if (canvasPreview)
+    {
+        auto& canvasContext = viewport->GetCanvasEditContext();
+        editingCanvas = canvasContext.ResolveCanvas(*activeScene);
+
+        if (!editingCanvas)
+        {
+            EditorSelection* selection = GetActiveSelection();
+            Actor* actor = selection ? selection->ResolveActor(activeScene) : nullptr;
+
+            if (canvasContext.OpenFromActor(actor))
+            {
+                editingCanvas = canvasContext.ResolveCanvas(*activeScene);
+            }
+        }
+
+        SyncCanvasViewNavigation(editingCanvas);
+        policy.canvasViewRoot = editingCanvas;
+        policy.renderSpaceFilter = editingCanvas ? RenderSpaceFilter::All : RenderSpaceFilter::ScreenOnly;
+    }
+    else
+    {
+        policy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
+    }
+
+    const CameraInfo camera = BuildViewportCameraInfo(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
+    rendering::ViewOutput output = m_editorRenderAssets->SceneColor();
+
+    if (!activeScene->AppendRenderData(frame, output, &camera, policy))
+    {
+        return;
+    }
+
+    EditorSelection* selection = GetActiveSelection();
+    const rendering::ViewId sourceView = canvasPreview ? 2 : 1;
+
+    if (selection)
+    {
+        if (!CheckRenderingResult(m_editorRenderAssets->AppendSelection(frame, *activeScene,
+            selection->GetSelectedActorGuid(), sourceView, canvasPreview)))
+        {
+            return;
+        }
+    }
+
+    if (m_showColliders && !canvasPreview)
+    {
+        m_editorRenderAssets->AppendColliders(frame, *activeScene, sourceView);
+    }
 }
+
+
+
+
+
+
+
+
+
+
 
 void EditorApp::RenderImGui()
 {
@@ -1787,7 +1668,6 @@ void EditorApp::RenderImGui()
 	RenderOperationDiagnosticModal();
 
     ImGui::Render();
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_pEngine->GetCommandList());
 }
 
 void EditorApp::RenderMainDockSpace()
@@ -2213,31 +2093,19 @@ void EditorApp::RenderSceneViewPanel()
 	{
 		closeDocumentRequest = id;
 	};
-	// Get the scene color render target from the engine
-	GpuTexture* sceneColor =  m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-
-	if (!sceneColor)
-	{
-		return;
-	}
-
-	// Get the GPU descriptor handle for the scene color render target's SRV
-	const uint32_t srvIndex = sceneColor->GetSrvIndex();
-	const auto gpuHandle = m_pEngine->GetDescriptorHeapAllocator()->GetCbvSrvUavGpuHandle(srvIndex);
-
 	// Build the overlay data for the scene view panel based on the current view mode and any selected screen canvas
 	ViewportOverlayData overlayData;
 
 	if (m_editorMode == EditorMode::Edit)
 	{
-		overlayData = BuildViewportOverlayData(sceneColor->GetWidth(), sceneColor->GetHeight());
+		overlayData = BuildViewportOverlayData(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
 	}
 
 	// Render the scene view panel with the scene color render target
 	m_sceneViewPanel.Render(
-		gpuHandle,
-		sceneColor->GetWidth(),
-		sceneColor->GetHeight(),
+		m_sceneImage,
+		m_editorRenderAssets->Width(),
+		m_editorRenderAssets->Height(),
 		viewport,
 		overlayData,
 		documents,
@@ -2259,7 +2127,6 @@ void EditorApp::RenderSceneViewPanel()
 		}
 		else if (result == EditorDocumentWorkflowResult::Closed)
 		{
-			m_selectionRenderData.Clear();
 		}
 
 		return;
@@ -2271,7 +2138,6 @@ void EditorApp::RenderSceneViewPanel()
 
 		if (m_documentWorkflow.Activate(*activateDocumentRequest))
 		{
-			m_selectionRenderData.Clear();
 		}
 
 		return;
@@ -2297,8 +2163,8 @@ void EditorApp::RenderSceneViewPanel()
         {
             ApplyCanvasNavigationInput(
                 navigationInput,
-                sceneColor->GetWidth(),
-                sceneColor->GetHeight()
+                m_editorRenderAssets->Width(),
+                m_editorRenderAssets->Height()
             );
         }
 
@@ -2334,7 +2200,7 @@ void EditorApp::RenderSceneViewPanel()
 		}
 
 		// Build the camera info for picking based on the current view mode (Scene or Canvas)
-        const CameraInfo pickCameraInfo = BuildViewportCameraInfo(sceneColor->GetWidth(), sceneColor->GetHeight());
+        const CameraInfo pickCameraInfo = BuildViewportCameraInfo(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
 
         // Determine the render space for picking based on the current view mode
         // World(3D) for Scene View, Screen(2D) for Canvas View
@@ -2536,7 +2402,6 @@ void EditorApp::RenderToolbar()
 
 		if (!visible)
 		{
-			m_colliderDebugRenderData.Clear();
 		}
 	};
 
@@ -2653,7 +2518,6 @@ void EditorApp::RenderActorImprintsPanel()
 			return false;
 		}
 
-		m_selectionRenderData.Clear();
 
 		return true;
 	};
@@ -2961,7 +2825,6 @@ void EditorApp::RenderDocumentDecisionModal()
 
 		if (result == EditorDocumentWorkflowResult::Closed)
 		{
-			m_selectionRenderData.Clear();
 		}
 
 		ImGui::CloseCurrentPopup();
@@ -3047,7 +2910,21 @@ void EditorApp::CompleteExitRequest()
 
 void EditorApp::ShutdownImGui()
 {
-    ImGui_ImplDX12_Shutdown();
+    if (!ImGui::GetCurrentContext())
+    {
+        return;
+    }
+
+    if (m_imguiAdapter)
+    {
+        const auto result = m_imguiAdapter->Shutdown();
+        (void)result;
+        m_imguiAdapter.reset();
+    }
+
+    ImGui::GetIO().BackendFlags &= ~ImGuiBackendFlags_RendererHasTextures;
+    ImGui::GetIO().BackendFlags &= ~ImGuiBackendFlags_RendererHasVtxOffset;
+    ImGui::GetIO().BackendRendererName = nullptr;
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
@@ -3126,7 +3003,7 @@ void EditorApp::ApplySceneViewResizeRequest()
     }
 
 	// Resize the scene render targets (color and depth) to the new width and height
-    if (!m_pEngine->ResizeSceneRenderTargets(width, height))
+    if (!CheckRenderingResult(m_editorRenderAssets->Resize(width, height)))
     {
         return;
     }
@@ -3149,19 +3026,10 @@ void EditorApp::ApplySceneViewResizeRequest()
 
 void EditorApp::ApplySceneRenderTargetSizeToScene(SceneBase& scene)
 {
-    if (!m_pEngine)
+    if (m_editorRenderAssets)
     {
-        return;
+        scene.SetViewportSize(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
     }
-
-    GpuTexture* sceneColor = m_pEngine->GetBuiltinRenderTarget(Engine::BuiltinRenderTarget::SceneColor);
-
-	if (!sceneColor)
-    {
-        return;
-    }
-
-	scene.SetViewportSize(sceneColor->GetWidth(), sceneColor->GetHeight());
 }
 
 void EditorApp::BeginTransformEdit(const Guid& actorGuid, const Transform3D& before)
@@ -3403,244 +3271,9 @@ void EditorApp::CancelRectTransformEdit()
 	m_rectTransformEditTransaction = {};
 }
 
-void EditorApp::BuildSelectionRenderData(
-    RenderSpace targetRenderSpace,
-    const CameraInfo& viewportCameraInfo,
-    const Canvas* canvasViewRoot
-)
-{
-	// Clear any existing selection render data
-    m_selectionRenderData.Clear();
 
-	SceneBase* activeScene = GetActiveScene();
 
-	if (!activeScene)
-	{
-		return;
-	}
 
-	EditorSelection* selection = GetActiveSelection();
-	Actor* selectedActor = selection ? selection->ResolveActor(activeScene) : nullptr;
-
-    if (!selectedActor ||
-        !selectedActor->IsActive() ||
-        selectedActor->IsDestroyed())
-    {
-        return;
-    }
-
-	// Determine if the current view mode is Canvas View based on whether a canvas view root is provided
-    const bool isCanvasView = canvasViewRoot != nullptr;
-
-    const Matrix4x4 worldToCanvas = isCanvasView
-        ? canvasViewRoot->GetContentWorldMatrix().Inverse()
-        : Matrix4x4::Identity();
-
-	// Try to get the MeshRenderer component from the selected actor
-    if (MeshRenderer* meshRenderer = selectedActor->GetComponentByClass<MeshRenderer>())
-    {
-		// Validate the MeshRenderer component
-        if (!meshRenderer->IsVisible() || !meshRenderer->IsConfigured())
-        {
-            return;
-        }
-
-		// In Canvas View, ensure that the renderer component is a descendant of the canvas view root
-        if (isCanvasView)
-        {
-            if (!canvasViewRoot->ContainsRenderer(meshRenderer))
-            {
-                return;
-            }
-        }
-        else if (meshRenderer->GetRenderSpace() != targetRenderSpace)
-        {
-            return;
-        }
-
-		// Get the render proxy
-        const MeshRendererProxy& proxy = meshRenderer->GetRenderProxy();
-
-		// Create render items for each submesh in the MeshRenderer
-        for (const SubmeshRenderTemplate& renderTemplate : meshRenderer->GetRenderTemplates())
-        {
-            MeshRenderItem item = RenderSystem::CreateMeshRenderItem(renderTemplate, proxy);
-
-			// In Canvas View, transform the world matrix of the render item to canvas space
-			if (isCanvasView)
-			{
-				item.common.worldMatrix *= worldToCanvas;
-			}
-
-			m_selectionRenderData.AddMeshs(std::move(item));
-        }
-
-        return;
-    }
-
-	// Try to get the SpriteRenderer component from the selected actor
-    if (SpriteRenderer* spriteRenderer = selectedActor->GetComponentByClass<SpriteRenderer>())
-    {
-		// Validate the SpriteRenderer component
-        if (!spriteRenderer->IsVisible() || !spriteRenderer->IsConfigured())
-        {
-            return;
-        }
-
-        // In Canvas View, ensure that the renderer component is a descendant of the canvas view root
-        if (isCanvasView)
-        {
-            if (!canvasViewRoot->ContainsRenderer(spriteRenderer))
-            {
-                return;
-            }
-        }
-        else if (spriteRenderer->GetRenderSpace() != targetRenderSpace)
-        {
-            return;
-        }
-
-		// Get the render proxy
-        const SpriteRendererProxy& proxy = spriteRenderer->GetRenderProxy(viewportCameraInfo);
-
-		// Create a render item for the sprite
-        SpriteRenderItem item = RenderSystem::CreateSpriteRenderItem(spriteRenderer->GetRenderTemplate(), proxy);
-
-		// In Canvas View, transform the world matrix of the render item to canvas space
-		if (isCanvasView)
-		{
-			item.common.worldMatrix *= worldToCanvas;
-		}
-
-		m_selectionRenderData.AddSprites(std::move(item));
-    }
-
-	// Try to get the UIRenderer component from the selected actor
-	if (UIRenderer* uiRenderer = selectedActor->GetComponentByClass<UIRenderer>())
-	{
-		// Validate the UIRenderer component
-        if (!uiRenderer->IsVisible() || !uiRenderer->IsConfigured())
-        {
-            return;
-        }
-
-        // In Canvas View, ensure that the renderer component is a descendant of the canvas view root
-        if (isCanvasView)
-        {
-            if (!canvasViewRoot->ContainsRenderer(uiRenderer))
-            {
-                return;
-            }
-        }
-        else if (uiRenderer->GetRenderSpace() != targetRenderSpace)
-        {
-            return;
-        }
-
-        // Get the render proxy
-		const UIRendererProxy& proxy = uiRenderer->GetRenderProxy();
-
-		// Create render items for each UI element in the UIRenderer
-        for (const UIRenderElement& element : uiRenderer->GetRenderTemplate())
-        {
-            UIRenderItem item = RenderSystem::CreateUIRenderItem(element, proxy);
-
-            // In Canvas View, transform the world matrix of the render item to canvas space
-			if (isCanvasView)
-			{
-				item.common.worldMatrix *= worldToCanvas;
-			}
-
-			m_selectionRenderData.AddUI(std::move(item));
-        }
-	}
-}
-
-void EditorApp::BuildColliderDebugRenderData(SceneBase* scene)
-{
-	m_colliderDebugRenderData.Clear();
-
-	if (!m_showColliders || !scene || !m_pMeshManager)
-	{
-		return;
-	}
-
-	for (Actor* actor : scene->GetAllActors())
-	{
-		if (!actor || !actor->IsActive() || actor->IsDestroyed())
-		{
-			continue;
-		}
-
-		for (Collider* collider : actor->GetComponentsByClass<Collider>())
-		{
-			if (!collider || !collider->isActive() ||
-				collider->GetType() == ColliderType::None)
-			{
-				continue;
-			}
-
-			collider->Flush();
-
-			if (collider->GetType() == ColliderType::CAPSULE)
-			{
-				const CapsuleCollider& capsule = collider->GetCurrentCapsuleCollider();
-				const float diameter = capsule.radius * 2.0f;
-				const Quaternion rotation = collider->GetWorldTransformCurrent().rotation;
-				const MeshHandle sphereMesh = m_pMeshManager->LoadDefaultMesh(DefaultMesh::Sphere);
-
-				auto addMesh = [this](MeshHandle mesh, const Matrix4x4& world)
-					{
-						MeshRenderItem item{};
-						item.meshDesc.meshHandle = mesh;
-						item.common.worldMatrix = world;
-						m_colliderDebugRenderData.AddMeshs(std::move(item));
-					};
-
-				if (capsule.cylHeight <= 0.0f)
-				{
-					addMesh(sphereMesh, Matrix4x4::CreateTRS(
-						collider->GetWorldTransformCurrent().position,
-						Quaternion::Identity(),
-						Vector3(diameter, diameter, diameter)));
-				}
-				else
-				{
-					const MeshHandle cylinderMesh =
-						m_pMeshManager->LoadDefaultMesh(DefaultMesh::Cylinder);
-					addMesh(cylinderMesh, Matrix4x4::CreateTRS(
-						collider->GetWorldTransformCurrent().position,
-						rotation,
-						Vector3(diameter, capsule.cylHeight, diameter)));
-					addMesh(sphereMesh, Matrix4x4::CreateTRS(
-						capsule.pointA, Quaternion::Identity(),
-						Vector3(diameter, diameter, diameter)));
-					addMesh(sphereMesh, Matrix4x4::CreateTRS(capsule.pointB, Quaternion::Identity(),
-											Vector3(diameter, diameter, diameter)));
-				}
-
-				continue;
-			}
-
-			DefaultMesh meshType;
-			switch (collider->GetType())
-			{
-			case ColliderType::BOX:
-				meshType = DefaultMesh::Cube;
-				break;
-			case ColliderType::SPHERE:
-				meshType = DefaultMesh::Sphere;
-				break;
-			default: continue;
-			}
-
-			MeshRenderItem item{};
-			item.meshDesc.meshHandle = m_pMeshManager->LoadDefaultMesh(meshType);
-			item.common.worldMatrix = collider->GetWorldMatrix();
-			m_colliderDebugRenderData.AddMeshs(std::move(item));
-		}
-	}
-}
 
 CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight)
 {
@@ -4177,8 +3810,19 @@ std::optional<EditorCameraFocusBounds> EditorApp::BuildSelectedActorFocusBounds(
         for (const SubmeshRenderTemplate& renderTemplate : renderer->GetRenderTemplates())
         {
             const MeshDesc& mesh = renderTemplate.meshDesc;
-            const Vector3 center = proxy.common.worldMatrix.TransformPoint(mesh.boundsCenter);
-            const float radius = std::max(0.0f, mesh.boundsRadius * maximumScale);
+            const Matrix4x4 placementWorld = renderTemplate.localToModel * proxy.common.worldMatrix;
+            const Vector3 center = placementWorld.TransformPoint(mesh.boundsCenter);
+            float scaleSquared = 0;
+
+            for (std::size_t row = 0; row < 3; ++row)
+            {
+                for (std::size_t column = 0; column < 3; ++column)
+                {
+                    scaleSquared += placementWorld.m[row][column] * placementWorld.m[row][column];
+                }
+            }
+
+            const float radius = std::max(0.0f, mesh.boundsRadius * std::sqrt(scaleSquared));
             const Vector3 extent(radius);
             const Vector3 sphereMin = center - extent;
             const Vector3 sphereMax = center + extent;
@@ -4283,4 +3927,27 @@ void EditorApp::StopAllEditTransactions()
 	m_inspectorPanel.CancelActiveEdit();
 	CancelTransformEdit();
 	CancelRectTransformEdit();
+}
+
+bool EditorApp::CheckRenderingResult(const rendering::Result& result)
+{
+    if (result.IsSuccess())
+    {
+        return true;
+    }
+
+    // Resource preparation failed. Record the stop before queuing WM_QUIT:
+    // queued messages cannot stop the current C++ stack from reaching Submit.
+    m_renderingStopped = true;
+    DBG("Editor Renderer: %s", result.message.c_str());
+
+    if (result.failureKind == rendering::FailureKind::GpuCompletionUnknown)
+    {
+        ExitProcess(EXIT_FAILURE);
+    }
+
+    // Device loss and failed frame preparation end this rendering session.
+    // Destructors are safe only when Renderer has known GPU completion.
+    PostQuitMessage(EXIT_FAILURE);
+    return false;
 }

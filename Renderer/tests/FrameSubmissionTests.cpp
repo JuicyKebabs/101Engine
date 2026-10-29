@@ -1,0 +1,220 @@
+// R7 implementation guide: section 4.35.
+// Follow the new submission contract without weakening value-ownership checks.
+// Multiple Views are supported; two Scene Views writing the same color output are still rejected.
+
+#include "Renderer/Renderer.h"
+#include "Renderer/Win32WindowOutputDesc.h"
+
+#include <Windows.h>
+#include <intrin.h>
+#include <array>
+#include <cstddef>
+#include <iostream>
+#include <stdexcept>
+#include <utility>
+
+namespace
+{
+
+void Require(bool condition, const char* message)
+{
+	if (!condition)
+	{
+		throw std::runtime_error(message);
+	}
+}
+
+void Check(const rendering::Result& result)
+{
+	if (!result.IsSuccess() && result.failureKind == rendering::FailureKind::GpuCompletionUnknown)
+	{
+		std::cerr << result.message << '\n';
+		__fastfail(FAST_FAIL_FATAL_APP_EXIT);
+	}
+
+	Require(result.IsSuccess(), result.message.c_str());
+}
+
+void CheckProcessed(const rendering::RenderResult& result)
+{
+	Check(result.status);
+	Require(result.disposition == rendering::RenderDisposition::Processed, "Submission was not processed.");
+}
+
+void CheckSkipped(rendering::Renderer& renderer)
+{
+	const auto result = renderer.Render();
+	Check(result.status);
+	Require(result.disposition == rendering::RenderDisposition::SkippedNoSubmission, "Submission was consumed twice.");
+}
+
+struct TestWindow
+{
+	static constexpr wchar_t ClassName[] = L"101RendererFrameSubmissionTests";
+	HWND window = nullptr;
+
+	TestWindow()
+	{
+		WNDCLASSW windowClass{};
+		windowClass.lpfnWndProc = DefWindowProcW;
+		windowClass.hInstance = GetModuleHandleW(nullptr);
+		windowClass.lpszClassName = ClassName;
+		Require(RegisterClassW(&windowClass) != 0, "Window class registration failed.");
+
+		// Keep the validation Window hidden; Render still exercises Clear and Present.
+		window = CreateWindowExW(0, ClassName, ClassName, WS_OVERLAPPEDWINDOW, 0, 0, 320, 200, nullptr, nullptr, windowClass.hInstance, nullptr);
+		if (!window)
+		{
+			UnregisterClassW(ClassName, windowClass.hInstance);
+			throw std::runtime_error("Validation Window creation failed.");
+		}
+	}
+
+	~TestWindow()
+	{
+		DestroyWindow(window);
+		UnregisterClassW(ClassName, GetModuleHandleW(nullptr));
+	}
+};
+
+void VerifyFrameSubmission()
+{
+	using namespace rendering;
+	TestWindow window;
+	Renderer renderer;
+    RendererConfiguration configuration{};
+    configuration.enableDebugLayer = true;
+    configuration.enableGpuValidation = true;
+	FrameRenderData uninitialized;
+	Require(!renderer.SubmitFrameRenderData(std::move(uninitialized)).IsSuccess(), "Uninitialized Submit was accepted.");
+	const auto uninitializedRender = renderer.Render();
+	Require(!uninitializedRender.status.IsSuccess() && uninitializedRender.disposition == RenderDisposition::NotProcessed, "Uninitialized Render was accepted.");
+
+	Check(renderer.Initialize(configuration));
+	CheckSkipped(renderer);
+
+	Win32WindowOutputDesc outputDescription{};
+    outputDescription.window = window.window;
+    outputDescription.width = 320;
+    outputDescription.height = 200;
+    const auto output = renderer.CreateWindowOutput(outputDescription);
+	Check(output.status);
+
+	FrameRenderData invalidView;
+	RenderObject unavailableObject{};
+    RenderView unavailableView{};
+    invalidView.objects.push_back(unavailableObject);
+    invalidView.views.push_back(unavailableView);
+	auto* invalidStorage = invalidView.objects.data();
+	Require(!renderer.SubmitFrameRenderData(std::move(invalidView)).IsSuccess(), "Invalid WindowOutput was accepted.");
+	Require(invalidView.objects.data() == invalidStorage && invalidView.objects.size() == 1, "Rejected input was moved.");
+	CheckSkipped(renderer);
+
+    FrameRenderData duplicateSceneOutput;
+    RenderView firstView;
+    firstView.output = output.handle;
+    firstView.id = 1;
+    duplicateSceneOutput.views.push_back(firstView);
+    RenderView secondView = firstView;
+    secondView.id = 2;
+    duplicateSceneOutput.views.push_back(secondView);
+    Require(!renderer.SubmitFrameRenderData(std::move(duplicateSceneOutput)).IsSuccess(), "Duplicate Scene output was accepted.");
+    Require(duplicateSceneOutput.views.size() == 2, "Rejected Views were moved.");
+
+	const std::array<MeshVertex, 3> vertices{};
+	GeometryDesc geometryDesc{};
+	geometryDesc.vertices = vertices;
+	const auto geometry = renderer.RegisterGeometry(geometryDesc);
+	Check(geometry.status);
+
+	const std::array<std::byte, 4> pixels{ std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255} };
+	std::array<TextureMipDesc, 1> mips{};
+    mips[0].pixels = pixels;
+    mips[0].rowPitch = 4;
+    TextureDesc textureDescription{};
+    textureDescription.width = 1;
+    textureDescription.height = 1;
+    textureDescription.format = TextureFormat::RGBA8_UNorm;
+    textureDescription.mips = mips;
+    const auto texture = renderer.RegisterTexture(textureDescription);
+	Check(texture.status);
+
+	FrameRenderData frame;
+	RenderObject registeredObject{};
+    registeredObject.geometry = geometry.handle;
+    RenderView outputView{};
+    outputView.output = output.handle;
+    frame.objects.push_back(registeredObject);
+    frame.objects.push_back(registeredObject);
+    frame.views.push_back(outputView);
+    Check(renderer.SubmitFrameRenderData(std::move(frame)));
+
+	FrameRenderData duplicate;
+	duplicate.objects.push_back(registeredObject);
+	auto* duplicateStorage = duplicate.objects.data();
+	Require(!renderer.SubmitFrameRenderData(std::move(duplicate)).IsSuccess(), "Duplicate Submit was accepted.");
+	Require(duplicate.objects.data() == duplicateStorage && duplicate.objects.size() == 1, "Duplicate Submit took its input.");
+
+	Check(renderer.DestroyGeometry(geometry.handle));
+	Check(renderer.DestroyTexture(texture.handle));
+	const auto destroyedDependencies = renderer.Render();
+	CheckProcessed(destroyedDependencies);
+	// R8 replaces both destroyed Geometry references with resident error cubes.
+    // The third actual draw is the private HDR display transform.
+	Require(destroyedDependencies.drawnObjects == 3, "R8 fallback/display draws were not recorded.");
+	Require(destroyedDependencies.diagnostics.size() == 2, "Destroyed Geometry was not diagnosed per Object.");
+	CheckSkipped(renderer);
+
+	// The same now-destroyed handles are unavailable for a new submission.
+	Check(renderer.SubmitFrameRenderData(std::move(duplicate)));
+	CheckProcessed(renderer.Render());
+
+	FrameRenderData empty;
+	Check(renderer.SubmitFrameRenderData(std::move(empty)));
+	CheckProcessed(renderer.Render());
+	CheckSkipped(renderer);
+
+	// A View-less frame prepares resources and can be finalized with uploads retained.
+	const auto secondGeometry = renderer.RegisterGeometry(geometryDesc);
+	Check(secondGeometry.status);
+	FrameRenderData uploadOnly;
+	RenderObject uploadObject{};
+    uploadObject.geometry = secondGeometry.handle;
+    uploadOnly.objects.push_back(uploadObject);
+	Check(renderer.SubmitFrameRenderData(std::move(uploadOnly)));
+	CheckProcessed(renderer.Render());
+	renderer.Finalize();
+	renderer.Finalize();
+
+	Check(renderer.Initialize(configuration));
+	FrameRenderData staleOutput;
+	staleOutput.views.push_back(outputView);
+	Require(!renderer.SubmitFrameRenderData(std::move(staleOutput)).IsSuccess(), "Old output survived reinitialization.");
+
+	// Finalize must also discard an accepted, unconsumed CPU submission.
+	FrameRenderData pending;
+	pending.objects.push_back(uploadObject);
+	Check(renderer.SubmitFrameRenderData(std::move(pending)));
+	renderer.Finalize();
+
+	Check(renderer.Initialize(configuration));
+	CheckSkipped(renderer);
+	renderer.Finalize();
+}
+
+}
+
+int main()
+{
+	try
+	{
+		VerifyFrameSubmission();
+		std::cout << "Frame submission checks passed.\n";
+		return 0;
+	}
+	catch (const std::exception& error)
+	{
+		std::cerr << error.what() << '\n';
+		return 1;
+	}
+}

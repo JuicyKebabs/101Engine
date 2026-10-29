@@ -105,6 +105,11 @@ public:
 	bool IsVisible() const { return m_isVisible; }
 	UINT GetSortOrder() const { return m_sortOrder; }
 
+    void PrepareRegistrationCapacity(std::size_t count)
+    {
+        m_uiList.reserve(m_uiList.size() + count);
+    }
+
 	// UIRenderer management
 	void RegisterUIRenderer(UIRenderer* ui) 
 	{

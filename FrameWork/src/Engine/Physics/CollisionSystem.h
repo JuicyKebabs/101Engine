@@ -53,9 +53,16 @@ public:
 	CollisionSystem() = default;	// Constructor
 	~CollisionSystem() = default;	// Destructor
 
+    void PrepareRegistrationCapacity(std::size_t count)
+    {
+        m_pCollidersList.reserve(m_pCollidersList.size() + count);
+    }
+
 	void Register(Collider* collider);		// Register a collider to the collision system
-	void Unregister(Collider* collider);	// Unregister a collider from the collision system
-	void ClearColliders();					// Clear all colliders from the collision system
+	// The argument must still be alive. Remove all system-owned references before
+	// its owner releases storage. No allocation or gameplay callbacks occur here.
+	void Unregister(Collider* collider) noexcept;
+	void ClearColliders() noexcept;			// End all live registrations and collision history
 	void CheckColliders();					// Check each collider if it is active and perform collision detection
 
 	void CheckCollisions();							// Check collisions between registered colliders
@@ -69,96 +76,96 @@ private:
 	std::vector<CollisionPair> m_previousCollisionPairs;	// Previous collision pairs array (pairs that were colliding in the previous frame)
 
 private:
-	//ChackCollisions()‚Ì•â•ŠÖ”
-	void BroadPhase();	//ƒuƒ[ƒhƒtƒF[ƒY
-	void NarrowPhase();	//ƒiƒ[ƒtƒF[ƒY
+	//ChackCollisions()ã®è£œåŠ©é–¢æ•°
+	void BroadPhase();	//ãƒ–ãƒ­ãƒ¼ãƒ‰ãƒ•ã‚§ãƒ¼ã‚º
+	void NarrowPhase();	//ãƒŠãƒ­ãƒ¼ãƒ•ã‚§ãƒ¼ã‚º
 
-	ContactResult NarrowPhaseCollision(	//ƒiƒ[ƒtƒF[ƒY‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-
-	bool CheckLayer(	//Õ“ËƒŒƒCƒ„[‚Ìƒ`ƒFƒbƒN
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
+	ContactResult NarrowPhaseCollision(	//ãƒŠãƒ­ãƒ¼ãƒ•ã‚§ãƒ¼ã‚ºã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
 	);
 
-	void RegisterCollisionPair(	//Õ“ËƒyƒA‚ğ“o˜^
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
+	bool CheckLayer(	//è¡çªãƒ¬ã‚¤ãƒ¤ãƒ¼ã®ãƒã‚§ãƒƒã‚¯
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
 	);
 
-	void UpdateCollisionState();	//‘O‰ñ‚ÌÕ“ËƒyƒA‚Æ”äŠr‚µ‚ÄV‹KÕ“Ë‚©Œp‘±Õ“Ë‚©‚ğƒ`ƒFƒbƒN
-
-	//ŠeíÕ“Ë”»’èŠÖ”
-	bool CollisionAABB(	//ƒ{ƒbƒNƒX‘Îƒ{ƒbƒNƒX‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-	ContactResult CollisionBoxToBox(	//ƒ{ƒbƒNƒX‘Îƒ{ƒbƒNƒX‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-	ContactResult CollisionSphereToSphere(	//‹…‘Î‹…‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-	ContactResult CollisionCapsuleToCapsule(	//ƒJƒvƒZƒ‹‘ÎƒJƒvƒZƒ‹‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-	ContactResult CollisionBoxToSphere(	//ƒ{ƒbƒNƒX‘Î‹…‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-	ContactResult CollisionBoxToCapsule(	//ƒ{ƒbƒNƒX‘ÎƒJƒvƒZƒ‹‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
-	);
-	ContactResult CollisionSphereToCapsule(	//‹…‘ÎƒJƒvƒZƒ‹‚ÌÕ“Ë”»’è
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
+	void RegisterCollisionPair(	//è¡çªãƒšã‚¢ã‚’ç™»éŒ²
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
 	);
 
-	//Œp‘±“IÕ“ËŒŸo(CCD)—pŠÖ”
-	ContactResult CollisionBoxToCapsuleCCD(	//ƒ{ƒbƒNƒX‘ÎƒJƒvƒZƒ‹‚ÌÕ“Ë”»’è(Œp‘±“IÕ“ËŒŸo)
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
+	void UpdateCollisionState();	//å‰å›ã®è¡çªãƒšã‚¢ã¨æ¯”è¼ƒã—ã¦æ–°è¦è¡çªã‹ç¶™ç¶šè¡çªã‹ã‚’ãƒã‚§ãƒƒã‚¯
+
+	//å„ç¨®è¡çªåˆ¤å®šé–¢æ•°
+	bool CollisionAABB(	//ãƒœãƒƒã‚¯ã‚¹å¯¾ãƒœãƒƒã‚¯ã‚¹ã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+	ContactResult CollisionBoxToBox(	//ãƒœãƒƒã‚¯ã‚¹å¯¾ãƒœãƒƒã‚¯ã‚¹ã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+	ContactResult CollisionSphereToSphere(	//çƒå¯¾çƒã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+	ContactResult CollisionCapsuleToCapsule(	//ã‚«ãƒ—ã‚»ãƒ«å¯¾ã‚«ãƒ—ã‚»ãƒ«ã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+	ContactResult CollisionBoxToSphere(	//ãƒœãƒƒã‚¯ã‚¹å¯¾çƒã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+	ContactResult CollisionBoxToCapsule(	//ãƒœãƒƒã‚¯ã‚¹å¯¾ã‚«ãƒ—ã‚»ãƒ«ã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+	ContactResult CollisionSphereToCapsule(	//çƒå¯¾ã‚«ãƒ—ã‚»ãƒ«ã®è¡çªåˆ¤å®š
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
 	);
 
-	//•â•ŠÖ”
-	ContactResult CollisonOBBtoCapsule(	//OBB‘ÎƒJƒvƒZƒ‹‚ÌÕ“Ë”»’è
+	//ç¶™ç¶šçš„è¡çªæ¤œå‡º(CCD)ç”¨é–¢æ•°
+	ContactResult CollisionBoxToCapsuleCCD(	//ãƒœãƒƒã‚¯ã‚¹å¯¾ã‚«ãƒ—ã‚»ãƒ«ã®è¡çªåˆ¤å®š(ç¶™ç¶šçš„è¡çªæ¤œå‡º)
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+
+	//è£œåŠ©é–¢æ•°
+	ContactResult CollisonOBBtoCapsule(	//OBBå¯¾ã‚«ãƒ—ã‚»ãƒ«ã®è¡çªåˆ¤å®š
 		const OBB& obb,					//OBB
-		const CapsuleSegment& capsule	//ƒJƒvƒZƒ‹ƒZƒOƒƒ“ƒg
+		const CapsuleSegment& capsule	//ã‚«ãƒ—ã‚»ãƒ«ã‚»ã‚°ãƒ¡ãƒ³ãƒˆ
 	);
-	ContactResult CollisionSpheresSegments(	//‹…ƒZƒOƒƒ“ƒg“¯m‚ÌÕ“Ë”»’è
-		const SphereSegment& sphereA,	//‹…ƒZƒOƒƒ“ƒgA
-		const SphereSegment& sphereB	//‹…ƒZƒOƒƒ“ƒgB
-	);
-
-	void SendNarrowPhase( //ƒiƒ[ƒtƒF[ƒY—p”z—ñ‚ÉÕ“ËƒyƒA‚ğ’Ç‰Á
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
+	ContactResult CollisionSpheresSegments(	//çƒã‚»ã‚°ãƒ¡ãƒ³ãƒˆåŒå£«ã®è¡çªåˆ¤å®š
+		const SphereSegment& sphereA,	//çƒã‚»ã‚°ãƒ¡ãƒ³ãƒˆA
+		const SphereSegment& sphereB	//çƒã‚»ã‚°ãƒ¡ãƒ³ãƒˆB
 	);
 
-	OBB CreateOBB(	//ƒRƒ‰ƒCƒ_[‚©‚çOBB‚ğì¬(LERP•âŠÔ•t‚«)
-		Collider* collider,	//ƒRƒ‰ƒCƒ_[
-		float alpfa = 1.0f	//LERP•âŠÔŒW”
+	void SendNarrowPhase( //ãƒŠãƒ­ãƒ¼ãƒ•ã‚§ãƒ¼ã‚ºç”¨é…åˆ—ã«è¡çªãƒšã‚¢ã‚’è¿½åŠ 
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
 	);
 
-	CapsuleSegment CreateCapsuleSegment(	//ƒRƒ‰ƒCƒ_[‚©‚çƒJƒvƒZƒ‹ƒZƒOƒƒ“ƒg‚ğì¬(LERP•âŠÔ•t‚«)
-		Collider* collider,	//ƒRƒ‰ƒCƒ_[
-		float alpfa = 1.0f	//LERP•âŠÔŒW”
+	OBB CreateOBB(	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã‹ã‚‰OBBã‚’ä½œæˆ(LERPè£œé–“ä»˜ã)
+		Collider* collider,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		float alpfa = 1.0f	//LERPè£œé–“ä¿‚æ•°
 	);
 
-	bool NeedsCCD(Collider* collider);	//Œp‘±“IÕ“ËŒŸo‚ª•K—v‚©‚Ç‚¤‚©ƒ`ƒFƒbƒN
-
-	int CalculateSubsteps(	//Œp‘±“IÕ“ËŒŸo‚ÌƒTƒuƒXƒeƒbƒv”‚ğŒvZ
-		Collider* colliderA,	//ƒRƒ‰ƒCƒ_[A
-		Collider* colliderB		//ƒRƒ‰ƒCƒ_[B
+	CapsuleSegment CreateCapsuleSegment(	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã‹ã‚‰ã‚«ãƒ—ã‚»ãƒ«ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã‚’ä½œæˆ(LERPè£œé–“ä»˜ã)
+		Collider* collider,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		float alpfa = 1.0f	//LERPè£œé–“ä¿‚æ•°
 	);
 
-	static float GetMinDistanceSquaredSegmentToSegment(	//ƒZƒOƒƒ“ƒgŠÔ‚ÌÅ¬‹——£‚Ì“ñæ‚ğæ“¾
+	bool NeedsCCD(Collider* collider);	//ç¶™ç¶šçš„è¡çªæ¤œå‡ºãŒå¿…è¦ã‹ã©ã†ã‹ãƒã‚§ãƒƒã‚¯
+
+	int CalculateSubsteps(	//ç¶™ç¶šçš„è¡çªæ¤œå‡ºã®ã‚µãƒ–ã‚¹ãƒ†ãƒƒãƒ—æ•°ã‚’è¨ˆç®—
+		Collider* colliderA,	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼A
+		Collider* colliderB		//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼B
+	);
+
+	static float GetMinDistanceSquaredSegmentToSegment(	//ã‚»ã‚°ãƒ¡ãƒ³ãƒˆé–“ã®æœ€å°è·é›¢ã®äºŒä¹—ã‚’å–å¾—
 		const DirectX::FXMVECTOR& p0,
 		const DirectX::FXMVECTOR& p1,
 		const DirectX::FXMVECTOR& q0,
@@ -166,59 +173,59 @@ private:
 		DirectX::XMVECTOR& outP,
 		DirectX::XMVECTOR& outQ
 	);
-	static float GetMinDistanceSquaredPointToSegment(	//“_‚ÆƒZƒOƒƒ“ƒgŠÔ‚ÌÅ¬‹——£‚Ì“ñæ‚ğæ“¾
-		const DirectX::FXMVECTOR& point,	//“_
-		const DirectX::FXMVECTOR& segA,		//ƒZƒOƒƒ“ƒg‚Ì’[“_A
-		const DirectX::FXMVECTOR& segB,		//ƒZƒOƒƒ“ƒg‚Ì’[“_B
-		DirectX::XMVECTOR& outClosest		//ƒZƒOƒƒ“ƒgã‚ÌÅ’Z“_
+	static float GetMinDistanceSquaredPointToSegment(	//ç‚¹ã¨ã‚»ã‚°ãƒ¡ãƒ³ãƒˆé–“ã®æœ€å°è·é›¢ã®äºŒä¹—ã‚’å–å¾—
+		const DirectX::FXMVECTOR& point,	//ç‚¹
+		const DirectX::FXMVECTOR& segA,		//ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ç«¯ç‚¹A
+		const DirectX::FXMVECTOR& segB,		//ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã®ç«¯ç‚¹B
+		DirectX::XMVECTOR& outClosest		//ã‚»ã‚°ãƒ¡ãƒ³ãƒˆä¸Šã®æœ€çŸ­ç‚¹
 	);
-	static float GetMinDistanceSquaredPointToOBB(	//“_‚ÆOBBŠÔ‚ÌÅ¬‹——£‚Ì“ñæ‚ğæ“¾
-		const DirectX::FXMVECTOR& point,	//“_
+	static float GetMinDistanceSquaredPointToOBB(	//ç‚¹ã¨OBBé–“ã®æœ€å°è·é›¢ã®äºŒä¹—ã‚’å–å¾—
+		const DirectX::FXMVECTOR& point,	//ç‚¹
 		const OBB& obb,					//OBB
-		DirectX::XMVECTOR& outClosest	//OBBã‚ÌÅ’Z“_
+		DirectX::XMVECTOR& outClosest	//OBBä¸Šã®æœ€çŸ­ç‚¹
 	);
-	static bool PairExistsinList(	//Õ“ËƒyƒA‚ª•Û‘¶‚³‚ê‚Ä‚¢‚é‚©‚Ç‚¤‚©ƒ`ƒFƒbƒN
-		const CollisionPair& pair,							//Õ“ËƒyƒA
-		const std::vector<CollisionPair>& collisionPairs	//Õ“ËƒyƒA”z—ñ
+	static bool PairExistsinList(	//è¡çªãƒšã‚¢ãŒä¿å­˜ã•ã‚Œã¦ã„ã‚‹ã‹ã©ã†ã‹ãƒã‚§ãƒƒã‚¯
+		const CollisionPair& pair,							//è¡çªãƒšã‚¢
+		const std::vector<CollisionPair>& collisionPairs	//è¡çªãƒšã‚¢é…åˆ—
 	);
-	static void SetCollisionState(	//ƒRƒ‰ƒCƒ_[‚ÌÕ“ËƒXƒe[ƒg‚ğİ’è
-		Collider* self,							//©•ª©g‚ÌƒRƒ‰ƒCƒ_[
-		Collider* opponent,						//Õ“Ë‘Šè‚ÌƒRƒ‰ƒCƒ_[
-		COLLISION_STATE state	//Õ“Ëó‘Ô
+	static void SetCollisionState(	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã®è¡çªã‚¹ãƒ†ãƒ¼ãƒˆã‚’è¨­å®š
+		Collider* self,							//è‡ªåˆ†è‡ªèº«ã®ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		Collider* opponent,						//è¡çªç›¸æ‰‹ã®ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		COLLISION_STATE state	//è¡çªçŠ¶æ…‹
 	);
-	static void PushCollisionInfo(	//ƒRƒ‰ƒCƒ_[‚ÉÕ“Ëî•ñ‚ğ’Ç‰Á
-		Collider* colliderA,	//©•ª©g‚ÌƒRƒ‰ƒCƒ_[
-		Collider* colliderB,	//Õ“Ë‘Šè‚ÌƒRƒ‰ƒCƒ_[
-		ContactResult& result	//Õ“Ë‚Ìƒpƒ‰ƒ[ƒ^
+	static void PushCollisionInfo(	//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã«è¡çªæƒ…å ±ã‚’è¿½åŠ 
+		Collider* colliderA,	//è‡ªåˆ†è‡ªèº«ã®ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		Collider* colliderB,	//è¡çªç›¸æ‰‹ã®ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		ContactResult& result	//è¡çªæ™‚ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿
 	);
-	static void OrientNormalAToB(	//–@üƒxƒNƒgƒ‹‚ğA‚©‚çB‚Ì•ûŒü‚ÉŒü‚¯‚é
-		Collider* colliderA,	//©•ª©g‚ÌƒRƒ‰ƒCƒ_[
-		Collider* colliderB,	//Õ“Ë‘Šè‚ÌƒRƒ‰ƒCƒ_[
-		ContactResult& result	//Õ“Ë‚Ìƒpƒ‰ƒ[ƒ^
-	);
-
-	//ƒŒƒCƒLƒƒƒXƒg•â•ŠÖ”
-	bool CheckLayerRaycast(	//ƒŒƒCƒLƒƒƒXƒg—pÕ“ËƒŒƒCƒ„[‚Ìƒ`ƒFƒbƒN
-		const RaycastSegment& ray,	//ƒŒƒCî•ñ
-		Collider* collider					//ƒRƒ‰ƒCƒ_[
-	);
-	void UpdateRaycastCollisionState(	//ƒŒƒCƒLƒƒƒXƒg‚ÌÕ“Ëó‘Ôƒ`ƒFƒbƒN
-		RaycastSegment& ray	//ƒŒƒCî•ñ
+	static void OrientNormalAToB(	//æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«ã‚’Aã‹ã‚‰Bã®æ–¹å‘ã«å‘ã‘ã‚‹
+		Collider* colliderA,	//è‡ªåˆ†è‡ªèº«ã®ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		Collider* colliderB,	//è¡çªç›¸æ‰‹ã®ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		ContactResult& result	//è¡çªæ™‚ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿
 	);
 
-	bool RaycastBox(	//AABBƒRƒ‰ƒCƒ_[‚Ö‚ÌƒŒƒCƒLƒƒƒXƒg
-		const RaycastSegment& ray,	//ƒŒƒCî•ñ
-		Collider* collider,						//ƒRƒ‰ƒCƒ_[
-		RaycastHitInfo& outHitInfo	//ƒqƒbƒgî•ñ
+	//ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆè£œåŠ©é–¢æ•°
+	bool CheckLayerRaycast(	//ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆç”¨è¡çªãƒ¬ã‚¤ãƒ¤ãƒ¼ã®ãƒã‚§ãƒƒã‚¯
+		const RaycastSegment& ray,	//ãƒ¬ã‚¤æƒ…å ±
+		Collider* collider					//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
 	);
-	bool RaycastSphere(	//‹…ƒRƒ‰ƒCƒ_[‚Ö‚ÌƒŒƒCƒLƒƒƒXƒg
-		const RaycastSegment& ray,	//ƒŒƒCî•ñ
-		Collider* collider,						//ƒRƒ‰ƒCƒ_[
-		RaycastHitInfo& outHitInfo	//ƒqƒbƒgî•ñ
+	void UpdateRaycastCollisionState(	//ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆã®è¡çªçŠ¶æ…‹ãƒã‚§ãƒƒã‚¯
+		RaycastSegment& ray	//ãƒ¬ã‚¤æƒ…å ±
 	);
-	bool RaycastCapsule(	//ƒJƒvƒZƒ‹ƒRƒ‰ƒCƒ_[‚Ö‚ÌƒŒƒCƒLƒƒƒXƒg
-		const RaycastSegment& ray,	//ƒŒƒCî•ñ
-		Collider* collider,						//ƒRƒ‰ƒCƒ_[
-		RaycastHitInfo& outHitInfo	//ƒqƒbƒgî•ñ
+
+	bool RaycastBox(	//AABBã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã¸ã®ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆ
+		const RaycastSegment& ray,	//ãƒ¬ã‚¤æƒ…å ±
+		Collider* collider,						//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		RaycastHitInfo& outHitInfo	//ãƒ’ãƒƒãƒˆæƒ…å ±
+	);
+	bool RaycastSphere(	//çƒã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã¸ã®ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆ
+		const RaycastSegment& ray,	//ãƒ¬ã‚¤æƒ…å ±
+		Collider* collider,						//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		RaycastHitInfo& outHitInfo	//ãƒ’ãƒƒãƒˆæƒ…å ±
+	);
+	bool RaycastCapsule(	//ã‚«ãƒ—ã‚»ãƒ«ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼ã¸ã®ãƒ¬ã‚¤ã‚­ãƒ£ã‚¹ãƒˆ
+		const RaycastSegment& ray,	//ãƒ¬ã‚¤æƒ…å ±
+		Collider* collider,						//ã‚³ãƒ©ã‚¤ãƒ€ãƒ¼
+		RaycastHitInfo& outHitInfo	//ãƒ’ãƒƒãƒˆæƒ…å ±
 	);
 };

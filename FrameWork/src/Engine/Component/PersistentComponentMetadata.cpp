@@ -3,8 +3,6 @@
 #include "PersistentMetadataHelpers.h"
 #include "Engine/Component/MeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
-#include "Engine/Component/SkyRenderer.h"
-#include "Engine/Component/WaveRenderer.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIImage.h"
@@ -17,14 +15,15 @@ void PersistentComponentMetadata::AddRendererProperties(TypeMetadataBuilder<T>& 
 	builder.Property("color", &T::GetColor, &T::SetColor)
 		.Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
 	builder.Property("visible", &T::GetVisible, &T::SetVisible);
-	builder.Property("blendMode", &T::GetBlendMode, &T::SetBlendMode)
-		.SerializedAs(EnumSerializationFormat::Integer).Optional();
 	// UI order is authoritative; retain the legacy JSON field without applying it twice.
 	builder.Property("sortOrderInCanvas", &T::GetSortOrderInCanvas,
-			   [writeLegacySortOrder](T& c, std::uint32_t v)
-	{ if (writeLegacySortOrder) {
-c.SetSortOrderInCanvas(v);
-} }).Optional();
+        [writeLegacySortOrder](T& component, std::uint32_t order)
+        {
+            if (writeLegacySortOrder)
+            {
+                component.SetSortOrderInCanvas(order);
+            }
+        }).Optional();
 }
 
 template<class T>
@@ -52,8 +51,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::MeshRenderer(std::str
 	TypeMetadataBuilder<::MeshRenderer> builder(std::move(stableTypeName));
 	AddRendererProperties(builder);
 	builder.Property("meshAssetId", &::MeshRenderer::GetMeshAssetReference, &::MeshRenderer::TrySetMeshAssetReference);
-	builder.Property("textureOverrideAssetId", &::MeshRenderer::GetTextureOverrideAssetReference,
-		&::MeshRenderer::TrySetTextureOverrideAssetReference).Optional();
+	builder.Property("castShadow", &::MeshRenderer::GetCastShadow, &::MeshRenderer::SetCastShadow).Optional();
 	return PersistentMetadata::Finish(builder);
 }
 
@@ -62,6 +60,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	using T = ::SpriteRenderer;
 	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
 	AddRendererProperties(builder);
+    builder.Property("castShadow", &T::GetCastShadow, &T::SetCastShadow).Optional();
 	builder.Property("uvScale", &T::GetUVScale, &T::SetUVScale).Validate(ValueValidation::Finite2);
 	builder.Property("uvOffset", &T::GetUVOffset, &T::SetUVOffset).Validate(ValueValidation::Finite2);
 	builder.Property("pivot", &T::GetPivot, &T::SetPivot).Validate(ValueValidation::UnitCoordinate2);
@@ -70,31 +69,6 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	builder.Property("flipX", &T::IsFlipX, &T::SetFlipX);
 	builder.Property("flipY", &T::IsFlipY, &T::SetFlipY);
 	builder.Property("textureAssetId", &T::GetTextureAssetReference, &T::TrySetTextureAssetReference);
-	return PersistentMetadata::Finish(builder);
-}
-
-std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SkyRenderer(std::string stableTypeName)
-{
-	using T = ::SkyRenderer;
-	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
-	AddRendererProperties(builder);
-	builder.Property("skyTextureAssetId", &T::GetSkyTextureAssetReference, &T::TrySetSkyTextureAssetReference);
-	builder.Property("followMode", &T::GetFollowMode, &T::SetFollowMode).SerializedAs(EnumSerializationFormat::Integer);
-	builder.Property("followActorId", &T::GetFollowActorReference, &T::SetFollowActorReference);
-	return PersistentMetadata::Finish(builder);
-}
-
-std::unique_ptr<TypeMetadata> PersistentComponentMetadata::WaveRenderer(std::string stableTypeName)
-{
-	using T = ::WaveRenderer;
-	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
-	AddRendererProperties(builder);
-	builder.Property("waveTextureAssetId", &T::GetWaveTextureAssetReference, &T::TrySetWaveTextureAssetReference).Optional();
-	builder.Property("vertexDivisions", &T::GetVertexDivisions, &T::SetVertexDivisions).Validate(ValueValidation::Finite2);
-	builder.Property("waveAmplitude", &T::GetWaveAmplitude, &T::SetWaveAmplitude);
-	builder.Property("waveFrequency", &T::GetWaveFrequency, &T::SetWaveFrequency);
-	builder.Property("waveSpeed", &T::GetWaveSpeed, &T::SetWaveSpeed);
-	builder.Property("waveDirection", &T::GetWaveDirection, &T::SetWaveDirection).Validate(ValueValidation::Finite2);
 	return PersistentMetadata::Finish(builder);
 }
 

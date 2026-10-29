@@ -1,255 +1,71 @@
 #pragma once
-#include "Engine/Graphics/FrameRenderData.h"
-#include "Engine/Component/MeshRenderer.h"
-#include "Engine/Component/SpriteRenderer.h"
-#include "Engine/Component/WaveRenderer.h"
-#include "Engine/UI/UIRenderer.h"
-#include "Engine/Graphics/RenderTemplateFactory.h"
-#include "Engine/Graphics/RenderData.h"
-#include "Engine/Resource/Texture.h"
-#include "Engine/Component/Camera.h"
 
+#include "Renderer/FrameRenderData.h"
+#include "Engine/Core/GUID/Guid.h"
+#include "Engine/Graphics/LightTypes.h"
+#include "Engine/Graphics/RenderTemplateFactory.h"
+
+class Actor;
 class Canvas;
 class SceneBase;
-class SkyRenderer;
+class MeshRenderer;
+class SpriteRenderer;
+class UIRenderer;
+class RendererComponent;
+struct CameraInfo;
 
-//-------------------------------------------------------------------------------
-// Render System class
-// This class is responsible for managing the RenderComponents in the scene.
-// Convert every RenderComponent into a draw packet and sort them for rendering.
-//-------------------------------------------------------------------------------
-
-// Enumeration to define which render space to filter for rendering
 enum class RenderSpaceFilter
 {
-	All,
-	WorldOnly,
-	ScreenOnly,
+    All,
+    WorldOnly,
+    ScreenOnly
 };
 
-// Struct to define the render view policy
 struct RenderViewPolicy
 {
-	RenderSpaceFilter renderSpaceFilter = RenderSpaceFilter::All;
-
-	// When set, only renderers belonging to this Canvas subtree are rendererd.
-	// Their world matrices are converted into this Canvas's local layout space.
-	const Canvas* canvasViewRoot = nullptr;
+    RenderSpaceFilter renderSpaceFilter = RenderSpaceFilter::All;
+    const Canvas* canvasViewRoot = nullptr;
+    // Editor navigation chooses the projection for a Canvas preview. No Canvas
+    // meaning crosses the Renderer API; it receives only View/Object values.
+    bool canvasPreview = false;
 };
 
-// Render system class
+// Temporary Engine-side metadata for Editor extraction. It points into live
+// Components only while the host builds this Frame, and is never submitted.
+struct ExtractedObjectRecord
+{
+    std::size_t objectIndex = 0;
+    Guid actorGuid;
+    const ComponentMaterialState* material = nullptr;
+    bool alphaMask = false;
+    rendering::ViewId viewId = 0;
+};
+
 class RenderSystem
 {
 public:
-	struct SortKeyOpaque
-	{
-		PSOKey psoKey = {};
-	};
+    explicit RenderSystem(SceneBase* scene = nullptr) : m_scene(scene) {}
+    void Register(MeshRenderer* renderer);
+    void Register(SpriteRenderer* renderer);
+    void Register(UIRenderer* renderer);
+    void Unregister(MeshRenderer* renderer);
+    void Unregister(SpriteRenderer* renderer);
+    void Unregister(UIRenderer* renderer);
+    void PrepareRegistrationCapacity(std::size_t additionalComponents);
+    void FlushRegisters();
 
-	struct SortKeyTransparent
-	{
-		PSOKey psoKey = {};
-		float depth = 0.0f;
-	};
-
-	struct SortKeyScreenSpace
-	{
-		PSOKey psoKey = {};
-		std::vector<uint32_t> orderPath;	// Stores all order numbers from the root canvas to the current element for hierarchical sorting
-	};
-
-	struct FrameSortData
-	{
-		std::vector<SortKeyOpaque> opaqueKeys;				// Sort keys for opaque objects
-		std::vector<SortKeyTransparent> transparentKeys;	// Sort keys for transparent objects
-		std::vector<SortKeyScreenSpace> screenSpaceKeys;	// Sort keys for screen-space objects (e.g., UI)
-
-		uint64_t AddOpaqueKey(SortKeyOpaque key) {
-			opaqueKeys.push_back(key);
-			return opaqueKeys.size() - 1;
-		}
-
-		SortKeyOpaque GetOpaqueKey(uint64_t index) const {
-			return opaqueKeys[index];
-		}
-
-		uint64_t AddTransparentKey(SortKeyTransparent key) {
-			transparentKeys.push_back(key);
-			return transparentKeys.size() - 1;
-		}
-
-		SortKeyTransparent GetTransparentKey(uint64_t index) const {
-			return transparentKeys[index];
-		}
-
-		uint64_t AddScreenSpaceKey(SortKeyScreenSpace key) {
-			screenSpaceKeys.push_back(key);
-			return screenSpaceKeys.size() - 1;
-		}
-
-		SortKeyScreenSpace GetScreenSpaceKey(uint64_t index) const {
-			return screenSpaceKeys[index];
-		}
-
-		void Clear() {
-			opaqueKeys.clear();
-			transparentKeys.clear();
-			screenSpaceKeys.clear();
-		}
-	};
-
-public:
-	explicit RenderSystem(SceneBase* scene = nullptr) : m_scene(scene) {}	// Constructor
-	~RenderSystem() = default;	// Destructor
-
-	void Register(MeshRenderer* renderer);						// Register a mesh renderer to be rendered
-	void Register(SpriteRenderer* renderer);					// Register a sprite renderer to be rendered
-	void Register(WaveRenderer* renderer);						// Register a wave renderer to be rendered
-	void Register(UIRenderer* renderer);						// Register a UI renderer to be rendered
-	void Unregister(MeshRenderer* renderer);					// Unregister a mesh renderer (stop rendering it)
-	void Unregister(SpriteRenderer* renderer);					// Unregister a sprite renderer (stop rendering it)
-	void Unregister(UIRenderer* renderer);						// Unregister a UI renderer (stop rendering it)
-	void Unregister(WaveRenderer* renderer);						// Unregister a wave renderer (stop rendering it)
-
-	bool SetActiveSkyRenderer(SkyRenderer* renderer);	// Set the active sky renderer for the scene
-	void ClearActiveSkyRenderer(SkyRenderer* renderer);
-	SkyRenderer* GetActiveSkyRenderer() const { return m_skyRenderer; }
-	
-	// Clear all registered renderers (called before rendering a new scene to prevent rendering old objects)
-	void FlushRegisters();
-	
-	// Build draw packets from the registered mesh renderers
-	void BuildFrameRenderData(const CameraInfo& cameraInfo, RenderViewPolicy viewPolicy);
-
-	// Get the render data for the current frame (contains draw packets and other rendering information)
-	FrameRenderData& GetFrameRenderData() { return m_frameRenderData; }
-
-	// Create render item functions (used to create draw packets from sort entries)
-	static MeshRenderItem CreateMeshRenderItem(
-		const SubmeshRenderTemplate& renderTemplate,
-		const MeshRendererProxy& renderProxy); // Create a draw packet from a sort entry
-	static SpriteRenderItem CreateSpriteRenderItem(
-		const SpriteRenderTemplate& renderTemplate,
-		const SpriteRendererProxy& renderProxy); // Create a sprite draw packet from a sort entry
-
-	WaveRenderItem CreateWaveRenderItem(
-		const SubmeshRenderTemplate& renderTemplate,
-		const WaveRendererProxy& renderProxy); // Create a wave draw packet from a sort entry
-	
-	static UIRenderItem CreateUIRenderItem(
-		const UIRenderElement& renderTemplate,
-		const UIRendererProxy& renderProxy); // Create a UI draw packet from a sort entry
-
-  private:
-	SceneBase* m_scene = nullptr;
-
-	SkyRenderer* m_skyRenderer = nullptr;			// Pointer to the sky renderer in the scene (if any)
-	std::vector<MeshRenderer*> m_meshRenderers;		// List of mesh renderers in the scene
-	std::vector<SpriteRenderer*> m_spriteRenderers;	// List of sprite renderers in the scene
-	std::vector<WaveRenderer*> m_waveRenderers;		// List of wave renderers in the scene
-	std::vector<UIRenderer*> m_uiRenderers;			// List of UI renderers in the scene
-
-	FrameRenderData m_frameRenderData;				// Render data for the current frame (contains draw packets and other rendering information)
-	FrameSortData m_frameSortData;					// Sort data for the current frame (contains sort keys for sorting draw packets)
-	CameraInfo m_cameraInfo;						// Cached camera information for the current frame (used for sorting transparent objects)
+    // One extraction walk updates Component snapshots and appends one Object
+    // array. Camera/Light visibility and transparent sorting remain Renderer work.
+    bool AppendFrame(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
+        const CameraInfo* camera, const RenderViewPolicy& policy, rendering::ViewId sceneViewId,
+        rendering::ViewId overlayViewId, std::uint32_t width, std::uint32_t height,
+        const DirectionalLight& light);
+    const std::vector<ExtractedObjectRecord>& GetExtractedObjects() const noexcept { return m_records; }
 
 private:
-	void SortOpaque();		// Sort opaque draw packets
-	void SortTransparent();	// Sort transparent draw packets
-	void SortScreenSpace();	// Sort screen-space draw packets
-	
-	RenderQueue GetRenderQueue(const PSOKey& psoKey);			// Determine the render queue for sort entry 
-	void NormalizePSOKey(PSOKey& psoKey, RenderQueue queue);	// Normalize the draw packet data
-
-	// Calculate depth as the distance along the camera's forward vector
-	static inline float CalculateDepth(const Vector3& position, const CameraInfo& cameraInfo)
-	{
-		return (position - cameraInfo.position).Dot(cameraInfo.forward);
-	}
-
-	// Sorting functions 
-	// PSOKey comparison
-	static inline bool PSOKeyLess(const PSOKey& a, const PSOKey& b)
-	{
-		return std::tie(a.vsKey.fileID, a.vsKey.entryID, a.vsKey.defines, a.psKey.fileID, a.psKey.entryID,
-				   a.psKey.defines, a.commonDefines, a.blend, a.depth, a.cull, a.rtvFormat, a.indexFree, a.fill) <
-			   std::tie(b.vsKey.fileID, b.vsKey.entryID, b.vsKey.defines, b.psKey.fileID, b.psKey.entryID,
-				   b.psKey.defines, b.commonDefines, b.blend, b.depth, b.cull, b.rtvFormat, b.indexFree, b.fill);
-	}
-
-	// Bind sort comparison
-	//static inline bool BindLess(const SortData& a, const SortData& b)
-	//{
-	//	// Convert pointer to integer for comparison
-	//	auto ap = reinterpret_cast<std::uintptr_t>(a.gpuHandle);
-	//	auto bp = reinterpret_cast<std::uintptr_t>(b.gpuHandle);
-	//	// Compare by textureHandle, pMeshGPU, startIndex, baseVertex
-	//	return std::tie(a.textureHandle, ap, a.startIndex, a.baseVertex)
-	//		< std::tie(b.textureHandle, bp, b.startIndex, b.baseVertex);
-	//}
-
-	// Opaque objects sorting
-	static inline bool OpaqueLess(const SortKeyOpaque& a, const SortKeyOpaque& b)
-	{
-		//If PSOKey is the same, sort by bind
-		if (a.psoKey == b.psoKey)
-		{
-			//return BindLess(a, b);
-			return false;
-		}
-
-		//Otherwise, sort by PSOKey
-		return PSOKeyLess(a.psoKey, b.psoKey);
-	}
-	// Transparent objects sorting (back to front)
-	static inline bool TransparentLess(const SortKeyTransparent& a, const SortKeyTransparent& b)
-	{
-		// Determine if the blend mode is order-dependent
-		auto isOrderDependent = [](BlendMode blendMode) {
-			return blendMode == BlendMode::Alpha;
-			};
-
-		// First, sort by whether the blend mode is order-dependent
-		const bool aOrderDependent = isOrderDependent(a.psoKey.blend);
-		const bool bOrderDependent = isOrderDependent(b.psoKey.blend);
-
-		if (aOrderDependent != bOrderDependent)
-		{// Order-dependent blends first
-			return aOrderDependent > bOrderDependent;
-		}
-
-		if (aOrderDependent)
-		{// For order-dependent blends, sort by depth (greater depth first)
-			// Quantize depth to avoid precision issues
-			const int64_t bucketA = static_cast<int64_t>(std::floor(a.depth * 64.0f));
-			const int64_t bucketB = static_cast<int64_t>(std::floor(b.depth * 64.0f));
-
-			//First, sort by bucket (greater bucket first)
-			if (bucketA != bucketB)
-			{
-				return bucketA > bucketB;
-			}
-
-			//Then, sort by fine depth within the bucket (greater fine depth first)
-			const int64_t fineA = (int64_t)std::llround(a.depth * 4096.0f);
-			const int64_t fineB = (int64_t)std::llround(b.depth * 4096.0f);
-
-			if (fineA != fineB)
-			{
-				return fineA > fineB;
-			}
-
-			return false;	// Ignore same depth
-		}
-
-		if (a.psoKey != b.psoKey)
-		{// If PSOKey is different, sort by PSOKey
-			return PSOKeyLess(a.psoKey, b.psoKey);
-		}
-
-		//// Finally, sort by bind
-		//return BindLess(a, b);
-
-		return false;
-	}
+    SceneBase* m_scene = nullptr;
+    std::vector<MeshRenderer*> m_meshRenderers;
+    std::vector<SpriteRenderer*> m_spriteRenderers;
+    std::vector<UIRenderer*> m_uiRenderers;
+    std::vector<ExtractedObjectRecord> m_records;
 };

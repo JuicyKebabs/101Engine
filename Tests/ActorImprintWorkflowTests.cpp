@@ -7,6 +7,7 @@
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/ActorImprint/ActorImprintAssetDeserializer.h"
 #include "Engine/ActorImprint/ActorImprintSystem.h"
+#include "Engine/Component/Transform.h"
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Resource/AssetManager.h"
@@ -18,6 +19,7 @@
 #include "UI/Inspector/AssetPicker.h"
 #include "UI/MenuBar.h"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -165,6 +167,48 @@ namespace
 			documentId.IsValid() &&
 			documents.GetActiveDocument()->GetSourceAssetGuid() == assetGuid,
 			"Panel Edit intent opens and activates the ActorImprint Document through ET-16");
+
+        // Edit can publish a fresh Document inside RenderImGui, after the
+        // ordinary EditorUpdate. Do not update the Scene in this regression:
+        // the first extraction must already see usable World caches. A finite
+        // matrix alone is insufficient because a zero homogeneous matrix can
+        // still produce a NaN Bounds center when TransformPoint is evaluated.
+        IEditorDocument* openedDocument = documents.GetActiveDocument();
+        SceneBase* openedScene = openedDocument ? openedDocument->GetWorkingScene() : nullptr;
+        Check(openedScene != nullptr, "Opened Document publishes its owned Working Scene");
+        unsigned checkedTransforms = 0;
+        if (openedScene)
+        {
+            for (Actor* actor : openedScene->GetAllActors())
+            {
+                Transform* transform = actor->GetComponentByClass<Transform>();
+                if (!transform)
+                {
+                    continue;
+                }
+
+                const Matrix4x4 world = transform->GetWorldMatrix();
+                bool finiteMatrix = true;
+                for (std::size_t row = 0; row < 4; ++row)
+                {
+                    for (std::size_t column = 0; column < 4; ++column)
+                    {
+                        finiteMatrix = finiteMatrix && std::isfinite(world.m[row][column]);
+                    }
+                }
+                Check(finiteMatrix && world.m[3][3] == 1.0f,
+                    "First Document publication has an initialized affine World matrix");
+
+                const Vector3 localCenter = Vector3::Zero();
+                const Vector3 worldCenter = world.TransformPoint(localCenter);
+                const bool finiteCenter = std::isfinite(worldCenter.x) &&
+                    std::isfinite(worldCenter.y) && std::isfinite(worldCenter.z);
+                Check(finiteCenter, "First Document publication produces a finite world Bounds center");
+                ++checkedTransforms;
+            }
+        }
+        Check(checkedTransforms > 0, "Initial publication regression checked a real Transform");
+
 		EditorDocumentId duplicateDocumentId;
 		Check(ActorImprintAssetWorkflow::OpenDocument(assetGuid, fixture.assets,
 			fixture.system, fixture.context, documents, 1280, 720, duplicateDocumentId) &&
