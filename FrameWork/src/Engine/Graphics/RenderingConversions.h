@@ -68,6 +68,7 @@ inline Vector3 FromRenderer(const rendering::Vector3& source)
 inline Matrix4x4 FromRenderer(const rendering::Matrix4x4& source)
 {
     Matrix4x4 value;
+
     for (std::size_t row = 0; row < 4; ++row)
     {
         for (std::size_t column = 0; column < 4; ++column)
@@ -82,6 +83,7 @@ inline Matrix4x4 FromRenderer(const rendering::Matrix4x4& source)
 inline rendering::Matrix4x4 ToRenderer(const Matrix4x4& source)
 {
     rendering::Matrix4x4 value;
+
     for (std::size_t row = 0; row < 4; ++row)
     {
         for (std::size_t column = 0; column < 4; ++column)

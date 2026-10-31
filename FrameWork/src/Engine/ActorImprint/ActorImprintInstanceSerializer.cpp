@@ -95,8 +95,12 @@ bool ActorImprintInstanceSerializer::Capture(
 			.assetReferenceContext = &assetContext,
 		};
 
-		auto CaptureProperties = [&](LocalObjectId id, const TypeMetadata& metadata,
-			std::type_index type, const void* object, const nlohmann::json& defaults)
+		auto CaptureProperties = [&](
+			LocalObjectId id,
+			const TypeMetadata& metadata,
+			std::type_index type,
+			const void* object,
+			const nlohmann::json& defaults)
 		{
 			for (const PropertyMetadata& property : metadata.GetProperties())
 			{
@@ -121,14 +125,24 @@ bool ActorImprintInstanceSerializer::Capture(
 
 			nlohmann::json current;
 
-			if (!ReflectionSerializer::Serialize(metadata, type, object, current, save))
+			if (!ReflectionSerializer::Serialize(
+				metadata,
+				type,
+				object,
+				current,
+				save))
 			{
 				return false;
 			}
 
 			ActorImprintPropertyOverrideTarget target;
 
-			if (!ActorImprintPropertyOverrides::Diff(metadata, id, defaults, current, target))
+			if (!ActorImprintPropertyOverrides::Diff(
+				metadata,
+				id,
+				defaults,
+				current,
+				target))
 			{
 				return false;
 			}
@@ -147,8 +161,12 @@ bool ActorImprintInstanceSerializer::Capture(
 		{
 			Actor* actor = scene.GetImprintInstances().ResolveActor(root, actorDefinition.id);
 
-			if (!actor || !CaptureProperties(actorDefinition.id, GetActorMetadata(), typeid(Actor),
-							  actor, actorDefinition.properties))
+			if (!actor || !CaptureProperties(
+				actorDefinition.id,
+				GetActorMetadata(),
+				typeid(Actor),
+				actor,
+				actorDefinition.properties))
 			{
 				return false;
 			}
@@ -165,8 +183,12 @@ bool ActorImprintInstanceSerializer::Capture(
 					return false;
 				}
 
-				if (!CaptureProperties(componentDefinition.id, *metadata, componentDefinition.type,
-						component, componentDefinition.properties))
+				if (!CaptureProperties(
+					componentDefinition.id,
+					*metadata,
+					componentDefinition.type,
+					component,
+					componentDefinition.properties))
 				{
 					return false;
 				}

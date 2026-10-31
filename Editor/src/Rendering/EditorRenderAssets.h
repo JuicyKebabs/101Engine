@@ -17,8 +17,12 @@ public:
     ~EditorRenderAssets();
     rendering::Result Initialize(const std::filesystem::path& shaderDirectory);
     rendering::Result Resize(std::uint32_t width, std::uint32_t height);
-    rendering::Result AppendSelection(rendering::FrameRenderData& frame, SceneBase& scene,
-        const Guid& selectedActor, rendering::ViewId sourceView, bool canvasPreview);
+    rendering::Result AppendSelection(
+        rendering::FrameRenderData& frame,
+        SceneBase& scene,
+        const Guid& selectedActor,
+        rendering::ViewId sourceView,
+        bool canvasPreview);
     void AppendColliders(rendering::FrameRenderData& frame, SceneBase& scene, rendering::ViewId sourceView);
 
     rendering::RenderTargetTextureHandle SceneColor() const { return m_sceneColor; }
@@ -26,15 +30,27 @@ public:
     std::uint32_t Height() const { return m_height; }
 
 private:
-    rendering::Result RegisterShader(const std::string& source, rendering::ShaderStage stage,
+    rendering::Result RegisterShader(
+        const std::string& source,
+        rendering::ShaderStage stage,
         std::size_t index);
-    rendering::Result RegisterPipeline(std::size_t index, std::size_t vertexShader,
-        std::size_t pixelShader, rendering::BlendMode blend, rendering::DepthMode depth,
+    rendering::Result RegisterPipeline(
+        std::size_t index,
+        std::size_t vertexShader,
+        std::size_t pixelShader,
+        rendering::BlendMode blend,
+        rendering::DepthMode depth,
         rendering::FillMode fill);
-    rendering::Result AppendMaskMaterial(const rendering::MaterialDesc& source,
-        bool alphaMask, std::size_t slot, rendering::MaterialHandle& output);
-    void AppendColliderObject(rendering::FrameRenderData& frame, rendering::AuxiliaryPass& pass,
-        rendering::GeometryHandle geometry, const Matrix4x4& world);
+    rendering::Result AppendMaskMaterial(
+        const rendering::MaterialDesc& source,
+        bool alphaMask,
+        std::size_t slot,
+        rendering::MaterialHandle& output);
+    void AppendColliderObject(
+        rendering::FrameRenderData& frame,
+        rendering::AuxiliaryPass& pass,
+        rendering::GeometryHandle geometry,
+        const Matrix4x4& world);
 
     rendering::Renderer& m_renderer;
     rendering::RenderTargetTextureHandle m_sceneColor;

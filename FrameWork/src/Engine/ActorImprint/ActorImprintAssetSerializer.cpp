@@ -5,6 +5,7 @@ nlohmann::json ActorImprintAssetSerializer::Serialize(const ActorImprint& imprin
 {
 	using json = nlohmann::json;
 	json actors = json::array();
+
 	// The only constructor receives validated records sorted by LocalObjectID.
 	for (const auto& actor : imprint.GetActors())
 	{

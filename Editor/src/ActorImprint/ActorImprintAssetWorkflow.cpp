@@ -27,7 +27,10 @@ namespace
 
 	std::wstring Lower(std::wstring value)
 	{
-		std::transform(value.begin(), value.end(), value.begin(),
+		std::transform(
+			value.begin(),
+			value.end(),
+			value.begin(),
 			[](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
 		return value;
 	}
@@ -51,8 +54,14 @@ namespace
 
 	bool WriteNewFile(const fs::path& path, std::string_view bytes)
 	{
-		const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
-			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, nullptr);
+		const HANDLE file = CreateFileW(
+			path.c_str(),
+			GENERIC_WRITE,
+			0,
+			nullptr,
+			CREATE_NEW,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+			nullptr);
 
 		if (file == INVALID_HANDLE_VALUE)
 		{
@@ -61,13 +70,19 @@ namespace
 
 		bool succeeded = true;
 		std::size_t offset = 0;
+
 		while (offset < bytes.size())
 		{
 			const DWORD requested = static_cast<DWORD>(
 				(std::min)(bytes.size() - offset, static_cast<std::size_t>((std::numeric_limits<DWORD>::max)())));
 			DWORD written = 0;
 
-			if (!WriteFile(file, bytes.data() + offset, requested, &written, nullptr) || written != requested)
+			if (!WriteFile(
+				file,
+				bytes.data() + offset,
+				requested,
+				&written,
+				nullptr) || written != requested)
 			{
 				succeeded = false;
 				break;
@@ -182,11 +197,14 @@ bool ActorImprintAssetWorkflow::NormalizeFileName(
 	const std::wstring raw = supplied.filename().wstring();
 
 	if (raw.empty() || raw == L"." || raw == L".." || raw.back() == L' ' || raw.back() == L'.' ||
-		std::any_of(raw.begin(), raw.end(), [](wchar_t c)
-		{
-			return c < 32 || c == L'<' || c == L'>' || c == L':' || c == L'"' ||
-				c == L'/' || c == L'\\' || c == L'|' || c == L'?' || c == L'*';
-		}))
+		std::any_of(
+			raw.begin(),
+			raw.end(),
+			[](wchar_t c)
+			{
+				return c < 32 || c == L'<' || c == L'>' || c == L':' || c == L'"' ||
+					c == L'/' || c == L'\\' || c == L'|' || c == L'?' || c == L'*';
+			}))
 	{
 		DBG("ActorImprint name contains characters Windows filenames do not allow.");
 		return false;
@@ -355,11 +373,14 @@ bool ActorImprintAssetWorkflow::Create(
 	{
 		bool recovered = MoveNew(destination, temporaryData);
 		recovered = MoveNew(destinationMeta, temporaryMeta) && recovered;
+
 		DeleteFileW(temporaryData.c_str());
 		DeleteFileW(temporaryMeta.c_str());
+
 		const char* failureMessage = recovered
 			? "Asset catalog update failed."
 			: "Catalog rejected creation and the published pair could not be fully recovered.";
+
 		DBG("%s", failureMessage);
 		return false;
 	}
@@ -379,7 +400,11 @@ bool ActorImprintAssetWorkflow::OpenDocument(
 	EditorDocumentId& outDocumentId)
 {
 	outDocumentId = {};
-	auto context = ActorImprintEditingContext::Open(assetGuid, assets, system, engineContext);
+	auto context = ActorImprintEditingContext::Open(
+		assetGuid,
+		assets,
+		system,
+		engineContext);
 
 	if (!context)
 	{
@@ -387,7 +412,9 @@ bool ActorImprintAssetWorkflow::OpenDocument(
 	}
 
 	outDocumentId = documents.AddDocument(std::make_unique<ActorImprintEditorDocument>(
-		std::move(context), viewportWidth, viewportHeight));
+		std::move(context),
+		viewportWidth,
+		viewportHeight));
 	return outDocumentId.IsValid();
 }
 
@@ -449,7 +476,11 @@ bool ActorImprintAssetWorkflow::Delete(
 
 	if (!assets.NotifyAssetChanged(relativePath))
 	{
-		const bool recovered = RestorePair(stagedData, destination, stagedMeta, destinationMeta);
+		const bool recovered = RestorePair(
+			stagedData,
+			destination,
+			stagedMeta,
+			destinationMeta);
 		const char* failureMessage = recovered
 			? "Asset catalog update failed."
 			: "Catalog rejected deletion and the asset pair could not be restored.";

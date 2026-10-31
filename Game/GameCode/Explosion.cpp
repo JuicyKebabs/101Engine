@@ -46,6 +46,7 @@ void Explosion::Update()
 	if (m_spriteIndex >= m_totalSprites)
 	{
 		auto owner = GetOwner();
+
 		if (owner)
 		{
 			owner->Destroy();

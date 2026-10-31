@@ -127,7 +127,9 @@ DirectX::XMFLOAT3 GetPushOutVector(
 	auto end = cands.end();
 
 	//貫入深さの大きい順にソート
-	std::sort(cands.begin(), cands.end(),
+	std::sort(
+		cands.begin(),
+		cands.end(),
 		[](const ObjectCollisionInfo* a, const ObjectCollisionInfo* b)
 		{
 			return LengthXMF3(a->penetrationDepth) > LengthXMF3(b->penetrationDepth);

@@ -49,5 +49,9 @@ inline Vector4 SplitSprite(TexSplitInfo info)
 	const float sizeU = baseSu * info.scaleU;
 	const float sizeV = baseSv * info.scaleV;
 
-	return Vector4(minU, minV, sizeU, sizeV);
+	return Vector4(
+		minU,
+		minV,
+		sizeU,
+		sizeV);
 }

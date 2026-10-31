@@ -3,13 +3,21 @@
 #include "Engine/Core/Path/ExecutablePath.h"
 #include <objbase.h>
 
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int WINAPI WinMain(
+    HINSTANCE,
+    HINSTANCE,
+    LPSTR,
+    int)
 {
     const auto executablePath = GetExecutableDirectory() / L"101Editor.exe";
 
     if (!PathManager::Initialize(executablePath.string()))
     {
-        MessageBoxW(nullptr, L"project.101 is not found", L"101Engine", MB_OK);
+        MessageBoxW(
+            nullptr,
+            L"project.101 is not found",
+            L"101Engine",
+            MB_OK);
         return EXIT_FAILURE;
     }
 
@@ -34,7 +42,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     }
     catch (const std::exception& error)
     {
-        MessageBoxA(nullptr, error.what(), "101Engine", MB_OK);
+        MessageBoxA(
+            nullptr,
+            error.what(),
+            "101Engine",
+            MB_OK);
     }
 
     // Partial initialization follows the same reverse ownership order.

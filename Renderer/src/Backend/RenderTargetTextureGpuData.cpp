@@ -30,6 +30,7 @@ Result RenderTargetTextureGpuData::Initialize(
 
 	const bool extentSupported = description.width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
 		description.height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+
 	if (!extentSupported)
 	{
 		return detail::Fail("RenderTargetTexture: dimensions exceed the supported 2D limit.");
@@ -46,6 +47,7 @@ Result RenderTargetTextureGpuData::Initialize(
     }
 
     DXGI_FORMAT nativeFormat = DXGI_FORMAT_UNKNOWN;
+
     switch (description.format)
     {
     case TextureFormat::RGBA8_UNorm:
@@ -80,6 +82,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	// The actual initialization is a later Graph attachment Clear on the GPU.
 	D3D12_CLEAR_VALUE optimizedClear{};
 	optimizedClear.Format = colorDescription.Format;
+
     // Use the same typed Format as the RTV. The caller supplies ordinary
     // values, not D3D12 types or an Editor-specific resource classification.
     for (std::size_t channel = 0; channel < description.optimizedClearColor.size(); ++channel)
@@ -95,13 +98,19 @@ Result RenderTargetTextureGpuData::Initialize(
 		D3D12_RESOURCE_STATE_COMMON,
 		&optimizedClear,
 		IID_PPV_ARGS(color.GetAddressOf()));
+
 	if (FAILED(created))
 	{
 		return MakeApiFailure("CreateCommittedResource(RenderTargetTexture)", created);
 	}
 
 	auto rtvHeap = std::make_unique<DescriptorHeap>();
-	Result prepared = rtvHeap->Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1, false);
+	Result prepared = rtvHeap->Initialize(
+		device,
+		D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+		1,
+		false);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -109,6 +118,7 @@ Result RenderTargetTextureGpuData::Initialize(
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtv{};
 	prepared = rtvHeap->GetCpuHandle(0, rtv);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -122,7 +132,12 @@ Result RenderTargetTextureGpuData::Initialize(
 	// This is CPU descriptor storage, not the shader-visible frame heap.
 	// Sampling copies the SRV into FrameResources later; copying a descriptor does not copy the pixels.
 	auto srvHeap = std::make_unique<DescriptorHeap>();
-	prepared = srvHeap->Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, false);
+	prepared = srvHeap->Initialize(
+		device,
+		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+		1,
+		false);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -130,6 +145,7 @@ Result RenderTargetTextureGpuData::Initialize(
 
 	D3D12_CPU_DESCRIPTOR_HANDLE srv{};
 	prepared = srvHeap->GetCpuHandle(0, srv);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -143,6 +159,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	device->CreateShaderResourceView(color.Get(), &shaderResourceView, srv);
 
 	const HRESULT descriptorStatus = device->GetDeviceRemovedReason();
+
 	if (FAILED(descriptorStatus))
 	{
 		return MakeApiFailure("CreateViews(RenderTargetTexture): device removed", descriptorStatus);
@@ -152,6 +169,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	// Even equal-sized outputs cannot share depth values because their Cameras and Objects may differ.
 	auto depth = std::make_unique<DepthTexture>();
 	prepared = depth->Ensure(device, description.width, description.height);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -164,9 +182,11 @@ Result RenderTargetTextureGpuData::Initialize(
 	m_depth = std::move(depth);
 	m_rtv = rtv;
 	m_srv = srv;
+
 	viewFormat = nativeFormat;
 	width = description.width;
 	height = description.height;
+
 	return {};
 }
 

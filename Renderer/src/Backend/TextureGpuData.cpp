@@ -29,7 +29,11 @@ Result TextureGpuData::InitializeSrv(ID3D12Device* device)
         return { false, "Unsupported texture SRV resource." };
     }
 
-    Result result = m_srvHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, false);
+    Result result = m_srvHeap.Initialize(
+        device,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        1,
+        false);
 
     if (!result.IsSuccess())
     {
@@ -127,8 +131,11 @@ Result PrepareTextureUpload(
         heap.VisibleNodeMask = 1;
 
         HRESULT hr = device->CreateCommittedResource(
-            &heap, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+            &heap,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
             IID_PPV_ARGS(&gpu->texture));
 
         if (FAILED(hr))
@@ -144,8 +151,14 @@ Result PrepareTextureUpload(
         UINT64 totalBytes = 0;
 
         device->GetCopyableFootprints(
-            &desc, 0, count, 0, upload->layouts.data(),
-            rows.data(), rowBytes.data(), &totalBytes);
+            &desc,
+            0,
+            count,
+            0,
+            upload->layouts.data(),
+            rows.data(),
+            rowBytes.data(),
+            &totalBytes);
 
         constexpr auto maxSize = (std::numeric_limits<std::size_t>::max)();
 
@@ -265,8 +278,9 @@ Result RecordTextureUpload(
     for (UINT mip = 0; mip < upload.layouts.size(); ++mip)
     {
         const Result result = context.CopyTextureRegion(
-            gpu.texture.Get(), 
-            mip, upload.buffer.GetNativeResource(), 
+            gpu.texture.Get(),
+            mip,
+            upload.buffer.GetNativeResource(),
             upload.layouts[mip]);
 
         if (!result.IsSuccess())

@@ -8,7 +8,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// File menu contains operations shared by every Editor Document.
         if (ImGui::BeginMenu("File"))
         {
-			if (ImGui::MenuItem("Save", "Ctrl+S", false, callbacks.canSave))
+			if (ImGui::MenuItem(
+				"Save",
+				"Ctrl+S",
+				false,
+				callbacks.canSave))
             {
 				if (callbacks.onSaveDocument)
 				{
@@ -21,7 +25,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem("Undo", nullptr, false, callbacks.canUndo))
+            if (ImGui::MenuItem(
+                "Undo",
+                nullptr,
+                false,
+                callbacks.canUndo))
             {
 				if (callbacks.onUndo)
 				{
@@ -29,7 +37,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 				}
 			}
 
-            if (ImGui::MenuItem("Redo", nullptr, false, callbacks.canRedo))
+            if (ImGui::MenuItem(
+                "Redo",
+                nullptr,
+                false,
+                callbacks.canRedo))
             {
 				if (callbacks.onRedo)
 				{
@@ -56,7 +68,10 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// Assets menu for creating new assets like behaviors
         if (ImGui::BeginMenu("Assets"))
         {
-			if (ImGui::MenuItem("Create Actor Imprint...", nullptr, false,
+			if (ImGui::MenuItem(
+				"Create Actor Imprint...",
+				nullptr,
+				false,
 				callbacks.canModifyActorImprints))
 			{
 				DispatchCreateActorImprint(callbacks);
@@ -64,7 +79,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 
 			ImGui::Separator();
 
-			if (ImGui::MenuItem("Create Script...", nullptr, false, callbacks.canModifyScripts))
+			if (ImGui::MenuItem(
+				"Create Script...",
+				nullptr,
+				false,
+				callbacks.canModifyScripts))
             {
                 m_showCreateScriptPopup = true;
                 m_newScriptNameBuffer[0] = '\0';
@@ -77,7 +96,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 		// Build menu for building the game and hot-reloading game code
         if (ImGui::BeginMenu("Build"))
         {
-            if (ImGui::MenuItem("Build Game", nullptr, false, callbacks.canBuild))
+            if (ImGui::MenuItem(
+                "Build Game",
+                nullptr,
+                false,
+                callbacks.canBuild))
             {
 				if (callbacks.onBuildGame)
 				{
@@ -85,7 +108,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 				}
 			}
 
-			if (ImGui::MenuItem("Reload GameCode", nullptr, false, callbacks.canBuild))
+			if (ImGui::MenuItem(
+				"Reload GameCode",
+				nullptr,
+				false,
+				callbacks.canBuild))
             {
                 // Build without reconfigure
 				if (callbacks.onReloadGameCode)
@@ -94,7 +121,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 				}
 			}
 
-			if (ImGui::MenuItem("Reload GameCode (with Reconfigure)", nullptr, false, callbacks.canBuild))
+			if (ImGui::MenuItem(
+				"Reload GameCode (with Reconfigure)",
+				nullptr,
+				false,
+				callbacks.canBuild))
             {
                 // Build with reconfigure
 				if (callbacks.onReloadGameCode)
@@ -110,8 +141,11 @@ void MenuBar::Render(const Callbacks& callbacks)
 	}
 
 	const ImGuiIO& io = ImGui::GetIO();
-	DispatchSaveShortcut(callbacks, io.KeyCtrl,
-		ImGui::IsKeyPressed(ImGuiKey_S, false), io.WantTextInput);
+	DispatchSaveShortcut(
+		callbacks,
+		io.KeyCtrl,
+		ImGui::IsKeyPressed(ImGuiKey_S, false),
+		io.WantTextInput);
 
 	// Handle the Create Script popup
     if (m_showCreateScriptPopup)

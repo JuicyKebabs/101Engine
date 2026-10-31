@@ -107,14 +107,34 @@ AudioHandle AudioManager::Load(const std::string& fullPath, uint32_t voiceCount)
 
 	WAVEFORMATEX format{};
 	MMCKINFO riff{};
-	riff.fccType = mmioFOURCC('W', 'A', 'V', 'E');
+	riff.fccType = mmioFOURCC(
+		'W',
+		'A',
+		'V',
+		'E');
 	MMCKINFO formatChunk{};
-	formatChunk.ckid = mmioFOURCC('f', 'm', 't', ' ');
+	formatChunk.ckid = mmioFOURCC(
+		'f',
+		'm',
+		't',
+		' ');
 	MMCKINFO dataChunk{};
-	dataChunk.ckid = mmioFOURCC('d', 'a', 't', 'a');
+	dataChunk.ckid = mmioFOURCC(
+		'd',
+		'a',
+		't',
+		'a');
 
-	bool valid = mmioDescend(file, &riff, nullptr, MMIO_FINDRIFF) == MMSYSERR_NOERROR &&
-				 mmioDescend(file, &formatChunk, &riff, MMIO_FINDCHUNK) == MMSYSERR_NOERROR;
+	bool valid = mmioDescend(
+		file,
+		&riff,
+		nullptr,
+		MMIO_FINDRIFF) == MMSYSERR_NOERROR &&
+				 mmioDescend(
+                     file,
+                     &formatChunk,
+                     &riff,
+                     MMIO_FINDCHUNK) == MMSYSERR_NOERROR;
 
 	if (valid)
 	{
@@ -142,7 +162,11 @@ AudioHandle AudioManager::Load(const std::string& fullPath, uint32_t voiceCount)
 	if (valid)
 	{
 		valid = mmioAscend(file, &formatChunk, 0) == MMSYSERR_NOERROR &&
-				mmioDescend(file, &dataChunk, &riff, MMIO_FINDCHUNK) == MMSYSERR_NOERROR &&
+				mmioDescend(
+					file,
+					&dataChunk,
+					&riff,
+					MMIO_FINDCHUNK) == MMSYSERR_NOERROR &&
 				dataChunk.cksize > 0 && format.nBlockAlign > 0;
 	}
 
@@ -151,8 +175,10 @@ AudioHandle AudioManager::Load(const std::string& fullPath, uint32_t voiceCount)
 	if (valid)
 	{
 		data.resize(dataChunk.cksize);
-		valid = data.size() <= LONG_MAX && mmioRead(file, reinterpret_cast<HPSTR>(data.data()),
-											   static_cast<LONG>(data.size())) == static_cast<LONG>(data.size());
+		valid = data.size() <= LONG_MAX && mmioRead(
+			file,
+			reinterpret_cast<HPSTR>(data.data()),
+			static_cast<LONG>(data.size())) == static_cast<LONG>(data.size());
 	}
 
 	mmioClose(file, 0);
@@ -180,8 +206,10 @@ AudioHandle AudioManager::Load(const std::string& fullPath, uint32_t voiceCount)
 				created->DestroyVoice();
 			}
 
-			DBG("AudioManager: CreateSourceVoice failed for %s (0x%08X).",
-				fullPath.c_str(), static_cast<unsigned int>(result));
+			DBG(
+				"AudioManager: CreateSourceVoice failed for %s (0x%08X).",
+				fullPath.c_str(),
+				static_cast<unsigned int>(result));
 			return InvalidAudioHandle;
 		}
 

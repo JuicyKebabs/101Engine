@@ -64,8 +64,13 @@ bool MetaFile::Save(const std::string& path, const Guid& guid, WriteMode mode)
 	j["guid"] = guid.ToString();
 
 	const auto contents = j.dump(4);
-	const HANDLE file = CreateFileW(std::filesystem::path(metaPath).c_str(), GENERIC_WRITE, 0, nullptr,
-		mode == WriteMode::CreateNew ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+	const HANDLE file = CreateFileW(
+		std::filesystem::path(metaPath).c_str(),
+		GENERIC_WRITE,
+		0,
+		nullptr,
+		mode == WriteMode::CreateNew ? CREATE_NEW : CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
 		nullptr);
 
 	if (file == INVALID_HANDLE_VALUE)
@@ -74,7 +79,12 @@ bool MetaFile::Save(const std::string& path, const Guid& guid, WriteMode mode)
 	}
 
 	DWORD written = 0;
-	const bool success = WriteFile(file, contents.data(), static_cast<DWORD>(contents.size()), &written, nullptr) &&
+	const bool success = WriteFile(
+		file,
+		contents.data(),
+		static_cast<DWORD>(contents.size()),
+		&written,
+		nullptr) &&
 		written == contents.size() && FlushFileBuffers(file);
 	const bool closed = CloseHandle(file) != FALSE;
 	return success && closed;

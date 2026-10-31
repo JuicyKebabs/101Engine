@@ -6,7 +6,6 @@
 #include "Backend.h"
 #include "Failure.h"
 #include "UploadBatch.h"
-#include "Failure.h"
 
 #include <array>
 #include <cassert>
@@ -20,362 +19,351 @@ namespace rendering::backend
 
 WindowOutputHandle ReserveWindowOutputHandle() noexcept
 {
-	// Counter for generating unique window output handles.
-	// This is shared across all instances of the Backend class within the same DLL.
-	static std::atomic<uint64_t> nextId{ 1 };
+    // Counter for generating unique window output handles.
+    // This is shared across all instances of the Backend class within the same DLL.
+    static std::atomic<uint64_t> nextId{1};
 
-	uint64_t candidate = nextId.load(std::memory_order_relaxed);
+    uint64_t candidate = nextId.load(std::memory_order_relaxed);
 
-	for (;;)
-	{
-		if (candidate == std::numeric_limits<uint64_t>::max())
-		{
-			return {};
-		}
+    for (;;)
+    {
+        if (candidate == std::numeric_limits<uint64_t>::max())
+        {
+            return {};
+        }
 
-		// Comparing the next id with the candidate and incrementind next id if they are equal.
-		if (nextId.compare_exchange_weak(candidate, candidate + 1, std::memory_order_relaxed))
-		{
-			return { candidate };
-		}
+        // Comparing the next id with the candidate and incrementind next id if they are equal.
+        if (nextId.compare_exchange_weak(candidate, candidate + 1, std::memory_order_relaxed))
+        {
+            return {candidate};
+        }
 
-		// Loop comparing and incrementing until a unique ID is reserved.
-	}
+        // Loop comparing and incrementing until a unique ID is reserved.
+    }
 }
 
 Result Backend::Initialize(const RendererConfiguration& configuration)
 {
-	// Initialize device
-	const Result deviceResult = m_device.Initialize(configuration);
+    // Initialize device
+    const Result deviceResult = m_device.Initialize(configuration);
 
-	if (!deviceResult.IsSuccess())
-	{
-		return deviceResult;
-	}
+    if (!deviceResult.IsSuccess())
+    {
+        return deviceResult;
+    }
 
-	// Initialize command queue
-	const Result commandQueueResult = m_graphicsQueue.Initialize(
-		m_device.GetNativeDevice(),
-		D3D12_COMMAND_LIST_TYPE_DIRECT);
+    // Initialize command queue
+    const Result commandQueueResult =
+        m_graphicsQueue.Initialize(m_device.GetNativeDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-	if (!commandQueueResult.IsSuccess())
-	{
-		m_device.Finalize();
-		return commandQueueResult;
-	}
+    if (!commandQueueResult.IsSuccess())
+    {
+        m_device.Finalize();
+        return commandQueueResult;
+    }
 
-	// Initialize command context
-	const Result commandContextResult = m_graphicsContext.Initialize(
-		m_device.GetNativeDevice(),
-		D3D12_COMMAND_LIST_TYPE_DIRECT);
+    // Initialize command context
+    const Result commandContextResult =
+        m_graphicsContext.Initialize(m_device.GetNativeDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-	if (!commandContextResult.IsSuccess())
-	{
-		Finalize();
-		return commandContextResult;
-	}
+    if (!commandContextResult.IsSuccess())
+    {
+        Finalize();
+        return commandContextResult;
+    }
 
-	// Initialize frame resources
-	const Result frameResult = m_frameResources.Initialize(
-		&m_device,
-		1024 * 1024,	// 1 MB for constants
-		1024,			// 1024 descriptors
-		4096);			// Retain up to 4096 objects
+    // Initialize frame resources
+    const Result frameResult = m_frameResources.Initialize(&m_device,
+                                                           1024 * 1024, // 1 MB for constants
+                                                           1024);       // 1024 descriptors
 
-	if (!frameResult.IsSuccess())
-	{
-		Finalize();
-		return frameResult;
-	}
+    if (!frameResult.IsSuccess())
+    {
+        Finalize();
+        return frameResult;
+    }
 
-	return {};
+    return {};
 }
 
 void Backend::Finalize() noexcept
 {
-	// Lamda to terminates the application with debug output
-	const auto stopWithoutCleanUp =
-		[](const Result& failure)
-		{
-			OutputDebugStringA(failure.message.c_str());
-			OutputDebugStringA("\n[101Renderer] Unsafe GPU cleanup was stopped.\n");
+    // Lamda to terminates the application with debug output
+    const auto stopWithoutCleanUp = [](const Result& failure)
+    {
+        OutputDebugStringA(failure.message.c_str());
+        OutputDebugStringA("\n[101Renderer] Unsafe GPU cleanup was stopped.\n");
 
-			// Do not unwind through GPU-owning objects.
-			std::terminate();
-		};
+        // Do not unwind through GPU-owning objects.
+        std::terminate();
+    };
 
-	bool deviceLost = false;
+    bool deviceLost = false;
 
-	// Check the status of the device before releasing resources.
-	if (m_device.IsInitialized())
-	{
-		const Result status = m_device.CheckStatus();
+    // Check the status of the device before releasing resources.
+    if (m_device.IsInitialized())
+    {
+        const Result status = m_device.CheckStatus();
 
-		if (!status.IsSuccess())
-		{
-			// Terminate the application when device is not lost despite the failure.
-			if (status.failureKind != FailureKind::DeviceLost)
-			{
-				stopWithoutCleanUp(status);
-			}
+        if (!status.IsSuccess())
+        {
+            // Terminate the application when device is not lost despite the failure.
+            if (status.failureKind != FailureKind::DeviceLost)
+            {
+                stopWithoutCleanUp(status);
+            }
 
-			deviceLost = true;
-		}
-	}
+            deviceLost = true;
+        }
+    }
 
-	// Discard unsubmitted commands before releasing their destinations.
-	if (!m_uploadBatch.IsInFlight())
-	{
-		const Result canceled = m_uploadBatch.Cancel();
+    // Discard unsubmitted commands before releasing their destinations.
+    if (!m_uploadBatch.IsInFlight())
+    {
+        const Result canceled = m_uploadBatch.Cancel();
 
-		if (!canceled.IsSuccess())
-		{
-			stopWithoutCleanUp(canceled);
-		}
-	}
+        if (!canceled.IsSuccess())
+        {
+            stopWithoutCleanUp(canceled);
+        }
+    }
 
-	// Finish the graphics queue to ensure all submitted commands are completed before releasing resources.
-	if (!deviceLost && m_graphicsQueue.IsInitialized())
-	{
-		const Result completed = m_graphicsQueue.Flush();
+    // Finish the graphics queue to ensure all submitted commands are completed before releasing resources.
+    if (!deviceLost && m_graphicsQueue.IsInitialized())
+    {
+        const Result completed = m_graphicsQueue.Flush();
 
-		if (!completed.IsSuccess())
-		{
-			const Result status = m_device.CheckStatus();
+        if (!completed.IsSuccess())
+        {
+            const Result status = m_device.CheckStatus();
 
-			if (!status.IsSuccess() && status.failureKind == FailureKind::DeviceLost)
-			{
-				deviceLost = true;
-			}
-			else
-			{
-				stopWithoutCleanUp(completed);
-			}
-		}
-	}
+            if (!status.IsSuccess() && status.failureKind == FailureKind::DeviceLost)
+            {
+                deviceLost = true;
+            }
+            else
+            {
+                stopWithoutCleanUp(completed);
+            }
+        }
+    }
 
-	// Make sure to finish the upload batch after the GPU completion check.
-	if (m_uploadBatch.IsInFlight())
-	{
-		if (deviceLost)
-		{
-			const Result released = m_uploadBatch.ReleaseAfterDeviceLost();
+    // Make sure to finish the upload batch after the GPU completion check.
+    if (m_uploadBatch.IsInFlight())
+    {
+        if (deviceLost)
+        {
+            const Result released = m_uploadBatch.ReleaseAfterDeviceLost();
 
-			if (!released.IsSuccess())
-			{
-				stopWithoutCleanUp(released);
-			}
-		}
-		else
-		{
-			bool collected = false;
-			const Result result = m_uploadBatch.TryCollect(collected);
+            if (!released.IsSuccess())
+            {
+                stopWithoutCleanUp(released);
+            }
+        }
+        else
+        {
+            bool collected = false;
+            const Result result = m_uploadBatch.TryCollect(collected);
 
-			if (!result.IsSuccess())
-			{
-				stopWithoutCleanUp(result);
-			}
+            if (!result.IsSuccess())
+            {
+                stopWithoutCleanUp(result);
+            }
 
-			if (!collected)
-			{
-				stopWithoutCleanUp({ false, "Finalize: Upload completion was not confirmed." });
-			}
-		}
-	}
+            if (!collected)
+            {
+                stopWithoutCleanUp({false, "Finalize: Upload completion was not confirmed."});
+            }
+        }
+    }
 
-	const Result canceled = m_uploadBatch.Cancel();
+    const Result canceled = m_uploadBatch.Cancel();
 
-	if (!canceled.IsSuccess())
-	{
-		stopWithoutCleanUp(canceled);
-	}
+    if (!canceled.IsSuccess())
+    {
+        stopWithoutCleanUp(canceled);
+    }
 
+    // Releases the components
+    m_windowOutputHandle = {};
 
-	// Releases the components
-	m_windowOutputHandle = {};
+    m_graphicsContext.Finalize();
+    m_frameResources.Finalize();
+    m_frameCommandsNeedDiscard = false;
+    m_frameActive = false;
+    m_frameCompletionUnknown = false;
+    m_frameFence = 0;
 
-	m_graphicsContext.Finalize();
-	m_frameResources.Finalize();
-	m_frameCommandsNeedDiscard = false;
-	m_frameActive = false;
-	m_frameCompletionUnknown = false;
-	m_frameFence = 0;
-
-	m_windowSwapChain.Finalize();
-	m_graphicsQueue.Finalize();
-	m_device.Finalize();
+    m_windowSwapChain.Finalize();
+    m_graphicsQueue.Finalize();
+    m_device.Finalize();
 }
 
 Result Backend::BeginFrameCommands()
 {
-	if (!m_frameActive || m_frameCompletionUnknown || m_frameCommandsNeedDiscard)
-	{
-		return { false, "Frame command recording is unavailable." };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown || m_frameCommandsNeedDiscard)
+    {
+        return {false, "Frame command recording is unavailable."};
+    }
 
-	// Wait for the previous frame's GPU completion.
-	if (m_frameFence != 0)
-	{
-		Result completion = m_graphicsQueue.WaitForFence(m_frameFence);
+    // Wait for the previous frame's GPU completion.
+    if (m_frameFence != 0)
+    {
+        Result completion = m_graphicsQueue.WaitForFence(m_frameFence);
 
-		if (!completion.IsSuccess())
-		{
-			m_frameCompletionUnknown = true;
-			return HandleSubmissionFailure(std::move(completion));
-		}
-	}
-	m_frameCommandsNeedDiscard = true;
+        if (!completion.IsSuccess())
+        {
+            m_frameCompletionUnknown = true;
+            return HandleSubmissionFailure(std::move(completion));
+        }
+    }
 
-	// Begin recording commands for the current frame.
-	return m_graphicsContext.Begin();
+    m_frameCommandsNeedDiscard = true;
+
+    // Begin recording commands for the current frame.
+    return m_graphicsContext.Begin();
 }
 
 QueueSubmissionResult Backend::SubmitFrameCommands()
 {
-	if (!m_frameActive || m_frameCompletionUnknown || !m_frameCommandsNeedDiscard)
-	{
-		return { { false, "Frame submission is unavailable." } };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown || !m_frameCommandsNeedDiscard)
+    {
+        return {{false, "Frame submission is unavailable."}};
+    }
 
-	// Execute the recorded commands for the current frame and signal the fence
-	auto submission = m_graphicsQueue.Execute(m_graphicsContext);
+    // Execute the recorded commands for the current frame and signal the fence
+    auto submission = m_graphicsQueue.Execute(m_graphicsContext);
 
-	// Check execution completion
-	if (submission.executionIssued)
-	{
-		m_frameCommandsNeedDiscard = false;
+    // Check execution completion
+    if (submission.executionIssued)
+    {
+        m_frameCommandsNeedDiscard = false;
 
-		// Check signal completion and fence value validity
-		if (!submission.status.IsSuccess() || submission.fenceValue == 0 ||
-			submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
-		{
-			m_frameCompletionUnknown = true;
+        // Check signal completion and fence value validity
+        if (!submission.status.IsSuccess() || submission.fenceValue == 0 ||
+            submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
+        {
+            m_frameCompletionUnknown = true;
 
-			if (submission.status.IsSuccess())
-			{
-				submission.status = { false, "Frame submission returned no valid fence." };
-			}
+            if (submission.status.IsSuccess())
+            {
+                submission.status = {false, "Frame submission returned no valid fence."};
+            }
 
-			submission.status = HandleSubmissionFailure(std::move(submission.status));
+            submission.status = HandleSubmissionFailure(std::move(submission.status));
 
-			return submission;
-		}
+            return submission;
+        }
 
-		m_frameFence = submission.fenceValue;
-	}
+        m_frameFence = submission.fenceValue;
+    }
 
-	return submission;
+    return submission;
 }
 
 Result Backend::Present(WindowOutputHandle handle)
 {
-	if (!IsWindowOutputValid(handle))
-	{
-		return { false, "Present: Invalid window output handle." };
-	}
+    if (!IsWindowOutputValid(handle))
+    {
+        return {false, "Present: Invalid window output handle."};
+    }
 
-	Result presentResult = m_windowSwapChain.Present(1, 0);
+    Result presentResult = m_windowSwapChain.Present(1, 0);
 
-	if (!presentResult.IsSuccess())
-	{
-		const Result deviceStatus = m_device.CheckStatus();
+    if (!presentResult.IsSuccess())
+    {
+        const Result deviceStatus = m_device.CheckStatus();
 
-		if (!deviceStatus.IsSuccess() && deviceStatus.failureKind == FailureKind::DeviceLost)
-		{
-			presentResult.failureKind = FailureKind::DeviceLost;
-			presentResult.message += "\n";
-			presentResult.message += deviceStatus.message;
+        if (!deviceStatus.IsSuccess() && deviceStatus.failureKind == FailureKind::DeviceLost)
+        {
+            presentResult.failureKind = FailureKind::DeviceLost;
+            presentResult.message += "\n";
+            presentResult.message += deviceStatus.message;
 
-			Finalize();
-			return presentResult;
-		}
-	}
+            Finalize();
+            return presentResult;
+        }
+    }
 
-	// Confirm completion after the presentation call.
-	// Even a failed Present does not justify skipping synchronization.
-	Result completionResult = m_graphicsQueue.Flush();
+    // Confirm completion after the presentation call.
+    // Even a failed Present does not justify skipping synchronization.
+    Result completionResult = m_graphicsQueue.Flush();
 
-	if (!completionResult.IsSuccess())
-	{
-		if (!presentResult.IsSuccess())
-		{
-			completionResult.message =
-				presentResult.message + "\n" + completionResult.message;
-		}
+    if (!completionResult.IsSuccess())
+    {
+        if (!presentResult.IsSuccess())
+        {
+            completionResult.message = presentResult.message + "\n" + completionResult.message;
+        }
 
-		return HandleSubmissionFailure(std::move(completionResult));
-	}
+        return HandleSubmissionFailure(std::move(completionResult));
+    }
 
-	return presentResult;
+    return presentResult;
 }
 
 bool Backend::IsWindowOutputValid(WindowOutputHandle handle) const noexcept
 {
-	return handle.value != 0
-		&& handle.value == m_windowOutputHandle.value
-		&& m_windowSwapChain.IsInitialized();
+    return handle.value != 0 && handle.value == m_windowOutputHandle.value && m_windowSwapChain.IsInitialized();
 }
 
 Result Backend::WaitForFrameCompletion()
 {
-	if (!m_frameActive || m_frameCompletionUnknown)
-	{
-		return { false, "WaitForFrameComletion: active healthy frame required." };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown)
+    {
+        return {false, "WaitForFrameComletion: active healthy frame required."};
+    }
 
-	if (m_frameFence == 0)
-	{
-		// No fence value was recorded.
-		return {};
-	}
+    if (m_frameFence == 0)
+    {
+        // No fence value was recorded.
+        return {};
+    }
 
-	Result result = m_graphicsQueue.WaitForFence(m_frameFence);
+    Result result = m_graphicsQueue.WaitForFence(m_frameFence);
 
-	if (!result.IsSuccess())
-	{
-		m_frameCompletionUnknown = true;
-		return HandleSubmissionFailure(std::move(result));
-	}
+    if (!result.IsSuccess())
+    {
+        m_frameCompletionUnknown = true;
+        return HandleSubmissionFailure(std::move(result));
+    }
 
-	return {};
+    return {};
 }
 
 WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDesc& outputDesc)
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
-	{
-		return { { false, "Backend is not initialized." },{} };
-	}
+    if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+    {
+        return {{false, "Backend is not initialized."}, {}};
+    }
 
-	if (m_windowSwapChain.IsInitialized())
-	{
-		return { { false, "Only one window output is currently supported." },{} };
-	}
+    if (m_windowSwapChain.IsInitialized())
+    {
+        return {{false, "Only one window output is currently supported."}, {}};
+    }
 
-	// Reserve a unique handle for the new window output.
-	const WindowOutputHandle handle = ReserveWindowOutputHandle();
+    // Reserve a unique handle for the new window output.
+    const WindowOutputHandle handle = ReserveWindowOutputHandle();
 
-	if (handle.value == 0)
-	{
-		return { { false, "Window output IDs are exhausted." },{} };
-	}
+    if (handle.value == 0)
+    {
+        return {{false, "Window output IDs are exhausted."}, {}};
+    }
 
-	// Initialize the swap chain for the given window output description.
-	Result result = m_windowSwapChain.Initialize(
-		m_device.GetNativeDevice(),
-		m_device.GetNativeFactory(),
-		m_graphicsQueue.GetNativeCommandQueue(),
-		outputDesc);
+    // Initialize the swap chain for the given window output description.
+    Result result = m_windowSwapChain.Initialize(m_device.GetNativeDevice(), m_device.GetNativeFactory(),
+                                                 m_graphicsQueue.GetNativeCommandQueue(), outputDesc);
 
-	if (!result.IsSuccess())
-	{
-		// The handle is not used if the swap chain initialization fails.
-		return { std::move(result), {} };
-	}
+    if (!result.IsSuccess())
+    {
+        // The handle is not used if the swap chain initialization fails.
+        return {std::move(result), {}};
+    }
 
-	m_windowOutputHandle = handle;
+    m_windowOutputHandle = handle;
 
-	return { {}, handle };
+    return {{}, handle};
 }
 
 // Synchronous replacement boundary, not an additional in-flight-frame mechanism.
@@ -383,433 +371,433 @@ WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDe
 // Collect Upload storage after the Queue is known idle.
 Result Backend::WaitIdle()
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
-	{
-		return detail::Fail("WaitIdle: Backend is not initialized.");
-	}
+    if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+    {
+        return detail::Fail("WaitIdle: Backend is not initialized.");
+    }
 
-	if (m_frameActive || m_frameCompletionUnknown)
-	{
-		return detail::Fail("WaitIdle: output replacement requires an inactive healthy frame.");
-	}
+    if (m_frameActive || m_frameCompletionUnknown)
+    {
+        return detail::Fail("WaitIdle: output replacement requires an inactive healthy frame.");
+    }
 
-	if (m_uploadBatch.IsRecording())
-	{
-		return detail::Fail("WaitIdle: unsubmitted uploads are still recording.");
-	}
+    if (m_uploadBatch.IsRecording())
+    {
+        return detail::Fail("WaitIdle: unsubmitted uploads are still recording.");
+    }
 
-	Result completed = m_graphicsQueue.Flush();
-	if (!completed.IsSuccess())
-	{
-		return HandleSubmissionFailure(std::move(completed));
-	}
+    Result completed = m_graphicsQueue.Flush();
 
-	completed = CollectUploads();
-	if (!completed.IsSuccess())
-	{
-		return completed;
-	}
+    if (!completed.IsSuccess())
+    {
+        return HandleSubmissionFailure(std::move(completed));
+    }
 
-	if (m_uploadBatch.IsInFlight())
-	{
-		Result inconsistent = detail::Fail("WaitIdle: upload completion remained unconfirmed after Flush.");
-		return HandleSubmissionFailure(std::move(inconsistent));
-	}
+    completed = CollectUploads();
 
-	return {};
+    if (!completed.IsSuccess())
+    {
+        return completed;
+    }
+
+    if (m_uploadBatch.IsInFlight())
+    {
+        Result inconsistent = detail::Fail("WaitIdle: upload completion remained unconfirmed after Flush.");
+        return HandleSubmissionFailure(std::move(inconsistent));
+    }
+
+    return {};
 }
 
 // Keep Window identity separate from BackBuffer readiness.
 // Finalize the old graphics context before DXGI releases buffers, because recorded lists can retain references.
 // Re-check device removal after a failure so DeviceLost is not mistaken for an ordinary retry.
-Result Backend::ResizeWindowOutput(
-	WindowOutputHandle handle,
-	std::uint32_t width,
-	std::uint32_t height)
+Result Backend::ResizeWindowOutput(WindowOutputHandle handle, std::uint32_t width, std::uint32_t height)
 {
-	if (!IsWindowOutputValid(handle))
-	{
-		return detail::Fail("ResizeWindowOutput: invalid Window handle.");
-	}
+    if (!IsWindowOutputValid(handle))
+    {
+        return detail::Fail("ResizeWindowOutput: invalid Window handle.");
+    }
 
-	if (width == 0 || height == 0)
-	{
-		return detail::Fail("ResizeWindowOutput: dimensions must be non-zero.");
-	}
+    if (width == 0 || height == 0)
+    {
+        return detail::Fail("ResizeWindowOutput: dimensions must be non-zero.");
+    }
 
-	const bool extentSupported = width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
-		height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
-	if (!extentSupported)
-	{
-		return detail::Fail("ResizeWindowOutput: dimensions exceed the supported 2D limit.");
-	}
+    const bool extentSupported =
+        width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION && height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
 
-	Result completed = WaitIdle();
-	if (!completed.IsSuccess())
-	{
-		return completed;
-	}
+    if (!extentSupported)
+    {
+        return detail::Fail("ResizeWindowOutput: dimensions exceed the supported 2D limit.");
+    }
 
-	// This completed list may still refer to the old back buffers. Recreate lazily
-	// in BeginFrameResources after DXGI releases/replaces its resources.
-	m_graphicsContext.Finalize();
-	Result resized = m_windowSwapChain.Resize(m_device.GetNativeDevice(), width, height);
-	if (!resized.IsSuccess())
-	{
-		const Result deviceStatus = m_device.CheckStatus();
-		if (!deviceStatus.IsSuccess())
-		{
-			return HandleSubmissionFailure(std::move(resized));
-		}
-	}
-	return resized;
+    Result completed = WaitIdle();
+
+    if (!completed.IsSuccess())
+    {
+        return completed;
+    }
+
+    // This completed list may still refer to the old back buffers. Recreate lazily
+    // in BeginFrameResources after DXGI releases/replaces its resources.
+    m_graphicsContext.Finalize();
+    Result resized = m_windowSwapChain.Resize(m_device.GetNativeDevice(), width, height);
+
+    if (!resized.IsSuccess())
+    {
+        const Result deviceStatus = m_device.CheckStatus();
+
+        if (!deviceStatus.IsSuccess())
+        {
+            return HandleSubmissionFailure(std::move(resized));
+        }
+    }
+
+    return resized;
 }
 
-Result Backend::GetWindowOutputSize(
-	WindowOutputHandle handle,
-	std::uint32_t& width,
-	std::uint32_t& height) const
+Result Backend::GetWindowOutputSize(WindowOutputHandle handle, std::uint32_t& width, std::uint32_t& height) const
 {
-	width = 0;
-	height = 0;
-	if (!IsWindowOutputValid(handle))
-	{
-		return detail::Fail("GetWindowOutputSize: invalid Window handle.");
-	}
-	return m_windowSwapChain.GetSize(width, height);
+    width = 0;
+    height = 0;
+
+    if (!IsWindowOutputValid(handle))
+    {
+        return detail::Fail("GetWindowOutputSize: invalid Window handle.");
+    }
+
+    return m_windowSwapChain.GetSize(width, height);
 }
 
 Result Backend::GetCurrentWindowTexture(WindowOutputHandle handle, BackBufferInfo& output) const
 {
-	output = {};
+    output = {};
 
-	if (!m_frameActive || m_frameCompletionUnknown || !IsWindowOutputValid(handle))
-	{
-		return { false, "GetCurrentWindowTexture: Invalid state or window output handle." };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown || !IsWindowOutputValid(handle))
+    {
+        return {false, "GetCurrentWindowTexture: Invalid state or window output handle."};
+    }
 
-	return m_windowSwapChain.GetCurrentTexture(output);
+    return m_windowSwapChain.GetCurrentTexture(output);
 }
 
 Result Backend::QueryTextureInfo(ID3D12Resource* resource, BackBufferInfo& output) const
 {
-	output = {};
+    output = {};
 
-	if (!m_frameActive || m_frameCompletionUnknown)
-	{
-		return { false, "QueryTextureInfo: active healthy frame required." };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown)
+    {
+        return {false, "QueryTextureInfo: active healthy frame required."};
+    }
 
-	Result result = m_windowSwapChain.GetCurrentTexture(output);
+    Result result = m_windowSwapChain.GetCurrentTexture(output);
 
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
+    if (!result.IsSuccess())
+    {
+        return result;
+    }
 
-	if (!resource || output.resource != resource)
-	{
-		return { false, "QueryTextureInfo: resource is not the current window texture." };
-	}
+    if (!resource || output.resource != resource)
+    {
+        return {false, "QueryTextureInfo: resource is not the current window texture."};
+    }
 
-	return {};
+    return {};
 }
 
 void Backend::CommitTextureState(ID3D12Resource* resource, D3D12_RESOURCE_STATES state) noexcept
 {
-	m_windowSwapChain.CommitSubmittedState(resource, state);
+    m_windowSwapChain.CommitSubmittedState(resource, state);
 }
 
 Result Backend::CollectUploads()
 {
-	if (!m_uploadBatch.IsInFlight())
-	{
-		return {};
-	}
+    if (!m_uploadBatch.IsInFlight())
+    {
+        return {};
+    }
 
-	bool collected = false;
-	Result result = m_uploadBatch.TryCollect(collected);
+    bool collected = false;
+    Result result = m_uploadBatch.TryCollect(collected);
 
-	if (!result.IsSuccess())
-	{
-		return HandleSubmissionFailure(std::move(result));
-	}
+    if (!result.IsSuccess())
+    {
+        return HandleSubmissionFailure(std::move(result));
+    }
 
-	return {};
+    return {};
 }
 
 Result Backend::BeginUploads()
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
-	{
-		return { false, "BeginUploads: Backend is not initialized." };
-	}
+    if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+    {
+        return {false, "BeginUploads: Backend is not initialized."};
+    }
 
-	if (m_uploadBatch.IsRecording())
-	{
-		return { false, "BeginUploads: Upload recording has already begun." };
-	}
+    if (m_uploadBatch.IsRecording())
+    {
+        return {false, "BeginUploads: Upload recording has already begun."};
+    }
 
-	// Collect any completed uploads before starting a new batch.
-	Result result = CollectUploads();
+    // Collect any completed uploads before starting a new batch.
+    Result result = CollectUploads();
 
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
+    if (!result.IsSuccess())
+    {
+        return result;
+    }
 
-	if (m_uploadBatch.IsInFlight())
-	{
-		result = m_graphicsQueue.WaitForFence(m_uploadBatch.GetFenceValue());
+    if (m_uploadBatch.IsInFlight())
+    {
+        result = m_graphicsQueue.WaitForFence(m_uploadBatch.GetFenceValue());
 
-		if (!result.IsSuccess())
-		{
-			return HandleSubmissionFailure(std::move(result));
-		}
+        if (!result.IsSuccess())
+        {
+            return HandleSubmissionFailure(std::move(result));
+        }
 
-		result = CollectUploads();
+        result = CollectUploads();
 
-		if (!result.IsSuccess())
-		{
-			return result;
-		}
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
 
-		if (m_uploadBatch.IsInFlight())
-		{
-			return HandleSubmissionFailure({ false, "BeginUploads: Batch remained in flight after waiting."});
-		}
-	}
+        if (m_uploadBatch.IsInFlight())
+        {
+            return HandleSubmissionFailure({false, "BeginUploads: Batch remained in flight after waiting."});
+        }
+    }
 
-	return m_uploadBatch.Begin(m_device.GetNativeDevice());
+    return m_uploadBatch.Begin(m_device.GetNativeDevice());
 }
 
-QueueSubmissionResult Backend::SubmitUploads()
+QueueSubmissionResult Backend::SubmitUploadsAndWait()
 {
-	auto submission = m_uploadBatch.Submit(m_graphicsQueue);
 
-	if (!submission.status.IsSuccess())
-	{
-		if (submission.executionIssued || submission.status.failureKind != FailureKind::General)
-		{
-			submission.status = HandleSubmissionFailure(submission.status);
-		}
-	}
+    auto submission = m_uploadBatch.Submit(m_graphicsQueue);
 
-	return submission;
+    if (!submission.status.IsSuccess())
+    {
+        if (submission.executionIssued || submission.status.failureKind != FailureKind::General)
+        {
+            submission.status = HandleSubmissionFailure(submission.status);
+        }
+    }
+
+    if (!submission.status.IsSuccess())
+    {
+        return submission;
+    }
+
+    const bool validFence =
+        submission.fenceValue != 0 && submission.fenceValue != (std::numeric_limits<std::uint64_t>::max)();
+
+    if (!submission.executionIssued || !validFence)
+    {
+        Result failure = detail::Fail("Upload submission did not provide a valid fence.");
+        submission.status = HandleSubmissionFailure(std::move(failure));
+        return submission;
+    }
+
+    // All upload sources and destinations remain owned until completion.
+    // This boundary is before BeginFrameResources, never per draw or resource.
+    submission.status = m_graphicsQueue.WaitForFence(submission.fenceValue);
+
+    if (!submission.status.IsSuccess())
+    {
+        submission.status = HandleSubmissionFailure(std::move(submission.status));
+        return submission;
+    }
+
+    submission.status = CollectUploads();
+    return submission;
 }
 
-Result Backend::PrepareGeometry(
-	const detail::GeometryCpuData& cpu,
-	std::unique_ptr<GeometryGpuData>& gpu,
-	std::unique_ptr<GeometryUploadData>& upload)
+Result Backend::PrepareGeometry(const detail::GeometryCpuData& cpu, std::unique_ptr<GeometryGpuData>& gpu,
+                                std::unique_ptr<GeometryUploadData>& upload)
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
-	{
-		return { false, "PrepareGeometry: Backend is not initialized." };
-	}
+    if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+    {
+        return {false, "PrepareGeometry: Backend is not initialized."};
+    }
 
-	Result result = PrepareGeometryUpload(m_device.GetNativeDevice(), cpu, gpu, upload);
+    Result result = PrepareGeometryUpload(m_device.GetNativeDevice(), cpu, gpu, upload);
 
-	if (!result.IsSuccess())
-	{
-		if (result.failureKind != FailureKind::General || !m_device.CheckStatus().IsSuccess())
-		{
-			return HandleSubmissionFailure(std::move(result));
-		}
-	}
+    if (!result.IsSuccess())
+    {
+        if (result.failureKind != FailureKind::General || !m_device.CheckStatus().IsSuccess())
+        {
+            return HandleSubmissionFailure(std::move(result));
+        }
+    }
 
-	return result;
+    return result;
 }
 
-Result Backend::PrepareTexture(
-	const detail::TextureCpuData& cpu,
-	std::unique_ptr<TextureGpuData>& gpu,
-	std::unique_ptr<TextureUploadData>& upload)
+Result Backend::PrepareTexture(const detail::TextureCpuData& cpu, std::unique_ptr<TextureGpuData>& gpu,
+                               std::unique_ptr<TextureUploadData>& upload)
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
-	{
-		return { false, "PrepareTexture: Backend is not initialized." };
-	}
+    if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+    {
+        return {false, "PrepareTexture: Backend is not initialized."};
+    }
 
-	Result result = PrepareTextureUpload(m_device.GetNativeDevice(), cpu, gpu, upload);
+    Result result = PrepareTextureUpload(m_device.GetNativeDevice(), cpu, gpu, upload);
 
-	if (!result.IsSuccess())
-	{
-		if (result.failureKind != FailureKind::General || !m_device.CheckStatus().IsSuccess())
-		{
-			return HandleSubmissionFailure(std::move(result));
-		}
-	}
+    if (!result.IsSuccess())
+    {
+        if (result.failureKind != FailureKind::General || !m_device.CheckStatus().IsSuccess())
+        {
+            return HandleSubmissionFailure(std::move(result));
+        }
+    }
 
-	return result;
+    return result;
 }
 
 // Estimate and grow storage before BeginFrameResources/any address allocation.
 // Changing a buffer or descriptor heap after recording begins would invalidate already-issued GPU addresses.
-Result Backend::EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount, UINT retainedCount)
+Result Backend::EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount)
 {
     if (m_frameActive || m_frameCompletionUnknown)
     {
         return detail::Fail("Frame capacity may change only outside an active Frame.");
     }
-    return m_frameResources.EnsureCapacity(constantBytes, descriptorCount, retainedCount);
+
+    return m_frameResources.EnsureCapacity(constantBytes, descriptorCount);
 }
 
 // Open the existing single-frame linear allocation window after prior use has completed.
 // This does not rotate through a ring or permit multiple simultaneous submitted frames.
 Result Backend::BeginFrameResources()
 {
-	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
-	{
-		return { false, "BeginFrameResources: Backend is not initialized." };
-	}
+    if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
+    {
+        return {false, "BeginFrameResources: Backend is not initialized."};
+    }
 
-	if (m_frameActive)
-	{
-		return { false, "BeginFrameResources: Frame resources are already active." };
-	}
+    if (m_frameActive)
+    {
+        return {false, "BeginFrameResources: Frame resources are already active."};
+    }
 
-	// Graphics context must be initialized before starting frame resources.
-	if (!m_graphicsContext.GetNativeCommandList())
-	{
-		Result initialized = m_graphicsContext.Initialize(
-			m_device.GetNativeDevice(),
-			D3D12_COMMAND_LIST_TYPE_DIRECT);
+    // Graphics context must be initialized before starting frame resources.
+    if (!m_graphicsContext.GetNativeCommandList())
+    {
+        Result initialized = m_graphicsContext.Initialize(m_device.GetNativeDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-		if (!initialized.IsSuccess())
-		{
-			return initialized;
-		}
-	}
+        if (!initialized.IsSuccess())
+        {
+            return initialized;
+        }
+    }
 
-	m_frameActive = true;
-	m_frameFence = 0;	// Begin with no fence value.
-	m_frameCompletionUnknown = false;
-	
-	return {};
+    m_frameActive = true;
+    m_frameFence = 0; // Begin with no fence value.
+    m_frameCompletionUnknown = false;
+
+    return {};
 }
 
 // End CPU allocation/borrowing, then reclaim only after the frame Fence is known complete.
-// Unknown completion must retain the buffers, descriptors and COM references rather than resetting them.
+// Unknown completion must retain the resource owners, buffers and descriptors rather than resetting them.
 Result Backend::EndFrameResources()
 {
-	if (!m_frameActive)
-	{
-		return {};
-	}
+    if (!m_frameActive)
+    {
+        return {};
+    }
 
-	if (m_frameCompletionUnknown)
-	{
-		return { false, "Frame completion is unknown; retain all storage.", FailureKind::GpuCompletionUnknown };
-	}
+    if (m_frameCompletionUnknown)
+    {
+        return {false, "Frame completion is unknown; retain all storage.", FailureKind::GpuCompletionUnknown};
+    }
 
-	// Wait for the GPU to complete the frame's commands.
-	if (m_frameFence != 0)
-	{
-		Result completed = m_graphicsQueue.WaitForFence(m_frameFence);
+    // Wait for the GPU to complete the frame's commands.
+    if (m_frameFence != 0)
+    {
+        Result completed = m_graphicsQueue.WaitForFence(m_frameFence);
 
-		if (!completed.IsSuccess())
-		{
-			m_frameCompletionUnknown = true;
-			return HandleSubmissionFailure(std::move(completed));
-		}
-	}
+        if (!completed.IsSuccess())
+        {
+            m_frameCompletionUnknown = true;
+            return HandleSubmissionFailure(std::move(completed));
+        }
+    }
 
-	const bool recreateContext = m_frameCommandsNeedDiscard;
+    const bool recreateContext = m_frameCommandsNeedDiscard;
 
-	if (recreateContext)
-	{
-		m_graphicsContext.Finalize();
-	}
+    if (recreateContext)
+    {
+        m_graphicsContext.Finalize();
+    }
 
-	m_frameCommandsNeedDiscard = false;
-	m_frameResources.ResetAfterCompletion();
-	m_frameActive = false;
-	m_frameFence = 0;
+    m_frameCommandsNeedDiscard = false;
+    m_frameResources.ResetAfterCompletion();
+    m_frameActive = false;
+    m_frameFence = 0;
 
-	if (recreateContext)
-	{
-		Result initialized = m_graphicsContext.Initialize(
-			m_device.GetNativeDevice(),
-			D3D12_COMMAND_LIST_TYPE_DIRECT);
+    if (recreateContext)
+    {
+        Result initialized = m_graphicsContext.Initialize(m_device.GetNativeDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-		if (!initialized.IsSuccess() && !m_device.CheckStatus().IsSuccess())
-		{
-			return HandleSubmissionFailure(std::move(initialized));
-		}
+        if (!initialized.IsSuccess() && !m_device.CheckStatus().IsSuccess())
+        {
+            return HandleSubmissionFailure(std::move(initialized));
+        }
 
-		return initialized;
-	}
+        return initialized;
+    }
 
-	return {};
-}
-
-Result Backend::QueryCompletedGraphicsFence(std::uint64_t& outValue)
-{
-	Result result = m_graphicsQueue.QueryCompletedFenceValue(outValue);
-
-	// Do not finish without checking the failuer reason.
-	if (!result.IsSuccess())
-	{
-		return HandleSubmissionFailure(std::move(result));
-	}
-
-	return {};
+    return {};
 }
 
 Result Backend::AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output)
 {
-	if (!m_frameActive || m_frameCompletionUnknown)
-	{
-		return { false, "Constant allocation requires an active healthy frame." };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown)
+    {
+        return {false, "Constant allocation requires an active healthy frame."};
+    }
 
-	return m_frameResources.AllocateConstants(data, output);
+    return m_frameResources.AllocateConstants(data, output);
 }
 
 Result Backend::CopyFrameDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output)
 {
-	if (!m_frameActive || m_frameCompletionUnknown)
-	{
-		return { false, "Descriptor allocation requires an active healthy frame." };
-	}
+    if (!m_frameActive || m_frameCompletionUnknown)
+    {
+        return {false, "Descriptor allocation requires an active healthy frame."};
+    }
 
-	return m_frameResources.CopyDescriptor(source, output);
-}
-
-Result Backend::KeepFrameObjectAlive(IUnknown* object)
-{
-	if (!m_frameActive || m_frameCompletionUnknown)
-	{
-		return { false, "Object retention requires an active healthy frame." };
-	}
-
-	return m_frameResources.KeepAlive(object);
+    return m_frameResources.CopyDescriptor(source, output);
 }
 
 Result Backend::HandleSubmissionFailure(Result failure)
 {
-	const Result deviceStatus = m_device.CheckStatus();
+    const Result deviceStatus = m_device.CheckStatus();
 
-	if (!deviceStatus.IsSuccess() && deviceStatus.failureKind == FailureKind::DeviceLost)
-	{// In case of the device lost.
-		failure.failureKind = FailureKind::DeviceLost;
-		failure.message += "\n";
-		failure.message += deviceStatus.message;
+    if (!deviceStatus.IsSuccess() && deviceStatus.failureKind == FailureKind::DeviceLost)
+    { // In case of the device lost.
+        failure.failureKind = FailureKind::DeviceLost;
+        failure.message += "\n";
+        failure.message += deviceStatus.message;
 
-		// Finalize the backend to clean up resources without waiting for GPU completion.
-		Finalize();
-		return failure;
-	}
+        // Finalize the backend to clean up resources without waiting for GPU completion.
+        Finalize();
+        return failure;
+    }
 
-	// It is impossible to confirm the GPU completion.
-	failure.failureKind = FailureKind::GpuCompletionUnknown;
-	failure.message += "\nGPU completion could not be confirmed.";
+    // It is impossible to confirm the GPU completion.
+    failure.failureKind = FailureKind::GpuCompletionUnknown;
+    failure.message += "\nGPU completion could not be confirmed.";
 
-	// Return the failure result without finalizing the backend to avoid potential crashes.
-	// User application must handle this situation by the abnormal termination of the application.
-	// It's also required to skip the destructor of the backend.
-	return failure;
+    // Return the failure result without finalizing the backend to avoid potential crashes.
+    // User application must handle this situation by the abnormal termination of the application.
+    // It's also required to skip the destructor of the backend.
+    return failure;
 }
 
-}
+} // namespace rendering::backend

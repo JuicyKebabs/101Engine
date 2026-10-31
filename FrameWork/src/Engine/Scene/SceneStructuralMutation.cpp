@@ -103,7 +103,11 @@ bool SceneBase::CanAddComponent(const Actor* actor, std::type_index type) const
 
 	if (type == typeid(Canvas))
 	{
-		return CanApplyUIHierarchy(actor, FindClosestCanvas(actor->GetParent()), actor, CanvasRenderMode::ScreenSpace);
+		return CanApplyUIHierarchy(
+			actor,
+			FindClosestCanvas(actor->GetParent()),
+			actor,
+			CanvasRenderMode::ScreenSpace);
 	}
 
 	return true;
@@ -142,7 +146,11 @@ bool SceneBase::CanRemoveComponent(const Actor* actor, const Component* componen
 
 	if (dynamic_cast<const Canvas*>(component))
 	{
-		return CanApplyUIHierarchy(actor, FindClosestCanvas(actor->GetParent()), actor, std::nullopt);
+		return CanApplyUIHierarchy(
+			actor,
+			FindClosestCanvas(actor->GetParent()),
+			actor,
+			std::nullopt);
 	}
 
 	return true;
@@ -178,6 +186,7 @@ bool SceneBase::RemoveActorComponent(Actor* actor, Component* component)
 	StructuralMutationScope mutationScope(this);
 	const bool removesCanvas = dynamic_cast<Canvas*>(component) != nullptr;
 	component->m_destroyed = true;
+
 	// Pending hierarchy components are absent from queries immediately. Recompute
 	// derived state now so later mutations never observe a half-removed Canvas.
 	if (removesCanvas && !ApplyUIHierarchyConstraints(actor, FindClosestCanvas(actor->GetParent())))
@@ -268,6 +277,7 @@ bool SceneBase::CanApplyUIHierarchy(
 {
 	std::vector<std::pair<const Actor*, std::optional<CanvasRenderMode>>> pending{
 		{ root, governingCanvas ? std::optional(governingCanvas->GetRenderMode()) : std::nullopt } };
+
 	while (!pending.empty())
 	{
 		auto [actor, inherited] = pending.back();
@@ -310,6 +320,7 @@ bool SceneBase::CanApplyUIHierarchy(
 			pending.emplace_back(ResolveActor(handle), effective ? effective : inherited);
 		}
 	}
+
 	return true;
 }
 
@@ -317,6 +328,7 @@ bool SceneBase::CanCaptureOrdinarySubtree(const Actor* root) const
 {
 	std::vector<const Actor*> pending{ root };
 	std::unordered_set<ActorHandle> visited;
+
 	while (!pending.empty())
 	{
 		const Actor* actor = pending.back();
@@ -343,6 +355,7 @@ bool SceneBase::CanCaptureOrdinarySubtree(const Actor* root) const
 			pending.push_back(ResolveActor(handle));
 		}
 	}
+
 	return true;
 }
 
@@ -524,6 +537,7 @@ bool SceneBase::CanDestroy(const Actor* root, bool cascade) const
 
 	std::vector<const Actor*> pending{ root };
 	std::unordered_set<ActorHandle> visited;
+
 	while (!pending.empty())
 	{
 		const Actor* actor = pending.back();
@@ -585,6 +599,7 @@ bool SceneBase::CanDestroy(const Actor* root, bool cascade) const
 			}
 		}
 	}
+
 	return true;
 }
 
@@ -605,6 +620,7 @@ bool SceneBase::RemoveActor(Actor* root, bool cascade)
 	std::vector<Actor*> ordinary;
 	std::vector<ActorHandle> instances;
 	std::vector<Actor*> pending{ root };
+
 	while (!pending.empty())
 	{
 		Actor* actor = pending.back();
@@ -629,6 +645,7 @@ bool SceneBase::RemoveActor(Actor* root, bool cascade)
 			}
 		}
 	}
+
 	StructuralMutationScope mutationScope(this);
 
 	for (auto instance : instances)

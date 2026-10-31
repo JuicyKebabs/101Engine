@@ -157,15 +157,18 @@ void EditorCameraController::Focus(
 {
     CameraPose pose = camera.GetCameraPose();
     const CameraLens lens = camera.GetCameraLens();
+
     const float aspect = lens.height > 0.0f ? lens.width / lens.height : 1.0f;
     const float verticalHalfFov = lens.fov * 0.5f;
     const float horizontalHalfFov = std::atan(std::tan(verticalHalfFov) * aspect);
     const float limitingHalfFov = std::min(verticalHalfFov, horizontalHalfFov);
+
     const float safeRadius = std::max(0.0f, bounds.radius);
     const float fitDistance = safeRadius > 0.0f
         ? safeRadius / std::max(std::sin(limitingHalfFov), 0.001f) * padding
         : minimumDistance;
     const float distance = std::max(minimumDistance, fitDistance);
+
     const Vector3 forward = pose.rotation.RotateVector3(Vector3::Forward()).Normalized();
 
     pivot = bounds.center;

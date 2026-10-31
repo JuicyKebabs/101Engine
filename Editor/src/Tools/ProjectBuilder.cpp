@@ -23,7 +23,8 @@ static std::string GetVSInstallPath()
 {
     FILE* pipe = _popen(
         "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\""
-        " -latest -version \"[18.0,19.0)\" -property installationPath 2>NUL", "r");
+        " -latest -version \"[18.0,19.0)\" -property installationPath 2>NUL",
+        "r");
 
     if (!pipe)
     {
@@ -114,8 +115,10 @@ bool ProjectBuilder::Build(const std::string& target, const std::string& config,
     bat.close();
 
 	// Run the batch file and check the result
-    DBG("ProjectBuilder: Building target '%s' (%s)%s via batch file...",
-        target.c_str(), config.c_str(),
+    DBG(
+        "ProjectBuilder: Building target '%s' (%s)%s via batch file...",
+        target.c_str(),
+        config.c_str(),
         buildDependencies ? "" : " (skip deps)");
     int result = system(batPath.c_str());
 
@@ -240,8 +243,10 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		// Compile all .cpp files into .obj files
         // Genarate obj files by giving all .cpp files to cl.exe.
         bat << "echo [HotReload] Compiling " << (int)sources.size() << " files...\n";
+
         bat << "cl.exe /nologo " << hotReloadConfig->compilerFlags
 			<< " /Z7 /EHsc /std:c++latest /DNOMINMAX /c";
+
         bat << " /I\"" << gameCodeDir << "\"";
         bat << " /I\"" << frameworkInc << "\"";
         bat << " /I\"" << thirdPartyInc << "\"";
@@ -250,6 +255,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
         bat << " /I\"" << assimpInc << "\"";
         bat << " /I\"" << imguiInc << "\"";
         bat << " /I\"" << imguiBackendInc << "\"";
+
         bat << " /Fo\"" << objDir << "\\\\\"";
 
         for (const auto& src : sources)
@@ -286,8 +292,10 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
     }
 
 	// Run the batch file to compile and link GameCode for hot reload
-    DBG("ProjectBuilder: Hot reload build (%s, %d files) via cl.exe...",
-		hotReloadConfig->configuration.c_str(), (int)sources.size());
+    DBG(
+        "ProjectBuilder: Hot reload build (%s, %d files) via cl.exe...",
+        hotReloadConfig->configuration.c_str(),
+        (int)sources.size());
     int result = system(batPath.c_str());
 
 	// Check if hot reload is succeeded or failed

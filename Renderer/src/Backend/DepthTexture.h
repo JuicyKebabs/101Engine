@@ -8,7 +8,11 @@ namespace rendering::backend
 class DepthTexture
 {
 public:
-	Result Ensure(ID3D12Device* device, UINT width, UINT height, bool allowSampling = false);
+	Result Ensure(
+		ID3D12Device* device,
+		UINT width,
+		UINT height,
+		bool allowSampling = false);
 	ID3D12Resource* Resource() const noexcept
 	{
 		return m_resource.Get();

@@ -226,7 +226,10 @@ void SceneManager::ChangeScene(SceneElement& element)
 
 		if (!load)
 		{
-			DBG("SceneManager: Failed to load scene from '%s' at '%s': %s", path.c_str(), load.error.path.c_str(),
+			DBG(
+				"SceneManager: Failed to load scene from '%s' at '%s': %s",
+				path.c_str(),
+				load.error.path.c_str(),
 				load.error.message.c_str());
 			ClearReservation();
 			return;
@@ -267,6 +270,7 @@ void SceneManager::ChangeScene(SceneElement& element)
 	{
         previousCurrent->m_deferAssetRelease = true;
         previousCurrent->Finalize();
+
         for (auto& previousElement : m_sceneElements)
         {
             if (previousElement.pSceneBase.get() == previousCurrent)

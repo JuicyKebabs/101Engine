@@ -47,15 +47,18 @@ public:
 		m_template = desc.renderTemplate;
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
+
 		SetUVScale(desc.uvScale);
 		SetUVOffset(desc.uvOffset);
 		SetPivot(desc.pivot);
 		SetBillboardType(desc.billboardType);
 		SetFlipX(desc.flipX);
 		SetFlipY(desc.flipY);
+
 		SetColor(desc.color);
 		SetVisible(desc.visible);
 		SetName(desc.name);
+
 		m_isProxyDirty = true;
         m_materialDirty = true;
 	}

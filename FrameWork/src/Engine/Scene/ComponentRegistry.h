@@ -80,7 +80,13 @@ public:
 		std::type_index typeId,
 		std::unique_ptr<TypeMetadata> metadata)
 	{
-		Register(name, factory, typeId, ComponentCardinality::Multiple, ComponentFamily::None, std::move(metadata));
+		Register(
+			name,
+			factory,
+			typeId,
+			ComponentCardinality::Multiple,
+			ComponentFamily::None,
+			std::move(metadata));
 		m_gameComponentNames.insert(name);
 		DBG("ComponentRegistry: REGISTERED GameCode component '%s'", name.c_str());
 	}
@@ -192,7 +198,9 @@ public:
 
 		if (!actor->CanAddComponent(entry.typeId))
 		{
-			DBG("ComponentRegistry: Component '%s' cannot be added to Actor '%s'.", name.c_str(),
+			DBG(
+				"ComponentRegistry: Component '%s' cannot be added to Actor '%s'.",
+				name.c_str(),
 				actor->GetName().c_str());
 			return false;
 		}

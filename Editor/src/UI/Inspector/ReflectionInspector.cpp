@@ -83,7 +83,9 @@ namespace
 
 		const NumericEditorMetadata& numeric = *inspector->numeric;
 		float displayValue = ConvertUnit(
-			storedValue, numeric.storageUnit, numeric.displayUnit);
+			storedValue,
+			numeric.storageUnit,
+			numeric.displayUnit);
 
 		float minimum = 0.0f;
 
@@ -99,7 +101,12 @@ namespace
 			maximum = static_cast<float>(*numeric.maximum);
 		}
 
-		const bool changed = ImGui::DragFloat(label, &displayValue, numeric.dragSpeed, minimum, maximum);
+		const bool changed = ImGui::DragFloat(
+			label,
+			&displayValue,
+			numeric.dragSpeed,
+			minimum,
+			maximum);
 
 		if (!changed)
 		{
@@ -107,7 +114,9 @@ namespace
 		}
 
 		storedValue = ConvertUnit(
-			displayValue, numeric.displayUnit, numeric.storageUnit);
+			displayValue,
+			numeric.displayUnit,
+			numeric.storageUnit);
 		return true;
 	}
 
@@ -143,49 +152,79 @@ namespace
 		const InspectorMetadata* inspector = property.GetInspectorMetadata();
 
 		DisabledScope disabled(!row.editable);
+
 		switch (row.editor)
 		{
 		case PropertyEditorKind::Bool:
-			DrawValue<bool>(result.value, result.changed,
+			DrawValue<bool>(
+				result.value,
+				result.changed,
 				[label](bool& value) { return ImGui::Checkbox(label, &value); });
 			break;
+
 		case PropertyEditorKind::SignedInteger:
-			DrawValue<std::int64_t>(result.value, result.changed,
+			DrawValue<std::int64_t>(
+				result.value,
+				result.changed,
 				[label](std::int64_t& value) { return ImGui::InputScalar(label, ImGuiDataType_S64, &value); });
 			break;
+
 		case PropertyEditorKind::UnsignedInteger:
-			DrawValue<std::uint64_t>(result.value, result.changed,
+			DrawValue<std::uint64_t>(
+				result.value,
+				result.changed,
 				[label](std::uint64_t& value) { return ImGui::InputScalar(label, ImGuiDataType_U64, &value); });
 			break;
+
 		case PropertyEditorKind::Float:
-			DrawValue<float>(result.value, result.changed,
+			DrawValue<float>(
+				result.value,
+				result.changed,
 				[label, inspector](float& value)
 				{
 					return DrawFloatEditor(label, value, inspector);
 				});
 			break;
+
 		case PropertyEditorKind::Double:
-			DrawValue<double>(result.value, result.changed,
+			DrawValue<double>(
+				result.value,
+				result.changed,
 				[label](double& value) { return ImGui::InputDouble(label, &value); });
 			break;
+
 		case PropertyEditorKind::String:
-			DrawValue<std::string>(result.value, result.changed,
+			DrawValue<std::string>(
+				result.value,
+				result.changed,
 				[label](std::string& value) { return ImGui::InputText(label, &value); });
 			break;
+
 		case PropertyEditorKind::Vector2:
-			DrawValue<Vector2>(result.value, result.changed,
+			DrawValue<Vector2>(
+				result.value,
+				result.changed,
 				[label](Vector2& value) { return ImGui::DragFloat2(label, &value.x, 0.05f); });
 			break;
+
 		case PropertyEditorKind::Vector3:
-			DrawValue<Vector3>(result.value, result.changed,
+			DrawValue<Vector3>(
+				result.value,
+				result.changed,
 				[label](Vector3& value) { return ImGui::DragFloat3(label, &value.x, 0.05f); });
 			break;
+
 		case PropertyEditorKind::Vector4:
-			DrawValue<Vector4>(result.value, result.changed,
+			DrawValue<Vector4>(
+				result.value,
+				result.changed,
 				[label](Vector4& value) { return ImGui::DragFloat4(label, &value.x, 0.05f); });
 			break;
+
 		case PropertyEditorKind::Color:
-			DrawValue<Vector4>(result.value, result.changed,
+			DrawValue<Vector4>(
+				result.value,
+				result.changed,
 				[label](Vector4& value)
                 {
                     Vector4 displayColor = EngineRendering::LinearToSrgb(value);
@@ -252,7 +291,11 @@ namespace
 				if (ActorReference* value = std::get_if<ActorReference>(&result.value))
 				{
 					ActorReference selected;
-					result.changed = services.drawActorReference(label, property, *value, selected);
+					result.changed = services.drawActorReference(
+						label,
+						property,
+						*value,
+						selected);
 
 					if (result.changed)
 					{
@@ -272,7 +315,11 @@ namespace
 				if (AssetReferenceValue* value = std::get_if<AssetReferenceValue>(&result.value))
 				{
 					AssetReferenceValue selected;
-					result.changed = services.drawAssetReference(label, property, *value, selected);
+					result.changed = services.drawAssetReference(
+						label,
+						property,
+						*value,
+						selected);
 
 					if (result.changed)
 					{
@@ -393,23 +440,44 @@ bool ReflectionInspector::Draw(
 			continue;
 		}
 
-		if (edit.began && !Matches(metadata, objectType, object, *row.property))
+		if (edit.began && !Matches(
+			metadata,
+			objectType,
+			object,
+			*row.property))
 		{
-			BeginEdit(metadata, objectType, object, *row.property, current, callbacks);
+			BeginEdit(
+				metadata,
+				objectType,
+				object,
+				*row.property,
+				current,
+				callbacks);
 		}
 
 		bool previewSucceeded = true;
 
 		if (edit.changed)
 		{
-			previewSucceeded = PreviewEdit(metadata, objectType, object, *row.property, edit.value, callbacks);
+			previewSucceeded = PreviewEdit(
+				metadata,
+				objectType,
+				object,
+				*row.property,
+				edit.value,
+				callbacks);
 		}
 
 		if (!previewSucceeded)
 		{
 			succeeded = false;
 			DBG("Reflected property edit failed.");
-			const bool restored = CancelEdit(metadata, objectType, object, *row.property, callbacks);
+			const bool restored = CancelEdit(
+				metadata,
+				objectType,
+				object,
+				*row.property,
+				callbacks);
 
 			if (!restored)
 			{
@@ -422,7 +490,12 @@ bool ReflectionInspector::Draw(
 
 		if (edit.canceled)
 		{
-			const bool restored = CancelEdit(metadata, objectType, object, *row.property, callbacks);
+			const bool restored = CancelEdit(
+				metadata,
+				objectType,
+				object,
+				*row.property,
+				callbacks);
 
 			if (!restored)
 			{
@@ -432,7 +505,13 @@ bool ReflectionInspector::Draw(
 		}
 		else if (edit.committed)
 		{
-			const bool committed = CommitEdit(metadata, objectType, object, *row.property, edit.value, callbacks);
+			const bool committed = CommitEdit(
+				metadata,
+				objectType,
+				object,
+				*row.property,
+				edit.value,
+				callbacks);
 
 			if (!committed)
 			{
@@ -440,7 +519,11 @@ bool ReflectionInspector::Draw(
 				DBG("Reflected property transaction could not be completed.");
 			}
 		}
-		else if (edit.endedWithoutChange && Matches(metadata, objectType, object, *row.property))
+		else if (edit.endedWithoutChange && Matches(
+			metadata,
+			objectType,
+			object,
+			*row.property))
 		{
 			// Activation reserves the original value even for a plain click. A
 			// widget that ends without editing has no preview to restore and no
@@ -466,7 +549,11 @@ bool ReflectionInspector::BeginEdit(
 		return false;
 	}
 
-	const bool conflictsWithActiveEdit = m_transaction && !Matches(metadata, objectType, object, property);
+	const bool conflictsWithActiveEdit = m_transaction && !Matches(
+		metadata,
+		objectType,
+		object,
+		property);
 
 	if (conflictsWithActiveEdit)
 	{
@@ -494,12 +581,20 @@ bool ReflectionInspector::PreviewEdit(
 	const PropertyValue& value,
 	const ReflectionInspectorCallbacks&)
 {
-	if (!Matches(metadata, objectType, object, property))
+	if (!Matches(
+		metadata,
+		objectType,
+		object,
+		property))
 	{
 		return false;
 	}
 
-	return metadata.TryWriteProperty(objectType, object, property, value);
+	return metadata.TryWriteProperty(
+		objectType,
+		object,
+		property,
+		value);
 }
 
 bool ReflectionInspector::CommitEdit(
@@ -510,7 +605,11 @@ bool ReflectionInspector::CommitEdit(
 	const PropertyValue& after,
 	const ReflectionInspectorCallbacks& callbacks)
 {
-	if (!Matches(metadata, objectType, object, property))
+	if (!Matches(
+		metadata,
+		objectType,
+		object,
+		property))
 	{
 		return false;
 	}
@@ -535,7 +634,11 @@ bool ReflectionInspector::CancelEdit(
 	const PropertyMetadata& property,
 	const ReflectionInspectorCallbacks& callbacks)
 {
-	if (!Matches(metadata, objectType, object, property))
+	if (!Matches(
+		metadata,
+		objectType,
+		object,
+		property))
 	{
 		return false;
 	}

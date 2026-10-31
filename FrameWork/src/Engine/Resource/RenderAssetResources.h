@@ -18,8 +18,15 @@ public:
     rendering::TextureHandle White() const noexcept { return m_white; }
     rendering::PipelineHandle MeshPipeline(bool screen) const noexcept;
     rendering::PipelineHandle TexturedPipeline(bool screen) const noexcept;
-    rendering::MaterialDesc MakeMaterial(bool mesh, bool screen, rendering::TextureHandle texture,
-        const Vector2& uvScale, const Vector2& uvOffset, const Vector2& pivot, bool flipX, bool flipY) const;
+    rendering::MaterialDesc MakeMaterial(
+        bool mesh,
+        bool screen,
+        rendering::TextureHandle texture,
+        const Vector2& uvScale,
+        const Vector2& uvOffset,
+        const Vector2& pivot,
+        bool flipX,
+        bool flipY) const;
 
 private:
     rendering::Renderer* m_renderer = nullptr;

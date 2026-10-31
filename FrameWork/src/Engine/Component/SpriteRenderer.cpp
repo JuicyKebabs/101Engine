@@ -97,11 +97,13 @@ bool SpriteRenderer::SetTextureAsset(const Guid& assetId)
 // Resource registration belongs to preparation/explicit edits, not OnAttach.
 // Each Sprite's Material owns its UV and local-Quad values independently.
 AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
-    const Guid& assetId, PreparedTextureAssetState& output) const
+    const Guid& assetId,
+    PreparedTextureAssetState& output) const
 {
     PreparedTextureAssetState prepared;
     prepared.assetId = assetId;
     prepared.renderTemplate.billboardType = m_billboardType;
+
     if (!assetId.IsValid())
     {
         output = std::move(prepared);
@@ -111,12 +113,14 @@ AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
     Actor* actor = GetOwner();
     SceneBase* scene = actor ? actor->GetOwner() : nullptr;
     const EngineContext* context = GetEngineContext();
+
     if (!scene || !context || !context->pAssetManager)
     {
         return AssetPrepareResult::Failed;
     }
 
     const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
+
     if (entry && entry->type != AssetType::Texture)
     {
         return AssetPrepareResult::Failed;
@@ -126,10 +130,18 @@ AssetPrepareResult SpriteRenderer::PrepareTextureAssetState(
     auto& material = prepared.renderTemplate.materialDesc;
     material.textureHandle = context->pAssetManager->GetTextureHandle(*scene, assetId);
     material.screen = GetRenderSpace() == RenderSpace::Screen;
+
     if (context->pRenderAssets)
     {
-        material.description = context->pRenderAssets->MakeMaterial(false, material.screen,
-            material.textureHandle, m_uvScale, m_uvOffset, m_pivot, m_flipX, m_flipY);
+        material.description = context->pRenderAssets->MakeMaterial(
+            false,
+            material.screen,
+            material.textureHandle,
+            m_uvScale,
+            m_uvOffset,
+            m_pivot,
+            m_flipX,
+            m_flipY);
         material.handle = context->pAssetManager->RegisterSceneMaterial(*scene, material.description);
     }
 
@@ -267,6 +279,7 @@ bool SpriteRenderer::SetPendingTextureAssetReference(const AssetReference<Textur
 bool SpriteRenderer::TrySetTextureAssetReference(const AssetReference<TextureAsset>& value)
 {
 	Actor* owner = GetOwner();
+
 	// Deserialization produces unresolved references; the AssetPicker marks its
 	// catalog-validated live selections as resolved.
 	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
@@ -289,6 +302,7 @@ bool SpriteRenderer::TrySetTextureAssetReference(const AssetReference<TextureAss
 bool SpriteRenderer::SynchronizeRenderResources()
 {
     const EngineContext* context = GetEngineContext();
+
     if (!context || !context->pRenderer || !context->pRenderAssets)
     {
         return true;
@@ -296,6 +310,7 @@ bool SpriteRenderer::SynchronizeRenderResources()
 
     auto& material = m_template.materialDesc;
     const bool screen = GetRenderSpace() == RenderSpace::Screen;
+
     if (!m_materialDirty && material.screen == screen)
     {
         return true;
@@ -307,9 +322,17 @@ bool SpriteRenderer::SynchronizeRenderResources()
         return true; // Keep the diagnosed Renderer Material fallback; do not re-register every Frame.
     }
 
-    auto description = context->pRenderAssets->MakeMaterial(false, screen, material.textureHandle,
-        m_uvScale, m_uvOffset, m_pivot, m_flipX, m_flipY);
+    auto description = context->pRenderAssets->MakeMaterial(
+        false,
+        screen,
+        material.textureHandle,
+        m_uvScale,
+        m_uvOffset,
+        m_pivot,
+        m_flipX,
+        m_flipY);
     const auto updated = context->pRenderer->UpdateMaterial(material.handle, description);
+
     if (!updated.IsSuccess())
     {
         DBG("Sprite Material update: %s", updated.message.c_str());

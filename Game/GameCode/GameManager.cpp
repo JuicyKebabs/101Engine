@@ -19,10 +19,14 @@ namespace
 		return true;
 	}
 
-	void SetUIImageVisible(SceneBase& scene, const ActorReference& reference,
-		bool visible, const char* name)
+	void SetUIImageVisible(
+		SceneBase& scene,
+		const ActorReference& reference,
+		bool visible,
+		const char* name)
 	{
 		Actor* actor = reference.Resolve(scene);
+
 		if (!actor)
 		{
 			DBG("GameManager: %s is not found.", name);
@@ -30,6 +34,7 @@ namespace
 		}
 
 		UIImage* image = actor->GetComponentByClass<UIImage>();
+
 		if (!image)
 		{
 			DBG("GameManager: %s has no UIImage.", name);
@@ -76,6 +81,7 @@ void GameManager::Start()
 		if (actor)
 		{
 			player = actor->GetComponentByClass<Player>();
+
 			if (player)
 			{
 				break;
@@ -123,9 +129,21 @@ void GameManager::Start()
 		DBG("GameManager: resultUIActor is not found.");
 	}
 
-	SetUIImageVisible(*scene, m_clearImageActor, false, "clearImageActor");
-	SetUIImageVisible(*scene, m_failedImageActor, false, "failedImageActor");
-	SetUIImageVisible(*scene, m_titlePromptImageActor, false, "titlePromptImageActor");
+	SetUIImageVisible(
+		*scene,
+		m_clearImageActor,
+		false,
+		"clearImageActor");
+	SetUIImageVisible(
+		*scene,
+		m_failedImageActor,
+		false,
+		"failedImageActor");
+	SetUIImageVisible(
+		*scene,
+		m_titlePromptImageActor,
+		false,
+		"titlePromptImageActor");
 }
 
 void GameManager::PreUpdate() {}
@@ -140,7 +158,9 @@ void GameManager::Update()
 		if (inputInfo.mouse.left.trigger)
 		{
 			m_player->SetCanMove(true);
+
 			auto tutorialUIActorPtr = m_tutorialUIActor.Resolve(*GetOwner()->GetOwner());
+
 			if (tutorialUIActorPtr)
 			{
 				if (!SetUICanvasVisible(*tutorialUIActorPtr, false))
@@ -150,6 +170,7 @@ void GameManager::Update()
 			{
 				DBG("GameManager: tutorialUIActor is not found.");
 			}
+
 			m_gameState = GameState::Playing;
 		}
 
@@ -167,11 +188,24 @@ void GameManager::Update()
 				? GameResult::Win : GameResult::Lose;
 			const bool won = result == GameResult::Win;
 
-			SetUIImageVisible(scene, m_clearImageActor, won, "clearImageActor");
-			SetUIImageVisible(scene, m_failedImageActor, !won, "failedImageActor");
-			SetUIImageVisible(scene, m_titlePromptImageActor, true, "titlePromptImageActor");
+			SetUIImageVisible(
+				scene,
+				m_clearImageActor,
+				won,
+				"clearImageActor");
+			SetUIImageVisible(
+				scene,
+				m_failedImageActor,
+				!won,
+				"failedImageActor");
+			SetUIImageVisible(
+				scene,
+				m_titlePromptImageActor,
+				true,
+				"titlePromptImageActor");
 
 			auto timerUIActorPtr = m_timerUIActor.Resolve(scene);
+
 			if (timerUIActorPtr)
 			{
 				if (!SetUICanvasVisible(*timerUIActorPtr, won))
@@ -183,6 +217,7 @@ void GameManager::Update()
 			}
 
 			auto resultUIActorPtr = m_resultUIActor.Resolve(scene);
+
 			if (resultUIActorPtr)
 			{
 				if (!SetUICanvasVisible(*resultUIActorPtr, true))
@@ -202,11 +237,13 @@ void GameManager::Update()
         if (inputInfo.mouse.left.trigger)
         {
 			auto guid = m_nextScene.GetGuid();
+
 			if (!guid.IsValid())
 			{
 				DBG("GameManager: nextScene AssetReference is invalid.");
 				return;
 			}
+
 			ChangeScene(guid);
         }
 

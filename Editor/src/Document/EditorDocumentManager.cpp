@@ -155,10 +155,13 @@ bool EditorDocumentManager::HasOpenSourceAsset(const Guid& assetGuid) const
 		return false;
 	}
 
-	return std::any_of(m_documents.begin(), m_documents.end(), [&](const Entry& entry)
-	{
-		return entry.document->GetSourceAssetGuid() == assetGuid;
-	});
+	return std::any_of(
+		m_documents.begin(),
+		m_documents.end(),
+		[&](const Entry& entry)
+		{
+			return entry.document->GetSourceAssetGuid() == assetGuid;
+		});
 }
 
 bool EditorDocumentManager::SaveDocument(EditorDocumentId id)
@@ -301,13 +304,17 @@ void EditorDocumentManager::ReconcileSceneReplacements(
 std::vector<EditorDocumentManager::Entry>::iterator
 EditorDocumentManager::FindEntry(EditorDocumentId id)
 {
-	return std::find_if(m_documents.begin(), m_documents.end(),
+	return std::find_if(
+		m_documents.begin(),
+		m_documents.end(),
 		[id](const Entry& entry) { return entry.id == id; });
 }
 
 std::vector<EditorDocumentManager::Entry>::const_iterator
 EditorDocumentManager::FindEntry(EditorDocumentId id) const
 {
-	return std::find_if(m_documents.begin(), m_documents.end(),
+	return std::find_if(
+		m_documents.begin(),
+		m_documents.end(),
 		[id](const Entry& entry) { return entry.id == id; });
 }

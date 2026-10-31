@@ -149,6 +149,7 @@ void Keyboard_ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
     }
 
     int vk = (int)wParam;
+
     switch (vk)
     {
     case VK_SHIFT:

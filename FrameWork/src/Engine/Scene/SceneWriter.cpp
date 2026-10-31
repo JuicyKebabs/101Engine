@@ -134,10 +134,13 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 		ordinaryActors.push_back(actor);
 	}
 
-	std::sort(ordinaryActors.begin(), ordinaryActors.end(), [](const Actor* left, const Actor* right)
-	{
-		return left->GetGuid().ToString() < right->GetGuid().ToString();
-	});
+	std::sort(
+		ordinaryActors.begin(),
+		ordinaryActors.end(),
+		[](const Actor* left, const Actor* right)
+		{
+			return left->GetGuid().ToString() < right->GetGuid().ToString();
+		});
 
 	for (Actor* actor : ordinaryActors)
 	{
@@ -174,28 +177,31 @@ bool SceneWriter::SerializeSceneImpl(const SceneBase* scene, json& outJson, bool
 		instanceRoots.push_back(root);
 	}
 
-	std::sort(instanceRoots.begin(), instanceRoots.end(), [scene](ActorHandle left, ActorHandle right)
-	{
-		const Actor* leftActor = scene->ResolveActor(left);
-		const Actor* rightActor = scene->ResolveActor(right);
-
-		if (!leftActor || !rightActor)
+	std::sort(
+		instanceRoots.begin(),
+		instanceRoots.end(),
+		[scene](ActorHandle left, ActorHandle right)
 		{
-			if (leftActor != rightActor)
+			const Actor* leftActor = scene->ResolveActor(left);
+			const Actor* rightActor = scene->ResolveActor(right);
+
+			if (!leftActor || !rightActor)
 			{
-				return leftActor != nullptr;
+				if (leftActor != rightActor)
+				{
+					return leftActor != nullptr;
+				}
+
+				if (left.index != right.index)
+				{
+					return left.index < right.index;
+				}
+
+				return left.generation < right.generation;
 			}
 
-			if (left.index != right.index)
-			{
-				return left.index < right.index;
-			}
-
-			return left.generation < right.generation;
-		}
-
-		return leftActor->GetGuid().ToString() < rightActor->GetGuid().ToString();
-	});
+			return leftActor->GetGuid().ToString() < rightActor->GetGuid().ToString();
+		});
 
 	for (ActorHandle root : instanceRoots)
 	{

@@ -322,11 +322,13 @@ void Collider::UpdateAABBCapsule()
 	const float radius = m_currentCapsuleCollider.radius;
 	const Vector3 pointA = m_currentCapsuleCollider.pointA;
 	const Vector3 pointB = m_currentCapsuleCollider.pointB;
+
 	m_currentAABB.min = {
 		(std::min)(pointA.x, pointB.x) - radius,
 		(std::min)(pointA.y, pointB.y) - radius,
 		(std::min)(pointA.z, pointB.z) - radius
 	};
+
 	m_currentAABB.max = {
 		(std::max)(pointA.x, pointB.x) + radius,
 		(std::max)(pointA.y, pointB.y) + radius,

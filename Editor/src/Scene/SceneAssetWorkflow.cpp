@@ -76,10 +76,14 @@ bool SceneAssetWorkflow::NormalizeName(
 	if (outName.size() > 6)
 	{
 		std::string suffix = outName.substr(outName.size() - 6);
-		std::transform(suffix.begin(), suffix.end(), suffix.begin(), [](unsigned char c)
-		{
-			return static_cast<char>(std::tolower(c));
-		});
+		std::transform(
+			suffix.begin(),
+			suffix.end(),
+			suffix.begin(),
+			[](unsigned char c)
+			{
+				return static_cast<char>(std::tolower(c));
+			});
 
 		if (suffix == ".scene")
 		{
@@ -99,10 +103,14 @@ bool SceneAssetWorkflow::NormalizeName(
 	}
 
 	std::string upper = outName;
-	std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c)
-	{
-		return static_cast<char>(std::toupper(c));
-	});
+	std::transform(
+		upper.begin(),
+		upper.end(),
+		upper.begin(),
+		[](unsigned char c)
+		{
+			return static_cast<char>(std::toupper(c));
+		});
 	static constexpr const char* reserved[] = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
 		"COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
 

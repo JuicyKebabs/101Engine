@@ -20,6 +20,7 @@ ActorImprintEditorDocument::ActorImprintEditorDocument(
         // Bounds values. This flush does not Start or advance gameplay, and it
         // deliberately leaves the normal per-frame edit order unchanged.
         SceneBase* workingScene = m_context->GetWorkingScene();
+
         if (workingScene)
         {
             workingScene->EditorUpdate(0.0f);
@@ -93,7 +94,9 @@ bool ActorImprintEditorDocument::ExecuteCommand(std::unique_ptr<IEditorCommand> 
 	}
 
 	return IEditorDocument::ExecuteCommand(std::make_unique<ActorImprintEditingCommand>(
-		*scene, m_context->GetObjectMap(), std::move(command)));
+		*scene,
+		m_context->GetObjectMap(),
+		std::move(command)));
 }
 
 std::unique_ptr<SceneBase>* ActorImprintEditorDocument::GetWorkingSceneOwnerSlot()

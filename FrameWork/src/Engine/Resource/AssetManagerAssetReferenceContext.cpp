@@ -32,6 +32,7 @@ bool AssetManagerAssetReferenceContext::Check(
 	if (!entry)
 	{
         const bool renderAsset = expectedType == AssetType::Mesh || expectedType == AssetType::Texture;
+
         if (m_preserveMissingRenderAssets && renderAsset)
         {
             DBG("Asset reference: missing render Asset GUID preserved for Invalid runtime resolution.");

@@ -437,7 +437,8 @@ Result RenderGraph::Compile()
 
 				// Combine shader stage flags of duplicated texture uses in the same pass.
 				auto previous = std::find_if(
-					compiled.uses.begin(), compiled.uses.end(),
+					compiled.uses.begin(),
+					compiled.uses.end(),
 					[&](const PassTextureUse& item) { return item.texture == use.texture; });
 
 				if (previous == compiled.uses.end())

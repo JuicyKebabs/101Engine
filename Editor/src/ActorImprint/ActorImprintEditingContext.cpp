@@ -105,7 +105,11 @@ std::unique_ptr<ActorImprintEditingContext> ActorImprintEditingContext::Open(
 	}
 
 	return std::unique_ptr<ActorImprintEditingContext>(new ActorImprintEditingContext(
-		assetGuid, assetPath, assets, std::move(scene), std::move(objectMap),
+		assetGuid,
+		assetPath,
+		assets,
+		std::move(scene),
+		std::move(objectMap),
 		ActorImprintAssetSerializer::Serialize(*definition)));
 }
 
@@ -118,7 +122,10 @@ std::unique_ptr<const ActorImprint> ActorImprintEditingContext::CaptureSnapshot(
 		return nullptr;
 	}
 
-	return ActorImprintEditingSnapshot::Capture(*m_workingScene, m_objectMap, *m_assets,
+	return ActorImprintEditingSnapshot::Capture(
+		*m_workingScene,
+		m_objectMap,
+		*m_assets,
 		outJson);
 }
 
@@ -179,7 +186,9 @@ bool ActorImprintEditingContext::Save()
 	const std::string bytes = serialized.dump(2) + '\n';
 
 	if (!AtomicFileReplacement::WriteTemporary(
-		std::filesystem::path(m_assetPath), bytes, temporary))
+		std::filesystem::path(m_assetPath),
+		bytes,
+		temporary))
 	{
 		DBG("ActorImprint file operation failed.");
 		return false;
@@ -271,9 +280,12 @@ bool ActorImprintEditingContext::RollbackPendingSave()
 	std::filesystem::path temporary;
 
 	if (!AtomicFileReplacement::WriteTemporary(
-		std::filesystem::path(m_assetPath), m_preSaveBytes, temporary) ||
+		std::filesystem::path(m_assetPath),
+		m_preSaveBytes,
+		temporary) ||
 		!AtomicFileReplacement::Replace(
-			temporary, std::filesystem::path(m_assetPath)))
+			temporary,
+			std::filesystem::path(m_assetPath)))
 	{
 		AtomicFileReplacement::RemoveTemporary(temporary);
 		DBG("Could not restore the original ActorImprint after reload failure.");

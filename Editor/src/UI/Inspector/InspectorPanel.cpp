@@ -39,7 +39,9 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 		auto tags = TagRegistry::Get().GetRegisteredTags();
 		const TagId currentTag = selectedActor->GetTag();
 
-		if (std::none_of(tags.begin(), tags.end(),
+		if (std::none_of(
+			tags.begin(),
+			tags.end(),
 			[currentTag](const auto& entry) { return entry.first == currentTag; }))
 		{
 			tags.emplace_back(currentTag, TagRegistry::Get().GetName(currentTag));
@@ -85,7 +87,13 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 
 	if (!m_propertyEditDiagnostic.empty())
 	{
-		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.45f, 0.35f, 1.0f));
+		ImGui::PushStyleColor(
+			ImGuiCol_Text,
+			ImVec4(
+				1.0f,
+				0.45f,
+				0.35f,
+				1.0f));
 		ImGui::TextWrapped("%s", m_propertyEditDiagnostic.c_str());
 		ImGui::PopStyleColor();
 		ImGui::Separator();
@@ -108,7 +116,13 @@ void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& contex
 
 		// Draw the component using reflection metadata.
 		const bool removeRequested =
-			DrawComponent(*component, occurrenceIndex, selectedActor->GetGuid(), context, callbacks, readOnly);
+			DrawComponent(
+				*component,
+				occurrenceIndex,
+				selectedActor->GetGuid(),
+				context,
+				callbacks,
+				readOnly);
 
 		if (removeRequested)
 		{// If the "Remove" button was clicked, prepare a removal request
@@ -279,9 +293,11 @@ bool InspectorPanel::DrawComponent(
 					m_propertyEditDiagnostic.clear();
 					m_propertyEditDiagnosticActorGuid = {};
 				};
+
 				SceneBase* editScene = context.scene;
 				const Guid editActorGuid = actorGuid;
 				const std::size_t editOccurrenceIndex = occurrenceIndex;
+
 				reflectionCallbacks.restoreValue = [
 					editScene, editActorGuid, typeId, editOccurrenceIndex](
 					const PropertyMetadata& property,
@@ -294,6 +310,7 @@ bool InspectorPanel::DrawComponent(
 						property.GetPath() };
 					return ApplyComponentPropertyValue(editScene, identity, value);
 				};
+
 				reflectionCallbacks.onEditCommit = [&, typeId](
 													   const PropertyMetadata& property,
 													   const PropertyValue& before,
@@ -306,12 +323,16 @@ bool InspectorPanel::DrawComponent(
 
 					return callbacks.onEditProperty(
 						ComponentPropertyIdentity{ actorGuid, typeId, occurrenceIndex, property.GetPath() },
-						before, after);
+						before,
+						after);
 				};
 
 				ReflectionInspectorServices services;
 				services.drawActorReference = [&context](
-					const char* label, const PropertyMetadata&, const ActorReference& current, ActorReference& selected)
+					const char* label,
+					const PropertyMetadata&,
+					const ActorReference& current,
+					ActorReference& selected)
 				{
 					if (!context.scene)
 					{
@@ -377,8 +398,10 @@ bool InspectorPanel::DrawComponent(
 					return changed;
 				};
 				services.drawAssetReference = [&context](
-												  const char* label, const PropertyMetadata& property,
-												  const AssetReferenceValue& current, AssetReferenceValue& selected)
+					const char* label,
+					const PropertyMetadata& property,
+					const AssetReferenceValue& current,
+					AssetReferenceValue& selected)
 				{
 					if (!context.assetManager)
 					{
@@ -387,7 +410,11 @@ bool InspectorPanel::DrawComponent(
 
 					Guid selectedGuid;
 					const bool selectionChanged = AssetPicker::Draw(
-						label, *context.assetManager, property.GetAssetType(), current.guid, selectedGuid);
+						label,
+						*context.assetManager,
+						property.GetAssetType(),
+						current.guid,
+						selectedGuid);
 
 					if (!selectionChanged)
 					{
@@ -401,8 +428,12 @@ bool InspectorPanel::DrawComponent(
 				};
 
 				m_reflectionInspector.Draw(
-					*metadata, typeId, &component, inspectorPolicy,
-					reflectionCallbacks, services);
+					*metadata,
+					typeId,
+					&component,
+					inspectorPolicy,
+					reflectionCallbacks,
+					services);
 
 			}
 		}

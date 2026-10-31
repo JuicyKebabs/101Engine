@@ -80,15 +80,22 @@ namespace
 	{
 		if (!object.is_object())
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidSchema, path, "Expected an object.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidSchema,
+				path,
+				"Expected an object.");
 		}
 
 		for (auto member = object.begin(); member != object.end(); ++member)
 		{
 			if (!Contains(required, member.key()) && !Contains(optional, member.key()))
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSchema,
-					AppendPath(path, member.key()), "Unknown field: " + member.key());
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSchema,
+					AppendPath(path, member.key()),
+					"Unknown field: " + member.key());
 			}
 		}
 
@@ -96,8 +103,11 @@ namespace
 		{
 			if (!object.contains(field))
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSchema,
-					AppendPath(path, std::string(field)), "Required field is missing.");
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSchema,
+					AppendPath(path, std::string(field)),
+					"Required field is missing.");
 			}
 		}
 
@@ -131,7 +141,10 @@ namespace
 	{
 		if (!value.is_array() || value.size() != 3)
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidSceneSettings, path,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidSceneSettings,
+				path,
 				"Expected an array containing exactly three finite numbers.");
 		}
 
@@ -139,7 +152,10 @@ namespace
 		{
 			if (!value[index].is_number())
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSceneSettings, path + "/" + std::to_string(index),
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSceneSettings,
+					path + "/" + std::to_string(index),
 					"Expected a finite number.");
 			}
 
@@ -147,8 +163,11 @@ namespace
 
 			if (!FitsFiniteFloat(source))
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
-					path + "/" + std::to_string(index), "Number is outside the finite float range.");
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSceneSettings,
+					path + "/" + std::to_string(index),
+					"Number is outside the finite float range.");
 			}
 		}
 
@@ -248,14 +267,22 @@ SceneLoadResult SceneLoader::LoadCandidate(
 				? "Scene contains a duplicate JSON field: " + duplicateFieldName
 				: "Scene file read failed while parsing JSON.";
 
-			Fail(error, SceneLoadErrorCode::JsonParseFailed, {}, message);
+			Fail(
+				error,
+				SceneLoadErrorCode::JsonParseFailed,
+				{},
+				message);
 
 			return { nullptr, std::move(error) };
 		}
 	}
 	catch (const json::exception& exception)
 	{
-		Fail(error, SceneLoadErrorCode::JsonParseFailed, {}, exception.what());
+		Fail(
+			error,
+			SceneLoadErrorCode::JsonParseFailed,
+			{},
+			exception.what());
 
 		return { nullptr, std::move(error) };
 	}
@@ -273,7 +300,11 @@ SceneLoadResult SceneLoader::LoadCandidate(
 	std::string assetPath)
 
 {
-	return LoadCandidate(sceneRecord, context, std::move(assetPath), {});
+	return LoadCandidate(
+		sceneRecord,
+		context,
+		std::move(assetPath),
+		{});
 }
 
 SceneLoadResult SceneLoader::LoadCandidate(
@@ -282,7 +313,12 @@ SceneLoadResult SceneLoader::LoadCandidate(
 	std::string assetPath,
 	SceneLoadOptions options)
 {
-	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), !options.deferPublish, std::move(options));
+	return LoadCandidateImpl(
+		sceneRecord,
+		context,
+		std::move(assetPath),
+		!options.deferPublish,
+		std::move(options));
 }
 
 SceneLoadResult SceneLoader::LoadPreparedCandidate(
@@ -290,7 +326,12 @@ SceneLoadResult SceneLoader::LoadPreparedCandidate(
 	EngineContext& context,
 	std::string assetPath)
 {
-	return LoadCandidateImpl(sceneRecord, context, std::move(assetPath), false, {});
+	return LoadCandidateImpl(
+		sceneRecord,
+		context,
+		std::move(assetPath),
+		false,
+		{});
 }
 
 SceneLoadResult SceneLoader::LoadCandidateImpl(
@@ -305,19 +346,31 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 
 	if (!sceneRecord.is_object())
 	{
-		Fail(error, SceneLoadErrorCode::InvalidSchema, {}, "Scene record must be an object.");
+		Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			{},
+			"Scene record must be an object.");
 		return { nullptr, std::move(error) };
 	}
 
 	if (!sceneRecord.contains("version"))
 	{
-		Fail(error, SceneLoadErrorCode::InvalidSchema, "/version", "Required field is missing.");
+		Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			"/version",
+			"Required field is missing.");
 		return { nullptr, std::move(error) };
 	}
 
 	if (!sceneRecord["version"].is_number_integer())
 	{
-		Fail(error, SceneLoadErrorCode::InvalidSchema, "/version", "Scene version must be an integer.");
+		Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			"/version",
+			"Scene version must be an integer.");
 		return { nullptr, std::move(error) };
 	}
 
@@ -346,7 +399,11 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 		const std::string message = legacyV2
 			? "Scene version 2 is no longer supported; migrate it to version 3 before loading."
 			: "Unsupported Scene version: " + versionValue.dump();
-		Fail(error, SceneLoadErrorCode::UnsupportedVersion, "/version", message);
+		Fail(
+			error,
+			SceneLoadErrorCode::UnsupportedVersion,
+			"/version",
+			message);
 		return { nullptr, std::move(error) };
 	}
 
@@ -356,14 +413,21 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 
 		if (instances != sceneRecord.end() && (!instances->is_array() || !instances->empty()))
 		{
-			Fail(error, SceneLoadErrorCode::InvalidSchema, "/actorImprintInstances",
+			Fail(
+				error,
+				SceneLoadErrorCode::InvalidSchema,
+				"/actorImprintInstances",
 				"Scene version 3 cannot contain ActorImprint Instance records; save it as version 4.");
 			return { nullptr, std::move(error) };
 		}
 	}
 
-	if (strictV4 && !ValidateFields(sceneRecord,
-		{ "version", "directional_light", "actors", "actorImprintInstances" }, {}, {}, error))
+	if (strictV4 && !ValidateFields(
+		sceneRecord,
+		{ "version", "directional_light", "actors", "actorImprintInstances" },
+		{},
+		{},
+		error))
 	{
 		return { nullptr, std::move(error) };
 	}
@@ -372,10 +436,19 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 	std::vector<ActorLoadRecord> actorRecords;
 	std::vector<InstanceLoadRecord> instanceRecords;
 
-	if (!BuildActorLoadRecords(sceneRecord, strictV4, actorRecords, origins, error) ||
+	if (!BuildActorLoadRecords(
+		sceneRecord,
+		strictV4,
+		actorRecords,
+		origins,
+		error) ||
 		!ValidateParentReferences(actorRecords, error) ||
 		!ValidateHierarchyCycles(actorRecords, error) ||
-		(strictV4 && !BuildInstanceLoadRecords(sceneRecord, instanceRecords, origins, error)) ||
+		(strictV4 && !BuildInstanceLoadRecords(
+			sceneRecord,
+			instanceRecords,
+			origins,
+			error)) ||
 		!ValidateSceneSettings(sceneRecord, strictV4, error))
 	{
 		return { nullptr, std::move(error) };
@@ -396,16 +469,27 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 
 	auto Abort = [&]() -> SceneLoadResult
 	{
-		DBG("SceneLoader: Candidate load failed at '%s': %s",
-			error.path.c_str(), error.message.c_str());
+		DBG(
+			"SceneLoader: Candidate load failed at '%s': %s",
+			error.path.c_str(),
+			error.message.c_str());
 		candidate->DiscardUnpublishedCandidate();
 		return { nullptr, std::move(error) };
 	};
 
 	try
 	{
-		if (!RestoreOrdinaryActors(actorRecords, *candidate, options, error) ||
-			!RestoreInstances(instanceRecords, reservedSceneGuids, origins, *candidate, error) ||
+		if (!RestoreOrdinaryActors(
+			actorRecords,
+			*candidate,
+			options,
+			error) ||
+			!RestoreInstances(
+				instanceRecords,
+				reservedSceneGuids,
+				origins,
+				*candidate,
+				error) ||
 			!RestoreOrdinaryHierarchy(actorRecords, *candidate, error) ||
 			!RestoreComponentReferences(origins, *candidate, error))
 		{
@@ -418,7 +502,10 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 		{
 			const auto origin = invalidUIActor ? origins.find(invalidUIActor->GetGuid()) : origins.end();
 			const std::string path = origin == origins.end() ? "/actors" : origin->second.path;
-			Fail(error, SceneLoadErrorCode::UIHierarchyFailed, path,
+			Fail(
+				error,
+				SceneLoadErrorCode::UIHierarchyFailed,
+				path,
 				"Scene UI hierarchy is incompatible with the Transform-family component on Actor '" +
 				(invalidUIActor ? invalidUIActor->GetName() : std::string("<unknown>")) + "'.");
 			return Abort();
@@ -437,12 +524,19 @@ SceneLoadResult SceneLoader::LoadCandidateImpl(
 	}
 	catch (const std::exception& exception)
 	{
-		Fail(error, SceneLoadErrorCode::InvalidSchema, error.path, exception.what());
+		Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			error.path,
+			exception.what());
 		return Abort();
 	}
 	catch (...)
 	{
-		Fail(error, SceneLoadErrorCode::InvalidSchema, error.path,
+		Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			error.path,
 			"Scene candidate construction threw an unknown exception.");
 		return Abort();
 	}
@@ -464,12 +558,20 @@ bool SceneLoader::BuildActorLoadRecords(
 {
 	if (!sceneJson.contains("actors"))
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSchema, "/actors", "Required field is missing.");
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			"/actors",
+			"Required field is missing.");
 	}
 
 	if (!sceneJson["actors"].is_array())
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSchema, "/actors", "Scene actors must be an array.");
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			"/actors",
+			"Scene actors must be an array.");
 	}
 
 	const json& actors = sceneJson["actors"];
@@ -482,36 +584,58 @@ bool SceneLoader::BuildActorLoadRecords(
 
 		if (!actorJson.is_object())
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidSchema, path, "Actor record must be an object.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidSchema,
+				path,
+				"Actor record must be an object.");
 		}
 
 		if (strictV4)
 		{
-			if (!ValidateFields(actorJson,
-					{"actorId", "parentId", "name", "is_active", "tag", "components"}, {}, path, error))
+			if (!ValidateFields(
+				actorJson,
+				{"actorId", "parentId", "name", "is_active", "tag", "components"},
+				{},
+				path,
+				error))
 			{
 				return false;
 			}
 
 			if (!actorJson["name"].is_string())
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/name", "Actor name must be a string.");
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSchema,
+					path + "/name",
+					"Actor name must be a string.");
 			}
 
 			if (!actorJson["is_active"].is_boolean())
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/is_active",
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSchema,
+					path + "/is_active",
 					"Actor active state must be a boolean.");
 			}
 
 			if (!actorJson["tag"].is_string())
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/tag", "Actor tag must be a string.");
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSchema,
+					path + "/tag",
+					"Actor tag must be a string.");
 			}
 
 			if (!actorJson["components"].is_array())
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/components",
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSchema,
+					path + "/components",
 					"Actor components must be an array.");
 			}
 
@@ -520,20 +644,31 @@ bool SceneLoader::BuildActorLoadRecords(
 				const json& component = actorJson["components"][componentIndex];
 				const std::string componentPath = path + "/components/" + std::to_string(componentIndex);
 
-				if (!ValidateFields(component, {"type", "data"}, {}, componentPath, error))
+				if (!ValidateFields(
+					component,
+					{"type", "data"},
+					{},
+					componentPath,
+					error))
 				{
 					return false;
 				}
 
 				if (!component["type"].is_string() || component["type"].get<std::string>().empty())
 				{
-					return Fail(error, SceneLoadErrorCode::InvalidSchema, componentPath + "/type",
+					return Fail(
+						error,
+						SceneLoadErrorCode::InvalidSchema,
+						componentPath + "/type",
 						"Component type must be a nonempty string.");
 				}
 
 				if (!component["data"].is_object())
 				{
-					return Fail(error, SceneLoadErrorCode::InvalidSchema, componentPath + "/data",
+					return Fail(
+						error,
+						SceneLoadErrorCode::InvalidSchema,
+						componentPath + "/data",
 						"Component data must be an object.");
 				}
 			}
@@ -541,20 +676,30 @@ bool SceneLoader::BuildActorLoadRecords(
 
 		if (!actorJson.contains("actorId"))
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/actorId", "Required field is missing.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidSchema,
+				path + "/actorId",
+				"Required field is missing.");
 		}
 
 		Guid actorGuid;
 
 		if (!ReadGuid(actorJson["actorId"], actorGuid))
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidActorGuid, path + "/actorId",
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidActorGuid,
+				path + "/actorId",
 				"Actor ID must be a nonzero GUID string.");
 		}
 
 		if (!origins.emplace(actorGuid, ActorOrigin{ActorProvenance::Ordinary, path}).second)
 		{
-			return Fail(error, SceneLoadErrorCode::DuplicateActorGuid, path + "/actorId",
+			return Fail(
+				error,
+				SceneLoadErrorCode::DuplicateActorGuid,
+				path + "/actorId",
 				"Actor GUID is duplicated across the Scene.");
 		}
 
@@ -565,7 +710,11 @@ bool SceneLoader::BuildActorLoadRecords(
 
 		if (!actorJson.contains("parentId"))
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidSchema, path + "/parentId", "Required field is missing.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidSchema,
+				path + "/parentId",
+				"Required field is missing.");
 		}
 
 		if (actorJson["parentId"].is_null())
@@ -578,14 +727,20 @@ bool SceneLoader::BuildActorLoadRecords(
 
 			if (!ReadGuid(actorJson["parentId"], parentGuid))
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidHierarchy, path + "/parentId",
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidHierarchy,
+					path + "/parentId",
 					"Parent ID must be null or a nonzero GUID string.");
 			}
 
 			if (parentGuid == actorGuid)
 			{
 				return Fail(
-					error, SceneLoadErrorCode::InvalidHierarchy, path + "/parentId", "Actor cannot be its own parent.");
+					error,
+					SceneLoadErrorCode::InvalidHierarchy,
+					path + "/parentId",
+					"Actor cannot be its own parent.");
 			}
 
 			record.hasParent = true;
@@ -595,10 +750,13 @@ bool SceneLoader::BuildActorLoadRecords(
 		outRecords.push_back(record);
 	}
 
-	std::sort(outRecords.begin(), outRecords.end(), [](const auto& left, const auto& right)
-	{
-		return GuidSortKey(left.actorGuid) < GuidSortKey(right.actorGuid);
-	});
+	std::sort(
+		outRecords.begin(),
+		outRecords.end(),
+		[](const auto& left, const auto& right)
+		{
+			return GuidSortKey(left.actorGuid) < GuidSortKey(right.actorGuid);
+		});
 
 	return true;
 }
@@ -613,7 +771,10 @@ bool SceneLoader::BuildInstanceLoadRecords(
 
 	if (!instances.is_array())
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSchema, "/actorImprintInstances",
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSchema,
+			"/actorImprintInstances",
 			"ActorImprint Instances must be an array.");
 	}
 
@@ -626,8 +787,11 @@ bool SceneLoader::BuildInstanceLoadRecords(
 
 		if (!ActorImprintInstanceRecordReader::Read(instances[instanceIndex], record))
 		{
-			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
-				path, "ActorImprint Instance record is invalid.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InstanceDeserializationFailed,
+				path,
+				"ActorImprint Instance record is invalid.");
 		}
 
 		const json& actorGuids = instances[instanceIndex]["actorGuids"];
@@ -643,7 +807,10 @@ bool SceneLoader::BuildInstanceLoadRecords(
 
 			if (!origins.emplace(actorGuid, ActorOrigin{provenance, path}).second)
 			{
-				return Fail(error, SceneLoadErrorCode::DuplicateActorGuid, mappingPath,
+				return Fail(
+					error,
+					SceneLoadErrorCode::DuplicateActorGuid,
+					mappingPath,
 					"Actor GUID is duplicated across the Scene.");
 			}
 		}
@@ -662,16 +829,21 @@ bool SceneLoader::BuildInstanceLoadRecords(
 
 		if (parent == origins.end() || parent->second.provenance != ActorProvenance::Ordinary)
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidHierarchy,
 				InstancePath(instance.sourceIndex) + "/externalParentActorGuid",
 				"External parent must identify an ordinary Actor in this Scene.");
 		}
 	}
 
-	std::sort(outRecords.begin(), outRecords.end(), [](const auto& left, const auto& right)
-	{
-		return GuidSortKey(left.record.rootActorGuid) < GuidSortKey(right.record.rootActorGuid);
-	});
+	std::sort(
+		outRecords.begin(),
+		outRecords.end(),
+		[](const auto& left, const auto& right)
+		{
+			return GuidSortKey(left.record.rootActorGuid) < GuidSortKey(right.record.rootActorGuid);
+		});
 
 	return true;
 }
@@ -692,7 +864,9 @@ bool SceneLoader::ValidateParentReferences(
 	{
 		if (record.hasParent && !actorGuids.contains(record.parentGuid))
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidHierarchy,
 				ActorPath(record.sourceIndex) + "/parentId",
 				"Ordinary Actor parent does not exist in the ordinary Actor array.");
 		}
@@ -733,7 +907,10 @@ bool SceneLoader::ValidateHierarchyCycles(
 
 			if (state == VisitState::Visiting)
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidHierarchy, ActorPath(record.sourceIndex) + "/parentId",
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidHierarchy,
+					ActorPath(record.sourceIndex) + "/parentId",
 					"Actor hierarchy contains a cycle.");
 			}
 
@@ -775,22 +952,30 @@ bool SceneLoader::RestoreOrdinaryActors(
 		ActorDeserializationOptions actorOptions;
 		actorOptions.unknownComponentPropertyPolicy = options.unknownComponentPropertyPolicy;
 		auto actor = ActorDeserializer::DeserializeActorRecord(
-			*record.actorJson, record.actorGuid, actorOptions, &actorError);
+			*record.actorJson,
+			record.actorGuid,
+			actorOptions,
+			&actorError);
 
 		if (!actor)
 		{
 			const std::string failureMessage = actorError.message.empty()
 				? "Actor deserialization failed."
 				: actorError.message;
-			return Fail(error, SceneLoadErrorCode::ActorDeserializationFailed,
+			return Fail(
+				error,
+				SceneLoadErrorCode::ActorDeserializationFailed,
 				ActorPath(record.sourceIndex) + actorError.path,
 				failureMessage);
 		}
 
 		if (!scene.RegisterRestoredActor(std::move(actor)))
 		{
-			return Fail(error, SceneLoadErrorCode::ActorDeserializationFailed,
-				ActorPath(record.sourceIndex), "Candidate Scene rejected the restored Actor.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::ActorDeserializationFailed,
+				ActorPath(record.sourceIndex),
+				"Candidate Scene rejected the restored Actor.");
 		}
 	}
 
@@ -814,7 +999,9 @@ bool SceneLoader::RestoreOrdinaryHierarchy(
 
 		if (!child || !parent || !scene.RestoreParentRelationship(child, parent))
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidHierarchy,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidHierarchy,
 				ActorPath(record.sourceIndex) + "/parentId",
 				"Failed to restore the ordinary Actor parent relationship.");
 		}
@@ -839,8 +1026,11 @@ bool SceneLoader::RestoreInstances(
 
 	if (!context || !context->pActorImprintSystem || !context->pAssetManager)
 	{
-		return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
-			"/actorImprintInstances", "Scene context has no ActorImprintSystem or AssetManager.");
+		return Fail(
+			error,
+			SceneLoadErrorCode::InstanceDeserializationFailed,
+			"/actorImprintInstances",
+			"Scene context has no ActorImprintSystem or AssetManager.");
 	}
 
 	ActorImprintSystem& system = *context->pActorImprintSystem;
@@ -851,18 +1041,27 @@ bool SceneLoader::RestoreInstances(
 		ActorImprintPreparedRestore prepared;
 
 		if (!ActorImprintInstanceDeserializer::Prepare(
-				instance.record, scene, system, prepared))
+			instance.record,
+			scene,
+			system,
+			prepared))
 		{
-			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
-				path, "ActorImprint Instance preparation failed.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InstanceDeserializationFailed,
+				path,
+				"ActorImprint Instance preparation failed.");
 		}
 
 		const ActorImprint* definition = system.ResolveForSceneCandidate(prepared.imprint);
 
 		if (!definition)
 		{
-			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
-				path + "/assetGuid", "ActorImprint definition was not retained after loading.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InstanceDeserializationFailed,
+				path + "/assetGuid",
+				"ActorImprint definition was not retained after loading.");
 		}
 
 		const auto rootMapping = prepared.input.actorGuids.find(definition->GetRootActorId());
@@ -870,25 +1069,37 @@ bool SceneLoader::RestoreInstances(
 		if (rootMapping == prepared.input.actorGuids.end() ||
 			rootMapping->second != instance.record.rootActorGuid)
 		{
-			return Fail(error, SceneLoadErrorCode::InstanceDeserializationFailed,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InstanceDeserializationFailed,
 				path + "/rootActorGuid",
 				"Root Actor GUID does not match the definition root LocalObjectID mapping.");
 		}
 
 		Actor* root =
-			system.RestoreInstanceForSceneCandidate(scene, prepared.imprint, prepared.input, reservedSceneGuids);
+			system.RestoreInstanceForSceneCandidate(
+				scene,
+				prepared.imprint,
+				prepared.input,
+				reservedSceneGuids);
 
 		if (!root)
 		{
-			return Fail(error, SceneLoadErrorCode::InstanceMaterializationFailed,
-				path, "ActorImprint Instance materialization failed.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InstanceMaterializationFailed,
+				path,
+				"ActorImprint Instance materialization failed.");
 		}
 
 		const ActorImprintInstanceRecord* runtime = scene.GetImprintInstances().FindInstance(root->GetHandle());
 
 		if (!runtime)
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidInstanceRegistry, path,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidInstanceRegistry,
+				path,
 				"Materialized Instance has no Scene registry record.");
 		}
 
@@ -914,7 +1125,10 @@ bool SceneLoader::RestoreComponentReferences(
 	{
 		if (!actor)
 		{
-			return Fail(error, SceneLoadErrorCode::ReferenceResolutionFailed, "/actors",
+			return Fail(
+				error,
+				SceneLoadErrorCode::ReferenceResolutionFailed,
+				"/actors",
 				"Candidate Scene contains a null Actor.");
 		}
 
@@ -938,13 +1152,19 @@ bool SceneLoader::RestoreComponentReferences(
 
 			if (!SerializeReflectedComponent(*component, properties, &scene))
 			{
-				return Fail(error, SceneLoadErrorCode::ReferenceResolutionFailed, componentPath,
+				return Fail(
+					error,
+					SceneLoadErrorCode::ReferenceResolutionFailed,
+					componentPath,
 					"Component persistence validation failed.");
 			}
 
 			if (!component->ResolveReferences(scene))
 			{
-				return Fail(error, SceneLoadErrorCode::ReferenceResolutionFailed, componentPath,
+				return Fail(
+					error,
+					SceneLoadErrorCode::ReferenceResolutionFailed,
+					componentPath,
 					"Component reference resolution failed on Actor '" + actor->GetName() + "'.");
 			}
 		}
@@ -964,7 +1184,11 @@ bool SceneLoader::ValidateSceneSettings(
 	{
 		if (strictV4)
 		{
-			return Fail(error, SceneLoadErrorCode::InvalidSceneSettings, "/directional_light", "Required field is missing.");
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidSceneSettings,
+				"/directional_light",
+				"Required field is missing.");
 		}
 
 		return true;
@@ -972,14 +1196,21 @@ bool SceneLoader::ValidateSceneSettings(
 
 	if (!lightEntry->is_object())
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
-			"/directional_light", "Directional light must be an object.");
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light",
+			"Directional light must be an object.");
 	}
 
 	if (strictV4)
 	{
-		if (!ValidateFields(*lightEntry,
-				{"direction", "color", "intensity"}, {}, "/directional_light", error))
+		if (!ValidateFields(
+			*lightEntry,
+			{"direction", "color", "intensity"},
+			{},
+			"/directional_light",
+			error))
 		{
 			return false;
 		}
@@ -991,8 +1222,11 @@ bool SceneLoader::ValidateSceneSettings(
 		{
 			if (!lightEntry->contains(field))
 			{
-				return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
-					AppendPath("/directional_light", std::string(field)), "Required field is missing.");
+				return Fail(
+					error,
+					SceneLoadErrorCode::InvalidSceneSettings,
+					AppendPath("/directional_light", std::string(field)),
+					"Required field is missing.");
 			}
 		}
 	}
@@ -1007,16 +1241,22 @@ bool SceneLoader::ValidateSceneSettings(
 
 	if (!intensity.is_number())
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
-			"/directional_light/intensity", "Directional light intensity must be a finite number.");
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light/intensity",
+			"Directional light intensity must be a finite number.");
 	}
 
 	const double sourceIntensity = intensity.get<double>();
 
 	if (!FitsFiniteFloat(sourceIntensity))
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
-			"/directional_light/intensity", "Directional light intensity is outside the finite float range.");
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light/intensity",
+			"Directional light intensity is outside the finite float range.");
 	}
 
 	return true;
@@ -1042,13 +1282,18 @@ bool SceneLoader::ApplySceneSettings(
 		light.color = { (*entry)["color"][0].get<float>(),
 			(*entry)["color"][1].get<float>(), (*entry)["color"][2].get<float>() };
 		light.intensity = (*entry)["intensity"].get<float>();
+
 		scene.SetDirectionalLight(light);
+
 		return true;
 	}
 	catch (const json::exception& exception)
 	{
-		return Fail(error, SceneLoadErrorCode::InvalidSceneSettings,
-			"/directional_light", exception.what());
+		return Fail(
+			error,
+			SceneLoadErrorCode::InvalidSceneSettings,
+			"/directional_light",
+			exception.what());
 	}
 }
 
@@ -1062,7 +1307,10 @@ bool SceneLoader::ValidateInstanceRegistry(SceneBase& scene, SceneLoadError& err
 			const std::string path = rootActor && rootActor->GetGuid().IsValid()
 				? "/actorImprintInstances" : "/actorImprintInstances";
 			(void)record;
-			return Fail(error, SceneLoadErrorCode::InvalidInstanceRegistry, path,
+			return Fail(
+				error,
+				SceneLoadErrorCode::InvalidInstanceRegistry,
+				path,
 				"ActorImprint Instance registry is inconsistent with the candidate Scene.");
 		}
 	}

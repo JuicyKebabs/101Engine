@@ -10,7 +10,12 @@ static void DBG(const char* fmt, ...)
 
 	va_list args;
 	va_start(args, fmt);
-	vsnprintf_s(buf, sizeof(buf), _TRUNCATE, fmt, args);
+	vsnprintf_s(
+		buf,
+		sizeof(buf),
+		_TRUNCATE,
+		fmt,
+		args);
 	va_end(args);
 
 	size_t len = strlen(buf);

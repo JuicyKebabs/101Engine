@@ -35,11 +35,23 @@ void Toolbar::Render(const Callbacks& callbacks)
 
 	if (callbacks.canStop)
 	{
-		ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.45f, 1.0f), "Playing");
+		ImGui::TextColored(
+			ImVec4(
+				0.35f,
+				0.80f,
+				0.45f,
+				1.0f),
+			"Playing");
 	}
 	else
 	{
-		ImGui::TextColored(ImVec4(0.35f, 0.45f, 0.80f, 1.0f), "Edit Mode");
+		ImGui::TextColored(
+			ImVec4(
+				0.35f,
+				0.45f,
+				0.80f,
+				1.0f),
+			"Edit Mode");
 	}
 
 	ImGui::SameLine();

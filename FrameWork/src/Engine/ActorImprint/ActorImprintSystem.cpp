@@ -66,6 +66,7 @@ ActorImprintHandle ActorImprintSystem::Load(const Guid& assetGuid)
 
 	Slot& slot = m_slots[index];
 	const ActorImprintHandle handle{ index, slot.generation };
+
 	try
 	{
 		m_handles.emplace(assetGuid, handle);
@@ -173,6 +174,7 @@ bool ActorImprintSystem::Unload(ActorImprintHandle handle)
 	}
 
 	Slot& slot = m_slots[handle.index];
+
 	// Retire exhausted generations permanently rather than aliasing a stale handle.
 	if (slot.generation != UINT32_MAX)
 	{

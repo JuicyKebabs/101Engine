@@ -28,6 +28,7 @@ Result CalculateBounds(GeometryCpuData& data)
     for (const MeshVertex& vertex : data.vertices)
     {
         const std::array<double, 3> position{ vertex.position.x, vertex.position.y, vertex.position.z };
+
         for (std::size_t axis = 0; axis < position.size(); ++axis)
         {
             minimum[axis] = (std::min)(minimum[axis], position[axis]);
@@ -43,6 +44,7 @@ Result CalculateBounds(GeometryCpuData& data)
     // Calculate from the rounded center that the caller will actually receive.
     // This includes the center's float conversion error in the radius.
     double radius = 0;
+
     for (const MeshVertex& vertex : data.vertices)
     {
         const double horizontal = static_cast<double>(vertex.position.x) - center.x;
@@ -53,6 +55,7 @@ Result CalculateBounds(GeometryCpuData& data)
     }
 
     float roundedRadius = static_cast<float>(radius);
+
     if (static_cast<double>(roundedRadius) < radius)
     {
         roundedRadius = std::nextafter(roundedRadius, (std::numeric_limits<float>::infinity)());
@@ -131,6 +134,7 @@ Result ValidateGeometryDesc(const GeometryDesc& desc)
 Result CopyGeometryCpuData(const GeometryDesc& desc, GeometryCpuData& output)
 {
 	Result validation = ValidateGeometryDesc(desc);
+
 	if (!validation.IsSuccess())
 	{
 		return validation;
@@ -148,6 +152,7 @@ Result CopyGeometryCpuData(const GeometryDesc& desc, GeometryCpuData& output)
 		}
 
         Result boundsResult = CalculateBounds(copied);
+
         if (!boundsResult.IsSuccess())
         {
             return boundsResult;

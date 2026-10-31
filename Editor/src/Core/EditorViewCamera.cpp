@@ -21,12 +21,21 @@ void EditorViewCamera::Look(
     float radiansPerPixel,
     float maxPitchRadians)
 {
-    m_controller.Look(m_camera, m_pivot, deltaPixels, radiansPerPixel, maxPitchRadians);
+    m_controller.Look(
+        m_camera,
+        m_pivot,
+        deltaPixels,
+        radiansPerPixel,
+        maxPitchRadians);
 }
 
 void EditorViewCamera::Fly(const Vector3& localMovement, float distance)
 {
-    m_controller.Fly(m_camera, m_pivot, localMovement, distance);
+    m_controller.Fly(
+        m_camera,
+        m_pivot,
+        localMovement,
+        distance);
 }
 
 void EditorViewCamera::Orbit(
@@ -34,14 +43,23 @@ void EditorViewCamera::Orbit(
     float radiansPerPixel,
     float maxPitchRadians)
 {
-    m_controller.Orbit(m_camera, m_pivot, deltaPixels, radiansPerPixel, maxPitchRadians);
+    m_controller.Orbit(
+        m_camera,
+        m_pivot,
+        deltaPixels,
+        radiansPerPixel,
+        maxPitchRadians);
 }
 
 void EditorViewCamera::Pan(
     const Vector2& deltaPixels,
     float distanceScalePerPixel)
 {
-    m_controller.Pan(m_camera, m_pivot, deltaPixels, distanceScalePerPixel);
+    m_controller.Pan(
+        m_camera,
+        m_pivot,
+        deltaPixels,
+        distanceScalePerPixel);
 }
 
 void EditorViewCamera::Dolly(
@@ -62,5 +80,10 @@ void EditorViewCamera::Focus(
     float padding,
     float minimumDistance)
 {
-    m_controller.Focus(m_camera, m_pivot, bounds, padding, minimumDistance);
+    m_controller.Focus(
+        m_camera,
+        m_pivot,
+        bounds,
+        padding,
+        minimumDistance);
 }

@@ -65,7 +65,8 @@ bool ActorImprintDefinitionExpander::Expand(
 			for (const auto& componentDefinition : records[i].components)
 			{
 				Component* component = actor->GetComponentByExactType(
-					componentDefinition.type, occurrences[componentDefinition.typeName]++);
+					componentDefinition.type,
+					occurrences[componentDefinition.typeName]++);
 
 				if (!component || !candidate.components.emplace(componentDefinition.id, component).second)
 				{

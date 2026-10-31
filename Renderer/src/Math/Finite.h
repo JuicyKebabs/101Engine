@@ -21,6 +21,7 @@ inline bool Finite(const Matrix4x4& m)
 			}
 		}
 	}
+
 	return true;
 }
 

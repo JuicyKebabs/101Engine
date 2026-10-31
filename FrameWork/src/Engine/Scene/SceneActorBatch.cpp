@@ -148,6 +148,7 @@ void SceneActorBatch::PrepareCommit(Actor* root, Actor* externalParent)
 	m_externalParent = externalParent;
     const auto candidateActors = m_candidate.GetAllActors();
     m_destination.PrepareComponentPublication(candidateActors);
+
     // Existing governing Canvases may receive new UI renderers during attach.
     for (Actor* actor : candidateActors)
     {

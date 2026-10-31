@@ -20,7 +20,9 @@ Result QueryBinding(
     GraphTextureBinding& output);
 
 // Commit the final state of a texture binding after graph execution to the backend.
-void CommitBinding(backend::Backend& backend,
+void CommitBinding(
+    backend::Backend& backend,
     const GraphTextureBinding& binding,
-    D3D12_RESOURCE_STATES state, bool contentsValid) noexcept;
+    D3D12_RESOURCE_STATES state,
+    bool contentsValid) noexcept;
 }

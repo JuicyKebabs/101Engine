@@ -64,10 +64,15 @@ rendering::Vector4 LocalQuadTransform(const ComponentMaterialState& material)
 // Frobenius norm bounds the maximum stretch, including shear. For Billboard,
 // retain a sphere around the Actor origin so rotating an off-center pivot for
 // Camera A/B cannot move Geometry outside a Camera-independent submitted bound.
-void SetWorldBounds(rendering::RenderObject& object, Vector3 localCenter, float localRadius,
-    std::uint64_t revision, const Matrix4x4& world)
+void SetWorldBounds(
+    rendering::RenderObject& object,
+    Vector3 localCenter,
+    float localRadius,
+    std::uint64_t revision,
+    const Matrix4x4& world)
 {
     double stretchSquared = 0;
+
     for (std::size_t row = 0; row < 3; ++row)
     {
         for (std::size_t column = 0; column < 3; ++column)
@@ -79,6 +84,7 @@ void SetWorldBounds(rendering::RenderObject& object, Vector3 localCenter, float 
 
     Vector3 center;
     double radius = localRadius;
+
     if (object.billboard == rendering::BillboardMode::None)
     {
         center = world.TransformPoint(localCenter);
@@ -90,6 +96,7 @@ void SetWorldBounds(rendering::RenderObject& object, Vector3 localCenter, float 
     }
 
     radius *= std::sqrt(stretchSquared);
+
     if (!std::isfinite(radius) || radius > (std::numeric_limits<float>::max)())
     {
         return; // Missing Bounds safely disables culling; do not submit infinity.
@@ -98,6 +105,7 @@ void SetWorldBounds(rendering::RenderObject& object, Vector3 localCenter, float 
     rendering::BoundingSphere bounds;
     bounds.center = EngineRendering::ToRenderer(center);
     bounds.radius = std::nextafter(static_cast<float>(radius), (std::numeric_limits<float>::infinity)());
+
     if (!std::isfinite(bounds.radius))
     {
         return;
@@ -133,6 +141,7 @@ void RenderSystem::FlushRegisters()
         {
             Actor* actor = renderer ? renderer->GetOwner() : nullptr;
             const bool live = IsActorHierarchyActive(actor);
+
             if (live && !renderer->IsDestroyed())
             {
                 renderer->Flush();
@@ -145,9 +154,15 @@ void RenderSystem::FlushRegisters()
     flush(m_uiRenderers);
 }
 
-bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
-    const CameraInfo* camera, const RenderViewPolicy& policy, rendering::ViewId sceneViewId,
-    rendering::ViewId overlayViewId, std::uint32_t width, std::uint32_t height,
+bool RenderSystem::AppendFrame(
+    rendering::FrameRenderData& frame,
+    const rendering::ViewOutput& output,
+    const CameraInfo* camera,
+    const RenderViewPolicy& policy,
+    rendering::ViewId sceneViewId,
+    rendering::ViewId overlayViewId,
+    std::uint32_t width,
+    std::uint32_t height,
     const DirectionalLight& light)
 {
     if (!m_scene || width == 0 || height == 0)
@@ -156,6 +171,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
     }
 
     const EngineContext* context = m_scene->GetEngineContext();
+
     if (!context)
     {
         return false;
@@ -164,6 +180,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
     m_records.clear();
     const bool canvasPreview = policy.canvasPreview || policy.canvasViewRoot;
     Matrix4x4 worldToCanvas = Matrix4x4::Identity();
+
     if (policy.canvasViewRoot)
     {
         worldToCanvas = policy.canvasViewRoot->GetContentWorldMatrix().Inverse();
@@ -176,6 +193,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
         {
             Actor* actor = renderer ? renderer->GetOwner() : nullptr;
             const bool liveActor = IsActorHierarchyActive(actor);
+
             if (!liveActor || renderer->IsDestroyed())
             {
                 continue;
@@ -192,6 +210,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             }
 
             const RenderSpace space = renderer->GetRenderSpace();
+
             if (policy.canvasViewRoot)
             {
                 if (!policy.canvasViewRoot->ContainsRenderer(renderer))
@@ -203,6 +222,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             {
                 const bool excludeWorld = policy.renderSpaceFilter == RenderSpaceFilter::ScreenOnly && space == RenderSpace::World;
                 const bool excludeScreen = policy.renderSpaceFilter == RenderSpaceFilter::WorldOnly && space == RenderSpace::Screen;
+
                 if (excludeWorld || excludeScreen)
                 {
                     continue;
@@ -213,6 +233,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             source.component = renderer;
             source.kind = kind;
             source.screen = canvasPreview || space == RenderSpace::Screen;
+
             if (!source.screen && !camera)
             {
                 continue;
@@ -237,15 +258,18 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
 
     // Sort only submission metadata, not a second World/Screen Object array.
     // The final single owning array already has the required Overlay order.
-    std::stable_sort(sources.begin(), sources.end(), [](const SubmissionSource& left, const SubmissionSource& right)
-    {
-        if (left.screen != right.screen)
+    std::stable_sort(
+        sources.begin(),
+        sources.end(),
+        [](const SubmissionSource& left, const SubmissionSource& right)
         {
-            return !left.screen;
-        }
+            if (left.screen != right.screen)
+            {
+                return !left.screen;
+            }
 
-        return left.screen && left.orderPath < right.orderPath;
-    });
+            return left.screen && left.orderPath < right.orderPath;
+        });
 
     if (camera && !canvasPreview && policy.renderSpaceFilter != RenderSpaceFilter::ScreenOnly)
     {
@@ -264,12 +288,15 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             input.lightDirection[0] = light.direction.x;
             input.lightDirection[1] = light.direction.y;
             input.lightDirection[2] = light.direction.z;
+
             input.lightColor[0] = light.color.x * light.intensity;
             input.lightColor[1] = light.color.y * light.intensity;
             input.lightColor[2] = light.color.z * light.intensity;
+
             input.ambient[0] = light.ambient;
             input.ambient[1] = light.ambient;
             input.ambient[2] = light.ambient;
+
             frame.directionalLight = input;
         }
     }
@@ -278,6 +305,7 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
     overlay.id = overlayViewId;
     overlay.kind = rendering::ViewKind::Overlay;
     overlay.output = output;
+
     if (canvasPreview && camera)
     {
         overlay.view = EngineRendering::ToRenderer(camera->viewMatrix);
@@ -286,8 +314,12 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
     }
     else
     {
-        overlay.projection = rendering::Matrix4x4::CreateOrthographic(static_cast<float>(width),
-            static_cast<float>(height), -1, 100);
+        overlay.projection = rendering::Matrix4x4::CreateOrthographic(
+            static_cast<float>(width),
+            static_cast<float>(height),
+            -1,
+            100);
+
         if (camera)
         {
             overlay.cameraPosition = EngineRendering::ToRenderer(camera->position);
@@ -297,30 +329,38 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
     // Always provide a background/Screen View, including no Main Camera.
     frame.views.push_back(overlay);
 
-    const auto append = [&](rendering::RenderObject object, const SubmissionSource& source,
-                            const ComponentMaterialState& material, bool alphaMask)
+    const auto append = [&](
+        rendering::RenderObject object,
+        const SubmissionSource& source,
+        const ComponentMaterialState& material,
+        bool alphaMask)
     {
         object.targetViews.push_back(source.screen ? overlayViewId : sceneViewId);
+
         ExtractedObjectRecord record;
         record.objectIndex = frame.objects.size();
         record.actorGuid = source.component->GetOwner()->GetGuid();
         record.material = &material;
         record.alphaMask = alphaMask;
         record.viewId = source.screen ? overlayViewId : sceneViewId;
+
         frame.objects.push_back(std::move(object));
         m_records.push_back(record);
     };
 
     CameraInfo emptyCamera;
     const CameraInfo& proxyCamera = camera ? *camera : emptyCamera;
+
     for (const SubmissionSource& source : sources)
     {
         if (source.kind == SourceKind::Mesh)
         {
             auto* renderer = static_cast<MeshRenderer*>(source.component);
             const auto& proxy = renderer->GetRenderProxy();
+
             for (const SubmeshRenderTemplate& renderTemplate : renderer->GetRenderTemplates())
             {
+
                 Matrix4x4 world = renderTemplate.localToModel * proxy.common.worldMatrix * worldToCanvas;
                 rendering::RenderObject object;
                 object.geometry = renderTemplate.meshDesc.meshHandle;
@@ -330,9 +370,19 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
                 object.castShadow = renderer->GetCastShadow() && !source.screen;
                 object.drawRange.first = renderTemplate.meshDesc.startIndex;
                 object.drawRange.baseVertex = renderTemplate.meshDesc.baseVertex;
-                SetWorldBounds(object, renderTemplate.meshDesc.boundsCenter, renderTemplate.meshDesc.boundsRadius,
-                    renderTemplate.meshDesc.boundsRevision, world);
-                append(std::move(object), source, renderTemplate.materialDesc, false);
+
+                SetWorldBounds(
+                    object,
+                    renderTemplate.meshDesc.boundsCenter,
+                    renderTemplate.meshDesc.boundsRadius,
+                    renderTemplate.meshDesc.boundsRevision,
+                    world);
+
+                append(
+                    std::move(object),
+                    source,
+                    renderTemplate.materialDesc,
+                    false);
             }
 
             continue;
@@ -343,10 +393,14 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             continue;
         }
 
-        const auto appendQuad = [&](const CommonRendererProxy& common, const ComponentMaterialState& material,
-                                    rendering::BillboardMode billboard, bool castShadow)
+        const auto appendQuad = [&](
+            const CommonRendererProxy& common,
+            const ComponentMaterialState& material,
+            rendering::BillboardMode billboard,
+            bool castShadow)
         {
             Matrix4x4 world = common.worldMatrix * worldToCanvas;
+
             rendering::RenderObject object;
             object.geometry = context->pRenderAssets->Quad();
             object.material = material.handle;
@@ -354,22 +408,34 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             object.tint = EngineRendering::ToRenderer(common.color);
             object.billboard = billboard;
             object.castShadow = castShadow && !source.screen;
+
             if (context->pRenderer)
             {
                 rendering::GeometryData snapshot;
                 const auto queried = context->pRenderer->GetGeometryData(object.geometry, snapshot);
+
                 if (queried.IsSuccess())
                 {
+
                     const rendering::Vector4 local = LocalQuadTransform(material);
                     Vector3 center = EngineRendering::FromRenderer(snapshot.boundsCenter);
                     center.x = center.x * local.x + local.z;
                     center.y = center.y * local.y + local.w;
                     const float localStretch = (std::max)({ std::abs(local.x), std::abs(local.y), 1.0f });
-                    SetWorldBounds(object, center, snapshot.boundsRadius * localStretch, snapshot.revision, world);
+                    SetWorldBounds(
+                        object,
+                        center,
+                        snapshot.boundsRadius * localStretch,
+                        snapshot.revision,
+                        world);
                 }
             }
 
-            append(std::move(object), source, material, true);
+            append(
+                std::move(object),
+                source,
+                material,
+                true);
         };
 
         if (source.kind == SourceKind::Sprite)
@@ -377,15 +443,24 @@ bool RenderSystem::AppendFrame(rendering::FrameRenderData& frame, const renderin
             auto* renderer = static_cast<SpriteRenderer*>(source.component);
             const auto& proxy = renderer->GetRenderProxy(proxyCamera);
             const auto mode = static_cast<rendering::BillboardMode>(renderer->GetBillboardType());
-            appendQuad(proxy.common, renderer->GetRenderTemplate().materialDesc, mode, renderer->GetCastShadow());
+            appendQuad(
+                proxy.common,
+                renderer->GetRenderTemplate().materialDesc,
+                mode,
+                renderer->GetCastShadow());
         }
         else
         {
             auto* renderer = static_cast<UIRenderer*>(source.component);
             const auto& proxy = renderer->GetRenderProxy();
+
             for (const UIRenderElement& element : renderer->GetRenderTemplate())
             {
-                appendQuad(proxy.common, element.materialDesc, rendering::BillboardMode::None, false);
+                appendQuad(
+                    proxy.common,
+                    element.materialDesc,
+                    rendering::BillboardMode::None,
+                    false);
             }
         }
     }

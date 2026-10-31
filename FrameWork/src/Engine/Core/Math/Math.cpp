@@ -636,11 +636,19 @@ Vector4 Vector4::Normalized() const
 
     if (length > 0.0f)
     {
-        return Vector4(x / length, y / length, z / length, w / length);
+        return Vector4(
+            x / length,
+            y / length,
+            z / length,
+            w / length);
     }
     else
     {
-        return Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+        return Vector4(
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f);
     }
 }
 
@@ -705,34 +713,58 @@ Vector4 Vector4::operator+() const
 
 Vector4 Vector4::operator-() const
 {
-    return Vector4(-x, -y, -z, -w);
+    return Vector4(
+        -x,
+        -y,
+        -z,
+        -w);
 }
 
 Vector4 Vector4::operator+(const Vector4& rhs) const
 {
-	return Vector4(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w);
+	return Vector4(
+		x + rhs.x,
+		y + rhs.y,
+		z + rhs.z,
+		w + rhs.w);
 }
 
 Vector4 Vector4::operator-(const Vector4& rhs) const
 {
-    return Vector4(x - rhs.x, y - rhs.y, z - rhs.z, w - rhs.w);
+    return Vector4(
+        x - rhs.x,
+        y - rhs.y,
+        z - rhs.z,
+        w - rhs.w);
 }
 
 Vector4 Vector4::operator*(float scalar) const
 {
-    return Vector4(x * scalar, y * scalar, z * scalar, w * scalar);
+    return Vector4(
+        x * scalar,
+        y * scalar,
+        z * scalar,
+        w * scalar);
 }
 
 Vector4 Vector4::operator*(const Vector4& rhs) const
 {
-	return Vector4(x * rhs.x, y * rhs.y, z * rhs.z, w * rhs.w);
+	return Vector4(
+		x * rhs.x,
+		y * rhs.y,
+		z * rhs.z,
+		w * rhs.w);
 }
 
 Vector4 Vector4::operator/(float scalar) const
 {
     if (scalar != 0.0f)
     {
-        return Vector4(x / scalar, y / scalar, z / scalar, w / scalar);
+        return Vector4(
+            x / scalar,
+            y / scalar,
+            z / scalar,
+            w / scalar);
     }
     else
     {
@@ -814,17 +846,29 @@ Quaternion Quaternion::Normalized() const
 
     if (length > 0.0f)
     {
-        return Quaternion(x / length, y / length, z / length, w / length);
+        return Quaternion(
+            x / length,
+            y / length,
+            z / length,
+            w / length);
     }
     else
     {
-        return Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
+        return Quaternion(
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f);
     }
 }
 
 Quaternion Quaternion::Conjugate() const
 {
-    return Quaternion(-x, -y, -z, w);
+    return Quaternion(
+        -x,
+        -y,
+        -z,
+        w);
 }
 
 Quaternion Quaternion::Inverse() const
@@ -887,7 +931,11 @@ Quaternion Quaternion::Lerp(const Quaternion& target, float t) const
     Quaternion to = target;
 
     if (Dot(target) < 0.0f) {
-		to = Quaternion(-target.x, -target.y, -target.z, -target.w);
+		to = Quaternion(
+			-target.x,
+			-target.y,
+			-target.z,
+			-target.w);
     }
 
     return Quaternion(
@@ -905,7 +953,11 @@ Quaternion Quaternion::Slerp(const Quaternion& target, float t) const
     Quaternion to = target;
 
     if (Dot(target) < 0.0f) {
-        to = Quaternion(-target.x, -target.y, -target.z, -target.w);
+        to = Quaternion(
+            -target.x,
+            -target.y,
+            -target.z,
+            -target.w);
     }
 
     using namespace DirectX;
@@ -1147,13 +1199,21 @@ Vector4 Matrix4x4::GetRow(int row) const
 {
     const float* m = &_11;
     int i = row * 4;
-    return Vector4(m[i], m[i + 1], m[i + 2], m[i + 3]);
+    return Vector4(
+        m[i],
+        m[i + 1],
+        m[i + 2],
+        m[i + 3]);
 }
 
 Vector4 Matrix4x4::GetCol(int col) const
 {
     const float* m = &_11;
-    return Vector4(m[col], m[col + 4], m[col + 8], m[col + 12]);
+    return Vector4(
+        m[col],
+        m[col + 4],
+        m[col + 8],
+        m[col + 12]);
 }
 
 Vector3 Matrix4x4::GetTranslation() const
@@ -1165,7 +1225,11 @@ Quaternion Matrix4x4::GetRotation() const
 {
     XMVECTOR scale, rotQuat, translation;
 
-    if (XMMatrixDecompose(&scale, &rotQuat, &translation, *this))
+    if (XMMatrixDecompose(
+        &scale,
+        &rotQuat,
+        &translation,
+        *this))
     {
         return Quaternion(rotQuat);
     }
@@ -1182,7 +1246,11 @@ bool Matrix4x4::Decompose(Vector3& outTranslation, Quaternion& outRotation, Vect
 {
     XMVECTOR scale, rotQuat, translation;
 
-    if (XMMatrixDecompose(&scale, &rotQuat, &translation, *this))
+    if (XMMatrixDecompose(
+        &scale,
+        &rotQuat,
+        &translation,
+        *this))
     {
         outTranslation = Vector3(translation);
         outRotation = Quaternion(rotQuat);
@@ -1241,18 +1309,23 @@ Matrix4x4 Matrix4x4::ToBillboard(const Vector3& cameraPos, const Vector3& camera
     Vector3 up = forward.Cross(right).Normalized();
 
     Matrix4x4 result = Matrix4x4::Identity();
+
     result._11 = right.x * sx;
     result._12 = right.y * sx;
     result._13 = right.z * sx;
+
     result._21 = up.x * sy;
     result._22 = up.y * sy;
     result._23 = up.z * sy;
+
     result._31 = forward.x * sz;
     result._32 = forward.y * sz;
     result._33 = forward.z * sz;
+
     result._41 = objectPos.x;
     result._42 = objectPos.y;
     result._43 = objectPos.z;
+
     return result;
 }
 
@@ -1296,18 +1369,23 @@ Matrix4x4 Matrix4x4::ToCylindricalBillboard(const Vector3& cameraPos, const Vect
     forward = right.Cross(up).Normalized();
 
     Matrix4x4 result = Matrix4x4::Identity();
+
     result._11 = right.x * sx;
     result._12 = right.y * sx;
     result._13 = right.z * sx;
+
     result._21 = up.x * sy;
     result._22 = up.y * sy;
     result._23 = up.z * sy;
+
     result._31 = forward.x * sz;
     result._32 = forward.y * sz;
     result._33 = forward.z * sz;
+
     result._41 = objectPos.x;
     result._42 = objectPos.y;
     result._43 = objectPos.z;
+
     return result;
 }
 
@@ -1365,14 +1443,30 @@ Matrix4x4 Matrix4x4::CreateLookAt(const Vector3& eye, const Vector3& target, con
     return Matrix4x4(XMMatrixLookAtLH(eye, target, up));
 }
 
-Matrix4x4 Matrix4x4::CreatePerspectiveFov(float fovY, float aspect, float nearZ, float farZ)
+Matrix4x4 Matrix4x4::CreatePerspectiveFov(
+    float fovY,
+    float aspect,
+    float nearZ,
+    float farZ)
 {
-	return Matrix4x4(XMMatrixPerspectiveFovLH(fovY, aspect, nearZ, farZ));
+	return Matrix4x4(XMMatrixPerspectiveFovLH(
+		fovY,
+		aspect,
+		nearZ,
+		farZ));
 }
 
-Matrix4x4 Matrix4x4::CreateOrthographic(float width, float height, float nearZ, float farZ)
+Matrix4x4 Matrix4x4::CreateOrthographic(
+    float width,
+    float height,
+    float nearZ,
+    float farZ)
 {
-    return Matrix4x4(XMMatrixOrthographicLH(width, height, nearZ, farZ));
+    return Matrix4x4(XMMatrixOrthographicLH(
+        width,
+        height,
+        nearZ,
+        farZ));
 }
 
 Matrix4x4 Matrix4x4::Transpose(const Matrix4x4& m)

@@ -48,9 +48,13 @@ public:
 	void PreUpdate(float deltaTime);			// Pre-update
 	void Update(float deltaTime);				// Update
 	void LateUpdate(float deltaTime);			// Late update
-    bool AppendRenderData(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
-        const CameraInfo* overrideCameraInfo = nullptr, RenderViewPolicy viewPolicy = {},
-        rendering::ViewId sceneViewId = 1, rendering::ViewId overlayViewId = 2);
+    bool AppendRenderData(
+        rendering::FrameRenderData& frame,
+        const rendering::ViewOutput& output,
+        const CameraInfo* overrideCameraInfo = nullptr,
+        RenderViewPolicy viewPolicy = {},
+        rendering::ViewId sceneViewId = 1,
+        rendering::ViewId overlayViewId = 2);
 	void Finalize();							// Finalize
 	void EditorUpdate(float deltaTime);		// Update limited elements for editor
 

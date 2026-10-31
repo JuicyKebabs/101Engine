@@ -48,7 +48,12 @@ Result CommandContext::Initialize(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE 
 	}
 
 	// Create the command list
-	hr = device->CreateCommandList(0, type, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
+	hr = device->CreateCommandList(
+		0,
+		type,
+		commandAllocator.Get(),
+		nullptr,
+		IID_PPV_ARGS(&commandList));
 
 	if (FAILED(hr))
 	{
@@ -204,7 +209,11 @@ Result CommandContext::SetRasterOutput(
 	}
 
 	// Set the viewport and scissor rectangle to cover the entire render target.
-	m_commandList->OMSetRenderTargets(static_cast<UINT>(colors.size()), colors.data(), FALSE, depth.ptr ? &depth : nullptr);
+	m_commandList->OMSetRenderTargets(
+		static_cast<UINT>(colors.size()),
+		colors.data(),
+		FALSE,
+		depth.ptr ? &depth : nullptr);
 
 	const D3D12_VIEWPORT viewport{
 		0.0f, 0.0f,
@@ -234,20 +243,26 @@ Result CommandContext::SetViewport(const Viewport& viewport, UINT outputWidth, U
     {
         return detail::Fail("Viewport requires an active recording.");
     }
+
     const bool finitePosition = std::isfinite(viewport.x) && std::isfinite(viewport.y);
     const bool finiteSize = std::isfinite(viewport.width) && std::isfinite(viewport.height);
+
     if (!finitePosition || !finiteSize)
     {
         return detail::Fail("Viewport must be finite.");
     }
+
     const bool validPosition = viewport.x >= 0 && viewport.y >= 0;
     const bool validSize = viewport.width > 0 && viewport.height > 0;
+
     if (!validPosition || !validSize)
     {
         return detail::Fail("Viewport position and dimensions are invalid.");
     }
+
     const bool insideWidth = viewport.x + viewport.width <= static_cast<float>(outputWidth);
     const bool insideHeight = viewport.y + viewport.height <= static_cast<float>(outputHeight);
+
     if (!insideWidth || !insideHeight)
     {
         return detail::Fail("Viewport exceeds current output dimensions (possibly after Resize).");
@@ -283,7 +298,11 @@ Result CommandContext::ClearRenderTarget(
 		return { false, "ClearRenderTarget: RTV handle is empty." };
 	}
 
-	m_commandList->ClearRenderTargetView(rtv, color.data(), 0, nullptr);
+	m_commandList->ClearRenderTargetView(
+		rtv,
+		color.data(),
+		0,
+		nullptr);
 
 	return {};
 }
@@ -335,7 +354,13 @@ Result CommandContext::CopyTextureRegion(
 	from.pResource = source;
 	from.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 	from.PlacedFootprint = layout;
-	m_commandList->CopyTextureRegion(&to, 0, 0, 0, &from, nullptr);
+	m_commandList->CopyTextureRegion(
+		&to,
+		0,
+		0,
+		0,
+		&from,
+		nullptr);
 
 	return {};
 }
@@ -375,8 +400,10 @@ Result CommandContext::CopyBufferRegion(
 
 	// Record the copy command.
 	m_commandList->CopyBufferRegion(
-		destination, destinationOffset,
-		source, sourceOffset,
+		destination,
+		destinationOffset,
+		source,
+		sourceOffset,
 		byteCount);
 
 	return {};

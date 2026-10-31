@@ -26,8 +26,9 @@ add_library(101Renderer SHARED
     src/FrameDrawContext.cpp
     src/Resource/ShaderData.cpp
     src/DrawSystem.cpp
+    src/DrawCommandPreparation.cpp
     src/FallbackResources.cpp
-    src/SceneFrameResources.cpp
+    src/SceneOutputResources.cpp
     src/Graph/FrameTextureResolver.cpp
     src/Graph/FrameResourceBindings.cpp
     src/Backend/RenderTargetTextureGpuData.cpp

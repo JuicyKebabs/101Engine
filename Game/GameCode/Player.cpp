@@ -133,13 +133,18 @@ void Player::Update()
 		if (transform)
 		{
 			auto system = GetEngineContext()->pActorImprintSystem;
+
 			if (system)
 			{
+
 				ActorImprintHandle handle = system->Load(m_bulletImprintRef);
 				Actor* bullet = system->Instantiate(*GetOwner()->GetOwner(), handle);
+
 				Bullet* bulletComponent = bullet ? bullet->GetComponentByClass<Bullet>() : nullptr;
+
 				if (bulletComponent)
 				{
+
 					Vector3 spawnPosition = transform->GetWorldPosition() + forwardDirection * 1.0f; // プレイヤーの前方に1.0fの距離でスポーン
 					spawnPosition.y += 0.7f; // プレイヤーの高さに合わせて少し上に調整
 					bulletComponent->Launch(spawnPosition, forwardDirection, m_bulletSpeed);
@@ -148,9 +153,11 @@ void Player::Update()
 					if (m_fireSoundRef.HasValue())
 					{
 						auto context = GetEngineContext();
+
 						if (context && context->pAssetManager && context->pAudioManager)
 						{
 							const AudioHandle sound = context->pAssetManager->GetAudioHandle(m_fireSoundRef.GetGuid());
+
 							if (sound != InvalidAudioHandle)
 							{
 								context->pAudioManager->Play(sound);
@@ -216,9 +223,11 @@ void Player::LateUpdate()
 	for (const auto& info : collisionInfo)
 	{
 		DBG("Player collided with: %s", info.opponent ? info.opponent->GetOwner()->GetName().c_str() : "Unknown");
+
 		if (info.opponent)
 		{
 			auto opponentActor = info.opponent->GetOwner();
+
 			if (opponentActor)
 			{
 				auto tagRegistry = TagRegistry::Get();
@@ -240,6 +249,7 @@ void Player::LateUpdate()
 
 				// 衝突した相手の方向に押し戻す
 				auto transform = GetOwner()->GetComponentByClass<Transform>();
+
 				if (transform)
 				{
 					if (info.state == COLLISION_STATE::COLLISION_ENTER || info.state == COLLISION_STATE::COLLISION_STAY)

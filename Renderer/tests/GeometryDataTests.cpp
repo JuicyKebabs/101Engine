@@ -26,6 +26,7 @@ int main()
 {
     rendering::Renderer renderer;
     rendering::RendererConfiguration configuration;
+
     if (!Check(renderer.Initialize(configuration).IsSuccess(), "Initialize Renderer"))
     {
         return 1;
@@ -39,12 +40,14 @@ int main()
     rendering::GeometryDesc description;
     description.vertices = vertices;
     rendering::GeometryRegistrationResult registration = renderer.RegisterGeometry(description);
+
     if (!Check(registration.status.IsSuccess(), "Accept CPU Geometry before upload"))
     {
         return 1;
     }
 
     rendering::GeometryData firstSnapshot;
+
     if (!Check(renderer.GetGeometryData(registration.handle, firstSnapshot).IsSuccess(), "Query pending Geometry without GPU wait"))
     {
         return 1;

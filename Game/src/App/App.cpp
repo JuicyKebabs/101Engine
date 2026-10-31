@@ -58,13 +58,22 @@ bool App::Initialize()
     windowDescription.clientWidth = WINDOW_WIDTH;
     windowDescription.clientHeight = WINDOW_HEIGHT;
     windowDescription.allowFullscreenToggle = true;
-    windowDescription.messageCallback = [](HWND window, UINT message, WPARAM key, LPARAM parameter, LRESULT&)
+    windowDescription.messageCallback = [](
+        HWND window,
+        UINT message,
+        WPARAM key,
+        LPARAM parameter,
+        LRESULT&)
     {
         InputManager::GetInstance().ProcessWindowMessage(message, key, parameter);
 
         if (message == WM_KEYDOWN && key == VK_ESCAPE)
         {
-            SendMessageW(window, WM_CLOSE, 0, 0);
+            SendMessageW(
+                window,
+                WM_CLOSE,
+                0,
+                0);
         }
 
         return false;
@@ -113,7 +122,11 @@ bool App::Initialize()
 
     m_assets = std::make_unique<AssetManager>();
 
-    if (!m_assets->Initialize(PathManager::Resolve("asset"), m_renderer.get(), m_renderAssets.get(), &m_audio))
+    if (!m_assets->Initialize(
+        PathManager::Resolve("asset"),
+        m_renderer.get(),
+        m_renderAssets.get(),
+        &m_audio))
     {
         return false;
     }
@@ -180,7 +193,12 @@ int App::Run()
 
     while (m_running && message.message != WM_QUIT)
     {
-        if (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        if (PeekMessageW(
+            &message,
+            nullptr,
+            0,
+            0,
+            PM_REMOVE))
         {
             TranslateMessage(&message);
             DispatchMessageW(&message);
@@ -264,6 +282,7 @@ void App::Render()
     frame.time = static_cast<float>(timeGetTime()) / 1000.0f;
     rendering::ViewOutput output = m_windowOutput;
 
+	// Constructs FrameRenderData from the current Scene and its Components.
     if (SceneBase* scene = m_scenes->GetCurrentScene())
     {
         if (!scene->AppendRenderData(frame, output))
@@ -281,11 +300,13 @@ void App::Render()
         frame.views.push_back(background);
     }
 
+	// Submit the FrameRenderData to the Renderer
     if (!CheckRenderingResult(m_renderer->SubmitFrameRenderData(std::move(frame))))
     {
         return;
     }
 
+	// Render the submitted FrameRenderData to the window output
     const auto result = m_renderer->Render();
     CheckRenderingResult(result.status);
 

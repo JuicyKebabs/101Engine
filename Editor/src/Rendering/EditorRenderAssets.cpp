@@ -87,14 +87,26 @@ EditorRenderAssets::~EditorRenderAssets()
     }
 }
 
-rendering::Result EditorRenderAssets::RegisterShader(const std::string& source,
-    rendering::ShaderStage stage, std::size_t index)
+rendering::Result EditorRenderAssets::RegisterShader(
+    const std::string& source,
+    rendering::ShaderStage stage,
+    std::size_t index)
 {
     Microsoft::WRL::ComPtr<ID3DBlob> bytecode;
     Microsoft::WRL::ComPtr<ID3DBlob> diagnostics;
     const char* profile = stage == rendering::ShaderStage::Vertex ? "vs_5_0" : "ps_5_0";
-    const HRESULT compiled = D3DCompile(source.data(), source.size(), nullptr, nullptr,
-        nullptr, "main", profile, D3DCOMPILE_ENABLE_STRICTNESS, 0, &bytecode, &diagnostics);
+    const HRESULT compiled = D3DCompile(
+        source.data(),
+        source.size(),
+        nullptr,
+        nullptr,
+        nullptr,
+        "main",
+        profile,
+        D3DCOMPILE_ENABLE_STRICTNESS,
+        0,
+        &bytecode,
+        &diagnostics);
 
     if (FAILED(compiled))
     {
@@ -117,8 +129,12 @@ rendering::Result EditorRenderAssets::RegisterShader(const std::string& source,
     return registration.result;
 }
 
-rendering::Result EditorRenderAssets::RegisterPipeline(std::size_t index, std::size_t vertexShader,
-    std::size_t pixelShader, rendering::BlendMode blend, rendering::DepthMode depth,
+rendering::Result EditorRenderAssets::RegisterPipeline(
+    std::size_t index,
+    std::size_t vertexShader,
+    std::size_t pixelShader,
+    rendering::BlendMode blend,
+    rendering::DepthMode depth,
     rendering::FillMode fill)
 {
     rendering::PipelineDesc description;
@@ -241,7 +257,10 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
     {
         const bool isOutline = index == 2;
         const bool isCollider = index == 3;
-        auto registered = RegisterPipeline(index, isOutline ? 1 : 0, index + 2,
+        auto registered = RegisterPipeline(
+            index,
+            isOutline ? 1 : 0,
+            index + 2,
             isOutline ? rendering::BlendMode::Alpha : rendering::BlendMode::Opaque,
             isCollider ? rendering::DepthMode::ReadOnly : rendering::DepthMode::Disabled,
             isCollider ? rendering::FillMode::Wireframe : rendering::FillMode::Solid);
@@ -363,8 +382,11 @@ rendering::Result EditorRenderAssets::Resize(std::uint32_t width, std::uint32_t 
     return {};
 }
 
-rendering::Result EditorRenderAssets::AppendMaskMaterial(const rendering::MaterialDesc& source,
-    bool alphaMask, std::size_t slot, rendering::MaterialHandle& output)
+rendering::Result EditorRenderAssets::AppendMaskMaterial(
+    const rendering::MaterialDesc& source,
+    bool alphaMask,
+    std::size_t slot,
+    rendering::MaterialHandle& output)
 {
     // Reserve the owning Handle slot before registration so allocation failure
     // cannot strand a successfully created Material registration.
@@ -378,10 +400,12 @@ rendering::Result EditorRenderAssets::AppendMaskMaterial(const rendering::Materi
 
     if (!alphaMask)
     {
-        std::erase_if(description.parameters, [](const rendering::MaterialParameter& parameter)
-        {
-            return parameter.name == "BaseTexture";
-        });
+        std::erase_if(
+            description.parameters,
+            [](const rendering::MaterialParameter& parameter)
+            {
+                return parameter.name == "BaseTexture";
+            });
     }
 
     output = m_maskMaterials[slot];
@@ -402,8 +426,12 @@ rendering::Result EditorRenderAssets::AppendMaskMaterial(const rendering::Materi
     return registered.result;
 }
 
-rendering::Result EditorRenderAssets::AppendSelection(rendering::FrameRenderData& frame, SceneBase& scene,
-    const Guid& selectedActor, rendering::ViewId sourceView, bool canvasPreview)
+rendering::Result EditorRenderAssets::AppendSelection(
+    rendering::FrameRenderData& frame,
+    SceneBase& scene,
+    const Guid& selectedActor,
+    rendering::ViewId sourceView,
+    bool canvasPreview)
 {
     if (!selectedActor.IsValid())
     {
@@ -429,7 +457,11 @@ rendering::Result EditorRenderAssets::AppendSelection(rendering::FrameRenderData
         }
 
         rendering::MaterialHandle maskMaterial;
-        auto prepared = AppendMaskMaterial(record.material->description, record.alphaMask, materialSlot++, maskMaterial);
+        auto prepared = AppendMaskMaterial(
+            record.material->description,
+            record.alphaMask,
+            materialSlot++,
+            maskMaterial);
 
         if (!prepared.IsSuccess())
         {
@@ -461,16 +493,22 @@ rendering::Result EditorRenderAssets::AppendSelection(rendering::FrameRenderData
     outline.sourceViewId = sourceView;
     outline.name = "Editor.SelectionOutline";
     outline.stage = mask.stage;
+
     rendering::AuxiliaryDraw draw;
     draw.objectIndex = outlineObject;
     outline.draws.push_back(draw);
+
     frame.auxiliaryPasses.push_back(std::move(mask));
     frame.auxiliaryPasses.push_back(std::move(outline));
+
     return {};
 }
 
-void EditorRenderAssets::AppendColliderObject(rendering::FrameRenderData& frame,
-    rendering::AuxiliaryPass& pass, rendering::GeometryHandle geometry, const Matrix4x4& world)
+void EditorRenderAssets::AppendColliderObject(
+    rendering::FrameRenderData& frame,
+    rendering::AuxiliaryPass& pass,
+    rendering::GeometryHandle geometry,
+    const Matrix4x4& world)
 {
     rendering::RenderObject object;
     object.geometry = geometry;
@@ -483,7 +521,9 @@ void EditorRenderAssets::AppendColliderObject(rendering::FrameRenderData& frame,
     pass.draws.push_back(draw);
 }
 
-void EditorRenderAssets::AppendColliders(rendering::FrameRenderData& frame, SceneBase& scene,
+void EditorRenderAssets::AppendColliders(
+    rendering::FrameRenderData& frame,
+    SceneBase& scene,
     rendering::ViewId sourceView)
 {
     rendering::AuxiliaryPass pass;
@@ -517,24 +557,52 @@ void EditorRenderAssets::AppendColliders(rendering::FrameRenderData& frame, Scen
 
                 if (capsule.cylHeight <= 0)
                 {
-                    AppendColliderObject(frame, pass, m_debugGeometry[1], Matrix4x4::CreateTRS(
-                        transform.position, Quaternion::Identity(), sphereScale));
+                    AppendColliderObject(
+                        frame,
+                        pass,
+                        m_debugGeometry[1],
+                        Matrix4x4::CreateTRS(
+                            transform.position,
+                            Quaternion::Identity(),
+                            sphereScale));
                 }
                 else
                 {
                     const Vector3 cylinderScale(diameter, capsule.cylHeight, diameter);
-                    AppendColliderObject(frame, pass, m_debugGeometry[2], Matrix4x4::CreateTRS(
-                        transform.position, transform.rotation, cylinderScale));
-                    AppendColliderObject(frame, pass, m_debugGeometry[1], Matrix4x4::CreateTRS(
-                        capsule.pointA, Quaternion::Identity(), sphereScale));
-                    AppendColliderObject(frame, pass, m_debugGeometry[1], Matrix4x4::CreateTRS(
-                        capsule.pointB, Quaternion::Identity(), sphereScale));
+                    AppendColliderObject(
+                        frame,
+                        pass,
+                        m_debugGeometry[2],
+                        Matrix4x4::CreateTRS(
+                            transform.position,
+                            transform.rotation,
+                            cylinderScale));
+                    AppendColliderObject(
+                        frame,
+                        pass,
+                        m_debugGeometry[1],
+                        Matrix4x4::CreateTRS(
+                            capsule.pointA,
+                            Quaternion::Identity(),
+                            sphereScale));
+                    AppendColliderObject(
+                        frame,
+                        pass,
+                        m_debugGeometry[1],
+                        Matrix4x4::CreateTRS(
+                            capsule.pointB,
+                            Quaternion::Identity(),
+                            sphereScale));
                 }
             }
             else if (collider->GetType() == ColliderType::BOX || collider->GetType() == ColliderType::SPHERE)
             {
                 const std::size_t geometryIndex = collider->GetType() == ColliderType::BOX ? 0 : 1;
-                AppendColliderObject(frame, pass, m_debugGeometry[geometryIndex], collider->GetWorldMatrix());
+                AppendColliderObject(
+                    frame,
+                    pass,
+                    m_debugGeometry[geometryIndex],
+                    collider->GetWorldMatrix());
             }
         }
     }

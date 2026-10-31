@@ -21,12 +21,15 @@ float EvaluateDirectionalShadow(float3 worldPosition)
     float2 textureUV = projected.xy * float2(0.5, -0.5) + 0.5;
     bool outsideTexture = any(textureUV < 0) || any(textureUV > 1);
     bool outsideDepth = projected.z < 0 || projected.z > 1;
+
     if (outsideTexture || outsideDepth)
     {
         return 1;
     }
 
-    return RendererShadowMap.SampleCmpLevelZero(RendererShadowSampler, textureUV,
+    return RendererShadowMap.SampleCmpLevelZero(
+        RendererShadowSampler,
+        textureUV,
         projected.z - shadowInformation.y);
 }
 

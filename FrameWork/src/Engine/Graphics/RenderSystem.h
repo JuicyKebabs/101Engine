@@ -56,9 +56,15 @@ public:
 
     // One extraction walk updates Component snapshots and appends one Object
     // array. Camera/Light visibility and transparent sorting remain Renderer work.
-    bool AppendFrame(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
-        const CameraInfo* camera, const RenderViewPolicy& policy, rendering::ViewId sceneViewId,
-        rendering::ViewId overlayViewId, std::uint32_t width, std::uint32_t height,
+    bool AppendFrame(
+        rendering::FrameRenderData& frame,
+        const rendering::ViewOutput& output,
+        const CameraInfo* camera,
+        const RenderViewPolicy& policy,
+        rendering::ViewId sceneViewId,
+        rendering::ViewId overlayViewId,
+        std::uint32_t width,
+        std::uint32_t height,
         const DirectionalLight& light);
     const std::vector<ExtractedObjectRecord>& GetExtractedObjects() const noexcept { return m_records; }
 

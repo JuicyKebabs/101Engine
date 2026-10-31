@@ -22,11 +22,13 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::RectTransform(std::st
 {
 	TypeMetadataBuilder<::RectTransform> builder(std::move(stableTypeName));
 	PersistentMetadata::AddComponentName(builder);
+
 	builder.Property("position", &::RectTransform::GetLocalPosition, &::RectTransform::SetLocalPosition)
 		.Validate(ValueValidation::Finite3).Inspector(std::nullopt);
 	builder.Property("rotation", &::RectTransform::GetLocalRotationQuat, &::RectTransform::SetAuthoredLocalRotation);
 	builder.Property("scale", &::RectTransform::GetLocalScale, &::RectTransform::SetLocalScale)
 		.Validate(ValueValidation::Finite3);
+
 	builder.Property("anchorMode", &::RectTransform::GetAnchorMode, &::RectTransform::SetAnchorMode)
 		.SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("anchoredPosition", &::RectTransform::GetAnchoredPosition, &::RectTransform::SetAnchoredPosition)
@@ -38,5 +40,6 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::RectTransform(std::st
 	{
 		return ValueValidation::Finite2(value) && value.x >= 0.0f && value.y >= 0.0f;
 	});
+
 	return PersistentMetadata::Finish(builder);
 }

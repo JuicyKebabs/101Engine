@@ -24,12 +24,19 @@ Result CommandContext::ClearDepth(D3D12_CPU_DESCRIPTOR_HANDLE depth, float value
 	}
 
 	const bool invalidValue = !std::isfinite(value) || value < 0 || value > 1;
+
 	if (!depth.ptr || invalidValue)
 	{
 		return detail::Fail("ClearDepth: invalid depth Descriptor or value.");
 	}
 
-	m_commandList->ClearDepthStencilView(depth, D3D12_CLEAR_FLAG_DEPTH, value, 0, 0, nullptr);
+	m_commandList->ClearDepthStencilView(
+		depth,
+		D3D12_CLEAR_FLAG_DEPTH,
+		value,
+		0,
+		0,
+		nullptr);
 	return {};
 }
 
@@ -49,6 +56,7 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 	}
 
 	const bool missingPipeline = !packet.pipeline || !packet.root || !packet.heap;
+
 	if (missingPipeline || packet.count == 0)
 	{
 		return detail::Fail("RecordDraw: missing Pipeline, Root Signature, Heap or count.");
@@ -67,9 +75,11 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 		}
 
 		UINT availableCount = packet.vertices.SizeInBytes / packet.vertices.StrideInBytes;
+
 		if (packet.kind == DrawKind::Indexed)
 		{
 			const bool missingIndexBuffer = !packet.indices.BufferLocation || packet.indices.SizeInBytes == 0;
+
 			if (missingIndexBuffer || packet.indices.Format != DXGI_FORMAT_R32_UINT)
 			{
 				return detail::Fail("RecordDraw: indexed drawing requires a 32-bit Index Buffer.");
@@ -127,6 +137,7 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 	}
 
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
 	if (packet.requiresVertexBuffer)
 	{
 		m_commandList->IASetVertexBuffers(0, 1, &packet.vertices);
@@ -142,12 +153,21 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 	if (packet.kind == DrawKind::Indexed)
 	{
 		m_commandList->IASetIndexBuffer(&packet.indices);
-		m_commandList->DrawIndexedInstanced(packet.count, 1, packet.first, packet.baseVertex, 0);
+		m_commandList->DrawIndexedInstanced(
+			packet.count,
+			1,
+			packet.first,
+			packet.baseVertex,
+			0);
 	}
 	else
 	{
 		m_commandList->IASetIndexBuffer(nullptr);
-		m_commandList->DrawInstanced(packet.count, 1, packet.first, 0);
+		m_commandList->DrawInstanced(
+			packet.count,
+			1,
+			packet.first,
+			0);
 	}
 
 	return {};

@@ -24,7 +24,11 @@ Actor* ActorImprintInstanceSnapshot::Restore(SceneBase& scene, ActorImprintSyste
 
 	ActorImprintPreparedRestore prepared;
 
-	if (!ActorImprintInstanceDeserializer::Prepare(*m_record, scene, system, prepared))
+	if (!ActorImprintInstanceDeserializer::Prepare(
+		*m_record,
+		scene,
+		system,
+		prepared))
 	{
 		return nullptr;
 	}

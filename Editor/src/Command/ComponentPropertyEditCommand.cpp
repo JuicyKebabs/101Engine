@@ -84,5 +84,8 @@ bool ApplyComponentPropertyValue(
 	}
 
 	return metadata->TryWriteProperty(
-		identity.componentType, component, *property, value);
+		identity.componentType,
+		component,
+		*property,
+		value);
 }

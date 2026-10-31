@@ -1,6 +1,6 @@
 // R7 implementation guide: section 4.10.
 // Registration publishes a complete GPU set; Resize swaps complete revisions transactionally.
-// Destroy first stops new use, then Collect releases physical storage after the use Fence.
+// Destroy releases storage at the same completed boundary as Resize.
 // All returned Content pointers are short borrows; Render prevents mutation during those borrows.
 
 #include "RenderTargetTextureRegistry.h"
@@ -19,179 +19,192 @@ namespace
 
 Result ClassifyDeviceFailure(ID3D12Device* device, Result failure)
 {
-	if (device && FAILED(device->GetDeviceRemovedReason()))
-	{
-		failure.failureKind = FailureKind::DeviceLost;
-	}
-	return failure;
+    if (device && FAILED(device->GetDeviceRemovedReason()))
+    {
+        failure.failureKind = FailureKind::DeviceLost;
+    }
+
+    return failure;
 }
 
-}
+} // namespace
 
 // Prepare the complete GPU allocation before registering a usable slot.
 // CPU allocation failures release only private candidates; no incomplete handle is returned.
 ResourceRegistrationResult<RenderTargetTextureHandle> RenderTargetTextureRegistry::Create(
-	ID3D12Device* device,
-	const RenderTargetTextureDesc& description)
+    ID3D12Device* device, const RenderTargetTextureDesc& description)
 {
-	ResourceRegistrationResult<RenderTargetTextureHandle> registration;
-	try
-	{
-		auto candidate = std::make_unique<RenderTargetTextureContent>();
+    ResourceRegistrationResult<RenderTargetTextureHandle> registration;
+
+    try
+    {
+        auto candidate = std::make_unique<RenderTargetTextureContent>();
         candidate->creationDescription = description;
-		candidate->gpuData = std::make_unique<backend::RenderTargetTextureGpuData>();
-		registration.result = candidate->gpuData->Initialize(device, description);
-		if (!registration.result.IsSuccess())
-		{
-			registration.result = ClassifyDeviceFailure(device, std::move(registration.result));
-			return registration;
-		}
+        candidate->gpuData = std::make_unique<backend::RenderTargetTextureGpuData>();
+        registration.result = candidate->gpuData->Initialize(device, description);
 
-		const auto slotIndex = m_slots.FindRegistrationSlotIndex();
-		const bool slotSupported = slotIndex < RenderTargetTextureHandle::InvalidIndex &&
-			slotIndex < m_contents.max_size();
-		if (!slotSupported)
-		{
-			registration.result = Fail("RenderTargetTexture: slot limit reached.");
-			return registration;
-		}
+        if (!registration.result.IsSuccess())
+        {
+            registration.result = ClassifyDeviceFailure(device, std::move(registration.result));
+            return registration;
+        }
 
-		if (slotIndex >= m_contents.size())
-		{
-			m_contents.resize(slotIndex + 1);
-		}
+        const auto slotIndex = m_slots.FindRegistrationSlotIndex();
+        const bool slotSupported =
+            slotIndex < RenderTargetTextureHandle::InvalidIndex && slotIndex < m_contents.max_size();
 
-		auto slot = m_slots.Register();
-		registration.result = std::move(slot.status);
-		if (!registration.result.IsSuccess())
-		{
-			return registration;
-		}
+        if (!slotSupported)
+        {
+            registration.result = Fail("RenderTargetTexture: slot limit reached.");
+            return registration;
+        }
 
-		m_contents[slot.handle.slotIndex] = std::move(candidate);
-		registration.handle = slot.handle;
-	}
-	catch (const std::bad_alloc&)
-	{
-		registration.result = Fail("RenderTargetTexture: allocation failed.");
-	}
-	catch (const std::length_error&)
-	{
-		registration.result = Fail("RenderTargetTexture: storage size is unsupported.");
-	}
-	return registration;
+        if (slotIndex >= m_contents.size())
+        {
+            m_contents.resize(slotIndex + 1);
+        }
+
+        auto slot = m_slots.Register();
+        registration.result = std::move(slot.status);
+
+        if (!registration.result.IsSuccess())
+        {
+            return registration;
+        }
+
+        m_contents[slot.handle.slotIndex] = std::move(candidate);
+        registration.handle = slot.handle;
+    }
+    catch (const std::bad_alloc&)
+    {
+        registration.result = Fail("RenderTargetTexture: allocation failed.");
+    }
+    catch (const std::length_error&)
+    {
+        registration.result = Fail("RenderTargetTexture: storage size is unsupported.");
+    }
+
+    return registration;
 }
 
 // Precondition: the public Renderer already established an inactive, confirmed-idle boundary.
 // Build a new complete revision first. The old dimensions, revision and GPU set survive any preparation failure.
 // Same-size requests are no-ops so valid existing contents are not unnecessarily discarded.
-Result RenderTargetTextureRegistry::Resize(
-	ID3D12Device* device,
-	RenderTargetTextureHandle handle,
-	std::uint32_t width,
-	std::uint32_t height)
+Result RenderTargetTextureRegistry::Resize(ID3D12Device* device, RenderTargetTextureHandle handle, std::uint32_t width,
+                                           std::uint32_t height)
 {
-	auto* current = FindForNewUse(handle);
-	if (!current)
-	{
-		return Fail("ResizeRenderTargetTexture: handle is unavailable.");
-	}
+    auto* current = FindForNewUse(handle);
 
-	if (width == 0 || height == 0)
-	{
-		return Fail("ResizeRenderTargetTexture: dimensions must be non-zero.");
-	}
+    if (!current)
+    {
+        return Fail("ResizeRenderTargetTexture: handle is unavailable.");
+    }
 
-	if (current->gpuData->width == width && current->gpuData->height == height)
-	{
-		return {};
-	}
+    if (width == 0 || height == 0)
+    {
+        return Fail("ResizeRenderTargetTexture: dimensions must be non-zero.");
+    }
 
-	if (current->revision == (std::numeric_limits<std::uint64_t>::max)())
-	{
-		return Fail("ResizeRenderTargetTexture: revision is exhausted.");
-	}
+    if (current->gpuData->width == width && current->gpuData->height == height)
+    {
+        return {};
+    }
 
-	try
-	{
+    if (current->revision == (std::numeric_limits<std::uint64_t>::max)())
+    {
+        return Fail("ResizeRenderTargetTexture: revision is exhausted.");
+    }
+
+    try
+    {
         // Copy the complete policy before touching the live owner. In particular,
         // a numeric Mask must not silently inherit the normal background hint.
         RenderTargetTextureDesc description = current->creationDescription;
         description.width = width;
         description.height = height;
 
-		auto candidate = std::make_unique<RenderTargetTextureContent>();
-		candidate->revision = current->revision + 1;
+        auto candidate = std::make_unique<RenderTargetTextureContent>();
+        candidate->revision = current->revision + 1;
         candidate->creationDescription = description;
-		candidate->gpuData = std::make_unique<backend::RenderTargetTextureGpuData>();
-		Result prepared = candidate->gpuData->Initialize(device, description);
-		if (!prepared.IsSuccess())
-		{
-			return ClassifyDeviceFailure(device, std::move(prepared));
-		}
+        candidate->gpuData = std::make_unique<backend::RenderTargetTextureGpuData>();
+        Result prepared = candidate->gpuData->Initialize(device, description);
 
-		// This allocation is the final potentially throwing operation before ownership exchange.
-		// Moving the current owner first would lose the old published output if vector growth failed.
-		// Allocate retirement storage before moving the live owner.
-		m_retired.emplace_back();
-		m_retired.back() = std::move(m_contents[handle.slotIndex]);
-		m_contents[handle.slotIndex] = std::move(candidate);
-		return {};
-	}
-	catch (const std::bad_alloc&)
-	{
-		return Fail("ResizeRenderTargetTexture: allocation failed; previous output retained.");
-	}
-	catch (const std::length_error&)
-	{
-		return Fail("ResizeRenderTargetTexture: storage size unsupported; previous output retained.");
-	}
+        if (!prepared.IsSuccess())
+        {
+            return ClassifyDeviceFailure(device, std::move(prepared));
+        }
+
+        // The caller has already confirmed GPU idle; replace the complete owner.
+        m_contents[handle.slotIndex] = std::move(candidate);
+        return {};
+    }
+    catch (const std::bad_alloc&)
+    {
+        return Fail("ResizeRenderTargetTexture: allocation failed; previous output retained.");
+    }
+    catch (const std::length_error&)
+    {
+        return Fail("ResizeRenderTargetTexture: storage size unsupported; previous output retained.");
+    }
 }
 
 // Logical invalidation is immediate for all new View and Material resolution.
-// Physical deletion is deferred to Collect; callers must not confuse these two times.
+// The caller is outside Render at a completed GPU boundary, so storage can be released now.
 Result RenderTargetTextureRegistry::Destroy(RenderTargetTextureHandle handle)
 {
-	if (m_slots.RequestDestroy(handle) != ResourceHandleValidationResult::Success)
-	{
-		return Fail("DestroyRenderTargetTexture: handle is unavailable.");
-	}
-	return {};
+    if (m_slots.RequestDestroy(handle) != ResourceHandleValidationResult::Success)
+    {
+        return Fail("DestroyRenderTargetTexture: handle is unavailable.");
+    }
+
+    m_contents[handle.slotIndex].reset();
+
+    if (m_slots.ReleaseSlotAfterResourceDestruction(handle) != ResourceHandleValidationResult::Success)
+    {
+        std::terminate();
+    }
+
+    return {};
 }
 
 // Validate owner/generation/destroy state before returning a short borrow.
 // Render's no-reentry rule prevents this owner from being replaced during Graph declaration and recording.
 RenderTargetTextureContent* RenderTargetTextureRegistry::FindForNewUse(RenderTargetTextureHandle handle) noexcept
 {
-	if (m_slots.ValidateForNewUse(handle) != ResourceHandleValidationResult::Success)
-	{
-		return nullptr;
-	}
-	return m_contents[handle.slotIndex].get();
+    if (m_slots.ValidateForNewUse(handle) != ResourceHandleValidationResult::Success)
+    {
+        return nullptr;
+    }
+
+    return m_contents[handle.slotIndex].get();
 }
 
-const RenderTargetTextureContent* RenderTargetTextureRegistry::FindForNewUse(RenderTargetTextureHandle handle) const noexcept
+const RenderTargetTextureContent* RenderTargetTextureRegistry::FindForNewUse(
+    RenderTargetTextureHandle handle) const noexcept
 {
-	if (m_slots.ValidateForNewUse(handle) != ResourceHandleValidationResult::Success)
-	{
-		return nullptr;
-	}
-	return m_contents[handle.slotIndex].get();
+    if (m_slots.ValidateForNewUse(handle) != ResourceHandleValidationResult::Success)
+    {
+        return nullptr;
+    }
+
+    return m_contents[handle.slotIndex].get();
 }
 
 // Fill a local value and assign the caller's storage only after validation succeeds.
 // A failed query leaves the caller's previous Info unchanged.
 Result RenderTargetTextureRegistry::QueryInfo(RenderTargetTextureHandle handle, RenderTargetTextureInfo& output) const
 {
-	const auto* current = FindForNewUse(handle);
-	if (!current || !current->gpuData)
-	{
-		return Fail("GetRenderTargetTextureInfo: handle is unavailable.");
-	}
+    const auto* current = FindForNewUse(handle);
 
-	RenderTargetTextureInfo information;
-	information.width = current->gpuData->width;
-	information.height = current->gpuData->height;
+    if (!current || !current->gpuData)
+    {
+        return Fail("GetRenderTargetTextureInfo: handle is unavailable.");
+    }
+
+    RenderTargetTextureInfo information;
+    information.width = current->gpuData->width;
+    information.height = current->gpuData->height;
+
     switch (current->gpuData->viewFormat)
     {
     case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
@@ -204,48 +217,13 @@ Result RenderTargetTextureRegistry::QueryInfo(RenderTargetTextureHandle handle, 
         information.format = TextureFormat::RGBA8_UNorm;
         break;
     }
-	information.revision = current->revision;
-	information.contentsValid = current->gpuData->contentsValid;
-	output = information;
-	return {};
+
+    information.revision = current->revision;
+    information.contentsValid = current->gpuData->contentsValid;
+
+    output = information;
+
+    return {};
 }
 
-// Only completed Queue use allows physical release.
-// Retired revisions and Destroy-requested current slots are two different sources of releasable storage.
-// Release a slot after destroying its resource so the next registration receives a new generation.
-void RenderTargetTextureRegistry::Collect(std::uint64_t completedFence)
-{
-	std::erase_if(m_retired, [completedFence](const auto& content)
-		{
-			return content->lastDrawFenceValue <= completedFence;
-		});
-
-	for (std::size_t slotIndex = 0; slotIndex < m_contents.size(); ++slotIndex)
-	{
-		const auto handle = m_slots.GetDestroyRequestedHandle(slotIndex);
-		if (handle == RenderTargetTextureHandle{})
-		{
-			continue;
-		}
-
-		const auto& content = m_contents[slotIndex];
-		if (!content)
-		{
-			std::terminate();
-		}
-
-		if (content->lastDrawFenceValue > completedFence)
-		{
-			continue;
-		}
-
-		m_contents[slotIndex].reset();
-		const auto released = m_slots.ReleaseSlotAfterResourceDestruction(handle);
-		if (released != ResourceHandleValidationResult::Success)
-		{
-			std::terminate();
-		}
-	}
-}
-
-}
+} // namespace rendering::detail

@@ -68,7 +68,11 @@ std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::CreateDefault(
 
 	}
 
-	auto result = Capture(*scene, objectMap, assets, outJson);
+	auto result = Capture(
+		*scene,
+		objectMap,
+		assets,
+		outJson);
 	scene->Finalize();
 	return result;
 }
@@ -153,8 +157,12 @@ std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::Capture(
 
 			nlohmann::json actorProperties;
 
-			if (!ReflectionSerializer::Serialize(GetActorMetadata(), typeid(Actor), actor,
-					actorProperties, save))
+			if (!ReflectionSerializer::Serialize(
+				GetActorMetadata(),
+				typeid(Actor),
+				actor,
+				actorProperties,
+				save))
 			{
 				return nullptr;
 			}
@@ -189,7 +197,12 @@ std::unique_ptr<const ActorImprint> ActorImprintEditingSnapshot::Capture(
 
 				nlohmann::json properties;
 
-				if (!ReflectionSerializer::Serialize(*metadata, *type, component, properties, save))
+				if (!ReflectionSerializer::Serialize(
+					*metadata,
+					*type,
+					component,
+					properties,
+					save))
 				{
 					return nullptr;
 				}

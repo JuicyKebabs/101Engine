@@ -39,12 +39,14 @@ Result PrepareGeometryUpload(
 			[&](std::span<const std::byte> bytes, Buffer& destination, Buffer& source) -> Result
 			{
 				Result result = destination.Initialize(device, bytes.size(), BufferMemory::Default);
+
 				if (!result.IsSuccess())
 				{
 					return result;
 				}
 
 				result = source.Initialize(device, bytes.size(), BufferMemory::Upload);
+
 				if (!result.IsSuccess())
 				{
 					return result;
@@ -134,8 +136,10 @@ Result RecordGeometryUpload(
 		[&](const Buffer& destination, const Buffer& source, D3D12_RESOURCE_STATES finalState)->Result
 		{
 			Result result = context.CopyBufferRegion(
-				destination.GetNativeResource(), 0,
-				source.GetNativeResource(), 0,
+				destination.GetNativeResource(),
+				0,
+				source.GetNativeResource(),
+				0,
 				destination.GetSize());
 
 			if (!result.IsSuccess())
@@ -150,7 +154,8 @@ Result RecordGeometryUpload(
 		};
 
 	Result result = recordBuffer(
-		gpuData.vertices, uploadData.vertices, 
+		gpuData.vertices,
+		uploadData.vertices,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
 	if (!result.IsSuccess())
@@ -161,7 +166,8 @@ Result RecordGeometryUpload(
 	if (indexed)
 	{
 		result = recordBuffer(
-			gpuData.indices, uploadData.indices,
+			gpuData.indices,
+			uploadData.indices,
 			D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
 		if (!result.IsSuccess())

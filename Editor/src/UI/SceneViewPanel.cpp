@@ -228,6 +228,7 @@ void SceneViewPanel::Render(
 		{
 			m_sceneNavigationInput.lookDeltaPixels +=
 				Vector2(io.MouseDelta.x, io.MouseDelta.y);
+
 			m_sceneNavigationInput.flyDirection.x =
 				(ImGui::IsKeyDown(ImGuiKey_D) ? 1.0f : 0.0f) -
 				(ImGui::IsKeyDown(ImGuiKey_A) ? 1.0f : 0.0f);
@@ -237,7 +238,9 @@ void SceneViewPanel::Render(
 			m_sceneNavigationInput.flyDirection.z =
 				(ImGui::IsKeyDown(ImGuiKey_W) ? 1.0f : 0.0f) -
 				(ImGui::IsKeyDown(ImGuiKey_S) ? 1.0f : 0.0f);
+
 			m_sceneNavigationInput.fastMove = io.KeyShift;
+
 			m_hasSceneNavigationInput = true;
 		}
 
@@ -303,7 +306,11 @@ void SceneViewPanel::Render(
 						m_imageMin.y + rect.corners[i].y * imageHeight};
 			}
 
-			ImU32 color = IM_COL32(120, 165, 185, 100);
+			ImU32 color = IM_COL32(
+				120,
+				165,
+				185,
+				100);
 			float thickness = 1.0f;
 
 			// Change the color and thickness of the rectangle based on its role in the canvas overlay
@@ -311,11 +318,19 @@ void SceneViewPanel::Render(
 			switch (rect.role)
 			{
 			case ViewportCanvasRole::EditingRoot:
-				color = IM_COL32(230, 180, 70, 220);
+				color = IM_COL32(
+					230,
+					180,
+					70,
+					220);
 				thickness = 2.0f;
 				break;
 			case ViewportCanvasRole::Selected:
-				color = IM_COL32(90, 190, 255, 255);
+				color = IM_COL32(
+					90,
+					190,
+					255,
+					255);
 				thickness = 2.5f;
 				break;
 			case ViewportCanvasRole::Ancestor:
@@ -323,8 +338,11 @@ void SceneViewPanel::Render(
 			}
 
 			drawList->AddPolyline(
-				canvasCorners, 4, color,
-				ImDrawFlags_Closed, thickness);
+				canvasCorners,
+				4,
+				color,
+				ImDrawFlags_Closed,
+				thickness);
 		}
 
 		drawList->PopClipRect();
@@ -332,10 +350,20 @@ void SceneViewPanel::Render(
 
 	if (getViewMode() == EditorViewportMode::Canvas)
 	{// Canvas View Mode
-		const ImU32 viewportColor = IM_COL32(110, 150, 170, 255);
+		const ImU32 viewportColor = IM_COL32(
+			110,
+			150,
+			170,
+			255);
 
 		// Draw a rectangle around the viewport to indicate the canvas view mode
-		drawList->AddRect(m_imageMin, m_imageMax, viewportColor, 0.0f, 0, 2.0f);
+		drawList->AddRect(
+			m_imageMin,
+			m_imageMax,
+			viewportColor,
+			0.0f,
+			0,
+			2.0f);
 
 		// Draw the canvas overlay rectangles for the currently editing canvas and its ancestors
 		drawCanvasRects(overlayData.canvasRects);

@@ -152,17 +152,28 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-bool SceneBase::AppendRenderData(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
-    const CameraInfo* overrideCameraInfo, RenderViewPolicy viewPolicy,
-    rendering::ViewId sceneViewId, rendering::ViewId overlayViewId)
+bool SceneBase::AppendRenderData(
+    rendering::FrameRenderData& frame,
+    const rendering::ViewOutput& output,
+    const CameraInfo* overrideCameraInfo,
+    RenderViewPolicy viewPolicy,
+    rendering::ViewId sceneViewId,
+    rendering::ViewId overlayViewId)
 {
     const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
     m_pRenderSystem->FlushRegisters();
     // No Camera is still a valid background + Screen UI Frame. Only World and
     // Shadow are omitted by extraction; Renderer owns final Render/Present.
-    return m_pRenderSystem->AppendFrame(frame, output, camera, viewPolicy, sceneViewId,
-        overlayViewId, static_cast<std::uint32_t>(m_viewportSize.x),
-        static_cast<std::uint32_t>(m_viewportSize.y), m_directionalLight);
+    return m_pRenderSystem->AppendFrame(
+        frame,
+        output,
+        camera,
+        viewPolicy,
+        sceneViewId,
+        overlayViewId,
+        static_cast<std::uint32_t>(m_viewportSize.x),
+        static_cast<std::uint32_t>(m_viewportSize.y),
+        m_directionalLight);
 }
 
 // Finalization
@@ -741,7 +752,11 @@ bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 	}
 
 	// Set the render mode of the topmost canvas
-	if (!CanApplyUIHierarchy(owner, nullptr, owner, renderMode))
+	if (!CanApplyUIHierarchy(
+		owner,
+		nullptr,
+		owner,
+		renderMode))
 	{
 		return false;
 	}
@@ -1074,6 +1089,7 @@ bool SceneBase::ApplyUIHierarchyConstraints(
 
 	// Iterative traversal also serves deep Imprint candidates without stack growth.
 	std::vector<std::pair<Actor*, Canvas*>> pending{ { root, governingCanvas } };
+
 	while (!pending.empty())
 	{
 		auto [actor, governing] = pending.back();
@@ -1093,7 +1109,8 @@ bool SceneBase::ApplyUIHierarchyConstraints(
 		}
 
 		const auto requiredKind = RequiredUITransformKind(
-			governing != nullptr, actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
+			governing != nullptr,
+			actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
 		const bool definitionOwned = m_imprintInstances.FindMember(actor->GetHandle()) != nullptr;
 
 		if (allowTransformConversion && !definitionOwned)
@@ -1135,6 +1152,7 @@ bool SceneBase::ApplyUIHierarchyConstraints(
 			pending.emplace_back(*it, actorCanvas ? actorCanvas : governing);
 		}
 	}
+
 	return true;
 }
 
@@ -1147,7 +1165,11 @@ bool SceneBase::ApplyAllUIHierarchyConstraints(Actor** outInvalidActor)
 
 	for (Actor* root : GetRootActors())
 	{
-		if (!ApplyUIHierarchyConstraints(root, nullptr, true, outInvalidActor))
+		if (!ApplyUIHierarchyConstraints(
+			root,
+			nullptr,
+			true,
+			outInvalidActor))
 		{
 			return false;
 		}
@@ -1233,6 +1255,7 @@ bool SceneBase::RollbackRestoredActors(const std::vector<ActorHandle>& restoredH
 void SceneBase::PrepareComponentPublication(const std::vector<Actor*>& actors)
 {
     std::size_t componentCount = 0;
+
     for (Actor* actor : actors)
     {
         if (actor)
@@ -1243,6 +1266,7 @@ void SceneBase::PrepareComponentPublication(const std::vector<Actor*>& actors)
 
     m_pRenderSystem->PrepareRegistrationCapacity(componentCount);
     m_pCollisionSystem->PrepareRegistrationCapacity(componentCount);
+
     for (Actor* actor : actors)
     {
         if (actor)

@@ -14,6 +14,7 @@
 bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 {
     PreparedMeshAssetState prepared;
+
     if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
     {
         return false;
@@ -26,6 +27,7 @@ bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, PreparedMeshAssetState& output) const
 {
     PreparedMeshAssetState prepared;
+
     if (!assetId.IsValid())
     {
         output = std::move(prepared);
@@ -35,12 +37,14 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
     Actor* actor = GetOwner();
     SceneBase* scene = actor ? actor->GetOwner() : nullptr;
     const EngineContext* context = GetEngineContext();
+
     if (!scene || !context || !context->pAssetManager)
     {
         return AssetPrepareResult::Failed;
     }
 
     const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
+
     if (entry && entry->type != AssetType::Mesh)
     {
         return AssetPrepareResult::Failed;
@@ -50,8 +54,10 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
     // Holding/copying failure still propagates so Scene preparation can cancel.
     SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
     const auto& geometries = context->pAssetManager->GetGeometryInfos(*scene, assetId);
+
     prepared.assetId = assetId;
     prepared.templates.reserve(geometries.size());
+
     for (const GeometryInfo& geometry : geometries)
     {
         SubmeshRenderTemplate renderTemplate;
@@ -59,6 +65,7 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
         renderTemplate.localToModel = geometry.localToModel;
         renderTemplate.materialDesc.textureHandle = geometry.texture;
         renderTemplate.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
+
         if (context->pRenderAssets)
         {
             Vector2 uvScale = Vector2::One();
@@ -66,8 +73,16 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
             Vector2 pivot;
             pivot.x = 0.5f;
             pivot.y = 0.5f;
-            renderTemplate.materialDesc.description = context->pRenderAssets->MakeMaterial(true,
-                renderTemplate.materialDesc.screen, geometry.texture, uvScale, uvOffset, pivot, false, false);
+
+            renderTemplate.materialDesc.description = context->pRenderAssets->MakeMaterial(
+                true,
+                renderTemplate.materialDesc.screen,
+                geometry.texture,
+                uvScale,
+                uvOffset,
+                pivot,
+                false,
+                false);
             renderTemplate.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene,
                 renderTemplate.materialDesc.description);
         }
@@ -76,6 +91,7 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
         {
             rendering::GeometryData snapshot;
             const auto queried = context->pRenderer->GetGeometryData(geometry.geometry, snapshot);
+
             if (queried.IsSuccess())
             {
                 renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
@@ -239,12 +255,14 @@ bool MeshRenderer::ResolveReferences(SceneBase& scene)
     }
 
     Actor* actor = GetOwner();
+
     if (!actor || actor->GetOwner() != &scene)
     {
         return false;
     }
 
     PreparedMeshAssetState prepared;
+
     if (PrepareMeshAssetState(*m_pendingMeshAssetId, prepared) != AssetPrepareResult::Ready)
     {
         return false;
@@ -333,6 +351,7 @@ bool MeshRenderer::SetPendingMeshAssetReference(const AssetReference<MeshAsset>&
 bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& value)
 {
 	Actor* owner = GetOwner();
+
 	// Deserialization produces unresolved references. Keep those pending even if
 	// an existing Component is currently attached to a Scene.
 	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
@@ -357,16 +376,19 @@ bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& val
 bool MeshRenderer::SynchronizeRenderResources()
 {
     const EngineContext* context = GetEngineContext();
+
     if (!context || !context->pRenderer)
     {
         return true;
     }
 
     const bool screen = GetRenderSpace() == RenderSpace::Screen;
+
     for (SubmeshRenderTemplate& renderTemplate : m_templates)
     {
         rendering::GeometryData snapshot;
         const auto queried = context->pRenderer->GetGeometryData(renderTemplate.meshDesc.meshHandle, snapshot);
+
         if (queried.IsSuccess() && snapshot.revision != renderTemplate.meshDesc.boundsRevision)
         {
             renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
@@ -384,6 +406,7 @@ bool MeshRenderer::SynchronizeRenderResources()
             auto description = renderTemplate.materialDesc.description;
             description.pipeline = context->pRenderAssets->MeshPipeline(screen);
             const auto updated = context->pRenderer->UpdateMaterial(renderTemplate.materialDesc.handle, description);
+
             if (!updated.IsSuccess())
             {
                 return false;

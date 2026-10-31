@@ -143,7 +143,12 @@ bool AssetPicker::Draw(
 			const auto& payload = *static_cast<const EditorAssetDragDropPayload*>(raw->Data);
 			Guid selected;
 
-			if (TrySelectPayload(assetManager, assetType, payload, currentAssetId, selected))
+			if (TrySelectPayload(
+				assetManager,
+				assetType,
+				payload,
+				currentAssetId,
+				selected))
 			{
 				outSelectedAssetId = selected;
 				changed = true;

@@ -206,14 +206,20 @@ bool ActorImprintEditingObjectMap::CaptureSnapshot(const SceneBase& scene, Snaps
 		return false;
 	}
 
-	std::sort(candidate.actors.begin(), candidate.actors.end(), [](const auto& a, const auto& b)
-	{
-		return a.id < b.id;
-	});
-	std::sort(candidate.components.begin(), candidate.components.end(), [](const auto& a, const auto& b)
-	{
-		return a.id < b.id;
-	});
+	std::sort(
+		candidate.actors.begin(),
+		candidate.actors.end(),
+		[](const auto& a, const auto& b)
+		{
+			return a.id < b.id;
+		});
+	std::sort(
+		candidate.components.begin(),
+		candidate.components.end(),
+		[](const auto& a, const auto& b)
+		{
+			return a.id < b.id;
+		});
 	outSnapshot = std::move(candidate);
 	return true;
 }

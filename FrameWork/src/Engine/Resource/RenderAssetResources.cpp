@@ -19,13 +19,16 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
     }
 
     m_renderer = &renderer;
+
     try
     {
         const std::array<const char*, 3> shaderFiles{ "MeshVS.cso", "LitPS.cso", "TexturePS.cso" };
+
         for (std::size_t index = 0; index < shaderFiles.size(); ++index)
         {
             std::vector<std::byte> bytes;
             rendering::Result loaded = rendering::assets::LoadShader(absoluteShaderDirectory, shaderFiles[index], bytes);
+
             if (!loaded.IsSuccess())
             {
                 DBG("Standard Shader: %s", loaded.message.c_str());
@@ -37,6 +40,7 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
             description.stage = index == 0 ? rendering::ShaderStage::Vertex : rendering::ShaderStage::Pixel;
             description.bytecode = bytes;
             auto registration = renderer.RegisterShader(description);
+
             if (!registration.result.IsSuccess())
             {
                 DBG("Standard Shader: %s", registration.result.message.c_str());
@@ -51,18 +55,21 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
         {
             const bool textured = index >= 2;
             const bool screen = index % 2 != 0;
+
             rendering::PipelineDesc description;
             description.vertexShader = m_shaders[0];
             description.pixelShader = m_shaders[textured ? 2 : 1];
             description.blend = textured ? rendering::BlendMode::Alpha : rendering::BlendMode::Opaque;
             description.cull = rendering::CullMode::None;
             description.depth = rendering::DepthMode::Disabled;
+
             if (!screen)
             {
                 description.depth = textured ? rendering::DepthMode::ReadOnly : rendering::DepthMode::ReadWrite;
             }
 
             auto registration = renderer.RegisterPipeline(description);
+
             if (!registration.result.IsSuccess())
             {
                 DBG("Standard Pipeline: %s", registration.result.message.c_str());
@@ -76,15 +83,19 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
         const std::array<std::byte, 4> whitePixels{
             std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255}
         };
+
         rendering::TextureMipDesc mip;
         mip.pixels = whitePixels;
         mip.rowPitch = 4;
+
         rendering::TextureDesc whiteDescription;
         whiteDescription.width = 1;
         whiteDescription.height = 1;
         whiteDescription.format = rendering::TextureFormat::RGBA8_sRGB;
         whiteDescription.mips = std::span(&mip, 1);
+
         auto whiteRegistration = renderer.RegisterTexture(whiteDescription);
+
         if (!whiteRegistration.status.IsSuccess())
         {
             Finalize();
@@ -94,19 +105,24 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
         m_white = whiteRegistration.handle;
 
         std::array<rendering::MeshVertex, 4> vertices{};
+
         for (std::size_t index = 0; index < vertices.size(); ++index)
         {
             rendering::MeshVertex vertex;
             vertex.position.x = index % 2 == 0 ? -0.5f : 0.5f;
             vertex.position.y = index < 2 ? 0.5f : -0.5f;
+
             vertex.normal.z = 1;
             vertex.tangent.x = 1;
+
             vertex.uv.x = index % 2 == 0 ? 0 : 1;
             vertex.uv.y = index < 2 ? 0 : 1;
+
             vertex.color.x = 1;
             vertex.color.y = 1;
             vertex.color.z = 1;
             vertex.color.w = 1;
+
             vertices[index] = vertex;
         }
 
@@ -115,6 +131,7 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
         quadDescription.vertices = vertices;
         quadDescription.indices = indices;
         auto quadRegistration = renderer.RegisterGeometry(quadDescription);
+
         if (!quadRegistration.status.IsSuccess())
         {
             Finalize();
@@ -146,6 +163,7 @@ void RenderAssetResources::Finalize() noexcept
         if (handle != rendering::PipelineHandle{})
         {
             const auto result = m_renderer->DestroyPipeline(handle);
+
             if (!result.IsSuccess())
             {
                 DBG("Standard Pipeline destruction: %s", result.message.c_str());
@@ -158,6 +176,7 @@ void RenderAssetResources::Finalize() noexcept
         if (handle != rendering::ShaderHandle{})
         {
             const auto result = m_renderer->DestroyShader(handle);
+
             if (!result.IsSuccess())
             {
                 DBG("Standard Shader destruction: %s", result.message.c_str());
@@ -168,6 +187,7 @@ void RenderAssetResources::Finalize() noexcept
     if (m_quad != rendering::GeometryHandle{})
     {
         const auto result = m_renderer->DestroyGeometry(m_quad);
+
         if (!result.IsSuccess())
         {
             DBG("Shared Quad destruction: %s", result.message.c_str());
@@ -177,6 +197,7 @@ void RenderAssetResources::Finalize() noexcept
     if (m_white != rendering::TextureHandle{})
     {
         const auto result = m_renderer->DestroyTexture(m_white);
+
         if (!result.IsSuccess())
         {
             DBG("White Texture destruction: %s", result.message.c_str());
@@ -200,8 +221,15 @@ rendering::PipelineHandle RenderAssetResources::TexturedPipeline(bool screen) co
     return m_pipelines[screen ? 3 : 2];
 }
 
-rendering::MaterialDesc RenderAssetResources::MakeMaterial(bool mesh, bool screen, rendering::TextureHandle texture,
-    const Vector2& uvScale, const Vector2& uvOffset, const Vector2& pivot, bool flipX, bool flipY) const
+rendering::MaterialDesc RenderAssetResources::MakeMaterial(
+    bool mesh,
+    bool screen,
+    rendering::TextureHandle texture,
+    const Vector2& uvScale,
+    const Vector2& uvOffset,
+    const Vector2& pivot,
+    bool flipX,
+    bool flipY) const
 {
     rendering::Vector4 white;
     white.x = 1;

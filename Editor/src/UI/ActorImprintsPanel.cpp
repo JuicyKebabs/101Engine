@@ -12,11 +12,13 @@ std::vector<AssetEntry> ActorImprintsPanel::GetVisibleEntries(const AssetManager
 {
 	auto entries = assets.GetAssetEntries(AssetType::ActorImprint);
 
-	std::erase_if(entries, [](const AssetEntry& entry)
-	{
-			// Filter out any ActorImprint assets that are not in the managed directory
-		return !ActorImprintAssetWorkflow::IsManagedAssetPath(entry.relativePath);
-	});
+	std::erase_if(
+		entries,
+		[](const AssetEntry& entry)
+		{
+				// Filter out any ActorImprint assets that are not in the managed directory
+			return !ActorImprintAssetWorkflow::IsManagedAssetPath(entry.relativePath);
+		});
 	return entries;
 }
 
@@ -63,12 +65,20 @@ void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& cal
 
 			if (ImGui::BeginPopupContextItem("ActorImprintItemContext"))
 			{
-				if (ImGui::MenuItem("Edit", nullptr, false, callbacks.canModify))
+				if (ImGui::MenuItem(
+					"Edit",
+					nullptr,
+					false,
+					callbacks.canModify))
 				{
 					DispatchEdit(callbacks, entry.guid);
 				}
 
-				if (ImGui::MenuItem("Delete", nullptr, false, callbacks.canModify))
+				if (ImGui::MenuItem(
+					"Delete",
+					nullptr,
+					false,
+					callbacks.canModify))
 				{
 					RequestDeleteConfirmation(entry.guid);
 				}
@@ -96,7 +106,11 @@ void ActorImprintsPanel::Render(const AssetManager& assets, const Callbacks& cal
 		if (ImGui::BeginPopupContextWindow("ActorImprintsEmptyContext",
 			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
-			if (ImGui::MenuItem("Create Actor Imprint...", nullptr, false, callbacks.canModify))
+			if (ImGui::MenuItem(
+				"Create Actor Imprint...",
+				nullptr,
+				false,
+				callbacks.canModify))
 			{
 				RequestCreateDialog();
 			}

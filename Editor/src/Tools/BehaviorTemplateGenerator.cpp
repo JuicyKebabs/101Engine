@@ -39,14 +39,17 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
 
         header << "#pragma once\n";
         header << "#include \"Engine/Component/Behavior.h\"\n\n";
+
         header << "class " << className << " : public Behavior\n";
         header << "{\n";
         header << "public:\n";
+
         header << "    void Start() override;\n";
         header << "    void PreUpdate() override;\n";
         header << "    void Update() override;\n";
         header << "    void LateUpdate() override;\n";
         header << "    void Destroy() override;\n";
+
         header << "    static std::optional<TypeMetadata> BuildMetadata();\n";
         header << "};\n\n";
     }
@@ -63,7 +66,9 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
 
         source << "#include \"" << className << ".h\"\n";
         source << "#include \"Engine/Scene/ComponentRegistry.h\"\n\n";
+
         source << "REGISTER_GAME_COMPONENT(" << className << ")\n\n";
+
         source << "std::optional<TypeMetadata> " << className << "::BuildMetadata()\n";
         source << "{\n";
         source << "    TypeMetadataBuilder<" << className << "> builder(\"" << className << "\");\n\n";
@@ -72,6 +77,7 @@ bool BehaviorTemplateGenerator::Generate(const std::string& className)
         source << "    // builder.Property(\"speed\", &" << className << "::m_speed);\n\n";
         source << "    return builder.Build();\n";
         source << "}\n\n";
+
         source << "void " << className << "::Start() {}\n";
         source << "void " << className << "::PreUpdate() {}\n";
         source << "void " << className << "::Update() {}\n";

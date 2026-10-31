@@ -14,7 +14,14 @@ namespace StringEncoding
 
         const int sourceLength = static_cast<int>(value.size());
         const int resultLength = WideCharToMultiByte(
-            CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), sourceLength, nullptr, 0, nullptr, nullptr);
+            CP_UTF8,
+            WC_ERR_INVALID_CHARS,
+            value.data(),
+            sourceLength,
+            nullptr,
+            0,
+            nullptr,
+            nullptr);
 
         if (resultLength <= 0)
         {
@@ -49,7 +56,13 @@ namespace StringEncoding
 
         const int sourceLength = static_cast<int>(value.size());
         const int resultLength =
-            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), sourceLength, nullptr, 0);
+            MultiByteToWideChar(
+                CP_UTF8,
+                MB_ERR_INVALID_CHARS,
+                value.data(),
+                sourceLength,
+                nullptr,
+                0);
 
         if (resultLength <= 0)
         {

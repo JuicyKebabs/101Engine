@@ -96,7 +96,11 @@ Model MakeCircleModel(int slice)
 		v.normal = Vector3(0.0f, 0.0f, 1.0f);       // +Z 向き
 		v.uv = Vector2(0.5f, 0.5f);             // テクスチャ中央
 		v.tangent = Vector3(1.0f, 0.0f, 0.0f);       // +X 方向
-		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f); // 白
+		v.color = Vector4(
+			1.0f,
+			1.0f,
+			1.0f,
+			1.0f); // 白
 
 		mesh.vertices.push_back(v);
 	}
@@ -120,7 +124,11 @@ Model MakeCircleModel(int slice)
 
 		v.uv = Vector2(u, vTex);
 		v.tangent = Vector3(1.0f, 0.0f, 0.0f);        // 一律 +X
-		v.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);  // 白
+		v.color = Vector4(
+			1.0f,
+			1.0f,
+			1.0f,
+			1.0f);  // 白
 
 		mesh.vertices.push_back(v);
 	}
@@ -177,7 +185,11 @@ Model MakeSphereModel(int slices, int stacks)
 			vertex.normal = Vector3(x, y, z);							//法線
 			vertex.uv = Vector2(u, 1.0f - v);							//UV座標
 			vertex.tangent = Vector3(-sin(theta), 0.0f, cos(theta));	//接空間
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
+			vertex.color = Vector4(
+				1.0f,
+				1.0f,
+				1.0f,
+				1.0f);			//頂点色
 
 			mesh.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -287,7 +299,11 @@ Model MakeCapsuleModel(int slices, int stacks)
 			float tz = radius * cos(theta);		//接空間Z
 			vertex.tangent = Vector3(tx, 0.0f, tz);					//接空間
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
+			vertex.color = Vector4(
+				1.0f,
+				1.0f,
+				1.0f,
+				1.0f);			//頂点色
 
 			cylinder.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -327,7 +343,11 @@ Model MakeCapsuleModel(int slices, int stacks)
 			float tz = ringR * cos(theta);		//接空間Z
 			vertex.tangent = Vector3(tx, 0.0f, tz);			//接空間
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//頂点色
+			vertex.color = Vector4(
+				1.0f,
+				1.0f,
+				1.0f,
+				1.0f);	//頂点色
 
 			halfSphereTop.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -367,7 +387,11 @@ Model MakeCapsuleModel(int slices, int stacks)
 			float tz = ringR * cos(theta);		//接空間Z
 			vertex.tangent = Vector3(tx, 0.0f, tz);			//接空間
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);	//頂点色
+			vertex.color = Vector4(
+				1.0f,
+				1.0f,
+				1.0f,
+				1.0f);	//頂点色
 
 			halfSphereBottom.vertices.push_back(vertex);	//頂点データを配列に追加
 		}
@@ -404,9 +428,11 @@ Model MakeCapsuleModel(int slices, int stacks)
 			uint32_t i1 = i0 + 1;
 			uint32_t i2 = i0 + ringStride;
 			uint32_t i3 = i2 + 1;
+
 			halfSphereTop.indices.push_back(i0);
 			halfSphereTop.indices.push_back(i1);
 			halfSphereTop.indices.push_back(i2);
+
 			halfSphereTop.indices.push_back(i1);
 			halfSphereTop.indices.push_back(i3);
 			halfSphereTop.indices.push_back(i2);
@@ -424,9 +450,11 @@ Model MakeCapsuleModel(int slices, int stacks)
 			uint32_t i1 = i0 + 1;
 			uint32_t i2 = i0 + ringStride;
 			uint32_t i3 = i2 + 1;
+
 			halfSphereBottom.indices.push_back(i0);
 			halfSphereBottom.indices.push_back(i1);
 			halfSphereBottom.indices.push_back(i2);
+
 			halfSphereBottom.indices.push_back(i1);
 			halfSphereBottom.indices.push_back(i3);
 			halfSphereBottom.indices.push_back(i2);
@@ -499,7 +527,11 @@ Model MakeCylinderModel(int slices, int stacks)
 			float tz = radius * cos(theta);		//接空間Z
 			vertex.tangent = Vector3(tx, 0.0f, tz);					//接空間
 
-			vertex.color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);			//頂点色
+			vertex.color = Vector4(
+				1.0f,
+				1.0f,
+				1.0f,
+				1.0f);			//頂点色
 
 			mesh.vertices.push_back(vertex);	//頂点データを配列に追加
 		}

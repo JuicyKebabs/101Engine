@@ -47,6 +47,7 @@ void TestBehavior::Update()
 	SceneBase* scene = owner ? owner->GetOwner() : nullptr;
 	EngineContext* context = owner ? GetEngineContext() : nullptr;
 	Transform* sourceTransform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+
 	if (!m_actorImprint.HasValue() || !scene || !context || !context->pActorImprintSystem || !sourceTransform)
 	{
 		DBG("TestBehavior: ActorImprint could not be instantiated because the reference or runtime context is invalid.");
@@ -55,12 +56,14 @@ void TestBehavior::Update()
 
 	const Vector3 spawnPosition = sourceTransform->GetWorldPosition();
 	Actor* instanceRoot = context->pActorImprintSystem->Instantiate(*scene, m_actorImprint, {});
+
 	if (!instanceRoot)
 	{
 		return;
 	}
 
 	Transform* instanceTransform = instanceRoot->GetComponentByClass<Transform>();
+
 	if (!instanceTransform)
 	{
 		context->pActorImprintSystem->DestroyInstance(*scene, instanceRoot->GetHandle());

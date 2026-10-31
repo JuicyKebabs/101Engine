@@ -23,7 +23,11 @@ void HierarchyPanel::Render(
 
             for (auto* actor : scene->GetRootActors())
             {
-				RenderActorNode(actor, scene, selection, callbacks);
+				RenderActorNode(
+					actor,
+					scene,
+					selection,
+					callbacks);
 			}
 		}
 
@@ -61,7 +65,11 @@ void HierarchyPanel::Render(
     if (ImGui::BeginPopup("HierarchyContextMenu"))
     {
         // Menu item for creating a new actor
-        if (ImGui::MenuItem("Create Empty Actor", nullptr, false, callbacks.canEdit))
+        if (ImGui::MenuItem(
+            "Create Empty Actor",
+            nullptr,
+            false,
+            callbacks.canEdit))
         {
 			m_creationParentGuid = ResolveEmptySpaceCreationParent(scene);
             m_showActorCreationPopup = true;
@@ -249,7 +257,11 @@ void HierarchyPanel::RenderActorNode(
 		flags |= ImGuiTreeNodeFlags_Selected;
 	}
 
-	bool opened = ImGui::TreeNodeEx((void*)actor, flags, "%s", actor->GetName().c_str());
+	bool opened = ImGui::TreeNodeEx(
+		(void*)actor,
+		flags,
+		"%s",
+		actor->GetName().c_str());
 
     // Left-click to select
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
@@ -275,16 +287,27 @@ void HierarchyPanel::RenderActorNode(
     {
 		ChangeSelection(selection, actor->GetGuid(), callbacks);
 
-		if (ImGui::MenuItem("Rename Actor", nullptr, false, callbacks.canEdit))
+		if (ImGui::MenuItem(
+			"Rename Actor",
+			nullptr,
+			false,
+			callbacks.canEdit))
 		{
 			m_renameTargetGuid = actor->GetGuid();
 			m_showRenamePopup = true;
-			std::snprintf(m_renameBuffer, sizeof(m_renameBuffer), "%s", actor->GetName().c_str());
+			std::snprintf(
+				m_renameBuffer,
+				sizeof(m_renameBuffer),
+				"%s",
+				actor->GetName().c_str());
 		}
 
 		const bool canDestroy = scene && scene->CanDestroy(actor, true);
 
-		if (ImGui::MenuItem("Delete Actor", nullptr, false,
+		if (ImGui::MenuItem(
+			"Delete Actor",
+			nullptr,
+			false,
 			callbacks.canEdit && canDestroy))
         {
 			m_actorToDeleteGuid = actor->GetGuid();
@@ -295,7 +318,11 @@ void HierarchyPanel::RenderActorNode(
 			ImGui::TextDisabled("Required root Actor cannot be deleted.");
 		}
 
-		if (ImGui::MenuItem("Create Child Actor", nullptr, false, callbacks.canEdit))
+		if (ImGui::MenuItem(
+			"Create Child Actor",
+			nullptr,
+			false,
+			callbacks.canEdit))
 		{
             m_creationParentGuid = actor->GetGuid();
             m_showActorCreationPopup = true;
@@ -322,7 +349,11 @@ void HierarchyPanel::RenderActorNode(
     {
         for (auto* child : children)
         {
-			RenderActorNode(child, scene, selection, callbacks);
+			RenderActorNode(
+				child,
+				scene,
+				selection,
+				callbacks);
         }
 
         ImGui::TreePop();

@@ -34,7 +34,11 @@ private:
 		bool ownsTexture = false;
 	};
 
-	Result AddImage(MaterialValue source, TextureHandle uploadedTexture, bool ownsTexture, ImTextureID& identifier);
+	Result AddImage(
+		MaterialValue source,
+		TextureHandle uploadedTexture,
+		bool ownsTexture,
+		ImTextureID& identifier);
 	Result CopyTexturePixels(const ImTextureData& texture, std::vector<std::byte>& pixels) const;
 	Result StoreDrawList(const ImDrawList& drawList, const ImDrawData& drawData, std::size_t listIndex);
 

@@ -5,8 +5,14 @@
 
 #include <cstdint>
 
-namespace rendering::graph { class RenderPassContext; }
-namespace rendering::detail{ class DrawResources; }
+namespace rendering::graph
+{
+class RenderPassContext;
+}
+namespace rendering::detail
+{
+class DrawResources;
+}
 
 namespace rendering
 {
@@ -14,15 +20,14 @@ namespace rendering
 class DrawCommand
 {
 public:
-	DrawCommand() = default;
+    DrawCommand() = default;
 
 private:
-	backend::DrawPacket m_packet;
-	std::vector<graph::PassTextureUse> m_reads;
-	std::vector<std::uint64_t*> m_fences;
+    backend::DrawPacket m_packet;
+    std::vector<graph::PassTextureUse> m_reads;
 
-	friend class detail::DrawResources;
-	friend class graph::RenderPassContext;
+    friend class detail::DrawResources;
+    friend class graph::RenderPassContext;
 };
 
-}
+} // namespace rendering

@@ -87,11 +87,13 @@ public:
             const auto result = m_owner.m_renderer->DestroyMaterial(handle);
             ReportCleanup(result);
         }
+
         for (auto handle : m_newGeometries)
         {
             const auto result = m_owner.m_renderer->DestroyGeometry(handle);
             ReportCleanup(result);
         }
+
         for (auto handle : m_newTextures)
         {
             const auto result = m_owner.m_renderer->DestroyTexture(handle);
@@ -117,6 +119,7 @@ public:
     {
         Include(m_usage.textureKeys, guid);
         const auto cached = m_owner.m_loadedTextures.find(guid);
+
         if (cached != m_owner.m_loadedTextures.end())
         {
             RetainTexture(cached->second);
@@ -124,6 +127,7 @@ public:
         }
 
         const auto staged = m_textures.find(guid);
+
         if (staged != m_textures.end())
         {
             return staged->second;
@@ -132,6 +136,7 @@ public:
         // Allocate the failed/success result slot before registering a resource.
         auto inserted = m_textures.try_emplace(guid);
         const AssetEntry* entry = m_owner.GetAssetEntry(guid);
+
         if (!entry || entry->type != AssetType::Texture)
         {
             DBG("Texture Asset missing: %s", guid.ToString().c_str());
@@ -146,6 +151,7 @@ public:
     {
         Include(m_usage.modelKeys, guid);
         const auto cached = m_owner.m_loadedModels.find(guid);
+
         if (cached != m_owner.m_loadedModels.end())
         {
             RetainModel(cached->second);
@@ -154,22 +160,30 @@ public:
 
         auto inserted = m_models.try_emplace(guid);
         CachedModel& result = inserted.first->second;
+
         const BuiltinMeshAsset* builtin = FindBuiltinMeshAsset(guid);
+
         if (builtin)
         {
+
             GeometryInfo geometry;
             geometry.texture = White();
+
             if (builtin->mesh == DefaultMesh::Quad && m_owner.m_renderAssets)
             {
                 geometry.geometry = m_owner.m_renderAssets->Quad();
             }
             else
             {
+
                 const ::Model generated = GetDefaultModel(builtin->mesh);
+
                 if (!generated.empty())
                 {
+
                     std::vector<rendering::MeshVertex> vertices;
                     vertices.reserve(generated.front().vertices.size());
+
                     for (const Vertex& source : generated.front().vertices)
                     {
                         rendering::MeshVertex vertex;
@@ -197,11 +211,15 @@ public:
         const AssetEntry* entry = m_owner.GetAssetEntry(guid);
         rendering::assets::ModelData imported;
         bool parsed = false;
+
         if (entry && entry->type == AssetType::Mesh)
         {
-            const auto loaded = rendering::assets::LoadModel(std::filesystem::absolute(m_owner.m_assetRoot),
-                std::filesystem::u8path(entry->relativePath), imported);
+            const auto loaded = rendering::assets::LoadModel(
+                std::filesystem::absolute(m_owner.m_assetRoot),
+                std::filesystem::u8path(entry->relativePath),
+                imported);
             parsed = loaded.IsSuccess();
+
             if (!parsed)
             {
                 DBG("Model import: %s", loaded.message.c_str());
@@ -220,10 +238,12 @@ public:
         std::vector<GeometryInfo> uniqueMeshes;
         uniqueMeshes.reserve(imported.meshes.size());
         result.registeredGeometries.reserve(imported.meshes.size());
+
         for (const rendering::assets::MeshData& mesh : imported.meshes)
         {
             GeometryInfo geometry;
             geometry.texture = mesh.texturePath.empty() ? White() : DependencyTexture(mesh.texturePath, result);
+
             if (mesh.valid)
             {
                 const rendering::GeometryDesc description = mesh.Description();
@@ -240,9 +260,11 @@ public:
         }
 
         result.placements.reserve(imported.placements.size());
+
         for (const rendering::assets::MeshPlacement& placement : imported.placements)
         {
             GeometryInfo geometry;
+
             if (placement.meshIndex < uniqueMeshes.size())
             {
                 geometry = uniqueMeshes[placement.meshIndex];
@@ -263,6 +285,7 @@ public:
     rendering::MaterialHandle Material(const rendering::MaterialDesc& description)
     {
         rendering::MaterialHandle unavailable;
+
         if (!m_owner.m_renderer)
         {
             return unavailable;
@@ -273,6 +296,7 @@ public:
         m_usage.newMaterials.reserve(m_usage.newMaterials.size() + 1);
         auto registration = m_owner.m_renderer->RegisterMaterial(description);
         CheckDeviceFailure(registration.result);
+
         if (!registration.result.IsSuccess())
         {
             DBG("Material registration: %s", registration.result.message.c_str());
@@ -332,6 +356,7 @@ private:
         for (const GeometryInfo& geometry : model.placements)
         {
             const bool residentQuad = m_owner.m_renderAssets && geometry.geometry == m_owner.m_renderAssets->Quad();
+
             if (geometry.geometry != rendering::GeometryHandle{} && !residentQuad)
             {
                 Include(m_usage.geometries, geometry.geometry);
@@ -346,6 +371,7 @@ private:
         for (const Guid& key : model.textureAssetDependencies)
         {
             const auto cached = m_owner.m_loadedTextures.find(key);
+
             if (cached != m_owner.m_loadedTextures.end())
             {
                 RetainTexture(cached->second);
@@ -353,6 +379,7 @@ private:
             }
 
             const auto staged = m_textures.find(key);
+
             if (staged == m_textures.end())
             {
                 throw std::logic_error("Retained model Texture GUID has no cached result.");
@@ -364,6 +391,7 @@ private:
         for (const std::string& key : model.textureDependencies)
         {
             const auto cached = m_owner.m_dependencyTextures.find(key);
+
             if (cached != m_owner.m_dependencyTextures.end())
             {
                 RetainTexture(cached->second);
@@ -371,6 +399,7 @@ private:
             }
 
             const auto staged = m_dependencyTextures.find(key);
+
             if (staged == m_dependencyTextures.end())
             {
                 throw std::logic_error("Retained model Texture path has no cached result.");
@@ -383,6 +412,7 @@ private:
     rendering::GeometryHandle RegisterGeometry(const rendering::GeometryDesc& description)
     {
         rendering::GeometryHandle unavailable;
+
         if (!m_owner.m_renderer)
         {
             return unavailable;
@@ -393,6 +423,7 @@ private:
         m_usage.newGeometries.reserve(m_usage.newGeometries.size() + 1);
         auto registration = m_owner.m_renderer->RegisterGeometry(description);
         CheckDeviceFailure(registration.status);
+
         if (!registration.status.IsSuccess())
         {
             DBG("Geometry registration: %s", registration.status.message.c_str());
@@ -410,6 +441,7 @@ private:
         rendering::TextureHandle unavailable;
         rendering::assets::TextureData decoded;
         const auto loaded = rendering::assets::LoadTexture(std::filesystem::absolute(m_owner.m_assetRoot), file, decoded);
+
         if (!loaded.IsSuccess())
         {
             DBG("Texture import: %s", loaded.message.c_str());
@@ -424,11 +456,14 @@ private:
         std::vector<rendering::TextureMipDesc> mipViews;
         rendering::TextureDesc description;
         decoded.Description(description, mipViews);
+
         m_newTextures.reserve(m_newTextures.size() + 1);
         m_usage.textures.reserve(m_usage.textures.size() + 1);
         m_usage.newTextures.reserve(m_usage.newTextures.size() + 1);
+
         auto registration = m_owner.m_renderer->RegisterTexture(description);
         CheckDeviceFailure(registration.status);
+
         if (!registration.status.IsSuccess())
         {
             DBG("Texture registration: %s", registration.status.message.c_str());
@@ -445,6 +480,7 @@ private:
     {
         const std::filesystem::path relative = file.lexically_relative(std::filesystem::absolute(m_owner.m_assetRoot));
         const AssetEntry* catalogTexture = m_owner.GetAssetEntryByPath(Utf8PathKey(relative));
+
         if (catalogTexture && catalogTexture->type == AssetType::Texture)
         {
             Include(model.textureAssetDependencies, catalogTexture->guid);
@@ -455,6 +491,7 @@ private:
         Include(model.textureDependencies, key);
         Include(m_usage.dependencyTextureKeys, key);
         const auto cached = m_owner.m_dependencyTextures.find(key);
+
         if (cached != m_owner.m_dependencyTextures.end())
         {
             RetainTexture(cached->second);
@@ -462,6 +499,7 @@ private:
         }
 
         const auto staged = m_dependencyTextures.find(key);
+
         if (staged != m_dependencyTextures.end())
         {
             return staged->second;
@@ -525,6 +563,7 @@ const ModelAnimationMetadata* AssetManager::GetModelAnimationMetadata(const Guid
 void AssetManager::ReleaseScene(const SceneBase* scene) noexcept
 {
     const auto released = m_sceneUsage.find(scene);
+
     if (released == m_sceneUsage.end())
     {
         return;
@@ -540,11 +579,14 @@ void AssetManager::ReleaseUnusedUsage(SceneAssetUsage& ending) noexcept
 {
     const auto stillRequired = [&](const auto& value, auto member)
     {
-        return std::any_of(m_sceneUsage.begin(), m_sceneUsage.end(), [&](const auto& record)
-        {
-            const auto& values = record.second.*member;
-            return std::find(values.begin(), values.end(), value) != values.end();
-        });
+        return std::any_of(
+            m_sceneUsage.begin(),
+            m_sceneUsage.end(),
+            [&](const auto& record)
+            {
+                const auto& values = record.second.*member;
+                return std::find(values.begin(), values.end(), value) != values.end();
+            });
     };
 
     if (m_renderer)
@@ -554,28 +596,33 @@ void AssetManager::ReleaseUnusedUsage(SceneAssetUsage& ending) noexcept
             if (!stillRequired(handle, &SceneAssetUsage::materials))
             {
                 const auto result = m_renderer->DestroyMaterial(handle);
+
                 if (!result.IsSuccess())
                 {
                     DBG("Scene Material destruction: %s", result.message.c_str());
                 }
             }
         }
+
         for (auto handle : ending.geometries)
         {
             if (!stillRequired(handle, &SceneAssetUsage::geometries))
             {
                 const auto result = m_renderer->DestroyGeometry(handle);
+
                 if (!result.IsSuccess())
                 {
                     DBG("Scene Geometry destruction: %s", result.message.c_str());
                 }
             }
         }
+
         for (auto handle : ending.textures)
         {
             if (!stillRequired(handle, &SceneAssetUsage::textures))
             {
                 const auto result = m_renderer->DestroyTexture(handle);
+
                 if (!result.IsSuccess())
                 {
                     DBG("Scene Texture destruction: %s", result.message.c_str());
@@ -592,7 +639,8 @@ void AssetManager::ReleaseUnusedUsage(SceneAssetUsage& ending) noexcept
 }
 
 std::unique_ptr<PreparedSceneAssetTransfer> AssetManager::PrepareSceneTransfer(
-    const SceneBase& source, const SceneBase& destination)
+    const SceneBase& source,
+    const SceneBase& destination)
 {
     auto prepared = std::make_unique<PreparedSceneAssetTransfer>();
     prepared->source = &source;
@@ -600,6 +648,7 @@ std::unique_ptr<PreparedSceneAssetTransfer> AssetManager::PrepareSceneTransfer(
     auto destinationRecord = m_sceneUsage.try_emplace(&destination);
     const auto sourceRecord = m_sceneUsage.find(&source);
     prepared->combined = destinationRecord.first->second;
+
     if (sourceRecord != m_sceneUsage.end())
     {
         MergeUsage(prepared->combined, sourceRecord->second);
@@ -611,6 +660,7 @@ std::unique_ptr<PreparedSceneAssetTransfer> AssetManager::PrepareSceneTransfer(
 void AssetManager::CommitSceneTransfer(PreparedSceneAssetTransfer& transfer) noexcept
 {
     const auto destination = m_sceneUsage.find(transfer.destination);
+
     if (destination == m_sceneUsage.end())
     {
         std::terminate();
@@ -633,6 +683,7 @@ SceneAssetAcquisition::~SceneAssetAcquisition()
     }
 
     const auto current = m_owner.m_sceneUsage.find(m_scene);
+
     if (current == m_owner.m_sceneUsage.end())
     {
         std::terminate();

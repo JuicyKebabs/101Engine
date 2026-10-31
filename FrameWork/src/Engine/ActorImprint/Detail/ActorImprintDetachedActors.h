@@ -28,7 +28,11 @@ namespace ActorImprintDetail
 		const SceneBase& destination,
 		const ActorImprintReferenceCodec::ActorGuids* restoredGuids)
 	{
-		return CreateDetachedActors(definition, destination, restoredGuids, nullptr,
+		return CreateDetachedActors(
+			definition,
+			destination,
+			restoredGuids,
+			nullptr,
 			ActorImprintOverrideRevisionRelation::Same);
 	}
 }

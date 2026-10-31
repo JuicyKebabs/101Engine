@@ -142,19 +142,86 @@ struct Vector3 : public DirectX::XMFLOAT3
 struct Vector4 : public DirectX::XMFLOAT4
 {
 	// Constructors
-	Vector4() : DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f) {}
-	Vector4(float value) : DirectX::XMFLOAT4(value, value, value, value) {}
-	Vector4(float x, float y, float z, float w) : DirectX::XMFLOAT4(x, y, z, w) {}
-	Vector4(float arr[4]) : DirectX::XMFLOAT4(arr[0], arr[1], arr[2], arr[3]) {}
+	Vector4() : DirectX::XMFLOAT4(
+		0.0f,
+		0.0f,
+		0.0f,
+		0.0f) {}
+	Vector4(float value) : DirectX::XMFLOAT4(
+		value,
+		value,
+		value,
+		value) {}
+	Vector4(
+		float x,
+		float y,
+		float z,
+		float w) : DirectX::XMFLOAT4(
+		x,
+		y,
+		z,
+		w) {}
+	Vector4(float arr[4]) : DirectX::XMFLOAT4(
+		arr[0],
+		arr[1],
+		arr[2],
+		arr[3]) {}
 	explicit Vector4(const DirectX::XMFLOAT4& v) : DirectX::XMFLOAT4(v) {}
 
 	// Constants
-	static Vector4 Zero()		{ return Vector4(0.0f, 0.0f, 0.0f, 0.0f); }
-	static Vector4 One()		{ return Vector4(1.0f, 1.0f, 1.0f, 1.0f); }
-	static Vector4 UnitX()		{ return Vector4(1.0f, 0.0f, 0.0f, 0.0f); }
-	static Vector4 UnitY()		{ return Vector4(0.0f, 1.0f, 0.0f, 0.0f); }
-	static Vector4 UnitZ()		{ return Vector4(0.0f, 0.0f, 1.0f, 0.0f); }
-	static Vector4 UnitW()		{ return Vector4(0.0f, 0.0f, 0.0f, 1.0f); }
+	static Vector4 Zero()
+	{
+		return Vector4(
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f);
+	}
+
+	static Vector4 One()
+	{
+		return Vector4(
+			1.0f,
+			1.0f,
+			1.0f,
+			1.0f);
+	}
+
+	static Vector4 UnitX()
+	{
+		return Vector4(
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f);
+	}
+
+	static Vector4 UnitY()
+	{
+		return Vector4(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f);
+	}
+
+	static Vector4 UnitZ()
+	{
+		return Vector4(
+			0.0f,
+			0.0f,
+			1.0f,
+			0.0f);
+	}
+
+	static Vector4 UnitW()
+	{
+		return Vector4(
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f);
+	}
 
 	// Methods
 	float Length() const;
@@ -198,20 +265,79 @@ struct Vector4 : public DirectX::XMFLOAT4
 struct Quaternion : public DirectX::XMFLOAT4
 {
 	// Constructors
-	Quaternion() : DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) {}
-	Quaternion(float value) : DirectX::XMFLOAT4(value, value, value, value) {}
-	Quaternion(float x, float y, float z, float w) : DirectX::XMFLOAT4(x, y, z, w) {}
-	Quaternion(float arr[4]) : DirectX::XMFLOAT4(arr[0], arr[1], arr[2], arr[3]) {}
-	explicit Quaternion(Vector3 vec3) : DirectX::XMFLOAT4(vec3.x, vec3.y, vec3.z, 1.0f) {}
-	explicit Quaternion(Vector4 vec4) : DirectX::XMFLOAT4(vec4.x, vec4.y, vec4.z, vec4.w) {}
-	explicit Quaternion(DirectX::XMFLOAT3 vec3) : DirectX::XMFLOAT4(vec3.x, vec3.y, vec3.z, 1.0f) {}
-	explicit Quaternion(DirectX::XMFLOAT4 vec4) : DirectX::XMFLOAT4(vec4.x, vec4.y, vec4.z, vec4.w) {}
+	Quaternion() : DirectX::XMFLOAT4(
+		0.0f,
+		0.0f,
+		0.0f,
+		1.0f) {}
+	Quaternion(float value) : DirectX::XMFLOAT4(
+		value,
+		value,
+		value,
+		value) {}
+	Quaternion(
+		float x,
+		float y,
+		float z,
+		float w) : DirectX::XMFLOAT4(
+		x,
+		y,
+		z,
+		w) {}
+	Quaternion(float arr[4]) : DirectX::XMFLOAT4(
+		arr[0],
+		arr[1],
+		arr[2],
+		arr[3]) {}
+	explicit Quaternion(Vector3 vec3) : DirectX::XMFLOAT4(
+		vec3.x,
+		vec3.y,
+		vec3.z,
+		1.0f) {}
+	explicit Quaternion(Vector4 vec4) : DirectX::XMFLOAT4(
+		vec4.x,
+		vec4.y,
+		vec4.z,
+		vec4.w) {}
+	explicit Quaternion(DirectX::XMFLOAT3 vec3) : DirectX::XMFLOAT4(
+		vec3.x,
+		vec3.y,
+		vec3.z,
+		1.0f) {}
+	explicit Quaternion(DirectX::XMFLOAT4 vec4) : DirectX::XMFLOAT4(
+		vec4.x,
+		vec4.y,
+		vec4.z,
+		vec4.w) {}
 	explicit Quaternion(DirectX::FXMVECTOR m) { DirectX::XMStoreFloat4(this, m); }
 
 	// Constants
-	static Quaternion Zero() { return Quaternion(0.0f, 0.0f, 0.0f, 0.0f); }
-	static Quaternion One() { return Quaternion(1.0f, 1.0f, 1.0f, 1.0f); }
-	static Quaternion Identity() { return Quaternion(0.0f, 0.0f, 0.0f, 1.0f); }
+	static Quaternion Zero()
+	{
+		return Quaternion(
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f);
+	}
+
+	static Quaternion One()
+	{
+		return Quaternion(
+			1.0f,
+			1.0f,
+			1.0f,
+			1.0f);
+	}
+
+	static Quaternion Identity()
+	{
+		return Quaternion(
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f);
+	}
 
 	// Methods
 	float Length() const;
@@ -270,28 +396,80 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 		float n,
 		float o,
 		float p) : DirectX::XMFLOAT4X4(
-				  a, b, c, d,
-				  e, f, g, h,
-				  i, j, k, l,
-				  m, n, o, p) {
+			a,
+			b,
+			c,
+			d,
+			e,
+			f,
+			g,
+			h,
+			i,
+			j,
+			k,
+			l,
+			m,
+			n,
+			o,
+			p) {
 	}
-	Matrix4x4(Vector4 v1, Vector4 v2, Vector4 v3, Vector4 v4) : DirectX::XMFLOAT4X4(
-		v1.x, v1.y, v1.z, v1.w,
-		v2.x, v2.y, v2.z, v2.w,
-		v3.x, v3.y, v3.z, v3.w,
-		v4.x, v4.y, v4.z, v4.w) {
+	Matrix4x4(
+		Vector4 v1,
+		Vector4 v2,
+		Vector4 v3,
+		Vector4 v4) : DirectX::XMFLOAT4X4(
+		v1.x,
+		v1.y,
+		v1.z,
+		v1.w,
+		v2.x,
+		v2.y,
+		v2.z,
+		v2.w,
+		v3.x,
+		v3.y,
+		v3.z,
+		v3.w,
+		v4.x,
+		v4.y,
+		v4.z,
+		v4.w) {
 	}
 	Matrix4x4(float arr[4][4]) : DirectX::XMFLOAT4X4(
-		arr[0][0], arr[0][1], arr[0][2], arr[0][3],
-		arr[1][0], arr[1][1], arr[1][2], arr[1][3],
-		arr[2][0], arr[2][1], arr[2][2], arr[2][3],
-		arr[3][0], arr[3][1], arr[3][2], arr[3][3]) {
+		arr[0][0],
+		arr[0][1],
+		arr[0][2],
+		arr[0][3],
+		arr[1][0],
+		arr[1][1],
+		arr[1][2],
+		arr[1][3],
+		arr[2][0],
+		arr[2][1],
+		arr[2][2],
+		arr[2][3],
+		arr[3][0],
+		arr[3][1],
+		arr[3][2],
+		arr[3][3]) {
 	}
 	Matrix4x4(float arr[16]) : DirectX::XMFLOAT4X4(
-		arr[0], arr[1], arr[2], arr[3],
-		arr[4], arr[5], arr[6], arr[7],
-		arr[8], arr[9], arr[10], arr[11],
-		arr[12], arr[13], arr[14], arr[15]) {
+		arr[0],
+		arr[1],
+		arr[2],
+		arr[3],
+		arr[4],
+		arr[5],
+		arr[6],
+		arr[7],
+		arr[8],
+		arr[9],
+		arr[10],
+		arr[11],
+		arr[12],
+		arr[13],
+		arr[14],
+		arr[15]) {
 	}
 	explicit Matrix4x4(const DirectX::XMFLOAT4X4& m) : DirectX::XMFLOAT4X4(m) {}
 	explicit Matrix4x4(const DirectX::XMMATRIX& m) {DirectX::XMStoreFloat4x4(this, m);}
@@ -300,10 +478,22 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 	static Matrix4x4 Identity() 
 	{
 		return Matrix4x4(
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f);
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f);
 	}
 
 	// Methods
@@ -334,8 +524,16 @@ struct Matrix4x4 : public DirectX::XMFLOAT4X4
 	static Matrix4x4 CreateFromQuaternion(const Quaternion& q);
 	static Matrix4x4 CreateTRS(const Vector3& translation, const Quaternion& rotation, const Vector3& scale);
 	static Matrix4x4 CreateLookAt(const Vector3& eye, const Vector3& target, const Vector3& up);
-	static Matrix4x4 CreatePerspectiveFov(float fovY, float aspect, float nearZ, float farZ);
-	static Matrix4x4 CreateOrthographic(float width, float height, float nearZ, float farZ);
+	static Matrix4x4 CreatePerspectiveFov(
+		float fovY,
+		float aspect,
+		float nearZ,
+		float farZ);
+	static Matrix4x4 CreateOrthographic(
+		float width,
+		float height,
+		float nearZ,
+		float farZ);
 	static Matrix4x4 Transpose(const Matrix4x4& m);
 
 	// Operators

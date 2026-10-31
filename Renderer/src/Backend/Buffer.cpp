@@ -105,6 +105,7 @@ Result Buffer::WriteAt(std::uint64_t offset, std::span<const std::byte> data)
 
 	// Map the resource to get a pointer to the memory where we can write the data
 	const HRESULT hr = m_resource->Map(0, &readRange, &mapped);
+
 	if (FAILED(hr))
 	{
 		return MakeApiFailure("ID3D12Resource::Map(Upload)", hr);

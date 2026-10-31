@@ -115,13 +115,21 @@ CameraInfo Camera::RebuildCameraInfo()
 	{
 		const float aspectRatio = m_cameraLens.width / m_cameraLens.height;
 		info.projMatrix =
-			Matrix4x4::CreatePerspectiveFov(m_cameraLens.fov, aspectRatio, m_cameraLens.nearZ, m_cameraLens.farZ);
+			Matrix4x4::CreatePerspectiveFov(
+				m_cameraLens.fov,
+				aspectRatio,
+				m_cameraLens.nearZ,
+				m_cameraLens.farZ);
 	}
 	else // Orthographic projection
 	{
 		float orthoWidth = m_cameraLens.width;
 		float orthoHeight = m_cameraLens.height;
-		info.projMatrix = Matrix4x4::CreateOrthographic(orthoWidth, orthoHeight, m_cameraLens.nearZ, m_cameraLens.farZ);
+		info.projMatrix = Matrix4x4::CreateOrthographic(
+			orthoWidth,
+			orthoHeight,
+			m_cameraLens.nearZ,
+			m_cameraLens.farZ);
 	}
 
 	info.position = m_cameraPose.position;
@@ -287,11 +295,13 @@ void Camera::UpdateRotation(float deltaTime)
 					targetPosition.y - cameraPosition.y,
 					targetPosition.z - cameraPosition.z
 				};
+
 				// Calculate yaw and pitch to look at the target
 				float yaw = atan2f(direction.x, direction.z);
 				float distanceXZ = sqrtf(direction.x * direction.x + direction.z * direction.z);
 				float pitch = atan2f(direction.y, distanceXZ);
 				targetRotation = Quaternion::CreateFromEulerRad(Vector3(pitch, yaw, 0.0f));
+
 				// Apply offset rotation from the camera rig
 				targetRotation *= m_cameraRig.offsetRotation;
 			}

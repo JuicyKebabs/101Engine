@@ -103,13 +103,16 @@ void InputManager::UpdateTriggerKeyInfo()
 	m_inputInfo.key.n.trigger = Keyboard_IsKeyDownTrigger(KK_N);
 	m_inputInfo.key.q.trigger = Keyboard_IsKeyDownTrigger(KK_Q);
 	m_inputInfo.key.e.trigger = Keyboard_IsKeyDownTrigger(KK_E);
+
 	m_inputInfo.key.up.trigger = Keyboard_IsKeyDownTrigger(KK_UP);
 	m_inputInfo.key.down.trigger = Keyboard_IsKeyDownTrigger(KK_DOWN);
 	m_inputInfo.key.left.trigger = Keyboard_IsKeyDownTrigger(KK_LEFT);
 	m_inputInfo.key.right.trigger = Keyboard_IsKeyDownTrigger(KK_RIGHT);
+
 	m_inputInfo.key.space.trigger = Keyboard_IsKeyDownTrigger(KK_SPACE);
 	m_inputInfo.key.enter.trigger = Keyboard_IsKeyDownTrigger(KK_ENTER);
 	m_inputInfo.key.rightCtrl.trigger = Keyboard_IsKeyDownTrigger(KK_RIGHTCONTROL);
+
 	m_inputInfo.key.one.trigger = Keyboard_IsKeyDownTrigger(KK_D1);
 	m_inputInfo.key.two.trigger = Keyboard_IsKeyDownTrigger(KK_D2);
 
@@ -162,13 +165,16 @@ void InputManager::UpdateDownKeyInfo()
 	m_inputInfo.key.n.down = Keyboard_IsKeyDown(KK_N);
 	m_inputInfo.key.q.down = Keyboard_IsKeyDown(KK_Q);
 	m_inputInfo.key.e.down = Keyboard_IsKeyDown(KK_E);
+
 	m_inputInfo.key.up.down = Keyboard_IsKeyDown(KK_UP);
 	m_inputInfo.key.down.down = Keyboard_IsKeyDown(KK_DOWN);
 	m_inputInfo.key.left.down = Keyboard_IsKeyDown(KK_LEFT);
 	m_inputInfo.key.right.down = Keyboard_IsKeyDown(KK_RIGHT);
+
 	m_inputInfo.key.space.down = Keyboard_IsKeyDown(KK_SPACE);
 	m_inputInfo.key.enter.down = Keyboard_IsKeyDown(KK_ENTER);
 	m_inputInfo.key.rightCtrl.down = Keyboard_IsKeyDown(KK_RIGHTCONTROL);
+
 	m_inputInfo.key.one.trigger = Keyboard_IsKeyDown(KK_D1);
 	m_inputInfo.key.two.trigger = Keyboard_IsKeyDown(KK_D2);
 
@@ -221,13 +227,16 @@ void InputManager::UpdateUpKeyInfo()
 	m_inputInfo.key.n.up = Keyboard_IsKeyUp(KK_N);
 	m_inputInfo.key.q.up = Keyboard_IsKeyUp(KK_Q);
 	m_inputInfo.key.e.up = Keyboard_IsKeyUp(KK_E);
+
 	m_inputInfo.key.up.up = !Keyboard_IsKeyUp(KK_UP);
 	m_inputInfo.key.down.up = !Keyboard_IsKeyUp(KK_DOWN);
 	m_inputInfo.key.left.up = !Keyboard_IsKeyUp(KK_LEFT);
 	m_inputInfo.key.right.up = !Keyboard_IsKeyUp(KK_RIGHT);
+
 	m_inputInfo.key.space.up = !Keyboard_IsKeyUp(KK_SPACE);
 	m_inputInfo.key.enter.up = !Keyboard_IsKeyUp(KK_ENTER);
 	m_inputInfo.key.rightCtrl.up = Keyboard_IsKeyUp(KK_RIGHTCONTROL);
+
 	m_inputInfo.key.one.trigger = Keyboard_IsKeyDownTrigger(KK_D1);
 	m_inputInfo.key.two.trigger = Keyboard_IsKeyDownTrigger(KK_D2);
 
