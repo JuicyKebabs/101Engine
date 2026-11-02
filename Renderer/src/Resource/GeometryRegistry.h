@@ -5,13 +5,11 @@
 #include "ResourceSlotTable.h"
 #include "ResourceState.h"
 #include "Backend/GeometryGpuData.h"
+#include "Renderer/DrawTypes.h"
 
-#include <cstddef>
-#include <algorithm>
 #include <exception>
 #include <cstdint>
 #include <memory>
-#include <new>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -46,18 +44,18 @@ public:
 	explicit GeometryRegistry(std::uint32_t ownerId) : m_slots(ownerId) {}
 
 	[[nodiscard]]
-	GeometryRegistrationResult Register(const GeometryDesc& desc)
+	ResourceRegistrationResult<GeometryHandle> Register(const GeometryDesc& desc)
 	{
 		try
 		{
 			auto content = std::make_unique<GeometryContent>();
 
 			// Copy given geometry description to the actual CPU data.
-			Result copied = CopyGeometryCpuData(desc, content->cpuData);
+			Result result = CopyGeometryCpuData(desc, content->cpuData);
 
-			if (!copied.IsSuccess())
+			if (!result.IsSuccess())
 			{
-				return {std::move(copied), {}};
+				return {std::move(result), {}};
 			}
 
 			// Get a registration slot for this geometry resource.

@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.5.
-// Public Renderer boundary: native resources and descriptors stay behind typed handles.
-// Calls are single-threaded and public API reentry during Render is rejected.
-// Resource mutation before Render affects a submitted frame; GPU lifetime is tracked separately.
-
 #pragma once
 #include <memory>
 
@@ -65,8 +60,8 @@ public:
 	RENDERER_API RenderResult Render();
 
 	// Registration APIs for resources
-	RENDERER_API GeometryRegistrationResult RegisterGeometry(const GeometryDesc& desc);
-	RENDERER_API TextureRegistrationResult RegisterTexture(const TextureDesc& desc);
+	RENDERER_API ResourceRegistrationResult<GeometryHandle> RegisterGeometry(const GeometryDesc& desc);
+	RENDERER_API ResourceRegistrationResult<TextureHandle> RegisterTexture(const TextureDesc& desc);
 	RENDERER_API ResourceRegistrationResult<ShaderHandle> RegisterShader(const ShaderDesc& desc);
 	RENDERER_API ResourceRegistrationResult<PipelineHandle> RegisterPipeline(const PipelineDesc& desc);
 	RENDERER_API ResourceRegistrationResult<MaterialHandle> RegisterMaterial(const MaterialDesc& desc);

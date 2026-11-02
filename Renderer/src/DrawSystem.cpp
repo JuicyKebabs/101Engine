@@ -276,6 +276,16 @@ Result ValidateFrameInputs(const FrameRenderData& data)
 	return {};
 }
 
+ResourceRegistrationResult<GeometryHandle> DrawResources::Register(const GeometryDesc& desc)
+{
+	return m_geometryResources.Register(desc);
+}
+
+ResourceRegistrationResult<TextureHandle> DrawResources::Register(const TextureDesc& desc)
+{
+	return m_textureResources.Register(desc);
+}
+
 ResourceRegistrationResult<ShaderHandle> DrawResources::Register(const ShaderDesc& desc)
 {
 	auto candidate = std::make_unique<ShaderContent>();
@@ -395,9 +405,9 @@ Result DrawResources::UpdateMaterial(MaterialHandle handle, const MaterialDesc& 
 	return m_materialResources.Update(handle, std::move(candidate));
 }
 
-Result DrawResources::ResolveTextureInput(const MaterialDesc& material, const ShaderResourceBinding& requirement,
-                                          TextureRegistry& textures, TextureHandle& handle,
-                                          TextureContent*& content) const
+Result DrawResources::ResolveTextureInput(
+	const MaterialDesc& material, const ShaderResourceBinding& requirement,
+    TextureHandle& handle, TextureContent*& content)
 {
 	const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
 
@@ -416,14 +426,14 @@ Result DrawResources::ResolveTextureInput(const MaterialDesc& material, const Sh
 	// the caller's Material and registration table retain their original values.
 	handle = selectedHandle;
 
-	if (!textures.FindForNewUse(selectedHandle))
+	if (!m_textureResources.FindForNewUse(selectedHandle))
 	{
 		handle = fallbackTexture;
 	}
 
-	content = textures.FindRegisteredContent(handle);
+	content = m_textureResources.FindRegisteredContent(handle);
 
-	if (!content || !textures.FindForNewUse(handle))
+	if (!content || !m_textureResources.FindForNewUse(handle))
 	{
 		return Fail("Texture and resident substitute unavailable: " + requirement.name);
 	}
@@ -433,9 +443,10 @@ Result DrawResources::ResolveTextureInput(const MaterialDesc& material, const Sh
 
 // Use the Material value's handle type to select the correct Registry owner.
 // This operation creates no read-only alias handle, descriptor ownership or duplicated GPU image.
-Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const ShaderResourceBinding& requirement,
-											TextureRegistry& textures, RenderTargetTextureRegistry& targets,
-											SampledTexture& sampled) const
+Result DrawResources::ResolveSampledTexture(
+	const MaterialDesc& material,
+	const ShaderResourceBinding& requirement,
+	SampledTexture& sampled)
 {
 	const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
 
@@ -448,7 +459,7 @@ Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const 
 	{
 		RenderTargetInput target;
 		target.handle = *handle;
-		target.content = targets.FindForNewUse(*handle);
+		target.content = m_renderTargetResources.FindForNewUse(*handle);
 
 		if (target.content && target.content->gpuData)
 		{
@@ -458,9 +469,9 @@ Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const 
 
 		UploadedTextureInput fallback;
 		fallback.handle = fallbackTexture;
-		fallback.content = textures.FindRegisteredContent(fallbackTexture);
+		fallback.content = m_textureResources.FindRegisteredContent(fallbackTexture);
 
-		if (!fallback.content || !textures.FindForNewUse(fallbackTexture))
+		if (!fallback.content || !m_textureResources.FindForNewUse(fallbackTexture))
 		{
 			return Fail("RenderTargetTexture and resident substitute unavailable: " + requirement.name);
 		}
@@ -470,7 +481,7 @@ Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const 
 	}
 
 	UploadedTextureInput texture;
-	Result resolved = ResolveTextureInput(material, requirement, textures, texture.handle, texture.content);
+	Result resolved = ResolveTextureInput(material, requirement, texture.handle, texture.content);
 
 	if (resolved.IsSuccess())
 	{
@@ -484,10 +495,9 @@ Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const 
 // Vertex deformation and Texture Alpha inputs must remain available in a compatible override.
 // This strict leaf resolver never changes caller identities. FrameDrawContext
 // may retry with a scoped substitute after retaining the original failure cause.
-Result DrawResources::ResolveDrawInputs(const RenderObject& object, std::size_t objectIndex,
-										const DrawSettings& settings, GeometryRegistry& geometries,
-										TextureRegistry& textures, DrawInputs& inputs, DrawDiagnostic& diagnostic,
-										RenderTargetTextureRegistry* targets)
+Result DrawResources::ResolveDrawInputs(
+	const RenderObject& object, std::size_t objectIndex,
+	const DrawSettings& settings, DrawInputs& inputs, DrawDiagnostic& diagnostic)
 {
 	diagnostic.objectIndex = objectIndex;
 	diagnostic.geometry = object.geometry;
@@ -510,12 +520,12 @@ Result DrawResources::ResolveDrawInputs(const RenderObject& object, std::size_t 
 
 	if (!object.procedural)
 	{
-		if (!geometries.FindForNewUse(object.geometry))
+		if (!m_geometryResources.FindForNewUse(object.geometry))
 		{
-			return Fail("Geometry unavailable: " + geometries.DescribeUnavailable(object.geometry));
+			return Fail("Geometry unavailable: " + m_geometryResources.DescribeUnavailable(object.geometry));
 		}
 
-		selected.geometry = geometries.FindRegisteredContent(object.geometry);
+		selected.geometry = m_geometryResources.FindRegisteredContent(object.geometry);
 		diagnostic.geometryRevision = selected.geometry->revision;
 	}
 
@@ -638,18 +648,8 @@ Result DrawResources::ResolveDrawInputs(const RenderObject& object, std::size_t 
 		}
 
 		Result resolved;
-
-		if (targets)
-		{
-			SampledTexture sampled;
-			resolved = ResolveSampledTexture(selected.material->desc, requirement, textures, *targets, sampled);
-		}
-		else
-		{
-			TextureHandle handle;
-			TextureContent* content = nullptr;
-			resolved = ResolveTextureInput(selected.material->desc, requirement, textures, handle, content);
-		}
+		SampledTexture sampled;
+		resolved = ResolveSampledTexture(selected.material->desc, requirement,sampled);
 
 		if (!resolved.IsSuccess())
 		{

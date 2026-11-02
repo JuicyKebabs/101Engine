@@ -294,8 +294,9 @@ RenderView MakeShadowView(const RenderView& source, const DirectionalLight& ligh
 	return shadow;
 }
 
-Result AppendShadowPass(FrameRenderData& frame, detail::FrameDrawContext& context, detail::SceneOutputImages* images,
-						PlannedPass& scene, std::vector<PlannedPass>& lists)
+Result AppendShadowPass(
+	FrameRenderData& frame, detail::FrameDrawContext& context, detail::SceneOutputImages* images,
+	PlannedPass& scene, std::vector<PlannedPass>& lists)
 {
 	const RenderView& source = frame.views[scene.sourceViewIndex];
 	PlannedPass shadowList;

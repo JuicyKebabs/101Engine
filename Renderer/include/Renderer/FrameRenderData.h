@@ -85,6 +85,8 @@ struct DrawRange
 	std::int32_t baseVertex = 0;
 };
 
+// A unit of the drawing an object in a specific View.
+// Describe what is drawn, how it looks, where it is, and which Views it appears in.
 // One immutable submitted value may appear in multiple View index lists.
 // Billboard changes only temporary draw constants; the stored World is never overwritten.
 struct RenderObject
@@ -122,14 +124,17 @@ struct RenderView
 	Matrix4x4 view = Matrix4x4::Identity();
 	Matrix4x4 projection = Matrix4x4::Identity();
 	Vector3 cameraPosition;
+
 	// Multiplicative exposure in linear HDR space; Engine currently uses 1.0.
 	// This numeric default is an implementation proposal, not a user-specified value.
 	float exposure = 1.0f;
 	DrawSettings drawSettings;
 	ViewId id = 0;
 	ViewKind kind = ViewKind::Scene;
+
 	// Omitted means the current complete output extent, resolved during Render.
 	std::optional<Viewport> viewport;
+
 	// The default matches the output allocation's optimized-clear hint.
 	// Other clear colors remain valid, but the DX12 debug layer may report a performance warning.
 	std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };

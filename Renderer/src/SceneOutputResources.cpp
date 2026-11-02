@@ -62,7 +62,7 @@ Result SceneOutputResources::Initialize(backend::Backend& backend, DrawResources
 	PipelineDesc shadowDescription;
 	shadowDescription.vertexShader = shadowVertex;
 	shadowDescription.depth = DepthMode::ReadWrite;
-	shadowDescription.cull = CullMode::Back;
+	shadowDescription.cull = CullMode::None;
 	ResourceRegistrationResult<PipelineHandle> shadowRegistration = draws.Register(shadowDescription);
 
 	if (!shadowRegistration.result.IsSuccess())
@@ -81,7 +81,7 @@ namespace
 Result QueryOutputExtent(
 	const RenderView& view,
 	backend::Backend& backend,
-	RenderTargetTextureRegistry& targets,
+	DrawResources& draws,
 	Extent2D& extent)
 {
 	std::uint32_t& width = extent.width;
@@ -99,7 +99,7 @@ Result QueryOutputExtent(
 	}
 	else
 	{
-		const auto* output = targets.FindForNewUse(std::get<RenderTargetTextureHandle>(view.output));
+		const auto* output = draws.FindContent(std::get<RenderTargetTextureHandle>(view.output));
 
 		if (!output || !output->gpuData)
 		{
@@ -117,7 +117,7 @@ Result EnsureHdrOutput(
 	const RenderView& view,
 	const Extent2D& extent,
 	backend::Backend& backend,
-	RenderTargetTextureRegistry& targets,
+	DrawResources& draws,
 	SceneOutputImages& images)
 {
 	// Extent is already validated at the beginning of the SceneOutputResources::Prepare.
@@ -137,7 +137,7 @@ Result EnsureHdrOutput(
 		description.optimizedClearColor = view.clearColor;	// Currently this value is not used by the Engine; it is a Renderer implementation proposal.
 		
 		// Create internal GPU resources for the HDR output of this view. The logical handle is cached for this output identity.
-		ResourceRegistrationResult<RenderTargetTextureHandle> registration = targets.Create(backend.GetNativeDevice(), description);
+		ResourceRegistrationResult<RenderTargetTextureHandle> registration = draws.CreateRenderTargetTexture(backend.GetNativeDevice(), description);
 
 		if (!registration.result.IsSuccess())
 		{
@@ -148,7 +148,7 @@ Result EnsureHdrOutput(
 	}
 	else
 	{// A cached HDR image exists; check if its extent matches the current View.
-		const auto* hdr = targets.FindForNewUse(images.hdrColor);
+		const auto* hdr = draws.FindContent(images.hdrColor);
 
 		// Detect the resizing of the HDR output. The logical handle is preserved, so the physical GPU will be replaced.
 		const bool changedExtent = hdr && (hdr->gpuData->width != width || hdr->gpuData->height != height);
@@ -165,7 +165,7 @@ Result EnsureHdrOutput(
 			}
 
 			// Replacement of the GPU resources based on the logical handle.
-			result = targets.Resize(backend.GetNativeDevice(), images.hdrColor, width, height);
+			result = draws.ResizeRenderTargetTexture(backend.GetNativeDevice(), images.hdrColor, width, height);
 
 			if (!result.IsSuccess())
 			{
@@ -252,13 +252,12 @@ Result EnsureShadowDepth(backend::Backend& backend, SceneOutputImages& images, R
 } // namespace
 
 Result SceneOutputResources::Prepare(
-	const RenderView& view, backend::Backend& backend,
-	RenderTargetTextureRegistry& targets, DrawResources& draws,
+	const RenderView& view, backend::Backend& backend, DrawResources& draws,
 	SceneOutputImages*& images, Result& shadowPreparation, bool needsShadow)
 {
 	// Query the output extent for the current RenderView.
 	Extent2D extent;
-	Result result = QueryOutputExtent(view, backend, targets, extent);
+	Result result = QueryOutputExtent(view, backend, draws, extent);
 
 	if (!result.IsSuccess())
 	{
@@ -285,7 +284,7 @@ Result SceneOutputResources::Prepare(
 	}
 
 	// Prepare the HDR output for this View, creating or resizing it if necessary.
-	result = EnsureHdrOutput(view, extent, backend, targets, *images);
+	result = EnsureHdrOutput(view, extent, backend, draws, *images);
 
 	if (!result.IsSuccess())
 	{

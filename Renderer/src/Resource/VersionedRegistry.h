@@ -10,7 +10,8 @@
 namespace rendering::detail
 {
 
-template <class Handle, class Content> class VersionedRegistry
+template <class Handle, class Content>
+class VersionedRegistry
 {
 public:
 	std::string DescribeUnavailable(Handle handle) const

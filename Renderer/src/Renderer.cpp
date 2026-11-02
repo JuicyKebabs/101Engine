@@ -645,10 +645,9 @@ Result Renderer::DestroyTexture(TextureHandle handle)
 
 	const auto result = m_pImpl->drawResources->Destroy(handle);
 
-	if (result != detail::ResourceHandleValidationResult::Success)
+	if (!result.IsSuccess())
 	{
-		return {false, "DestroyTexture: handle does not identify a registered texture "
-                       "in this renderer initialization."};
+		return {false, "DestroyTexture: handle does not identify a registered texture in this renderer initialization."};
 	}
 
 	return {};
@@ -658,7 +657,7 @@ Result Renderer::impl::UploadSelectedResources(
 	std::span<const GeometryUploadTarget> geometries,
 	std::span<const TextureUploadTarget> textures)
 {
-	if (!initialized || !geometryResources || !textureResources)
+	if (!initialized || !drawResources)
 	{
 		return {false, "UploadSelectedResources: Renderer is not initialized."};
 	}
@@ -679,18 +678,19 @@ Result Renderer::impl::UploadSelectedResources(
 	using TextureWork = UploadWork<TextureUploadTarget, backend::TextureUploadData>;
 	std::vector<GeometryWork> geometryWork;
 	std::vector<TextureWork> textureWork;
+
 	//-------------------------------------------------------------------------------------------------
 	// 2. Gather the resources for upload.
 	//    Validate the selected content without replacing it or rejecting an accepted Destroy request.
 	//-------------------------------------------------------------------------------------------------
-	const auto gather = [](auto targets, auto& registry, auto& work) -> Result
+	const auto gather = [](auto targets, detail::DrawResources& registry, auto& work) -> Result
 	{
 		work.reserve(targets.size());
 
 		for (const auto& target : targets)
 		{
 			// Check if registry still has the same content for the given handle.
-			if (!target.content || !registry.OwnsContent(target.handle, target.content))
+			if (!target.content || !(registry.FindContent(target.handle) == target.content))
 			{
 				return {false, "Upload target no longer matches its registered content."};
 			}
@@ -726,11 +726,11 @@ Result Renderer::impl::UploadSelectedResources(
 	try
 	{
 		// Gather the selected geometries and textures for upload preparation.
-		result = gather(geometries, *geometryResources, geometryWork);
+		result = gather(geometries, *drawResources, geometryWork);
 
 		if (result.IsSuccess())
 		{
-			result = gather(textures, *textureResources, textureWork);
+			result = gather(textures, *drawResources, textureWork);
 		}
 	}
 	catch (const std::bad_alloc&)
@@ -774,7 +774,7 @@ Result Renderer::impl::UploadSelectedResources(
 	//-------------------------------------------------------------------------------------------------
 	bool hasPrepared = false;
 
-	const auto prepare = [&](auto& work, auto& registry, auto prepareFunction) -> Result
+	const auto prepare = [&](auto& work, detail::DrawResources& registry, auto prepareFunction) -> Result
 	{
 		for (auto& item : work)
 		{
@@ -807,11 +807,11 @@ Result Renderer::impl::UploadSelectedResources(
 		return {};
 	};
 
-	result = prepare(geometryWork, *geometryResources, &backend::Backend::PrepareGeometry);
+	result = prepare(geometryWork, *drawResources, &backend::Backend::PrepareGeometry);
 
 	if (result.IsSuccess())
 	{
-		result = prepare(textureWork, *textureResources, &backend::Backend::PrepareTexture);
+		result = prepare(textureWork, *drawResources, &backend::Backend::PrepareTexture);
 	}
 
 	if (!result.IsSuccess())
@@ -912,7 +912,7 @@ Result Renderer::impl::UploadSelectedResources(
 				FailureKind::GpuCompletionUnknown};
 	}
 
-	const auto markReady = [&](auto& work, auto& registry) -> Result
+	const auto markReady = [&](auto& work, detail::DrawResources& registry) -> Result
 	{
 		for (auto& item : work)
 		{
@@ -930,14 +930,14 @@ Result Renderer::impl::UploadSelectedResources(
 		return {};
 	};
 
-	result = markReady(geometryWork, *geometryResources);
+	result = markReady(geometryWork, *drawResources);
 
 	if (!result.IsSuccess())
 	{
 		return result;
 	}
 
-	return markReady(textureWork, *textureResources);
+	return markReady(textureWork, *drawResources);
 }
 
 // Called after temporary CPU borrows have ended, or between public updates outside Render.
@@ -950,8 +950,8 @@ Result Renderer::impl::CollectDestroyedResources()
 		return {};
 	}
 
-	geometryResources->CollectDestroyed();
-	textureResources->CollectDestroyed();
+	drawResources->CollectgeometryDestroyed();
+	drawResources->CollectTextureDestroyed();
 	return {};
 }
 
@@ -1071,7 +1071,7 @@ Result Renderer::UpdateGeometry(GeometryHandle handle, const GeometryDesc& desc)
 				return result;
 			}
 
-			return m_pImpl->geometryResources->Update(handle, desc);
+			return m_pImpl->drawResources->Update(handle, desc);
 		});
 }
 
@@ -1089,7 +1089,7 @@ Result Renderer::UpdateTexture(TextureHandle handle, const TextureDesc& desc)
 				return result;
 			}
 
-			return m_pImpl->textureResources->Update(handle, desc);
+			return m_pImpl->drawResources->Update(handle, desc);
 		});
 }
 
@@ -1102,7 +1102,7 @@ Result Renderer::GetGeometryData(GeometryHandle handle, GeometryData& output) co
 		return available;
 	}
 
-	return m_pImpl->geometryResources->GetData(handle, output);
+	return m_pImpl->drawResources->GetGeometryData(handle, output);
 }
 
 Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) const
@@ -1117,7 +1117,7 @@ Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) 
 				return result;
 			}
 
-			const auto* shader = m_pImpl->drawResources->m_shaderResources.FindForNewUse(handle);
+			const auto* shader = m_pImpl->drawResources->FindContent(handle);
 
 			if (!shader)
 			{
@@ -1143,7 +1143,7 @@ Result Renderer::DestroyShader(ShaderHandle handle)
 				return result;
 			}
 
-			return m_pImpl->drawResources->m_shaderResources.Destroy(handle);
+			return m_pImpl->drawResources->Destroy(handle);
 		});
 }
 
@@ -1159,7 +1159,7 @@ Result Renderer::DestroyPipeline(PipelineHandle handle)
 				return result;
 			}
 
-			return m_pImpl->drawResources->m_pipelineResources.Destroy(handle);
+			return m_pImpl->drawResources->Destroy(handle);
 		});
 }
 
@@ -1175,7 +1175,7 @@ Result Renderer::DestroyMaterial(MaterialHandle handle)
 				return result;
 			}
 
-			return m_pImpl->drawResources->m_materialResources.Destroy(handle);
+			return m_pImpl->drawResources->Destroy(handle);
 		});
 }
 
@@ -1195,7 +1195,7 @@ ResourceRegistrationResult<RenderTargetTextureHandle> Renderer::CreateRenderTarg
 				return created;
 			}
 
-			created = m_pImpl->renderTargetResources->Create(m_pImpl->backend.GetNativeDevice(), description);
+			created = m_pImpl->drawResources->CreateRenderTargetTexture(m_pImpl->backend.GetNativeDevice(), description);
 			created.result = m_pImpl->ObserveFailure(std::move(created.result));
 			return created;
 		});
@@ -1216,7 +1216,7 @@ Result Renderer::ResizeRenderTargetTexture(RenderTargetTextureHandle handle, std
 				return result;
 			}
 
-			if (!m_pImpl->renderTargetResources->FindForNewUse(handle))
+			if (!m_pImpl->drawResources->FindContent(handle))
 			{
 				return detail::Fail("ResizeRenderTargetTexture: invalid output.");
 			}
@@ -1233,7 +1233,7 @@ Result Renderer::ResizeRenderTargetTexture(RenderTargetTextureHandle handle, std
 				return result;
 			}
 
-			result = m_pImpl->renderTargetResources->Resize(m_pImpl->backend.GetNativeDevice(), handle, width, height);
+			result = m_pImpl->drawResources->ResizeRenderTargetTexture(m_pImpl->backend.GetNativeDevice(), handle, width, height);
 			return m_pImpl->ObserveFailure(std::move(result));
 		});
 }
@@ -1249,7 +1249,7 @@ Result Renderer::DestroyRenderTargetTexture(RenderTargetTextureHandle handle)
 		return result;
 	}
 
-	return m_pImpl->renderTargetResources->Destroy(handle);
+	return m_pImpl->drawResources->Destroy(handle);
 }
 
 // Return metadata by value without exposing borrowed native descriptors or owner pointers.
@@ -1263,7 +1263,7 @@ Result Renderer::GetRenderTargetTextureInfo(RenderTargetTextureHandle handle, Re
 		return result;
 	}
 
-	return m_pImpl->renderTargetResources->QueryInfo(handle, output);
+	return m_pImpl->drawResources->QueryRenderTargetTextureInfo(handle, output);
 }
 
 // Window Resize has a different failure guarantee from ordinary image replacement.

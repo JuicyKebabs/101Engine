@@ -96,7 +96,7 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
 
 		auto whiteRegistration = renderer.RegisterTexture(whiteDescription);
 
-		if (!whiteRegistration.status.IsSuccess())
+		if (!whiteRegistration.result.IsSuccess())
 		{
 			Finalize();
 			return false;
@@ -132,7 +132,7 @@ bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
 		quadDescription.indices = indices;
 		auto quadRegistration = renderer.RegisterGeometry(quadDescription);
 
-		if (!quadRegistration.status.IsSuccess())
+		if (!quadRegistration.result.IsSuccess())
 		{
 			Finalize();
 			return false;

@@ -5,14 +5,12 @@
 #include "ResourceSlotTable.h"
 #include "ResourceState.h"
 #include "Backend/TextureGpuData.h"
+#include "Renderer/DrawTypes.h"
 
-#include <cstddef>
-#include <algorithm>
 #include <exception>
 #include <cstdint>
 #include <memory>
 #include <limits>
-#include <new>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -46,7 +44,7 @@ public:
 	explicit TextureRegistry(std::uint32_t ownerId) : m_slots(ownerId) {}
 
 	[[nodiscard]]
-	TextureRegistrationResult Register(const TextureDesc& desc)
+	ResourceRegistrationResult<TextureHandle> Register(const TextureDesc& desc)
 	{
 		try
 		{

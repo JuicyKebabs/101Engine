@@ -117,24 +117,27 @@ public:
 	Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
 
 	Result ResolveDrawInputs(
-		const RenderObject& object, std::size_t objectIndex, const DrawSettings& settings,
-		GeometryRegistry& geometries, TextureRegistry& textures, DrawInputs& inputs,
-		DrawDiagnostic& diagnostic, RenderTargetTextureRegistry* targets = nullptr);
+		const RenderObject& object,
+		std::size_t objectIndex,
+		const DrawSettings& settings,
+		DrawInputs& inputs,
+		DrawDiagnostic& diagnostic);
 
 	Result ResolveTextureInput(
-		const MaterialDesc& material, const ShaderResourceBinding& requirement,
-		TextureRegistry& textures, TextureHandle& handle, TextureContent*& content) const;
+		const MaterialDesc& material,
+		const ShaderResourceBinding& requirement,
+		TextureHandle& handle,
+		TextureContent*& content);
 
 	Result ResolveSampledTexture(
-		const MaterialDesc& material, const ShaderResourceBinding& requirement,
-		TextureRegistry& textures, RenderTargetTextureRegistry& targets,
-		SampledTexture& sampled) const;
+		const MaterialDesc& material,
+		const ShaderResourceBinding& requirement,
+		SampledTexture& sampled);
 
 	Result PrepareCommands(
 		FrameDrawContext& drawContext, const PassRecordingInputs& pass,
 		std::span<const PlannedDraw> draws, const graph::OutputLayout& output,
 		std::vector<DrawCommand>& commands);
-
 
 	GeometryContent* FindContent(GeometryHandle handle) { return m_geometryResources.FindRegisteredContent(handle); }
 	TextureContent* FindContent(TextureHandle handle) { return m_textureResources.FindRegisteredContent(handle); }
@@ -149,6 +152,28 @@ public:
 	Result Destroy(ShaderHandle handle) { return m_shaderResources.Destroy(handle); }
 	Result Destroy(PipelineHandle handle) { return m_pipelineResources.Destroy(handle); }
 	Result Destroy(MaterialHandle handle) { return m_materialResources.Destroy(handle); }
+
+	Result Update(GeometryHandle handle, const GeometryDesc& desc) { return m_geometryResources.Update(handle, desc); }
+	Result Update(TextureHandle handle, const TextureDesc& desc) { return m_textureResources.Update(handle, desc); }
+
+
+	void CollectgeometryDestroyed() { m_geometryResources.CollectDestroyed(); }
+	void CollectTextureDestroyed() { m_textureResources.CollectDestroyed(); }
+
+	bool MarkPrepared(GeometryHandle handle, GeometryContent& content) { return m_geometryResources.MarkPrepared(handle, content); }
+	bool MarkPrepared(TextureHandle handle, TextureContent& content) { return m_textureResources.MarkPrepared(handle, content); }
+	bool MarkPreparationFailed(GeometryHandle handle, GeometryContent& content) { return m_geometryResources.MarkPreparationFailed(handle, content); }
+	bool MarkPreparationFailed(TextureHandle handle, TextureContent& content) { return m_textureResources.MarkPreparationFailed(handle, content); }
+
+	Result GetGeometryData(GeometryHandle handle, GeometryData& output) const { return m_geometryResources.GetData(handle, output); }
+
+	// Wrappers for RenderTargetTextureRegistry.
+	ResourceRegistrationResult<RenderTargetTextureHandle> CreateRenderTargetTexture(ID3D12Device* device, const RenderTargetTextureDesc& description) { return m_renderTargetResources.Create(device, description); }
+	Result ResizeRenderTargetTexture(ID3D12Device* device, RenderTargetTextureHandle handle, std::uint32_t width, std::uint32_t height) { return m_renderTargetResources.Resize(device, handle, width, height); }
+	Result QueryRenderTargetTextureInfo(RenderTargetTextureHandle handle, RenderTargetTextureInfo& output) const { return m_renderTargetResources.QueryInfo(handle, output); }
+	
+	std::string DescribeTextureUnavailable(TextureHandle handle) const { return m_textureResources.DescribeUnavailable(handle); }
+	std::string DescribeRenderTargetTextureUnavailable(RenderTargetTextureHandle handle) const { return m_renderTargetResources.DescribeUnavailable(handle); }
 
 private:
 	GeometryRegistry m_geometryResources;

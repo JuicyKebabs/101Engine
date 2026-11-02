@@ -33,25 +33,25 @@ template <class Target> void AddUniqueUploadTarget(std::vector<Target>& targets,
 
 } // namespace
 
-FrameDrawContext::FrameDrawContext(const FrameRenderData& frame, const FrameDrawServices& services,
-                                   std::vector<DrawDiagnostic>& diagnostics, std::size_t& drawnObjects) noexcept
-	: m_sceneResources(services.sceneResources), m_renderTargets(services.targets), m_frame(frame),
-      m_resources(*services.draws), m_geometries(*services.geometries), m_textures(*services.textures),
-      m_backend(*services.backend), m_depth(*services.depth), m_bindings(*services.bindings),
-      m_diagnostics(diagnostics), m_drawnObjects(drawnObjects)
+FrameDrawContext::FrameDrawContext(
+	const FrameRenderData& frame, const FrameDrawServices& services,
+	std::vector<DrawDiagnostic>& diagnostics, std::size_t& drawnObjects) noexcept
+	: m_sceneResources(services.sceneResources), m_frame(frame),
+	  m_resources(*services.draws), m_backend(*services.backend), m_depth(*services.depth),
+	  m_bindings(*services.bindings), m_diagnostics(diagnostics), m_drawnObjects(drawnObjects)
 {
 }
 
-Result FrameDrawContext::PrepareSceneImages(const RenderView& view, SceneOutputImages*& images,
-											Result& shadowPreparation)
+Result FrameDrawContext::PrepareSceneImages(const RenderView& view, SceneOutputImages*& images, Result& shadowPreparation)
 {
-	if (!m_sceneResources || !m_renderTargets)
+	if (!m_sceneResources)
 	{
 		return Fail("Scene working-image owner is unavailable.");
 	}
 
-	return m_sceneResources->Prepare(view, m_backend, *m_renderTargets, m_resources, images, shadowPreparation,
-                                     m_frame.directionalLight.has_value());
+	return m_sceneResources->Prepare(
+		view, m_backend, m_resources, images,
+		shadowPreparation, m_frame.directionalLight.has_value());
 }
 
 backend::DepthTexture& FrameDrawContext::DisabledShadow() noexcept
@@ -61,7 +61,7 @@ backend::DepthTexture& FrameDrawContext::DisabledShadow() noexcept
 
 backend::DepthTexture* FrameDrawContext::SceneDepth(SceneOutputImages& images) noexcept
 {
-	auto* hdr = m_renderTargets->FindForNewUse(images.hdrColor);
+	auto* hdr = m_resources.FindContent(images.hdrColor);
 	return hdr ? &hdr->gpuData->Depth() : nullptr;
 }
 
@@ -80,8 +80,7 @@ PipelineHandle FrameDrawContext::ShadowPipeline() const noexcept
 	return m_sceneResources->ShadowPipeline();
 }
 
-bool FrameDrawContext::SelectExplicitDraw(std::size_t index, const DrawSettings& settings,
-                                          const PassRecordingInputs& pass)
+bool FrameDrawContext::SelectExplicitDraw(std::size_t index, const DrawSettings& settings, const PassRecordingInputs& pass)
 {
 	DrawInputs inputs;
 	DrawDiagnostic diagnostic;
@@ -96,8 +95,9 @@ bool FrameDrawContext::SelectExplicitDraw(std::size_t index, const DrawSettings&
 	return true;
 }
 
-Result FrameDrawContext::ResolveObjectInputs(std::size_t objectIndex, const DrawSettings& settings, DrawInputs& inputs,
-                                             DrawDiagnostic& diagnostic, const PassRecordingInputs& pass)
+Result FrameDrawContext::ResolveObjectInputs(
+	std::size_t objectIndex, const DrawSettings& settings, DrawInputs& inputs,
+	DrawDiagnostic& diagnostic, const PassRecordingInputs& pass)
 {
 	if (objectIndex >= m_frame.objects.size())
 	{
@@ -105,8 +105,7 @@ Result FrameDrawContext::ResolveObjectInputs(std::size_t objectIndex, const Draw
 	}
 
 	const RenderObject& sourceObject = m_frame.objects[objectIndex];
-	Result resolved = m_resources.ResolveDrawInputs(sourceObject, objectIndex, settings, m_geometries, m_textures,
-													inputs, diagnostic, m_renderTargets);
+	Result resolved = m_resources.ResolveDrawInputs(sourceObject, objectIndex, settings, inputs, diagnostic);
 
 	if (resolved.IsSuccess())
 	{
@@ -124,24 +123,23 @@ Result FrameDrawContext::ResolveObjectInputs(std::size_t objectIndex, const Draw
 				continue;
 			}
 
+			// Check if the parameter is a TextureHandle or RenderTargetTextureHandle and validate its availability
 			if (const auto* texture = std::get_if<TextureHandle>(&parameter->value))
 			{
-				if (!m_textures.FindForNewUse(*texture))
+				if (!m_resources.FindContent(*texture))
 				{
 					AddDiagnostic(diagnostic, "TextureFallback",
-                                  requirement.name + ": " + m_textures.DescribeUnavailable(*texture) +
-                                      "; resident error Texture substituted.",
-                                  pass);
+								requirement.name + ": " + m_resources.DescribeTextureUnavailable(*texture) +
+								"; resident error Texture substituted.", pass);
 				}
 			}
 			else if (const auto* target = std::get_if<RenderTargetTextureHandle>(&parameter->value))
 			{
-				if (m_renderTargets && !m_renderTargets->FindForNewUse(*target))
+				if (!m_resources.FindContent(*target))
 				{
 					AddDiagnostic(diagnostic, "TextureFallback",
-                                  requirement.name + ": " + m_renderTargets->DescribeUnavailable(*target) +
-                                      "; resident error Texture substituted.",
-                                  pass);
+								requirement.name + ": " + m_resources.DescribeRenderTargetTextureUnavailable(*target) +
+								"; resident error Texture substituted.", pass);
 				}
 			}
 		}
@@ -156,7 +154,7 @@ Result FrameDrawContext::ResolveObjectInputs(std::size_t objectIndex, const Draw
 	RenderObject effectiveObject = sourceObject;
 	DrawSettings effectiveSettings = settings;
 
-	const bool geometryUnavailable = !sourceObject.procedural && !m_geometries.FindForNewUse(sourceObject.geometry);
+	const bool geometryUnavailable = !sourceObject.procedural && !m_resources.FindContent(sourceObject.geometry);
 
 	if (geometryUnavailable)
 	{
@@ -179,7 +177,7 @@ Result FrameDrawContext::ResolveObjectInputs(std::size_t objectIndex, const Draw
 
 	if (effectiveSettings.pipelineOverride)
 	{
-		const auto* overridePipeline = m_resources.m_pipelineResources.FindForNewUse(*effectiveSettings.pipelineOverride);
+		const auto* overridePipeline = m_resources.FindContent(*effectiveSettings.pipelineOverride);
 		const bool compatibleDepthOnly = overridePipeline && overridePipeline->desc.pixelShader == ShaderHandle{};
 
 		if (!compatibleDepthOnly)
@@ -188,8 +186,7 @@ Result FrameDrawContext::ResolveObjectInputs(std::size_t objectIndex, const Draw
 		}
 	}
 
-	resolved = m_resources.ResolveDrawInputs(effectiveObject, objectIndex, effectiveSettings, m_geometries, m_textures,
-                                             inputs, diagnostic, m_renderTargets);
+	resolved = m_resources.ResolveDrawInputs(effectiveObject, objectIndex, effectiveSettings, inputs, diagnostic);
 
 	if (!resolved.IsSuccess())
 	{
@@ -265,7 +262,7 @@ Result FrameDrawContext::SelectAvailableDraws(const DrawSettings& settings, Rend
 		// Resolve before culling: fallback selection must not be hidden by the
 		// original Geometry's obsolete Bounds. A submitted revision mismatch
 		// intentionally performs extra work instead of losing visible geometry.
-		const GeometryContent* boundsGeometry = m_geometries.FindForNewUse(object.geometry);
+		const GeometryContent* boundsGeometry = m_resources.FindContent(object.geometry);
 		const bool proceduralBounds = object.procedural.has_value();
 		const bool currentGeometryBounds = boundsGeometry && object.boundsGeometryRevision != 0 &&
                                            boundsGeometry->revision == object.boundsGeometryRevision;
@@ -381,11 +378,11 @@ Result FrameDrawContext::CollectUploadTargets(std::span<const PlannedDraw> draws
 
 		const auto& object = m_frame.objects[objectIndex];
 
-		if (m_geometries.FindForNewUse(object.geometry))
+		if (m_resources.FindContent(object.geometry))
 		{
 			GeometryUploadTarget target;
 			target.handle = object.geometry;
-			target.content = m_geometries.FindRegisteredContent(object.geometry);
+			target.content = m_resources.FindContent(object.geometry);
 			AddUniqueUploadTarget(geometries, target);
 		}
 
@@ -431,8 +428,11 @@ Result FrameDrawContext::CollectUploadTargets(std::span<const PlannedDraw> draws
 	return {};
 }
 
-Result FrameDrawContext::ResolveSample(const MaterialDesc& material, const ShaderResourceBinding& requirement,
-                                       SampledTexture& sample, const PassRecordingInputs& pass)
+Result FrameDrawContext::ResolveSample(
+	const MaterialDesc& material,
+	const ShaderResourceBinding& requirement,
+	SampledTexture& sample,
+	const PassRecordingInputs& pass)
 {
 	if (requirement.name == "RendererShadowMap")
 	{
@@ -445,21 +445,7 @@ Result FrameDrawContext::ResolveSample(const MaterialDesc& material, const Shade
 		return {};
 	}
 
-	if (m_renderTargets)
-	{
-		return m_resources.ResolveSampledTexture(material, requirement, m_textures, *m_renderTargets, sample);
-	}
-
-	UploadedTextureInput texture;
-	Result resolved =
-		m_resources.ResolveTextureInput(material, requirement, m_textures, texture.handle, texture.content);
-
-	if (resolved.IsSuccess())
-	{
-		sample = texture;
-	}
-
-	return resolved;
+	return m_resources.ResolveSampledTexture(material, requirement, sample);
 }
 
 bool FrameDrawContext::AreResourcesPrepared(const DrawInputs& inputs, const PassRecordingInputs& pass)
@@ -558,13 +544,8 @@ Result FrameDrawContext::GetViewExtent(const RenderView& view, std::uint32_t& wi
 		return m_backend.GetWindowOutputSize(*window, width, height);
 	}
 
-	if (!m_renderTargets)
-	{
-		return Fail("View output registry is unavailable.");
-	}
-
 	const auto handle = std::get<RenderTargetTextureHandle>(view.output);
-	const auto* target = m_renderTargets->FindForNewUse(handle);
+	const auto* target = m_resources.FindContent(handle);
 
 	if (!target || !target->gpuData)
 	{
@@ -586,12 +567,7 @@ Result FrameDrawContext::PrepareViewTargets(const RenderView& view, graph::ViewT
 		return m_bindings.PrepareViewTargets(*window, m_depth, targets, view.kind == ViewKind::Scene);
 	}
 
-	if (!m_renderTargets)
-	{
-		return Fail("View output registry is unavailable.");
-	}
-
-	auto* target = m_renderTargets->FindForNewUse(std::get<RenderTargetTextureHandle>(view.output));
+	auto* target = m_resources.FindContent(std::get<RenderTargetTextureHandle>(view.output));
 
 	if (!target)
 	{
@@ -603,8 +579,10 @@ Result FrameDrawContext::PrepareViewTargets(const RenderView& view, graph::ViewT
 
 // Declare exact sampled resources required by the final Pipeline before Graph Compile.
 // Normal textures and render-target samples use separate owners but converge to a Graph ShaderRead usage.
-Result FrameDrawContext::DeclareDrawResources(graph::RenderPassBuilder& builder, std::span<const PlannedDraw> draws,
-                                              const PassRecordingInputs& pass)
+Result FrameDrawContext::DeclareDrawResources(
+	graph::RenderPassBuilder& builder,
+	std::span<const PlannedDraw> draws,
+	const PassRecordingInputs& pass)
 {
 	for (const PlannedDraw& draw : draws)
 	{
@@ -670,8 +648,10 @@ Result FrameDrawContext::DeclareDrawResources(graph::RenderPassBuilder& builder,
 // Set the View context and viewport before preparing this View's DrawCommands.
 // The same source indices and settings used in declaration are used here.
 // DrawResources owns packing/PSO preparation; this borrowed gateway does not duplicate them.
-Result FrameDrawContext::RecordPass(graph::RenderPassContext& context, const PassRecordingInputs& pass,
-									std::span<const PlannedDraw> draws)
+Result FrameDrawContext::RecordPass(
+	graph::RenderPassContext& context,
+	const PassRecordingInputs& pass,
+	std::span<const PlannedDraw> draws)
 {
 	if (draws.empty())
 	{
@@ -724,8 +704,10 @@ Result FrameDrawContext::RecordPass(graph::RenderPassContext& context, const Pas
 // If an output is produced in this frame, require its producer to precede this read.
 // Last frame's valid pixels do not excuse reading a future current-frame producer.
 // An image not produced this frame can reuse its last valid contents, subject to Graph validation.
-Result FrameDrawContext::CheckOutputReadOrder(std::span<const PlannedDraw> draws, const PassRecordingInputs& pass,
-                                              const std::vector<RenderTargetTextureHandle>& producers)
+Result FrameDrawContext::CheckOutputReadOrder(
+		std::span<const PlannedDraw> draws,
+		const PassRecordingInputs& pass,
+		const std::vector<RenderTargetTextureHandle>& producers)
 {
 	for (const PlannedDraw& draw : draws)
 	{
@@ -762,18 +744,22 @@ Result FrameDrawContext::CheckOutputReadOrder(std::span<const PlannedDraw> draws
 				continue;
 			}
 
-			const bool producedThisFrame = std::any_of(m_frame.views.begin(), m_frame.views.end(),
-                                                       [sampledTarget](const RenderView& view)
-                                                       {
-                                                           const auto* target =
-                                                               std::get_if<RenderTargetTextureHandle>(&view.output);
-                                                           return target && *target == sampledTarget->handle;
-                                                       });
+			const bool producedThisFrame = 
+				std::any_of(
+					m_frame.views.begin(), m_frame.views.end(),
+					[sampledTarget](const RenderView& view)
+					{
+						const auto* target = std::get_if<RenderTargetTextureHandle>(&view.output);
+						return target && *target == sampledTarget->handle;
+					});
 
 			const bool auxiliaryProducer =
-				std::any_of(m_frame.auxiliaryPasses.begin(), m_frame.auxiliaryPasses.end(),
-							[sampledTarget](const AuxiliaryPass& pass)
-							{ return pass.colorOutput && *pass.colorOutput == sampledTarget->handle; });
+				std::any_of(
+					m_frame.auxiliaryPasses.begin(), m_frame.auxiliaryPasses.end(),
+					[sampledTarget](const AuxiliaryPass& pass)
+					{ 
+						return pass.colorOutput && *pass.colorOutput == sampledTarget->handle;
+					});
 
 			const bool alreadyProduced =
 				std::find(producers.begin(), producers.end(), sampledTarget->handle) != producers.end();
@@ -791,8 +777,10 @@ Result FrameDrawContext::CheckOutputReadOrder(std::span<const PlannedDraw> draws
 // Compute a conservative upper bound before recording: aligned constants and SRV slots.
 // Repeated common constants may make actual use smaller, but cannot make it larger than this bound.
 // Reject hard-limit overflow before casts or GPU addresses/handles are issued.
-Result FrameDrawContext::EstimateRequirements(std::span<const PlannedDraw> draws, const PassRecordingInputs& pass,
-                                              std::uint64_t& constantBytes, std::uint64_t& descriptors)
+Result FrameDrawContext::EstimateRequirements(
+	std::span<const PlannedDraw> draws,
+	const PassRecordingInputs& pass,
+	std::uint64_t& constantBytes, std::uint64_t& descriptors)
 {
 	for (const PlannedDraw& draw : draws)
 	{

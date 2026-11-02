@@ -103,11 +103,12 @@ D3D12_RECT DrawScissor(const RenderObject& object, const Viewport& viewport, std
 // Allocate this View's Camera and per-Object data in distinct frame storage.
 // Common allocations may be shared inside the current preparation call, never across different Views.
 // Compute both World and inverse-transpose normal data from the derived Billboard World.
-Result DrawResources::PrepareConstantBindings(const FrameRenderData& frame, const PassRecordingInputs& pass,
-                                              const RenderObject& object, const DrawInputs& inputs,
-                                              FrameDrawContext& drawContext,
-                                              std::array<backend::ConstantAllocation, 4>& commonAllocations,
-                                              DrawCommand& command)
+Result DrawResources::PrepareConstantBindings(
+	const FrameRenderData& frame, const PassRecordingInputs& pass,
+	const RenderObject& object, const DrawInputs& inputs,
+	FrameDrawContext& drawContext,
+	std::array<backend::ConstantAllocation, 4>& commonAllocations,
+	DrawCommand& command)
 {
 	ViewConstants viewConstants;
 	viewConstants.view = pass.view->view;
@@ -119,7 +120,10 @@ Result DrawResources::PrepareConstantBindings(const FrameRenderData& frame, cons
 
 	viewConstants.shadowViewProjection = pass.shadow.viewProjection;
 	viewConstants.shadowInformation.x = pass.shadow.enabled ? 1.0f : 0.0f;
-	viewConstants.shadowInformation.y = 0.001f;
+
+	constexpr float depthBiasWorld = 0.04f;
+	viewConstants.shadowInformation.y = depthBiasWorld / (400.0f - 0.1f);
+
 	viewConstants.shadowInformation.z = 0;
 	viewConstants.shadowInformation.w = 0;
 

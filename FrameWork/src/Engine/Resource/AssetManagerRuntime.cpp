@@ -422,11 +422,11 @@ private:
 		m_usage.geometries.reserve(m_usage.geometries.size() + 1);
 		m_usage.newGeometries.reserve(m_usage.newGeometries.size() + 1);
 		auto registration = m_owner.m_renderer->RegisterGeometry(description);
-		CheckDeviceFailure(registration.status);
+		CheckDeviceFailure(registration.result);
 
-		if (!registration.status.IsSuccess())
+		if (!registration.result.IsSuccess())
 		{
-			DBG("Geometry registration: %s", registration.status.message.c_str());
+			DBG("Geometry registration: %s", registration.result.message.c_str());
 			return unavailable;
 		}
 
@@ -462,11 +462,11 @@ private:
 		m_usage.newTextures.reserve(m_usage.newTextures.size() + 1);
 
 		auto registration = m_owner.m_renderer->RegisterTexture(description);
-		CheckDeviceFailure(registration.status);
+		CheckDeviceFailure(registration.result);
 
-		if (!registration.status.IsSuccess())
+		if (!registration.result.IsSuccess())
 		{
-			DBG("Texture registration: %s", registration.status.message.c_str());
+			DBG("Texture registration: %s", registration.result.message.c_str());
 			return unavailable;
 		}
 

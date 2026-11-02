@@ -32,11 +32,10 @@ public:
 	Result Initialize(backend::Backend& backend, DrawResources& draws);
 
 	Result Prepare(
-		const RenderView& view, backend::Backend& backend,
-		RenderTargetTextureRegistry& targets, DrawResources& draws,
+		const RenderView& view, backend::Backend& backend, DrawResources& draws,
 		SceneOutputImages*& images, Result& shadowPreparation, bool needsShadow);
 
-	Result PruneOutputs(backend::Backend& backend, RenderTargetTextureRegistry& targets, DrawResources& draws);
+	Result PruneOutputs(backend::Backend& backend, DrawResources& draws);
 
 	backend::DepthTexture& DisabledShadow() noexcept
 	{

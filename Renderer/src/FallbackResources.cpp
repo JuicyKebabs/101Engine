@@ -86,11 +86,11 @@ Result DrawResources::InitializeFallbacks()
 	geometryDescription.vertices = vertices;
 	geometryDescription.indices = indices;
 
-	GeometryRegistrationResult geometryRegistration = m_geometryResources.Register(geometryDescription);
+	auto geometryRegistration = m_geometryResources.Register(geometryDescription);
 
-	if (!geometryRegistration.status.IsSuccess())
+	if (!geometryRegistration.result.IsSuccess())
 	{
-		return geometryRegistration.status;
+		return geometryRegistration.result;
 	}
 
 	fallbackGeometry = geometryRegistration.handle;
@@ -106,11 +106,11 @@ Result DrawResources::InitializeFallbacks()
 	textureDescription.height = 2;
 	textureDescription.format = TextureFormat::RGBA8_sRGB;
 	textureDescription.mips = std::span(&mip, 1);
-	TextureRegistrationResult textureRegistration = m_textureResources.Register(textureDescription);
+	auto textureRegistration = m_textureResources.Register(textureDescription);
 
-	if (!textureRegistration.status.IsSuccess())
+	if (!textureRegistration.result.IsSuccess())
 	{
-		return textureRegistration.status;
+		return textureRegistration.result;
 	}
 
 	fallbackTexture = textureRegistration.handle;
