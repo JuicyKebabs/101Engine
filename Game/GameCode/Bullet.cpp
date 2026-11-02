@@ -11,16 +11,16 @@ REGISTER_GAME_COMPONENT(Bullet)
 
 std::optional<TypeMetadata> Bullet::BuildMetadata()
 {
-    TypeMetadataBuilder<Bullet> builder("Bullet");
+	TypeMetadataBuilder<Bullet> builder("Bullet");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in Bullet.
-    // builder.Property("speed", &Bullet::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in Bullet.
+	// builder.Property("speed", &Bullet::m_speed);
 
 	builder.Property("damage", &Bullet::m_damage).Optional();
 	builder.Property("lifeTime", &Bullet::m_lifeTime).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void Bullet::Start() 

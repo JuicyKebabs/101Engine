@@ -11,15 +11,15 @@ REGISTER_GAME_COMPONENT(TitleManager)
 
 std::optional<TypeMetadata> TitleManager::BuildMetadata()
 {
-    TypeMetadataBuilder<TitleManager> builder("TitleManager");
+	TypeMetadataBuilder<TitleManager> builder("TitleManager");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in TitleManager.
-    // builder.Property("speed", &TitleManager::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in TitleManager.
+	// builder.Property("speed", &TitleManager::m_speed);
 
 	builder.Property("nextScene", &TitleManager::m_nextScene).Optional();
 	builder.Property("FadeImageActor", &TitleManager::m_fadeImageActor).Optional();
-    return builder.Build();
+	return builder.Build();
 }
 
 void TitleManager::Start()

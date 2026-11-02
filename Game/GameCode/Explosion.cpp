@@ -6,18 +6,18 @@ REGISTER_GAME_COMPONENT(Explosion)
 
 std::optional<TypeMetadata> Explosion::BuildMetadata()
 {
-    TypeMetadataBuilder<Explosion> builder("Explosion");
+	TypeMetadataBuilder<Explosion> builder("Explosion");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in Explosion.
-    // builder.Property("speed", &Explosion::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in Explosion.
+	// builder.Property("speed", &Explosion::m_speed);
 
 	builder.Property("duration", &Explosion::m_duration).Optional();
 	builder.Property("elapsedTime", &Explosion::m_elapsedTime).Optional();
 	builder.Property("spriteIndex", &Explosion::m_spriteIndex).Optional();
 	builder.Property("totalSprites", &Explosion::m_totalSprites).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void Explosion::Start() 

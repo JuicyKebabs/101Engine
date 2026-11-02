@@ -20,12 +20,12 @@ void PersistentComponentMetadata::AddRendererProperties(TypeMetadataBuilder<T>& 
 		"sortOrderInCanvas",
 		&T::GetSortOrderInCanvas,
 		[writeLegacySortOrder](T& component, std::uint32_t order)
-        {
-            if (writeLegacySortOrder)
-            {
-                component.SetSortOrderInCanvas(order);
-            }
-        }).Optional();
+		{
+			if (writeLegacySortOrder)
+			{
+				component.SetSortOrderInCanvas(order);
+			}
+		}).Optional();
 }
 
 template<class T>
@@ -68,7 +68,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
 
 	AddRendererProperties(builder);
-    builder.Property("castShadow", &T::GetCastShadow, &T::SetCastShadow).Optional();
+	builder.Property("castShadow", &T::GetCastShadow, &T::SetCastShadow).Optional();
 
 	builder.Property("uvScale", &T::GetUVScale, &T::SetUVScale).Validate(ValueValidation::Finite2);
 	builder.Property("uvOffset", &T::GetUVOffset, &T::SetUVOffset).Validate(ValueValidation::Finite2);

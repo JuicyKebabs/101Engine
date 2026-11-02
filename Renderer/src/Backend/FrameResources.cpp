@@ -22,59 +22,59 @@ constexpr UINT MaximumDescriptorCount = 65536;
 
 Result ClassifyDeviceFailure(Device& device, Result failure)
 {
-    Result deviceStatus = device.CheckStatus();
+	Result deviceStatus = device.CheckStatus();
 
-    if (!deviceStatus.IsSuccess())
-    {
-        deviceStatus.message = failure.message + "\n" + deviceStatus.message;
-        return deviceStatus;
-    }
+	if (!deviceStatus.IsSuccess())
+	{
+		deviceStatus.message = failure.message + "\n" + deviceStatus.message;
+		return deviceStatus;
+	}
 
-    return failure;
+	return failure;
 }
 
 // Grow geometrically up to a validated hard limit and never shrink on a smaller later frame.
 // Capacity is retained for reuse; allocation offsets are reset after completion.
 UINT GrowthCapacity(UINT current, UINT required, UINT maximum)
 {
-    UINT capacity = (std::max)(current, UINT{1});
+	UINT capacity = (std::max)(current, UINT{1});
 
-    while (capacity < required)
-    {
-        capacity = capacity > maximum / 2 ? maximum : capacity * 2;
-    }
+	while (capacity < required)
+	{
+		capacity = capacity > maximum / 2 ? maximum : capacity * 2;
+	}
 
-    return capacity;
+	return capacity;
 }
 
 } // namespace
 
 Result FrameResources::Initialize(Device* device, UINT constantBytes, UINT descriptorCount)
 {
-    if (!device || !device->IsInitialized())
-    {
-        return detail::Fail("FrameResources: initialized Device required.");
-    }
+	if (!device || !device->IsInitialized())
+	{
+		return detail::Fail("FrameResources: initialized Device required.");
+	}
 
-    if (m_device)
-    {
-        return detail::Fail("FrameResources: already initialized.");
-    }
+	if (m_device)
+	{
+		return detail::Fail("FrameResources: already initialized.");
+	}
 
-    if (constantBytes == 0 || descriptorCount == 0)
-    {
-        return detail::Fail("FrameResources: initial capacities must be nonzero.");
-    }
+	if (constantBytes == 0 || descriptorCount == 0)
+	{
+		return detail::Fail("FrameResources: initial capacities must be nonzero.");
+	}
 
-    m_device = device;
-    Result prepared = EnsureCapacity(constantBytes, descriptorCount);
+	m_device = device;
+	Result prepared = EnsureCapacity(constantBytes, descriptorCount);
 
-    if (!prepared.IsSuccess())
-    {
-        Finalize();
-    }
+	if (!prepared.IsSuccess())
+	{
+		Finalize();
+	}
 
-    return prepared;
+	return prepared;
 }
 
 // Precondition: previous GPU use is complete and this frame has allocated nothing yet.
@@ -82,96 +82,96 @@ Result FrameResources::Initialize(Device* device, UINT constantBytes, UINT descr
 // If preparation fails, old allocations remain intact and no previously handed-out addresses change.
 Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount)
 {
-    if (!m_device || !m_device->IsInitialized())
-    {
-        return detail::Fail("FrameResources: Device is unavailable.");
-    }
+	if (!m_device || !m_device->IsInitialized())
+	{
+		return detail::Fail("FrameResources: Device is unavailable.");
+	}
 
-    const bool hasAllocations = m_constantOffset != 0 || m_descriptorOffset != 0;
+	const bool hasAllocations = m_constantOffset != 0 || m_descriptorOffset != 0;
 
-    if (hasAllocations)
-    {
-        return detail::Fail("FrameResources: capacity cannot change after allocation begins.");
-    }
+	if (hasAllocations)
+	{
+		return detail::Fail("FrameResources: capacity cannot change after allocation begins.");
+	}
 
-    if (constantBytes > MaximumConstantBytes || descriptorCount > MaximumDescriptorCount)
-    {
-        return detail::Fail("FrameResources: constant or Descriptor hard limit exceeded.");
-    }
+	if (constantBytes > MaximumConstantBytes || descriptorCount > MaximumDescriptorCount)
+	{
+		return detail::Fail("FrameResources: constant or Descriptor hard limit exceeded.");
+	}
 
-    const UINT currentConstantBytes = m_constants ? static_cast<UINT>(m_constants->GetSize()) : 0;
-    const UINT desiredConstantBytes = GrowthCapacity(currentConstantBytes, constantBytes, MaximumConstantBytes);
-    const UINT desiredDescriptors = GrowthCapacity(m_descriptorCapacity, descriptorCount, MaximumDescriptorCount);
+	const UINT currentConstantBytes = m_constants ? static_cast<UINT>(m_constants->GetSize()) : 0;
+	const UINT desiredConstantBytes = GrowthCapacity(currentConstantBytes, constantBytes, MaximumConstantBytes);
+	const UINT desiredDescriptors = GrowthCapacity(m_descriptorCapacity, descriptorCount, MaximumDescriptorCount);
 
-    try
-    {
-        std::unique_ptr<Buffer> replacementConstants;
+	try
+	{
+		std::unique_ptr<Buffer> replacementConstants;
 
-        if (!m_constants || desiredConstantBytes > currentConstantBytes)
-        {
-            replacementConstants = std::make_unique<Buffer>();
-            Result created = replacementConstants->Initialize(m_device->GetNativeDevice(), desiredConstantBytes,
+		if (!m_constants || desiredConstantBytes > currentConstantBytes)
+		{
+			replacementConstants = std::make_unique<Buffer>();
+			Result created = replacementConstants->Initialize(m_device->GetNativeDevice(), desiredConstantBytes,
                                                               BufferMemory::Upload);
 
-            if (!created.IsSuccess())
-            {
-                return ClassifyDeviceFailure(*m_device, std::move(created));
-            }
-        }
+			if (!created.IsSuccess())
+			{
+				return ClassifyDeviceFailure(*m_device, std::move(created));
+			}
+		}
 
-        std::unique_ptr<DescriptorHeap> replacementDescriptors;
+		std::unique_ptr<DescriptorHeap> replacementDescriptors;
 
-        if (!m_descriptors || desiredDescriptors > m_descriptorCapacity)
-        {
-            replacementDescriptors = std::make_unique<DescriptorHeap>();
-            Result created = replacementDescriptors->Initialize(
-                m_device->GetNativeDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, desiredDescriptors, true);
+		if (!m_descriptors || desiredDescriptors > m_descriptorCapacity)
+		{
+			replacementDescriptors = std::make_unique<DescriptorHeap>();
+			Result created = replacementDescriptors->Initialize(
+				m_device->GetNativeDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, desiredDescriptors, true);
 
-            if (!created.IsSuccess())
-            {
-                return ClassifyDeviceFailure(*m_device, std::move(created));
-            }
-        }
+			if (!created.IsSuccess())
+			{
+				return ClassifyDeviceFailure(*m_device, std::move(created));
+			}
+		}
 
-        // No GPU references have been handed out, so all replacements can commit together.
-        if (replacementConstants)
-        {
-            m_constants = std::move(replacementConstants);
-        }
+		// No GPU references have been handed out, so all replacements can commit together.
+		if (replacementConstants)
+		{
+			m_constants = std::move(replacementConstants);
+		}
 
-        if (replacementDescriptors)
-        {
-            m_descriptors = std::move(replacementDescriptors);
-        }
+		if (replacementDescriptors)
+		{
+			m_descriptors = std::move(replacementDescriptors);
+		}
 
-        m_descriptorCapacity = desiredDescriptors;
-        return {};
-    }
-    catch (const std::bad_alloc&)
-    {
-        return detail::Fail("FrameResources: capacity allocation failed.");
-    }
-    catch (const std::length_error&)
-    {
-        return detail::Fail("FrameResources: capacity is unsupported.");
-    }
+		m_descriptorCapacity = desiredDescriptors;
+		return {};
+	}
+	catch (const std::bad_alloc&)
+	{
+		return detail::Fail("FrameResources: capacity allocation failed.");
+	}
+	catch (const std::length_error&)
+	{
+		return detail::Fail("FrameResources: capacity is unsupported.");
+	}
 }
 
 void FrameResources::Finalize() noexcept
 {
-    ResetAfterCompletion();
-    m_descriptors.reset();
-    m_constants.reset();
-    m_device = nullptr;
-    m_descriptorCapacity = 0;
+	ResetAfterCompletion();
+	m_descriptors.reset();
+	m_constants.reset();
+	m_device = nullptr;
+	m_descriptorCapacity = 0;
 }
 
 // The caller, not this small helper, proves Fence completion.
 // Resetting offsets while commands are pending would let the CPU overwrite Camera data or SRVs still in use.
 void FrameResources::ResetAfterCompletion() noexcept
 {
-    m_constantOffset = 0;
-    m_descriptorOffset = 0;
+	m_constantOffset = 0;
+	m_descriptorOffset = 0;
 }
 
 // Reserve a fresh 256-byte-aligned range and zero its padding.
@@ -179,96 +179,96 @@ void FrameResources::ResetAfterCompletion() noexcept
 // A single binding is also constrained by DX12's constant-buffer size limit.
 Result FrameResources::AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output)
 {
-    constexpr UINT alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
-    constexpr UINT maximumBufferBytes = D3D12_REQ_CONSTANT_BUFFER_ELEMENT_COUNT * 16;
+	constexpr UINT alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+	constexpr UINT maximumBufferBytes = D3D12_REQ_CONSTANT_BUFFER_ELEMENT_COUNT * 16;
 
-    if (!m_device || !m_constants)
-    {
-        return detail::Fail("FrameResources: constants are unavailable.");
-    }
+	if (!m_device || !m_constants)
+	{
+		return detail::Fail("FrameResources: constants are unavailable.");
+	}
 
-    if (data.empty() || data.size() > maximumBufferBytes)
-    {
-        return detail::Fail("FrameResources: invalid constant block size.");
-    }
+	if (data.empty() || data.size() > maximumBufferBytes)
+	{
+		return detail::Fail("FrameResources: invalid constant block size.");
+	}
 
-    const UINT paddedBytes = (static_cast<UINT>(data.size()) + alignment - 1) & ~(alignment - 1);
+	const UINT paddedBytes = (static_cast<UINT>(data.size()) + alignment - 1) & ~(alignment - 1);
 
-    if (m_constantOffset > m_constants->GetSize() || paddedBytes > m_constants->GetSize() - m_constantOffset)
-    {
-        return detail::Fail("Frame constant capacity exceeded.");
-    }
+	if (m_constantOffset > m_constants->GetSize() || paddedBytes > m_constants->GetSize() - m_constantOffset)
+	{
+		return detail::Fail("Frame constant capacity exceeded.");
+	}
 
-    Result written = m_constants->WriteAt(m_constantOffset, data);
+	Result written = m_constants->WriteAt(m_constantOffset, data);
 
-    if (!written.IsSuccess())
-    {
-        return ClassifyDeviceFailure(*m_device, std::move(written));
-    }
+	if (!written.IsSuccess())
+	{
+		return ClassifyDeviceFailure(*m_device, std::move(written));
+	}
 
-    const UINT paddingBytes = paddedBytes - static_cast<UINT>(data.size());
+	const UINT paddingBytes = paddedBytes - static_cast<UINT>(data.size());
 
-    if (paddingBytes != 0)
-    {
-        const std::array<std::byte, alignment> zeros{};
-        written = m_constants->WriteAt(m_constantOffset + data.size(),
+	if (paddingBytes != 0)
+	{
+		const std::array<std::byte, alignment> zeros{};
+		written = m_constants->WriteAt(m_constantOffset + data.size(),
                                        std::span<const std::byte>(zeros.data(), paddingBytes));
 
-        if (!written.IsSuccess())
-        {
-            return ClassifyDeviceFailure(*m_device, std::move(written));
-        }
-    }
+		if (!written.IsSuccess())
+		{
+			return ClassifyDeviceFailure(*m_device, std::move(written));
+		}
+	}
 
-    ConstantAllocation allocation;
-    allocation.gpuAddress = m_constants->GetNativeResource()->GetGPUVirtualAddress() + m_constantOffset;
-    allocation.sizeInBytes = paddedBytes;
-    output = allocation;
-    m_constantOffset += paddedBytes;
-    return {};
+	ConstantAllocation allocation;
+	allocation.gpuAddress = m_constants->GetNativeResource()->GetGPUVirtualAddress() + m_constantOffset;
+	allocation.sizeInBytes = paddedBytes;
+	output = allocation;
+	m_constantOffset += paddedBytes;
+	return {};
 }
 
 // Copy one CPU SRV description into the shader-visible frame heap.
 // Advance monotonically so a later Draw cannot overwrite a descriptor used by an earlier Draw.
 Result FrameResources::CopyDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output)
 {
-    if (!m_device || !m_descriptors)
-    {
-        return detail::Fail("FrameResources: Descriptor storage is unavailable.");
-    }
+	if (!m_device || !m_descriptors)
+	{
+		return detail::Fail("FrameResources: Descriptor storage is unavailable.");
+	}
 
-    if (!source.ptr)
-    {
-        return detail::Fail("FrameResources: source Descriptor is null.");
-    }
+	if (!source.ptr)
+	{
+		return detail::Fail("FrameResources: source Descriptor is null.");
+	}
 
-    if (m_descriptorOffset >= m_descriptorCapacity)
-    {
-        return detail::Fail("Frame descriptor capacity exceeded.");
-    }
+	if (m_descriptorOffset >= m_descriptorCapacity)
+	{
+		return detail::Fail("Frame descriptor capacity exceeded.");
+	}
 
-    D3D12_CPU_DESCRIPTOR_HANDLE destinationCpu{};
-    D3D12_GPU_DESCRIPTOR_HANDLE destinationGpu{};
-    Result found = m_descriptors->GetCpuHandle(m_descriptorOffset, destinationCpu);
+	D3D12_CPU_DESCRIPTOR_HANDLE destinationCpu{};
+	D3D12_GPU_DESCRIPTOR_HANDLE destinationGpu{};
+	Result found = m_descriptors->GetCpuHandle(m_descriptorOffset, destinationCpu);
 
-    if (!found.IsSuccess())
-    {
-        return found;
-    }
+	if (!found.IsSuccess())
+	{
+		return found;
+	}
 
-    found = m_descriptors->GetGpuHandle(m_descriptorOffset, destinationGpu);
+	found = m_descriptors->GetGpuHandle(m_descriptorOffset, destinationGpu);
 
-    if (!found.IsSuccess())
-    {
-        return found;
-    }
+	if (!found.IsSuccess())
+	{
+		return found;
+	}
 
-    m_device->GetNativeDevice()->CopyDescriptorsSimple(1, destinationCpu, source,
+	m_device->GetNativeDevice()->CopyDescriptorsSimple(1, destinationCpu, source,
                                                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    output = destinationGpu;
-    ++m_descriptorOffset;
-    return {};
+	output = destinationGpu;
+	++m_descriptorOffset;
+	return {};
 }
 
 } // namespace rendering::backend

@@ -20,28 +20,28 @@ namespace rendering::backend
 
 struct VertexField
 {
-    const char* semantic;
-    UINT count;
-    UINT offset;
-    DXGI_FORMAT format;
+	const char* semantic;
+	UINT count;
+	UINT offset;
+	DXGI_FORMAT format;
 };
 
 std::vector<VertexField> VertexFields();
 
 struct PipelineGpuData
 {
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
 };
 
 struct PipelineBuildInputs
 {
-    const PipelineDesc* description = nullptr;
-    const ShaderMetadata* layout = nullptr;
-    const detail::ShaderContent* vertex = nullptr;
-    const detail::ShaderContent* pixel = nullptr;
-    const graph::OutputLayout* output = nullptr;
-    DepthMode depth = DepthMode::Disabled;
+	const PipelineDesc* description = nullptr;
+	const ShaderMetadata* layout = nullptr;
+	const detail::ShaderContent* vertex = nullptr;
+	const detail::ShaderContent* pixel = nullptr;
+	const graph::OutputLayout* output = nullptr;
+	DepthMode depth = DepthMode::Disabled;
 };
 
 Result BuildPipeline(ID3D12Device* device, const PipelineBuildInputs& inputs, PipelineGpuData& output);

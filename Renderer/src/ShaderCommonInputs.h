@@ -11,18 +11,18 @@ namespace rendering::detail
 // Shared CPU/HLSL ABI. Reflection and command preparation use these same layouts.
 struct ViewConstants
 {
-    Matrix4x4 view;
-    Matrix4x4 projection;
-    Vector4 cameraPosition;
-    Matrix4x4 shadowViewProjection;
-    Vector4 shadowInformation;
+	Matrix4x4 view;
+	Matrix4x4 projection;
+	Vector4 cameraPosition;
+	Matrix4x4 shadowViewProjection;
+	Vector4 shadowInformation;
 };
 
 struct ObjectConstants
 {
-    Matrix4x4 world;
-    Matrix4x4 normalMatrix;
-    Vector4 tint;
+	Matrix4x4 world;
+	Matrix4x4 normalMatrix;
+	Vector4 tint;
 };
 
 static_assert(std::is_standard_layout_v<ViewConstants>);

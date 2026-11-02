@@ -226,17 +226,17 @@ namespace
 				result.value,
 				result.changed,
 				[label](Vector4& value)
-                {
-                    Vector4 displayColor = EngineRendering::LinearToSrgb(value);
-                    const bool changed = ImGui::ColorEdit4(label, &displayColor.x);
+				{
+					Vector4 displayColor = EngineRendering::LinearToSrgb(value);
+					const bool changed = ImGui::ColorEdit4(label, &displayColor.x);
 
-                    if (changed)
-                    {
-                        value = EngineRendering::SrgbToLinear(displayColor);
-                    }
+					if (changed)
+					{
+						value = EngineRendering::SrgbToLinear(displayColor);
+					}
 
-                    return changed;
-                });
+					return changed;
+				});
 			break;
 		case PropertyEditorKind::Quaternion:
 			if (Quaternion* value = std::get_if<Quaternion>(&result.value))

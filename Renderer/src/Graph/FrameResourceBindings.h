@@ -23,37 +23,37 @@ namespace rendering::graph
 
 struct ViewTargets
 {
-    GraphTextureHandle color;
-    GraphTextureHandle depth;
-    std::uint32_t width = 0;
-    std::uint32_t height = 0;
+	GraphTextureHandle color;
+	GraphTextureHandle depth;
+	std::uint32_t width = 0;
+	std::uint32_t height = 0;
 };
 
 // Borrowed connections for one Graph. Owners must survive until execution ends.
 class FrameResourceBindings
 {
 public:
-    FrameResourceBindings(backend::Backend& backend, RenderGraph& graph, GraphExecutor& executor) noexcept;
+	FrameResourceBindings(backend::Backend& backend, RenderGraph& graph, GraphExecutor& executor) noexcept;
 
-    Result PrepareViewTargets(WindowOutputHandle output, backend::DepthTexture& depth, ViewTargets& targets,
+	Result PrepareViewTargets(WindowOutputHandle output, backend::DepthTexture& depth, ViewTargets& targets,
                               bool includeDepth = true);
-    Result PrepareRenderTargetTargets(detail::RenderTargetTextureContent& content, bool includeDepth,
+	Result PrepareRenderTargetTargets(detail::RenderTargetTextureContent& content, bool includeDepth,
                                       ViewTargets& targets);
-    Result ImportTexture(detail::TextureContent& content, const std::string& name, GraphTextureHandle& texture);
-    Result FindImportedTexture(const detail::TextureContent& content, GraphTextureHandle& texture) const;
-    Result ImportRenderTarget(detail::RenderTargetTextureContent& content, const std::string& name,
+	Result ImportTexture(detail::TextureContent& content, const std::string& name, GraphTextureHandle& texture);
+	Result FindImportedTexture(const detail::TextureContent& content, GraphTextureHandle& texture) const;
+	Result ImportRenderTarget(detail::RenderTargetTextureContent& content, const std::string& name,
                               GraphTextureHandle& texture);
-    Result ImportDepth(backend::DepthTexture& depth, GraphTextureHandle& texture);
-    Result FindImportedDepth(const backend::DepthTexture& depth, GraphTextureHandle& texture) const;
-    Result FindImportedRenderTarget(const detail::RenderTargetTextureContent& content,
-                                    GraphTextureHandle& texture) const;
+	Result ImportDepth(backend::DepthTexture& depth, GraphTextureHandle& texture);
+	Result FindImportedDepth(const backend::DepthTexture& depth, GraphTextureHandle& texture) const;
+	Result FindImportedRenderTarget(const detail::RenderTargetTextureContent& content,
+									GraphTextureHandle& texture) const;
 
 private:
-    Result ImportBinding(const GraphTextureBinding& binding, const std::string& name, GraphTextureHandle& texture);
-    Result ImportWindowOutput(WindowOutputHandle output, GraphTextureHandle& texture, ViewTargets& targets);
-    backend::Backend& m_backend;
-    RenderGraph& m_graph;
-    GraphExecutor& m_executor;
+	Result ImportBinding(const GraphTextureBinding& binding, const std::string& name, GraphTextureHandle& texture);
+	Result ImportWindowOutput(WindowOutputHandle output, GraphTextureHandle& texture, ViewTargets& targets);
+	backend::Backend& m_backend;
+	RenderGraph& m_graph;
+	GraphExecutor& m_executor;
 };
 
 } // namespace rendering::graph

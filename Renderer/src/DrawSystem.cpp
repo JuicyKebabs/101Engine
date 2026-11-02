@@ -25,153 +25,153 @@ namespace
 
 Result ValidateLight(const DirectionalLight& light)
 {
-    if (!Finite(light.lightDirection) || !Finite(light.lightColor) || !Finite(light.ambient))
-    {
-        return {false, "ValidateLight: non-finite parameters."};
-    }
+	if (!Finite(light.lightDirection) || !Finite(light.lightColor) || !Finite(light.ambient))
+	{
+		return {false, "ValidateLight: non-finite parameters."};
+	}
 
-    const auto& direction = light.lightDirection;
+	const auto& direction = light.lightDirection;
 
-    const float lengthSquared = direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2];
+	const float lengthSquared = direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2];
 
-    if (lengthSquared < 1e-12f)
-    {
-        return {false, "ValidateLight: direction is too small."};
-    }
+	if (lengthSquared < 1e-12f)
+	{
+		return {false, "ValidateLight: direction is too small."};
+	}
 
-    return {};
+	return {};
 }
 
 Result ValidatePipelineDesc(const PipelineDesc& desc)
 {
-    if (desc.blend != BlendMode::Opaque && desc.blend != BlendMode::Alpha)
-    {
-        return {false, "ValidatePipelineDesc: unsupported blend mode."};
-    }
+	if (desc.blend != BlendMode::Opaque && desc.blend != BlendMode::Alpha)
+	{
+		return {false, "ValidatePipelineDesc: unsupported blend mode."};
+	}
 
-    if (desc.depth != DepthMode::Disabled && desc.depth != DepthMode::ReadOnly && desc.depth != DepthMode::ReadWrite)
-    {
-        return {false, "ValidatePipelineDesc: unsupported depth mode."};
-    }
+	if (desc.depth != DepthMode::Disabled && desc.depth != DepthMode::ReadOnly && desc.depth != DepthMode::ReadWrite)
+	{
+		return {false, "ValidatePipelineDesc: unsupported depth mode."};
+	}
 
-    if (desc.cull != CullMode::None && desc.cull != CullMode::Back && desc.cull != CullMode::Front)
-    {
-        return {false, "ValidatePipelineDesc: unsupported cull mode."};
-    }
+	if (desc.cull != CullMode::None && desc.cull != CullMode::Back && desc.cull != CullMode::Front)
+	{
+		return {false, "ValidatePipelineDesc: unsupported cull mode."};
+	}
 
-    if (desc.fill != FillMode::Solid && desc.fill != FillMode::Wireframe)
-    {
-        return Fail("ValidatePipelineDesc: unsupported fill mode.");
-    }
+	if (desc.fill != FillMode::Solid && desc.fill != FillMode::Wireframe)
+	{
+		return Fail("ValidatePipelineDesc: unsupported fill mode.");
+	}
 
-    if (desc.blend == BlendMode::Alpha && desc.depth == DepthMode::ReadWrite)
-    {
-        return {false, "ValidatePipelineDesc: Transparent Pipeline must disable Depth writes."};
-    }
+	if (desc.blend == BlendMode::Alpha && desc.depth == DepthMode::ReadWrite)
+	{
+		return {false, "ValidatePipelineDesc: Transparent Pipeline must disable Depth writes."};
+	}
 
-    return {};
+	return {};
 }
 
 // Validate that the vertex shader outputs match the pixel shader inputs for all non-system value semantics.
 Result ValidateShaderLink(const ShaderContent& vertex, const ShaderContent* pixel)
 {
-    if (!pixel)
-    {
-        return {};
-    }
+	if (!pixel)
+	{
+		return {};
+	}
 
-    // Use D3DReflect to obtain shader reflection interfaces for both vertex and pixel shaders.
-    Microsoft::WRL::ComPtr<ID3D12ShaderReflection> vertexReflection;
-    auto vsHr = D3DReflect(vertex.bytecode.data(), vertex.bytecode.size(), IID_PPV_ARGS(&vertexReflection));
+	// Use D3DReflect to obtain shader reflection interfaces for both vertex and pixel shaders.
+	Microsoft::WRL::ComPtr<ID3D12ShaderReflection> vertexReflection;
+	auto vsHr = D3DReflect(vertex.bytecode.data(), vertex.bytecode.size(), IID_PPV_ARGS(&vertexReflection));
 
-    if (FAILED(vsHr))
-    {
-        return {false, "ValidateShaderLink: Vertex shader reflection failed."};
-    }
+	if (FAILED(vsHr))
+	{
+		return {false, "ValidateShaderLink: Vertex shader reflection failed."};
+	}
 
-    Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pixelReflection;
-    auto psHr = D3DReflect(pixel->bytecode.data(), pixel->bytecode.size(), IID_PPV_ARGS(&pixelReflection));
+	Microsoft::WRL::ComPtr<ID3D12ShaderReflection> pixelReflection;
+	auto psHr = D3DReflect(pixel->bytecode.data(), pixel->bytecode.size(), IID_PPV_ARGS(&pixelReflection));
 
-    if (FAILED(psHr))
-    {
-        return {false, "ValidateShaderLink: Pixel shader reflection failed."};
-    }
+	if (FAILED(psHr))
+	{
+		return {false, "ValidateShaderLink: Pixel shader reflection failed."};
+	}
 
-    // Retrieve the shader descriptions for both vertex and pixel shaders.
-    D3D12_SHADER_DESC vertexDesc{};
+	// Retrieve the shader descriptions for both vertex and pixel shaders.
+	D3D12_SHADER_DESC vertexDesc{};
 
-    if (FAILED(vertexReflection->GetDesc(&vertexDesc)))
-    {
-        return {false, "ValidateShaderLink: Vertex shader reflection description failed."};
-    }
+	if (FAILED(vertexReflection->GetDesc(&vertexDesc)))
+	{
+		return {false, "ValidateShaderLink: Vertex shader reflection description failed."};
+	}
 
-    D3D12_SHADER_DESC pixelDesc{};
+	D3D12_SHADER_DESC pixelDesc{};
 
-    if (FAILED(pixelReflection->GetDesc(&pixelDesc)))
-    {
-        return {false, "ValidateShaderLink: Pixel shader reflection description failed."};
-    }
+	if (FAILED(pixelReflection->GetDesc(&pixelDesc)))
+	{
+		return {false, "ValidateShaderLink: Pixel shader reflection description failed."};
+	}
 
-    // Helper function to convert semantic names to uppercase for case-insensitive comparison.
-    auto canonical = [](const char* name)
-    {
-        std::string nameStr = name;
+	// Helper function to convert semantic names to uppercase for case-insensitive comparison.
+	auto canonical = [](const char* name)
+	{
+		std::string nameStr = name;
 
-        for (char& character : nameStr)
-        {
-            character = static_cast<char>(std::toupper(static_cast<unsigned char>(character)));
-        }
+		for (char& character : nameStr)
+		{
+			character = static_cast<char>(std::toupper(static_cast<unsigned char>(character)));
+		}
 
-        return nameStr;
-    };
+		return nameStr;
+	};
 
-    // Iterate through each input parameter of the pixel shader.
-    for (UINT i = 0; i < pixelDesc.InputParameters; ++i)
-    {
-        // Get and validate the input parameter description of the pixel shader for the current index.
-        D3D12_SIGNATURE_PARAMETER_DESC input{};
+	// Iterate through each input parameter of the pixel shader.
+	for (UINT i = 0; i < pixelDesc.InputParameters; ++i)
+	{
+		// Get and validate the input parameter description of the pixel shader for the current index.
+		D3D12_SIGNATURE_PARAMETER_DESC input{};
 
-        if (FAILED(pixelReflection->GetInputParameterDesc(i, &input)))
-        {
-            return {false, "ValidateShaderLink: Pixel shader linkage lookup failed"};
-        }
+		if (FAILED(pixelReflection->GetInputParameterDesc(i, &input)))
+		{
+			return {false, "ValidateShaderLink: Pixel shader linkage lookup failed"};
+		}
 
-        if (!input.ReadWriteMask ||
-            (input.SystemValueType != D3D_NAME_UNDEFINED && input.SystemValueType != D3D_NAME_POSITION))
-        {
-            continue;
-        }
+		if (!input.ReadWriteMask ||
+			(input.SystemValueType != D3D_NAME_UNDEFINED && input.SystemValueType != D3D_NAME_POSITION))
+		{
+			continue;
+		}
 
-        bool match = false;
+		bool match = false;
 
-        // Iterate through each output parameter of the vertex shader.
-        for (UINT j = 0; j < vertexDesc.OutputParameters; ++j)
-        {
-            // Get and validate the output parameter description of the vertex shader for the current index.
-            D3D12_SIGNATURE_PARAMETER_DESC output{};
+		// Iterate through each output parameter of the vertex shader.
+		for (UINT j = 0; j < vertexDesc.OutputParameters; ++j)
+		{
+			// Get and validate the output parameter description of the vertex shader for the current index.
+			D3D12_SIGNATURE_PARAMETER_DESC output{};
 
-            if (FAILED(vertexReflection->GetOutputParameterDesc(j, &output)))
-            {
-                return {false, "ValidateShaderLink: Vertex shader linkage lookup failed"};
-            }
+			if (FAILED(vertexReflection->GetOutputParameterDesc(j, &output)))
+			{
+				return {false, "ValidateShaderLink: Vertex shader linkage lookup failed"};
+			}
 
-            // Check if the semantic names, indices, component types, and read/write masks
-            // match between the vertex shader output and pixel shader input.
-            if (canonical(input.SemanticName) == canonical(output.SemanticName) &&
-                input.SemanticIndex == output.SemanticIndex && input.ComponentType == output.ComponentType &&
-                (input.ReadWriteMask & ~output.Mask) == 0)
-            {
-                match = true;
-            }
-        }
+			// Check if the semantic names, indices, component types, and read/write masks
+			// match between the vertex shader output and pixel shader input.
+			if (canonical(input.SemanticName) == canonical(output.SemanticName) &&
+				input.SemanticIndex == output.SemanticIndex && input.ComponentType == output.ComponentType &&
+				(input.ReadWriteMask & ~output.Mask) == 0)
+			{
+				match = true;
+			}
+		}
 
-        if (!match)
-        {
-            return {false, "ValidateShaderLink: VS/PS semantic mismatch: " + std::string(input.SemanticName)};
-        }
-    }
+		if (!match)
+		{
+			return {false, "ValidateShaderLink: VS/PS semantic mismatch: " + std::string(input.SemanticName)};
+		}
+	}
 
-    return {};
+	return {};
 }
 
 // Explicit procedural input must not conceal a missing/destroyed Mesh.
@@ -179,305 +179,305 @@ Result ValidateShaderLink(const ShaderContent& vertex, const ShaderContent* pixe
 // An in-range Index Buffer slice alone cannot guarantee that Vertex Buffer references are in range.
 Result ValidateGeometrySelection(const RenderObject& object, const DrawInputs& inputs)
 {
-    if (object.procedural)
-    {
-        if (object.geometry != GeometryHandle{} || object.procedural->vertexCount == 0)
-        {
-            return Fail("Procedural drawing requires an explicit count and no GeometryHandle.");
-        }
+	if (object.procedural)
+	{
+		if (object.geometry != GeometryHandle{} || object.procedural->vertexCount == 0)
+		{
+			return Fail("Procedural drawing requires an explicit count and no GeometryHandle.");
+		}
 
-        const bool usesRangeOffset = object.drawRange.first != 0 || object.drawRange.baseVertex != 0;
+		const bool usesRangeOffset = object.drawRange.first != 0 || object.drawRange.baseVertex != 0;
 
-        if (usesRangeOffset || object.drawRange.count != 0)
-        {
-            return Fail("Procedural drawing takes its count from ProceduralGeometry only.");
-        }
+		if (usesRangeOffset || object.drawRange.count != 0)
+		{
+			return Fail("Procedural drawing takes its count from ProceduralGeometry only.");
+		}
 
-        if (!inputs.vertexShader->metadata.vertexInputs.empty())
-        {
-            return Fail("Procedural drawing cannot satisfy Vertex Buffer inputs.");
-        }
+		if (!inputs.vertexShader->metadata.vertexInputs.empty())
+		{
+			return Fail("Procedural drawing cannot satisfy Vertex Buffer inputs.");
+		}
 
-        return {};
-    }
+		return {};
+	}
 
-    const auto& geometry = inputs.geometry->cpuData;
-    const bool indexed = !geometry.indices.empty();
-    const std::size_t availableCount = indexed ? geometry.indices.size() : geometry.vertices.size();
+	const auto& geometry = inputs.geometry->cpuData;
+	const bool indexed = !geometry.indices.empty();
+	const std::size_t availableCount = indexed ? geometry.indices.size() : geometry.vertices.size();
 
-    if (object.drawRange.first > availableCount)
-    {
-        return Fail("Draw range starts beyond the Geometry.");
-    }
+	if (object.drawRange.first > availableCount)
+	{
+		return Fail("Draw range starts beyond the Geometry.");
+	}
 
-    const std::size_t remainingCount = availableCount - object.drawRange.first;
-    const std::size_t selectedCount = object.drawRange.count == 0 ? remainingCount : object.drawRange.count;
+	const std::size_t remainingCount = availableCount - object.drawRange.first;
+	const std::size_t selectedCount = object.drawRange.count == 0 ? remainingCount : object.drawRange.count;
 
-    if (selectedCount == 0 || selectedCount > remainingCount)
-    {
-        return Fail("Draw range is empty or exceeds the Geometry.");
-    }
+	if (selectedCount == 0 || selectedCount > remainingCount)
+	{
+		return Fail("Draw range is empty or exceeds the Geometry.");
+	}
 
-    if (!indexed && object.drawRange.baseVertex != 0)
-    {
-        return Fail("Base vertex is only supported for indexed Geometry.");
-    }
+	if (!indexed && object.drawRange.baseVertex != 0)
+	{
+		return Fail("Base vertex is only supported for indexed Geometry.");
+	}
 
-    if (indexed)
-    {
-        for (std::size_t index = 0; index < selectedCount; ++index)
-        {
-            const std::uint32_t rawIndex = geometry.indices[object.drawRange.first + index];
-            const std::int64_t vertexIndex = static_cast<std::int64_t>(rawIndex) + object.drawRange.baseVertex;
+	if (indexed)
+	{
+		for (std::size_t index = 0; index < selectedCount; ++index)
+		{
+			const std::uint32_t rawIndex = geometry.indices[object.drawRange.first + index];
+			const std::int64_t vertexIndex = static_cast<std::int64_t>(rawIndex) + object.drawRange.baseVertex;
 
-            if (vertexIndex < 0 || static_cast<std::uint64_t>(vertexIndex) >= geometry.vertices.size())
-            {
-                return Fail("Index plus base vertex is outside the Geometry.");
-            }
-        }
-    }
+			if (vertexIndex < 0 || static_cast<std::uint64_t>(vertexIndex) >= geometry.vertices.size())
+			{
+				return Fail("Index plus base vertex is outside the Geometry.");
+			}
+		}
+	}
 
-    return {};
+	return {};
 }
 
 } // namespace
 
 Result ValidateFrameInputs(const FrameRenderData& data)
 {
-    if (!std::isfinite(data.time))
-    {
-        return {false, "ValidateFrameInputs: invalid Frame time input"};
-    }
+	if (!std::isfinite(data.time))
+	{
+		return {false, "ValidateFrameInputs: invalid Frame time input"};
+	}
 
-    if (data.directionalLight.has_value())
-    {
-        auto checked = ValidateLight(data.directionalLight.value());
+	if (data.directionalLight.has_value())
+	{
+		auto checked = ValidateLight(data.directionalLight.value());
 
-        if (!checked.IsSuccess())
-        {
-            return {false, "ValidateFrameInputs: invalid Frame light input"};
-        }
-    }
+		if (!checked.IsSuccess())
+		{
+			return {false, "ValidateFrameInputs: invalid Frame light input"};
+		}
+	}
 
-    for (const auto& view : data.views)
-    {
-        if (!std::isfinite(view.exposure) || view.exposure < 0)
-        {
-            return Fail("Exposure must be a finite nonnegative multiplier.");
-        }
+	for (const auto& view : data.views)
+	{
+		if (!std::isfinite(view.exposure) || view.exposure < 0)
+		{
+			return Fail("Exposure must be a finite nonnegative multiplier.");
+		}
 
-        if (!Finite(view.view) || !Finite(view.projection) ||
-            !Finite(Vector4{view.cameraPosition.x, view.cameraPosition.y, view.cameraPosition.z, 0}))
-        {
-            return {false, "ValidateFrameInputs: invalid Frame view input"};
-        }
-    }
+		if (!Finite(view.view) || !Finite(view.projection) ||
+			!Finite(Vector4{view.cameraPosition.x, view.cameraPosition.y, view.cameraPosition.z, 0}))
+		{
+			return {false, "ValidateFrameInputs: invalid Frame view input"};
+		}
+	}
 
-    return {};
+	return {};
 }
 
-ResourceRegistrationResult<ShaderHandle> DrawResources::RegisterShader(const ShaderDesc& desc)
+ResourceRegistrationResult<ShaderHandle> DrawResources::Register(const ShaderDesc& desc)
 {
-    auto candidate = std::make_unique<ShaderContent>();
+	auto candidate = std::make_unique<ShaderContent>();
 
-    auto result = ReflectShader(desc, *candidate);
+	auto result = ReflectShader(desc, *candidate);
 
-    if (!result.IsSuccess())
-    {
-        return {result, {}};
-    }
+	if (!result.IsSuccess())
+	{
+		return {result, {}};
+	}
 
-    return shaders.Register(std::move(candidate));
+	return m_shaderResources.Register(std::move(candidate));
 }
 
-ResourceRegistrationResult<PipelineHandle> DrawResources::RegisterPipeline(const PipelineDesc& desc)
+ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const PipelineDesc& desc)
 {
-    auto checked = ValidatePipelineDesc(desc);
+	auto checked = ValidatePipelineDesc(desc);
 
-    if (!checked.IsSuccess())
-    {
-        return {checked, {}};
-    }
+	if (!checked.IsSuccess())
+	{
+		return {checked, {}};
+	}
 
-    auto* vs = shaders.FindForNewUse(desc.vertexShader);
-    auto* ps = shaders.FindForNewUse(desc.pixelShader);
+	auto* vs = m_shaderResources.FindForNewUse(desc.vertexShader);
+	auto* ps = m_shaderResources.FindForNewUse(desc.pixelShader);
 
-    if (!vs || vs->metadata.stage != ShaderStage::Vertex)
-    {
-        return {{false, "RegisterPipeline: Vertex shader handle is invalid or not a vertex shader."}, {}};
-    }
+	if (!vs || vs->metadata.stage != ShaderStage::Vertex)
+	{
+		return {{false, "RegisterPipeline: Vertex shader handle is invalid or not a vertex shader."}, {}};
+	}
 
-    if (desc.pixelShader != ShaderHandle{} && (!ps || ps->metadata.stage != ShaderStage::Pixel))
-    {
-        return {{false, "RegisterPipeline: Pixel shader handle is invalid or not a pixel shader."}, {}};
-    }
+	if (desc.pixelShader != ShaderHandle{} && (!ps || ps->metadata.stage != ShaderStage::Pixel))
+	{
+		return {{false, "RegisterPipeline: Pixel shader handle is invalid or not a pixel shader."}, {}};
+	}
 
-    checked = ValidateShaderLink(*vs, ps);
+	checked = ValidateShaderLink(*vs, ps);
 
-    if (!checked.IsSuccess())
-    {
-        return {checked, {}};
-    }
+	if (!checked.IsSuccess())
+	{
+		return {checked, {}};
+	}
 
-    auto candidate = std::make_unique<PipelineContent>();
+	auto candidate = std::make_unique<PipelineContent>();
 
-    candidate->desc = desc;
+	candidate->desc = desc;
 
-    checked = MergeMetadata(vs->metadata, ps ? &ps->metadata : nullptr, candidate->layout);
+	checked = MergeMetadata(vs->metadata, ps ? &ps->metadata : nullptr, candidate->layout);
 
-    if (!checked.IsSuccess())
-    {
-        return {checked, {}};
-    }
+	if (!checked.IsSuccess())
+	{
+		return {checked, {}};
+	}
 
-    auto fields = backend::VertexFields();
+	auto fields = backend::VertexFields();
 
-    for (const auto& input : vs->metadata.vertexInputs)
-    {
-        bool mismatchVertex =
-            std::none_of(fields.begin(), fields.end(), [&](const backend::VertexField& field)
+	for (const auto& input : vs->metadata.vertexInputs)
+	{
+		bool mismatchVertex =
+			std::none_of(fields.begin(), fields.end(), [&](const backend::VertexField& field)
                          { return input.semantic == field.semantic && input.components == field.count; });
 
-        if (input.index != 0 || mismatchVertex)
-        {
-            return {{false, "RegisterPipeline: MeshVertex input mismatch: " + input.semantic}, {}};
-        }
-    }
+		if (input.index != 0 || mismatchVertex)
+		{
+			return {{false, "RegisterPipeline: MeshVertex input mismatch: " + input.semantic}, {}};
+		}
+	}
 
-    const auto tables = std::count_if(candidate->layout.resources.begin(), candidate->layout.resources.end(),
+	const auto tables = std::count_if(candidate->layout.resources.begin(), candidate->layout.resources.end(),
                                       [](const auto& binding) { return !binding.sampler; });
 
-    if (candidate->layout.constants.size() * 2 + tables > 64)
-    {
-        return {{false, "RegisterPipeline: Root Signature exceeds 64 DWORDs"}, {}};
-    }
+	if (candidate->layout.constants.size() * 2 + tables > 64)
+	{
+		return {{false, "RegisterPipeline: Root Signature exceeds 64 DWORDs"}, {}};
+	}
 
-    return pipelines.Register(std::move(candidate));
+	return m_pipelineResources.Register(std::move(candidate));
 }
 
-ResourceRegistrationResult<MaterialHandle> DrawResources::RegisterMaterial(const MaterialDesc& desc)
+ResourceRegistrationResult<MaterialHandle> DrawResources::Register(const MaterialDesc& desc)
 {
-    auto checked = ValidateMaterial(desc);
+	auto checked = ValidateMaterial(desc);
 
-    if (!checked.IsSuccess())
-    {
-        return {checked, {}};
-    }
+	if (!checked.IsSuccess())
+	{
+		return {checked, {}};
+	}
 
-    if (!pipelines.FindForNewUse(desc.pipeline))
-    {
-        return {{false, "RegisterMaterial: Pipeline handle is invalid."}, {}};
-    }
+	if (!m_pipelineResources.FindForNewUse(desc.pipeline))
+	{
+		return {{false, "RegisterMaterial: Pipeline handle is invalid."}, {}};
+	}
 
-    auto candidate = std::make_unique<MaterialContent>();
-    candidate->desc = desc;
+	auto candidate = std::make_unique<MaterialContent>();
+	candidate->desc = desc;
 
-    return materials.Register(std::move(candidate));
+	return m_materialResources.Register(std::move(candidate));
 }
 
 Result DrawResources::UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc)
 {
-    auto checked = ValidateMaterial(desc);
+	auto checked = ValidateMaterial(desc);
 
-    if (!checked.IsSuccess())
-    {
-        return checked;
-    }
+	if (!checked.IsSuccess())
+	{
+		return checked;
+	}
 
-    if (!pipelines.FindForNewUse(desc.pipeline))
-    {
-        return {false, "UpdateMaterial: Pipeline handle is invalid."};
-    }
+	if (!m_pipelineResources.FindForNewUse(desc.pipeline))
+	{
+		return {false, "UpdateMaterial: Pipeline handle is invalid."};
+	}
 
-    auto candidate = std::make_unique<MaterialContent>();
-    candidate->desc = desc;
+	auto candidate = std::make_unique<MaterialContent>();
+	candidate->desc = desc;
 
-    return materials.Update(handle, std::move(candidate));
+	return m_materialResources.Update(handle, std::move(candidate));
 }
 
 Result DrawResources::ResolveTextureInput(const MaterialDesc& material, const ShaderResourceBinding& requirement,
                                           TextureRegistry& textures, TextureHandle& handle,
                                           TextureContent*& content) const
 {
-    const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
+	const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
 
-    if (!parameter)
-    {
-        return {false, "Missing Texture2D parameter: " + requirement.name};
-    }
+	if (!parameter)
+	{
+		return {false, "Missing Texture2D parameter: " + requirement.name};
+	}
 
-    if (!std::holds_alternative<TextureHandle>(parameter->value))
-    {
-        return {false, "Expected Texture2D parameter: " + requirement.name};
-    }
+	if (!std::holds_alternative<TextureHandle>(parameter->value))
+	{
+		return {false, "Expected Texture2D parameter: " + requirement.name};
+	}
 
-    const TextureHandle selectedHandle = std::get<TextureHandle>(parameter->value);
-    // Invalid identity remains invalid. Only this draw's sampling source changes;
-    // the caller's Material and registration table retain their original values.
-    handle = selectedHandle;
+	const TextureHandle selectedHandle = std::get<TextureHandle>(parameter->value);
+	// Invalid identity remains invalid. Only this draw's sampling source changes;
+	// the caller's Material and registration table retain their original values.
+	handle = selectedHandle;
 
-    if (!textures.FindForNewUse(selectedHandle))
-    {
-        handle = fallbackTexture;
-    }
+	if (!textures.FindForNewUse(selectedHandle))
+	{
+		handle = fallbackTexture;
+	}
 
-    content = textures.FindRegisteredContent(handle);
+	content = textures.FindRegisteredContent(handle);
 
-    if (!content || !textures.FindForNewUse(handle))
-    {
-        return Fail("Texture and resident substitute unavailable: " + requirement.name);
-    }
+	if (!content || !textures.FindForNewUse(handle))
+	{
+		return Fail("Texture and resident substitute unavailable: " + requirement.name);
+	}
 
-    return {};
+	return {};
 }
 
 // Use the Material value's handle type to select the correct Registry owner.
 // This operation creates no read-only alias handle, descriptor ownership or duplicated GPU image.
 Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const ShaderResourceBinding& requirement,
-                                            TextureRegistry& textures, RenderTargetTextureRegistry& targets,
-                                            SampledTexture& sampled) const
+											TextureRegistry& textures, RenderTargetTextureRegistry& targets,
+											SampledTexture& sampled) const
 {
-    const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
+	const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
 
-    if (!parameter)
-    {
-        return Fail("Missing Texture2D parameter: " + requirement.name);
-    }
+	if (!parameter)
+	{
+		return Fail("Missing Texture2D parameter: " + requirement.name);
+	}
 
-    if (const auto* handle = std::get_if<RenderTargetTextureHandle>(&parameter->value))
-    {
-        RenderTargetInput target;
-        target.handle = *handle;
-        target.content = targets.FindForNewUse(*handle);
+	if (const auto* handle = std::get_if<RenderTargetTextureHandle>(&parameter->value))
+	{
+		RenderTargetInput target;
+		target.handle = *handle;
+		target.content = targets.FindForNewUse(*handle);
 
-        if (target.content && target.content->gpuData)
-        {
-            sampled = target;
-            return {};
-        }
+		if (target.content && target.content->gpuData)
+		{
+			sampled = target;
+			return {};
+		}
 
-        UploadedTextureInput fallback;
-        fallback.handle = fallbackTexture;
-        fallback.content = textures.FindRegisteredContent(fallbackTexture);
+		UploadedTextureInput fallback;
+		fallback.handle = fallbackTexture;
+		fallback.content = textures.FindRegisteredContent(fallbackTexture);
 
-        if (!fallback.content || !textures.FindForNewUse(fallbackTexture))
-        {
-            return Fail("RenderTargetTexture and resident substitute unavailable: " + requirement.name);
-        }
+		if (!fallback.content || !textures.FindForNewUse(fallbackTexture))
+		{
+			return Fail("RenderTargetTexture and resident substitute unavailable: " + requirement.name);
+		}
 
-        sampled = fallback;
-        return {};
-    }
+		sampled = fallback;
+		return {};
+	}
 
-    UploadedTextureInput texture;
-    Result resolved = ResolveTextureInput(material, requirement, textures, texture.handle, texture.content);
+	UploadedTextureInput texture;
+	Result resolved = ResolveTextureInput(material, requirement, textures, texture.handle, texture.content);
 
-    if (resolved.IsSuccess())
-    {
-        sampled = texture;
-    }
+	if (resolved.IsSuccess())
+	{
+		sampled = texture;
+	}
 
-    return resolved;
+	return resolved;
 }
 
 // Resolve the final Pipeline after applying View overrides, then validate its complete input contract.
@@ -485,255 +485,255 @@ Result DrawResources::ResolveSampledTexture(const MaterialDesc& material, const 
 // This strict leaf resolver never changes caller identities. FrameDrawContext
 // may retry with a scoped substitute after retaining the original failure cause.
 Result DrawResources::ResolveDrawInputs(const RenderObject& object, std::size_t objectIndex,
-                                        const DrawSettings& settings, GeometryRegistry& geometries,
-                                        TextureRegistry& textures, DrawInputs& inputs, DrawDiagnostic& diagnostic,
-                                        RenderTargetTextureRegistry* targets)
+										const DrawSettings& settings, GeometryRegistry& geometries,
+										TextureRegistry& textures, DrawInputs& inputs, DrawDiagnostic& diagnostic,
+										RenderTargetTextureRegistry* targets)
 {
-    diagnostic.objectIndex = objectIndex;
-    diagnostic.geometry = object.geometry;
-    diagnostic.material = settings.materialOverride.value_or(object.material);
+	diagnostic.objectIndex = objectIndex;
+	diagnostic.geometry = object.geometry;
+	diagnostic.material = settings.materialOverride.value_or(object.material);
 
-    DrawInputs selected;
-    selected.depthOverride = settings.depthOverride;
+	DrawInputs selected;
+	selected.depthOverride = settings.depthOverride;
 
-    if (selected.depthOverride)
-    {
-        const DepthMode mode = *selected.depthOverride;
-        const bool supported =
-            mode == DepthMode::Disabled || mode == DepthMode::ReadOnly || mode == DepthMode::ReadWrite;
+	if (selected.depthOverride)
+	{
+		const DepthMode mode = *selected.depthOverride;
+		const bool supported =
+			mode == DepthMode::Disabled || mode == DepthMode::ReadOnly || mode == DepthMode::ReadWrite;
 
-        if (!supported)
-        {
-            return Fail("Unsupported draw Depth override.");
-        }
-    }
+		if (!supported)
+		{
+			return Fail("Unsupported draw Depth override.");
+		}
+	}
 
-    if (!object.procedural)
-    {
-        if (!geometries.FindForNewUse(object.geometry))
-        {
-            return Fail("Geometry unavailable: " + geometries.DescribeUnavailable(object.geometry));
-        }
+	if (!object.procedural)
+	{
+		if (!geometries.FindForNewUse(object.geometry))
+		{
+			return Fail("Geometry unavailable: " + geometries.DescribeUnavailable(object.geometry));
+		}
 
-        selected.geometry = geometries.FindRegisteredContent(object.geometry);
-        diagnostic.geometryRevision = selected.geometry->revision;
-    }
+		selected.geometry = geometries.FindRegisteredContent(object.geometry);
+		diagnostic.geometryRevision = selected.geometry->revision;
+	}
 
-    selected.material = materials.FindForNewUse(diagnostic.material);
+	selected.material = m_materialResources.FindForNewUse(diagnostic.material);
 
-    if (!selected.material)
-    {
-        return {false, "Material unavailable: " + materials.DescribeUnavailable(diagnostic.material)};
-    }
+	if (!selected.material)
+	{
+		return {false, "Material unavailable: " + m_materialResources.DescribeUnavailable(diagnostic.material)};
+	}
 
-    diagnostic.materialRevision = selected.material->revision;
+	diagnostic.materialRevision = selected.material->revision;
 
-    diagnostic.pipeline = settings.pipelineOverride.value_or(selected.material->desc.pipeline);
-    selected.pipeline = pipelines.FindForNewUse(diagnostic.pipeline);
+	diagnostic.pipeline = settings.pipelineOverride.value_or(selected.material->desc.pipeline);
+	selected.pipeline = m_pipelineResources.FindForNewUse(diagnostic.pipeline);
 
-    if (!selected.pipeline)
-    {
-        return {false, "Pipeline unavailable: " + pipelines.DescribeUnavailable(diagnostic.pipeline)};
-    }
+	if (!selected.pipeline)
+	{
+		return {false, "Pipeline unavailable: " + m_pipelineResources.DescribeUnavailable(diagnostic.pipeline)};
+	}
 
-    const DepthMode effectiveDepth = settings.depthOverride.value_or(selected.pipeline->desc.depth);
+	const DepthMode effectiveDepth = settings.depthOverride.value_or(selected.pipeline->desc.depth);
 
-    if (selected.pipeline->desc.blend == BlendMode::Alpha && effectiveDepth == DepthMode::ReadWrite)
-    {
-        return Fail("Alpha draws cannot write Depth, including View overrides.");
-    }
+	if (selected.pipeline->desc.blend == BlendMode::Alpha && effectiveDepth == DepthMode::ReadWrite)
+	{
+		return Fail("Alpha draws cannot write Depth, including View overrides.");
+	}
 
-    diagnostic.vertexShader = selected.pipeline->desc.vertexShader;
-    diagnostic.pixelShader = selected.pipeline->desc.pixelShader;
-    selected.vertexShader = shaders.FindForNewUse(diagnostic.vertexShader);
-    selected.pixelShader = shaders.FindForNewUse(diagnostic.pixelShader);
-    const bool requiredPixelMissing = diagnostic.pixelShader != ShaderHandle{} && !selected.pixelShader;
+	diagnostic.vertexShader = selected.pipeline->desc.vertexShader;
+	diagnostic.pixelShader = selected.pipeline->desc.pixelShader;
+	selected.vertexShader = m_shaderResources.FindForNewUse(diagnostic.vertexShader);
+	selected.pixelShader = m_shaderResources.FindForNewUse(diagnostic.pixelShader);
+	const bool requiredPixelMissing = diagnostic.pixelShader != ShaderHandle{} && !selected.pixelShader;
 
-    if (!selected.vertexShader || requiredPixelMissing)
-    {
-        return {false, "Dependent Shader unavailable: VS " + shaders.DescribeUnavailable(diagnostic.vertexShader) +
-                           "; PS " + shaders.DescribeUnavailable(diagnostic.pixelShader)};
-    }
+	if (!selected.vertexShader || requiredPixelMissing)
+	{
+		return {false, "Dependent Shader unavailable: VS " + m_shaderResources.DescribeUnavailable(diagnostic.vertexShader) +
+                           "; PS " + m_shaderResources.DescribeUnavailable(diagnostic.pixelShader)};
+	}
 
-    diagnostic.vertexRevision = selected.vertexShader->revision;
-    diagnostic.pixelRevision = selected.pixelShader ? selected.pixelShader->revision : 0;
+	diagnostic.vertexRevision = selected.vertexShader->revision;
+	diagnostic.pixelRevision = selected.pixelShader ? selected.pixelShader->revision : 0;
 
-    if (!Finite(object.world) || !Finite(object.tint))
-    {
-        return {false, "World and Tint must be finite."};
-    }
+	if (!Finite(object.world) || !Finite(object.tint))
+	{
+		return {false, "World and Tint must be finite."};
+	}
 
-    const float worldDeterminant = object.world.Determinant();
+	const float worldDeterminant = object.world.Determinant();
 
-    if (!std::isfinite(worldDeterminant) || std::abs(worldDeterminant) < 1e-12f)
-    {
-        return {false, "World must be invertible."};
-    }
+	if (!std::isfinite(worldDeterminant) || std::abs(worldDeterminant) < 1e-12f)
+	{
+		return {false, "World must be invertible."};
+	}
 
-    const bool supportedBillboard = object.billboard == BillboardMode::None ||
-                                    object.billboard == BillboardMode::Spherical ||
-                                    object.billboard == BillboardMode::Cylindrical;
+	const bool supportedBillboard = object.billboard == BillboardMode::None ||
+									object.billboard == BillboardMode::Spherical ||
+									object.billboard == BillboardMode::Cylindrical;
 
-    if (!supportedBillboard)
-    {
-        return Fail("Unsupported Billboard mode.");
-    }
+	if (!supportedBillboard)
+	{
+		return Fail("Unsupported Billboard mode.");
+	}
 
-    if (object.scissor)
-    {
-        if (object.scissor->right < object.scissor->left || object.scissor->bottom < object.scissor->top)
-        {
-            return Fail("Scissor coordinates are reversed.");
-        }
-    }
+	if (object.scissor)
+	{
+		if (object.scissor->right < object.scissor->left || object.scissor->bottom < object.scissor->top)
+		{
+			return Fail("Scissor coordinates are reversed.");
+		}
+	}
 
-    Result geometryChecked = ValidateGeometrySelection(object, selected);
+	Result geometryChecked = ValidateGeometrySelection(object, selected);
 
-    if (!geometryChecked.IsSuccess())
-    {
-        return geometryChecked;
-    }
+	if (!geometryChecked.IsSuccess())
+	{
+		return geometryChecked;
+	}
 
-    // Validate logical inputs without retaining a packed copy for every Object.
-    for (const auto& buffer : selected.pipeline->layout.constants)
-    {
-        if (buffer.binding != 5)
-        {
-            continue;
-        }
+	// Validate logical inputs without retaining a packed copy for every Object.
+	for (const auto& buffer : selected.pipeline->layout.constants)
+	{
+		if (buffer.binding != 5)
+		{
+			continue;
+		}
 
-        for (const auto& variable : buffer.variables)
-        {
-            if (!variable.used)
-            {
-                continue;
-            }
+		for (const auto& variable : buffer.variables)
+		{
+			if (!variable.used)
+			{
+				continue;
+			}
 
-            const MaterialParameter* parameter = FindMaterialParameter(selected.material->desc, variable.name);
+			const MaterialParameter* parameter = FindMaterialParameter(selected.material->desc, variable.name);
 
-            if (!parameter)
-            {
-                return {false, "Missing Material parameter: " + variable.name};
-            }
+			if (!parameter)
+			{
+				return {false, "Missing Material parameter: " + variable.name};
+			}
 
-            if (TypeOf(parameter->value) != variable.type)
-            {
-                return {false, "Material type mismatch: " + variable.name};
-            }
-        }
-    }
+			if (TypeOf(parameter->value) != variable.type)
+			{
+				return {false, "Material type mismatch: " + variable.name};
+			}
+		}
+	}
 
-    for (const auto& requirement : selected.pipeline->layout.resources)
-    {
-        // Reserved View-common data is supplied by FrameDrawContext, never a
-        // Material parameter. Reflection already verified its exclusive slot.
-        if (requirement.name == "RendererShadowMap")
-        {
-            continue;
-        }
+	for (const auto& requirement : selected.pipeline->layout.resources)
+	{
+		// Reserved View-common data is supplied by FrameDrawContext, never a
+		// Material parameter. Reflection already verified its exclusive slot.
+		if (requirement.name == "RendererShadowMap")
+		{
+			continue;
+		}
 
-        if (requirement.sampler)
-        {
-            continue;
-        }
+		if (requirement.sampler)
+		{
+			continue;
+		}
 
-        Result resolved;
+		Result resolved;
 
-        if (targets)
-        {
-            SampledTexture sampled;
-            resolved = ResolveSampledTexture(selected.material->desc, requirement, textures, *targets, sampled);
-        }
-        else
-        {
-            TextureHandle handle;
-            TextureContent* content = nullptr;
-            resolved = ResolveTextureInput(selected.material->desc, requirement, textures, handle, content);
-        }
+		if (targets)
+		{
+			SampledTexture sampled;
+			resolved = ResolveSampledTexture(selected.material->desc, requirement, textures, *targets, sampled);
+		}
+		else
+		{
+			TextureHandle handle;
+			TextureContent* content = nullptr;
+			resolved = ResolveTextureInput(selected.material->desc, requirement, textures, handle, content);
+		}
 
-        if (!resolved.IsSuccess())
-        {
-            return resolved;
-        }
-    }
+		if (!resolved.IsSuccess())
+		{
+			return resolved;
+		}
+	}
 
-    inputs = selected;
-    return {};
+	inputs = selected;
+	return {};
 }
 
 Result DrawResources::GetOrCreatePipelineVariant(const DrawInputs& inputs, const DrawDiagnostic& diagnostic,
                                                  const graph::OutputLayout& output, backend::Backend& backend,
                                                  PipelineVariant*& result)
 {
-    auto& pipeline = *inputs.pipeline;
-    const DepthMode effectiveDepth = inputs.depthOverride.value_or(pipeline.desc.depth);
+	auto& pipeline = *inputs.pipeline;
+	const DepthMode effectiveDepth = inputs.depthOverride.value_or(pipeline.desc.depth);
 
-    if (output.colorFormats.size() > 1 || output.sampleCount != 1 || output.sampleQuality)
-    {
-        return {false, "GetOrCreatePipelineVariant: Multi-sample and multi-render target pipelines are not supported."};
-    }
+	if (output.colorFormats.size() > 1 || output.sampleCount != 1 || output.sampleQuality)
+	{
+		return {false, "GetOrCreatePipelineVariant: Multi-sample and multi-render target pipelines are not supported."};
+	}
 
-    if (effectiveDepth != DepthMode::Disabled && !output.depthFormat)
-    {
-        return {
-            false,
-            "GetOrCreatePipelineVariant: Depth mode is enabled but no depth format is provided in the output layout."};
-    }
+	if (effectiveDepth != DepthMode::Disabled && !output.depthFormat)
+	{
+		return {
+			false,
+			"GetOrCreatePipelineVariant: Depth mode is enabled but no depth format is provided in the output layout."};
+	}
 
-    const bool colorCountMismatch =
-        inputs.pixelShader && inputs.pixelShader->metadata.colorOutputs != output.colorFormats.size();
-    const bool missingPixelShader = !inputs.pixelShader && !output.colorFormats.empty();
+	const bool colorCountMismatch =
+		inputs.pixelShader && inputs.pixelShader->metadata.colorOutputs != output.colorFormats.size();
+	const bool missingPixelShader = !inputs.pixelShader && !output.colorFormats.empty();
 
-    if (colorCountMismatch || missingPixelShader)
-    {
-        return {false, "GetOrCreatePipelineVariant: Pixel shader color output count does not match the output layout."};
-    }
+	if (colorCountMismatch || missingPixelShader)
+	{
+		return {false, "GetOrCreatePipelineVariant: Pixel shader color output count does not match the output layout."};
+	}
 
-    Pipelinekey key;
-    key.pipeline = diagnostic.pipeline;
-    key.vertex = pipeline.desc.vertexShader;
-    key.pixel = pipeline.desc.pixelShader;
-    key.vertexRevision = inputs.vertexShader->revision;
-    key.pixelRevision = inputs.pixelShader ? inputs.pixelShader->revision : 0;
+	Pipelinekey key;
+	key.pipeline = diagnostic.pipeline;
+	key.vertex = pipeline.desc.vertexShader;
+	key.pixel = pipeline.desc.pixelShader;
+	key.vertexRevision = inputs.vertexShader->revision;
+	key.pixelRevision = inputs.pixelShader ? inputs.pixelShader->revision : 0;
 
-    key.vertexLayout = 1;
+	key.vertexLayout = 1;
 
-    key.colors = output.colorFormats;
-    key.depth = output.depthFormat;
-    key.sampleCount = output.sampleCount;
-    key.effectiveDepth = effectiveDepth;
-    key.sampleQuality = output.sampleQuality;
+	key.colors = output.colorFormats;
+	key.depth = output.depthFormat;
+	key.sampleCount = output.sampleCount;
+	key.effectiveDepth = effectiveDepth;
+	key.sampleQuality = output.sampleQuality;
 
-    for (auto& variant : pipeline.variants)
-    {
-        if (variant.key == key)
-        {
-            result = &variant;
-            return {};
-        }
-    }
+	for (auto& variant : pipeline.variants)
+	{
+		if (variant.key == key)
+		{
+			result = &variant;
+			return {};
+		}
+	}
 
-    PipelineVariant candidate;
-    candidate.key = key;
+	PipelineVariant candidate;
+	candidate.key = key;
 
-    backend::PipelineBuildInputs build;
-    build.description = &pipeline.desc;
-    build.layout = &pipeline.layout;
-    build.vertex = inputs.vertexShader;
-    build.pixel = inputs.pixelShader;
-    build.output = &output;
-    build.depth = effectiveDepth;
-    Result created = backend::BuildPipeline(backend.GetNativeDevice(), build, candidate.gpu);
+	backend::PipelineBuildInputs build;
+	build.description = &pipeline.desc;
+	build.layout = &pipeline.layout;
+	build.vertex = inputs.vertexShader;
+	build.pixel = inputs.pixelShader;
+	build.output = &output;
+	build.depth = effectiveDepth;
+	Result created = backend::BuildPipeline(backend.GetNativeDevice(), build, candidate.gpu);
 
-    if (!created.IsSuccess())
-    {
-        return created;
-    }
+	if (!created.IsSuccess())
+	{
+		return created;
+	}
 
-    pipeline.variants.push_back(std::move(candidate));
-    result = &pipeline.variants.back();
+	pipeline.variants.push_back(std::move(candidate));
+	result = &pipeline.variants.back();
 
-    return {};
+	return {};
 }
 
 } // namespace rendering::detail

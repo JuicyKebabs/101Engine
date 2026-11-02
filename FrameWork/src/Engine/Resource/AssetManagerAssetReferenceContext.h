@@ -10,7 +10,7 @@ class AssetManagerAssetReferenceContext final
 {
 public:
 	explicit AssetManagerAssetReferenceContext(const AssetManager& assetManager, bool preserveMissingRenderAssets = false)
-        : m_assetManager(assetManager), m_preserveMissingRenderAssets(preserveMissingRenderAssets)
+		: m_assetManager(assetManager), m_preserveMissingRenderAssets(preserveMissingRenderAssets)
 	{}
 
 	bool Validate(
@@ -27,5 +27,5 @@ private:
 		AssetType expectedType) const;
 
 	const AssetManager& m_assetManager;
-    bool m_preserveMissingRenderAssets = false;
+	bool m_preserveMissingRenderAssets = false;
 };

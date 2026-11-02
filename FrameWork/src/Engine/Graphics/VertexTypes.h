@@ -5,9 +5,9 @@
 // Framework no longer publishes an old native InputLayout or GPU VertexBuffer.
 struct Vertex
 {
-    Vector3 position;
-    Vector3 normal;
-    Vector2 uv;
-    Vector3 tangent;
-    Vector4 color;
+	Vector3 position;
+	Vector3 normal;
+	Vector2 uv;
+	Vector3 tangent;
+	Vector4 color;
 };

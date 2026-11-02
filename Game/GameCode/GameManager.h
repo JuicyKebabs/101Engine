@@ -5,9 +5,9 @@
 
 enum class GameState
 {
-    Tutorial,
+	Tutorial,
 	Playing,
-    Result
+	Result
 };
 
 enum class GameResult
@@ -19,12 +19,12 @@ enum class GameResult
 class GameManager : public Behavior
 {
 public:
-    void Start() override;
-    void PreUpdate() override;
-    void Update() override;
-    void LateUpdate() override;
-    void Destroy() override;
-    static std::optional<TypeMetadata> BuildMetadata();
+	void Start() override;
+	void PreUpdate() override;
+	void Update() override;
+	void LateUpdate() override;
+	void Destroy() override;
+	static std::optional<TypeMetadata> BuildMetadata();
 
 	void DestroyTarget() { m_restTarget--; }	// ターゲットを破壊したときに呼ばれる関数
 
@@ -39,7 +39,7 @@ private:
 
 	Player* m_player = nullptr;	// プレイヤーコンポーネントへのポインタ
 
-    AssetReference<SceneAsset> m_nextScene;
+	AssetReference<SceneAsset> m_nextScene;
 	ActorReference m_tutorialUIActor;
 	ActorReference m_resultUIActor;
 	ActorReference m_timerUIActor;

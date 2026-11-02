@@ -202,168 +202,168 @@ namespace
 {
 struct EditableObject
 {
-    bool earlier = false;
-    Vector3 first;
-    bool second = false;
+	bool earlier = false;
+	Vector3 first;
+	bool second = false;
 };
 
 void RequireInteraction(bool condition, const char* explanation)
 {
-    if (!condition)
-    {
-        throw std::runtime_error(explanation);
-    }
+	if (!condition)
+	{
+		throw std::runtime_error(explanation);
+	}
 }
 
 struct InteractionFixture
 {
-    EditableObject object;
-    std::optional<TypeMetadata> metadata;
-    ReflectionInspector inspector;
-    ReflectionInspectorCallbacks callbacks;
-    ImVec2 firstPoint;
-    ImVec2 secondPoint;
-    ImVec2 earlierPoint;
-    unsigned commits = 0;
-    unsigned cancels = 0;
+	EditableObject object;
+	std::optional<TypeMetadata> metadata;
+	ReflectionInspector inspector;
+	ReflectionInspectorCallbacks callbacks;
+	ImVec2 firstPoint;
+	ImVec2 secondPoint;
+	ImVec2 earlierPoint;
+	unsigned commits = 0;
+	unsigned cancels = 0;
 
-    InteractionFixture()
-    {
-        object.first.x = 1;
-        TypeMetadataBuilder<EditableObject> builder("R10InspectorInteraction");
-        builder.Property("earlier", &EditableObject::earlier);
-        builder.Property("first", &EditableObject::first);
-        builder.Property("second", &EditableObject::second);
-        auto built = builder.Build();
-        RequireInteraction(built.has_value(), "Metadata build failed");
-        metadata = std::move(*built);
-        ImGui::CreateContext();
-        auto& input = ImGui::GetIO();
-        input.IniFilename = nullptr;
-        input.DisplaySize.x = 640;
-        input.DisplaySize.y = 480;
-        input.DeltaTime = 1.0f / 60;
-        unsigned char* fontPixels = nullptr;
-        int fontWidth = 0;
-        int fontHeight = 0;
-        input.Fonts->GetTexDataAsRGBA32(&fontPixels, &fontWidth, &fontHeight);
-        callbacks.onEditCommit = [this](const PropertyMetadata&, const PropertyValue&, const PropertyValue&)
-        {
-            ++commits;
-            return true;
-        };
-        callbacks.onEditCancel = [this](const PropertyMetadata&, const PropertyValue&, bool restored)
-        {
-            RequireInteraction(restored, "Canceled edit could not be restored");
-            ++cancels;
-        };
-        Frame();
-        // Allow initial Window/navigation focus to settle before mouse input.
-        // Otherwise ImGui classifies the first auto-focused item as keyboard
-        // activation, which is a different interaction from an ordinary click.
-        Frame();
-        Frame();
-    }
+	InteractionFixture()
+	{
+		object.first.x = 1;
+		TypeMetadataBuilder<EditableObject> builder("R10InspectorInteraction");
+		builder.Property("earlier", &EditableObject::earlier);
+		builder.Property("first", &EditableObject::first);
+		builder.Property("second", &EditableObject::second);
+		auto built = builder.Build();
+		RequireInteraction(built.has_value(), "Metadata build failed");
+		metadata = std::move(*built);
+		ImGui::CreateContext();
+		auto& input = ImGui::GetIO();
+		input.IniFilename = nullptr;
+		input.DisplaySize.x = 640;
+		input.DisplaySize.y = 480;
+		input.DeltaTime = 1.0f / 60;
+		unsigned char* fontPixels = nullptr;
+		int fontWidth = 0;
+		int fontHeight = 0;
+		input.Fonts->GetTexDataAsRGBA32(&fontPixels, &fontWidth, &fontHeight);
+		callbacks.onEditCommit = [this](const PropertyMetadata&, const PropertyValue&, const PropertyValue&)
+		{
+			++commits;
+			return true;
+		};
+		callbacks.onEditCancel = [this](const PropertyMetadata&, const PropertyValue&, bool restored)
+		{
+			RequireInteraction(restored, "Canceled edit could not be restored");
+			++cancels;
+		};
+		Frame();
+		// Allow initial Window/navigation focus to settle before mouse input.
+		// Otherwise ImGui classifies the first auto-focused item as keyboard
+		// activation, which is a different interaction from an ordinary click.
+		Frame();
+		Frame();
+	}
 
-    ~InteractionFixture()
-    {
-        inspector.CancelActiveEdit();
-        ImGui::DestroyContext();
-    }
+	~InteractionFixture()
+	{
+		inspector.CancelActiveEdit();
+		ImGui::DestroyContext();
+	}
 
-    void Frame()
-    {
-        ImGui::NewFrame();
-        ImVec2 position;
-        position.x = 10;
-        position.y = 10;
-        ImVec2 size;
-        size.x = 500;
-        size.y = 300;
-        ImGui::SetNextWindowPos(position);
-        ImGui::SetNextWindowSize(size);
-        ImGui::Begin("R10 interaction fixture", nullptr, ImGuiWindowFlags_NoSavedSettings);
-        const ImVec2 firstMinimum = ImGui::GetCursorScreenPos();
-        earlierPoint.x = firstMinimum.x + 8;
-        earlierPoint.y = firstMinimum.y + 8;
-        firstPoint.x = firstMinimum.x + 40;
-        firstPoint.y = firstMinimum.y + ImGui::GetFrameHeightWithSpacing() + ImGui::GetFrameHeight() / 2;
-        const bool drawn = inspector.Draw(*metadata, typeid(EditableObject), &object,
-            ReflectionInspectorPolicy::Editable, callbacks);
-        const ImVec2 secondMinimum = ImGui::GetItemRectMin();
-        secondPoint.x = secondMinimum.x + 8;
-        secondPoint.y = secondMinimum.y + 8;
-        ImGui::End();
-        ImGui::Render();
-        const auto& input = ImGui::GetIO();
-        std::cout << "interaction-frame=" << ImGui::GetFrameCount()
-            << " mouse=" << input.MousePos.x << ',' << input.MousePos.y
-            << " down=" << input.MouseDown[0] << " active=" << ImGui::IsAnyItemActive()
-            << " transaction=" << inspector.HasActiveEdit() << '\n';
-        RequireInteraction(drawn, "Real Inspector Draw rejected a valid property interaction");
-    }
+	void Frame()
+	{
+		ImGui::NewFrame();
+		ImVec2 position;
+		position.x = 10;
+		position.y = 10;
+		ImVec2 size;
+		size.x = 500;
+		size.y = 300;
+		ImGui::SetNextWindowPos(position);
+		ImGui::SetNextWindowSize(size);
+		ImGui::Begin("R10 interaction fixture", nullptr, ImGuiWindowFlags_NoSavedSettings);
+		const ImVec2 firstMinimum = ImGui::GetCursorScreenPos();
+		earlierPoint.x = firstMinimum.x + 8;
+		earlierPoint.y = firstMinimum.y + 8;
+		firstPoint.x = firstMinimum.x + 40;
+		firstPoint.y = firstMinimum.y + ImGui::GetFrameHeightWithSpacing() + ImGui::GetFrameHeight() / 2;
+		const bool drawn = inspector.Draw(*metadata, typeid(EditableObject), &object,
+			ReflectionInspectorPolicy::Editable, callbacks);
+		const ImVec2 secondMinimum = ImGui::GetItemRectMin();
+		secondPoint.x = secondMinimum.x + 8;
+		secondPoint.y = secondMinimum.y + 8;
+		ImGui::End();
+		ImGui::Render();
+		const auto& input = ImGui::GetIO();
+		std::cout << "interaction-frame=" << ImGui::GetFrameCount()
+			<< " mouse=" << input.MousePos.x << ',' << input.MousePos.y
+			<< " down=" << input.MouseDown[0] << " active=" << ImGui::IsAnyItemActive()
+			<< " transaction=" << inspector.HasActiveEdit() << '\n';
+		RequireInteraction(drawn, "Real Inspector Draw rejected a valid property interaction");
+	}
 
-    void Mouse(ImVec2 point, bool down)
-    {
-        auto& input = ImGui::GetIO();
-        input.AddMousePosEvent(point.x, point.y);
-        input.AddMouseButtonEvent(0, down);
-        Frame();
-    }
+	void Mouse(ImVec2 point, bool down)
+	{
+		auto& input = ImGui::GetIO();
+		input.AddMousePosEvent(point.x, point.y);
+		input.AddMouseButtonEvent(0, down);
+		Frame();
+	}
 };
 }
 
 int RunUnchangedNumericInteractionChecks()
 {
-    try
-    {
-        InteractionFixture fixture;
-        fixture.Mouse(fixture.firstPoint, true);
-        RequireInteraction(fixture.inspector.HasActiveEdit(), "Numeric mouse down did not begin the edit");
-        fixture.Mouse(fixture.firstPoint, false);
-        // DragFloat may enter temporary text mode on an unchanged click.
-        // Explicitly move focus away before requiring the transaction to end.
-        ImVec2 outside;
-        outside.x = fixture.firstPoint.x;
-        outside.y = fixture.secondPoint.y + 100;
-        fixture.Mouse(outside, true);
-        fixture.Mouse(outside, false);
-        RequireInteraction(!fixture.inspector.HasActiveEdit(), "Unchanged numeric click left a live edit transaction");
-        RequireInteraction(fixture.commits == 0, "An unchanged click created an Undo entry");
-        fixture.Mouse(fixture.secondPoint, true);
-        fixture.Mouse(fixture.secondPoint, false);
-        RequireInteraction(fixture.object.second && fixture.commits == 1,
-            "Subsequent Bool edit was blocked after an unchanged numeric click");
-        RequireInteraction(!fixture.inspector.HasActiveEdit(), "Discrete edit retained a transaction");
+	try
+	{
+		InteractionFixture fixture;
+		fixture.Mouse(fixture.firstPoint, true);
+		RequireInteraction(fixture.inspector.HasActiveEdit(), "Numeric mouse down did not begin the edit");
+		fixture.Mouse(fixture.firstPoint, false);
+		// DragFloat may enter temporary text mode on an unchanged click.
+		// Explicitly move focus away before requiring the transaction to end.
+		ImVec2 outside;
+		outside.x = fixture.firstPoint.x;
+		outside.y = fixture.secondPoint.y + 100;
+		fixture.Mouse(outside, true);
+		fixture.Mouse(outside, false);
+		RequireInteraction(!fixture.inspector.HasActiveEdit(), "Unchanged numeric click left a live edit transaction");
+		RequireInteraction(fixture.commits == 0, "An unchanged click created an Undo entry");
+		fixture.Mouse(fixture.secondPoint, true);
+		fixture.Mouse(fixture.secondPoint, false);
+		RequireInteraction(fixture.object.second && fixture.commits == 1,
+			"Subsequent Bool edit was blocked after an unchanged numeric click");
+		RequireInteraction(!fixture.inspector.HasActiveEdit(), "Discrete edit retained a transaction");
 
-        fixture.Mouse(fixture.firstPoint, true);
-        ImVec2 moved = fixture.firstPoint;
-        moved.x += 40;
-        fixture.Mouse(moved, true);
-        fixture.Mouse(moved, false);
-        RequireInteraction(fixture.object.first.x != 1 && fixture.commits == 2,
-            "A real changed numeric drag did not commit exactly once");
-        RequireInteraction(!fixture.inspector.HasActiveEdit(), "Changed drag did not close its transaction");
-        fixture.Mouse(fixture.firstPoint, true);
-        fixture.Mouse(fixture.firstPoint, false);
-        fixture.Mouse(fixture.earlierPoint, true);
-        fixture.Mouse(fixture.earlierPoint, false);
-        RequireInteraction(fixture.object.earlier && fixture.commits == 3,
-            "Switching from an unchanged numeric field to an earlier row was blocked");
-        std::cout << "PASS unchanged numeric click ends without history; next Bool and changed drag commit once\n";
-        return EXIT_SUCCESS;
-    }
-    catch (const std::exception& error)
-    {
-        std::cerr << error.what() << '\n';
-        return EXIT_FAILURE;
-    }
+		fixture.Mouse(fixture.firstPoint, true);
+		ImVec2 moved = fixture.firstPoint;
+		moved.x += 40;
+		fixture.Mouse(moved, true);
+		fixture.Mouse(moved, false);
+		RequireInteraction(fixture.object.first.x != 1 && fixture.commits == 2,
+			"A real changed numeric drag did not commit exactly once");
+		RequireInteraction(!fixture.inspector.HasActiveEdit(), "Changed drag did not close its transaction");
+		fixture.Mouse(fixture.firstPoint, true);
+		fixture.Mouse(fixture.firstPoint, false);
+		fixture.Mouse(fixture.earlierPoint, true);
+		fixture.Mouse(fixture.earlierPoint, false);
+		RequireInteraction(fixture.object.earlier && fixture.commits == 3,
+			"Switching from an unchanged numeric field to an earlier row was blocked");
+		std::cout << "PASS unchanged numeric click ends without history; next Bool and changed drag commit once\n";
+		return EXIT_SUCCESS;
+	}
+	catch (const std::exception& error)
+	{
+		std::cerr << error.what() << '\n';
+		return EXIT_FAILURE;
+	}
 }
 
 int main()
 {
-    Check(RunUnchangedNumericInteractionChecks() == EXIT_SUCCESS,
-        "Real Draw closes unchanged numeric interactions");
+	Check(RunUnchangedNumericInteractionChecks() == EXIT_SUCCESS,
+		"Real Draw closes unchanged numeric interactions");
 	TestColorPresentation();
 	TestTransformPilot();
 	TestRowsAndTransaction();

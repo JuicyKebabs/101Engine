@@ -239,44 +239,44 @@ Result CommandContext::SetRasterOutput(
 // Scissor is separate and will be set per Draw rather than inherited from this operation.
 Result CommandContext::SetViewport(const Viewport& viewport, UINT outputWidth, UINT outputHeight)
 {
-    if (!IsRecording())
-    {
-        return detail::Fail("Viewport requires an active recording.");
-    }
+	if (!IsRecording())
+	{
+		return detail::Fail("Viewport requires an active recording.");
+	}
 
-    const bool finitePosition = std::isfinite(viewport.x) && std::isfinite(viewport.y);
-    const bool finiteSize = std::isfinite(viewport.width) && std::isfinite(viewport.height);
+	const bool finitePosition = std::isfinite(viewport.x) && std::isfinite(viewport.y);
+	const bool finiteSize = std::isfinite(viewport.width) && std::isfinite(viewport.height);
 
-    if (!finitePosition || !finiteSize)
-    {
-        return detail::Fail("Viewport must be finite.");
-    }
+	if (!finitePosition || !finiteSize)
+	{
+		return detail::Fail("Viewport must be finite.");
+	}
 
-    const bool validPosition = viewport.x >= 0 && viewport.y >= 0;
-    const bool validSize = viewport.width > 0 && viewport.height > 0;
+	const bool validPosition = viewport.x >= 0 && viewport.y >= 0;
+	const bool validSize = viewport.width > 0 && viewport.height > 0;
 
-    if (!validPosition || !validSize)
-    {
-        return detail::Fail("Viewport position and dimensions are invalid.");
-    }
+	if (!validPosition || !validSize)
+	{
+		return detail::Fail("Viewport position and dimensions are invalid.");
+	}
 
-    const bool insideWidth = viewport.x + viewport.width <= static_cast<float>(outputWidth);
-    const bool insideHeight = viewport.y + viewport.height <= static_cast<float>(outputHeight);
+	const bool insideWidth = viewport.x + viewport.width <= static_cast<float>(outputWidth);
+	const bool insideHeight = viewport.y + viewport.height <= static_cast<float>(outputHeight);
 
-    if (!insideWidth || !insideHeight)
-    {
-        return detail::Fail("Viewport exceeds current output dimensions (possibly after Resize).");
-    }
+	if (!insideWidth || !insideHeight)
+	{
+		return detail::Fail("Viewport exceeds current output dimensions (possibly after Resize).");
+	}
 
-    D3D12_VIEWPORT native;
-    native.TopLeftX = viewport.x;
-    native.TopLeftY = viewport.y;
-    native.Width = viewport.width;
-    native.Height = viewport.height;
-    native.MinDepth = 0;
-    native.MaxDepth = 1;
-    m_commandList->RSSetViewports(1, &native);
-    return {};
+	D3D12_VIEWPORT native;
+	native.TopLeftX = viewport.x;
+	native.TopLeftY = viewport.y;
+	native.Width = viewport.width;
+	native.Height = viewport.height;
+	native.MinDepth = 0;
+	native.MaxDepth = 1;
+	m_commandList->RSSetViewports(1, &native);
+	return {};
 }
 
 Result CommandContext::ClearRenderTarget(

@@ -7,18 +7,18 @@
 // Camera visibility, and must be resolved before submitting Renderer values.
 inline bool IsActorHierarchyActive(const Actor* actor)
 {
-    if (!actor)
-    {
-        return false;
-    }
+	if (!actor)
+	{
+		return false;
+	}
 
-    for (const Actor* current = actor; current; current = current->GetParent())
-    {
-        if (!current->IsActive() || current->IsDestroyed())
-        {
-            return false;
-        }
-    }
+	for (const Actor* current = actor; current; current = current->GetParent())
+	{
+		if (!current->IsActive() || current->IsDestroyed())
+		{
+			return false;
+		}
+	}
 
-    return true;
+	return true;
 }

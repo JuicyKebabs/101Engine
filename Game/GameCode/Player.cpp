@@ -16,11 +16,11 @@ REGISTER_GAME_COMPONENT(Player)
 
 std::optional<TypeMetadata> Player::BuildMetadata()
 {
-    TypeMetadataBuilder<Player> builder("Player");
+	TypeMetadataBuilder<Player> builder("Player");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in Player.
-    // builder.Property("speed", &Player::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in Player.
+	// builder.Property("speed", &Player::m_speed);
 
 	builder.Property("moveSpeed", &Player::m_moveSpeed).Optional();
 	builder.Property("moveSlowSpeed", &Player::m_moveSlowSpeed).Optional();
@@ -32,7 +32,7 @@ std::optional<TypeMetadata> Player::BuildMetadata()
 	builder.Property("aimingFOV", &Player::m_aimingFOV).Optional();
 	builder.Property("fovSwitchingSpeed", &Player::m_fovSwitchingSpeed).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void Player::Start()

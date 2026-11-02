@@ -18,9 +18,9 @@ namespace rendering
 // CPU information is available before upload and never waits for GPU completion.
 struct GeometryData
 {
-    Vector3 boundsCenter;
-    float boundsRadius = 0;
-    std::uint64_t revision = 0;
+	Vector3 boundsCenter;
+	float boundsRadius = 0;
+	std::uint64_t revision = 0;
 };
 
 struct [[nodiscard]] GeometryRegistrationResult

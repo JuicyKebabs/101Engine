@@ -8,13 +8,13 @@ REGISTER_GAME_COMPONENT(FixedTarget)
 
 std::optional<TypeMetadata> FixedTarget::BuildMetadata()
 {
-    TypeMetadataBuilder<FixedTarget> builder("FixedTarget");
+	TypeMetadataBuilder<FixedTarget> builder("FixedTarget");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in FixedTarget.
-    // builder.Property("speed", &FixedTarget::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in FixedTarget.
+	// builder.Property("speed", &FixedTarget::m_speed);
 	builder.Property("explosionImprintRef", &FixedTarget::m_explosionImprintRef).Optional();
-    return builder.Build();
+	return builder.Build();
 }
 
 void FixedTarget::Start()

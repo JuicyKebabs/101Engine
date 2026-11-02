@@ -164,8 +164,8 @@ enum class CullMode
 // Rasterizer intent is generic; Renderer never needs a Collider/Editor type.
 enum class FillMode
 {
-    Solid,
-    Wireframe
+	Solid,
+	Wireframe
 };
 
 struct PipelineDesc
@@ -175,7 +175,7 @@ struct PipelineDesc
 	BlendMode blend = BlendMode::Opaque;
 	DepthMode depth = DepthMode::ReadWrite;
 	CullMode cull = CullMode::Back;
-    FillMode fill = FillMode::Solid;
+	FillMode fill = FillMode::Solid;
 };
 
 //----------------------------------------------------------------
@@ -199,9 +199,9 @@ struct DrawSettings
 {
 	std::optional<MaterialHandle> materialOverride;
 	std::optional<PipelineHandle> pipelineOverride;
-    // A View can disable attachment testing without replacing every Material's
-    // Shader/blend intent, e.g. Canvas preview of mixed Mesh/Sprite renderers.
-    std::optional<DepthMode> depthOverride;
+	// A View can disable attachment testing without replacing every Material's
+	// Shader/blend intent, e.g. Canvas preview of mixed Mesh/Sprite renderers.
+	std::optional<DepthMode> depthOverride;
 };
 
 struct DrawDiagnostic

@@ -18,39 +18,39 @@ namespace rendering::backend
 
 struct ConstantAllocation
 {
-    D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = 0;
-    UINT sizeInBytes = 0;
+	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = 0;
+	UINT sizeInBytes = 0;
 };
 
 class FrameResources
 {
 public:
-    Result Initialize(Device* device, UINT constantBytes, UINT descriptorCount);
+	Result Initialize(Device* device, UINT constantBytes, UINT descriptorCount);
 
-    // Only before any allocations, after the previous use has completed.
-    Result EnsureCapacity(UINT constantBytes, UINT descriptorCount);
+	// Only before any allocations, after the previous use has completed.
+	Result EnsureCapacity(UINT constantBytes, UINT descriptorCount);
 
-    void Finalize() noexcept;
+	void Finalize() noexcept;
 
-    void ResetAfterCompletion() noexcept;
+	void ResetAfterCompletion() noexcept;
 
-    Result AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output);
+	Result AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output);
 
-    Result CopyDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output);
+	Result CopyDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output);
 
-    [[nodiscard]]
-    ID3D12DescriptorHeap* GetDescriptorHeap() const noexcept
-    {
-        return m_descriptors ? m_descriptors->GetNativeHeap() : nullptr;
-    }
+	[[nodiscard]]
+	ID3D12DescriptorHeap* GetDescriptorHeap() const noexcept
+	{
+		return m_descriptors ? m_descriptors->GetNativeHeap() : nullptr;
+	}
 
 private:
-    Device* m_device = nullptr;
-    std::unique_ptr<Buffer> m_constants;
-    std::unique_ptr<DescriptorHeap> m_descriptors;
-    std::uint64_t m_constantOffset = 0;
-    UINT m_descriptorOffset = 0;
-    UINT m_descriptorCapacity = 0;
+	Device* m_device = nullptr;
+	std::unique_ptr<Buffer> m_constants;
+	std::unique_ptr<DescriptorHeap> m_descriptors;
+	std::uint64_t m_constantOffset = 0;
+	UINT m_descriptorOffset = 0;
+	UINT m_descriptorCapacity = 0;
 };
 
 } // namespace rendering::backend

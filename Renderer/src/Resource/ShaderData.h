@@ -17,9 +17,9 @@ namespace rendering::detail
 // Stores the compiled shader bytecode and metadata for a shader resource.
 struct ShaderContent
 {
-    std::uint64_t revision = 1;      // Incremented on each update to the shader content.
-    std::vector<std::byte> bytecode; // Compiled shader bytecode.
-    ShaderMetadata metadata;         // Metadata describing the shader's resources, constants, and inputs.
+	std::uint64_t revision = 1;      // Incremented on each update to the shader content.
+	std::vector<std::byte> bytecode; // Compiled shader bytecode.
+	ShaderMetadata metadata;         // Metadata describing the shader's resources, constants, and inputs.
 };
 
 // Construct ShaderContent by reflecting the given shader bytecode and populating the metadata.

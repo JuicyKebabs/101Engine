@@ -32,7 +32,7 @@ namespace
 bool AssetManager::Initialize(
 	const std::string& projectDir,
 	rendering::Renderer* renderer,
-    RenderAssetResources* renderAssets,
+	RenderAssetResources* renderAssets,
 	AssetCatalogError* outError)
 {
 	return Initialize(
@@ -46,18 +46,18 @@ bool AssetManager::Initialize(
 bool AssetManager::Initialize(
 	const std::string& projectDir,
 	rendering::Renderer* renderer,
-    RenderAssetResources* renderAssets,
+	RenderAssetResources* renderAssets,
 	AudioManager* pAudioManager,
 	AssetCatalogError* outError)
 {
-    if (!m_sceneUsage.empty())
-    {
-        return FailCatalog(
-            outError,
-            AssetCatalogErrorCode::IoError,
-            projectDir,
-            "Cannot reinitialize AssetManager while Scene resource ownership is live.");
-    }
+	if (!m_sceneUsage.empty())
+	{
+		return FailCatalog(
+			outError,
+			AssetCatalogErrorCode::IoError,
+			projectDir,
+			"Cannot reinitialize AssetManager while Scene resource ownership is live.");
+	}
 
 	if (!ScanAssetDirectory(projectDir, "", outError))
 	{
@@ -65,11 +65,11 @@ bool AssetManager::Initialize(
 	}
 
 	m_renderer = renderer;
-    m_renderAssets = renderAssets;
+	m_renderAssets = renderAssets;
 	m_pAudioManager = pAudioManager;
 	m_loadedModels.clear();
-    m_dependencyTextures.clear();
-    m_sceneUsage.clear();
+	m_dependencyTextures.clear();
+	m_sceneUsage.clear();
 	m_loadedTextures.clear();
 	m_loadedAudio.clear();
 	return true;

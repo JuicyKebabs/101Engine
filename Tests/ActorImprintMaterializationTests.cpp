@@ -366,11 +366,11 @@ namespace
 		source["nextLocalObjectId"] = 13;
 		Fixture fixture(source, textureGuid);
 		Check(fixture.system.Instantiate(fixture.scene, fixture.imprint) != nullptr,
-            "Unreadable visual Texture preserves the Instance with Invalid runtime fallback");
+			"Unreadable visual Texture preserves the Instance with Invalid runtime fallback");
 		std::filesystem::remove(fixture.path / "texture.png");
 		Check(fixture.assets.Refresh(), "Catalog observes removed referenced asset");
 		Check(fixture.system.Instantiate(fixture.scene, fixture.imprint) != nullptr,
-            "Removed visual Texture GUID remains restorable through cached Invalid fallback");
+			"Removed visual Texture GUID remains restorable through cached Invalid fallback");
 		Fixture simple(Sample());
 		{
 			SceneBase another;

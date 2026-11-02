@@ -18,7 +18,7 @@ std::optional<TypeMetadata> TestBehavior::BuildMetadata()
 
 void TestBehavior::Start()
 {
-    DBG("TestBehavior::Start()");
+	DBG("TestBehavior::Start()");
 }
 
 void TestBehavior::Update()
@@ -26,17 +26,17 @@ void TestBehavior::Update()
 	const InputInfo& input = InputManager::GetInstance().GetInputInfo();
 
 	if (input.key.a.down)
-    {
-        Transform* transform = GetOwner()->GetComponentByClass<Transform>();
+	{
+		Transform* transform = GetOwner()->GetComponentByClass<Transform>();
 
-        transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, m_rotationSpeed));
-    }
+		transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, m_rotationSpeed));
+	}
 	else if (input.key.d.down)
-    {
-        Transform* transform = GetOwner()->GetComponentByClass<Transform>();
+	{
+		Transform* transform = GetOwner()->GetComponentByClass<Transform>();
 
-        transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, -m_rotationSpeed));
-    }
+		transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, -m_rotationSpeed));
+	}
 
 	if (!input.key.space.trigger)
 	{

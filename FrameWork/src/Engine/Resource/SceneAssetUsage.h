@@ -15,24 +15,24 @@ class AssetManager;
 // Scene teardown, rather than being removed when one Component disappears.
 struct SceneAssetUsage
 {
-    std::vector<rendering::GeometryHandle> geometries;
-    std::vector<rendering::TextureHandle> textures;
-    std::vector<rendering::MaterialHandle> materials;
-    std::vector<rendering::GeometryHandle> newGeometries;
-    std::vector<rendering::TextureHandle> newTextures;
-    std::vector<rendering::MaterialHandle> newMaterials;
-    std::vector<Guid> modelKeys;
-    std::vector<Guid> textureKeys;
-    std::vector<std::string> dependencyTextureKeys;
+	std::vector<rendering::GeometryHandle> geometries;
+	std::vector<rendering::TextureHandle> textures;
+	std::vector<rendering::MaterialHandle> materials;
+	std::vector<rendering::GeometryHandle> newGeometries;
+	std::vector<rendering::TextureHandle> newTextures;
+	std::vector<rendering::MaterialHandle> newMaterials;
+	std::vector<Guid> modelKeys;
+	std::vector<Guid> textureKeys;
+	std::vector<std::string> dependencyTextureKeys;
 };
 
 // Actor transactions prepare this value while failure is still recoverable.
 // Commit exchanges complete records without allocation before Actors publish.
 struct PreparedSceneAssetTransfer
 {
-    const SceneBase* source = nullptr;
-    const SceneBase* destination = nullptr;
-    SceneAssetUsage combined;
+	const SceneBase* source = nullptr;
+	const SceneBase* destination = nullptr;
+	SceneAssetUsage combined;
 };
 
 // One Component preparation may load a model, register several Materials, then
@@ -41,15 +41,15 @@ struct PreparedSceneAssetTransfer
 class SceneAssetAcquisition
 {
 public:
-    SceneAssetAcquisition(AssetManager& owner, const SceneBase& scene);
-    ~SceneAssetAcquisition();
-    SceneAssetAcquisition(const SceneAssetAcquisition&) = delete;
-    SceneAssetAcquisition& operator=(const SceneAssetAcquisition&) = delete;
-    void Commit() noexcept { m_committed = true; }
+	SceneAssetAcquisition(AssetManager& owner, const SceneBase& scene);
+	~SceneAssetAcquisition();
+	SceneAssetAcquisition(const SceneAssetAcquisition&) = delete;
+	SceneAssetAcquisition& operator=(const SceneAssetAcquisition&) = delete;
+	void Commit() noexcept { m_committed = true; }
 
 private:
-    AssetManager& m_owner;
-    const SceneBase* m_scene = nullptr;
-    SceneAssetUsage m_previous;
-    bool m_committed = false;
+	AssetManager& m_owner;
+	const SceneBase* m_scene = nullptr;
+	SceneAssetUsage m_previous;
+	bool m_committed = false;
 };

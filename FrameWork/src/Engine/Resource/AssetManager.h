@@ -47,17 +47,17 @@ struct AssetCatalogError
 // Bounds/Revision snapshots belong to MeshRenderer, never this catalog cache.
 struct GeometryInfo
 {
-    rendering::GeometryHandle geometry;
-    rendering::TextureHandle texture;
-    Matrix4x4 localToModel = Matrix4x4::Identity();
+	rendering::GeometryHandle geometry;
+	rendering::TextureHandle texture;
+	Matrix4x4 localToModel = Matrix4x4::Identity();
 };
 
 struct ModelAnimationMetadata
 {
-    std::vector<rendering::assets::ModelNode> nodes;
-    std::vector<rendering::assets::AnimationChannel> channels;
-    double duration = 0;
-    double ticksPerSecond = 30;
+	std::vector<rendering::assets::ModelNode> nodes;
+	std::vector<rendering::assets::AnimationChannel> channels;
+	double duration = 0;
+	double ticksPerSecond = 30;
 };
 
 class AssetManager
@@ -70,13 +70,13 @@ public:
 	bool Initialize(
 		const std::string& projectDir,
 		rendering::Renderer* renderer,
-        RenderAssetResources* renderAssets,
+		RenderAssetResources* renderAssets,
 		AssetCatalogError* outError = nullptr
 	);
 	bool Initialize(
 		const std::string& projectDir,
 		rendering::Renderer* renderer,
-        RenderAssetResources* renderAssets,
+		RenderAssetResources* renderAssets,
 		AudioManager* pAudioManager,
 		AssetCatalogError* outError = nullptr
 	);
@@ -98,19 +98,19 @@ public:
 	const std::string& GetAssetRoot() const { return m_assetRoot; }
 
 	// Get the handle for each asset type by GUID
-    const std::vector<GeometryInfo>& GetGeometryInfos(SceneBase& scene, const Guid& guid);
-    rendering::TextureHandle GetTextureHandle(SceneBase& scene, const Guid& guid);
-    const ModelAnimationMetadata* GetModelAnimationMetadata(const Guid& guid) const;
-    rendering::MaterialHandle RegisterSceneMaterial(SceneBase& scene, const rendering::MaterialDesc& description);
-    void ReleaseScene(const SceneBase* scene) noexcept;
-    std::unique_ptr<PreparedSceneAssetTransfer> PrepareSceneTransfer(const SceneBase& source, const SceneBase& destination);
-    void CommitSceneTransfer(PreparedSceneAssetTransfer& transfer) noexcept;
+	const std::vector<GeometryInfo>& GetGeometryInfos(SceneBase& scene, const Guid& guid);
+	rendering::TextureHandle GetTextureHandle(SceneBase& scene, const Guid& guid);
+	const ModelAnimationMetadata* GetModelAnimationMetadata(const Guid& guid) const;
+	rendering::MaterialHandle RegisterSceneMaterial(SceneBase& scene, const rendering::MaterialDesc& description);
+	void ReleaseScene(const SceneBase* scene) noexcept;
+	std::unique_ptr<PreparedSceneAssetTransfer> PrepareSceneTransfer(const SceneBase& source, const SceneBase& destination);
+	void CommitSceneTransfer(PreparedSceneAssetTransfer& transfer) noexcept;
 	AudioHandle GetAudioHandle(const Guid& guid);
 	AudioHandle GetAudioHandleByPath(const std::string& relativePath);
 
 private:
-    friend class SceneAssetAcquisition;
-    void ReleaseUnusedUsage(SceneAssetUsage& ending) noexcept;
+	friend class SceneAssetAcquisition;
+	void ReleaseUnusedUsage(SceneAssetUsage& ending) noexcept;
 	std::unordered_map<Guid, AssetEntry> m_catalog;		// GUID -> Entry (Subscribe without loading)
 	std::unordered_map<std::string, Guid> m_pathToId;	// Path -> GUID (Reverse lookup)
 	struct FileState
@@ -125,28 +125,28 @@ private:
 	std::vector<AssetChange> m_pendingChanges;
 
 	// Lazy-load cache for each asset type
-    struct CachedModel
-    {
-        std::vector<GeometryInfo> placements;
-        // Retention also covers imported meshes with no visible node placement.
-        // This is identity bookkeeping only; Bounds/Revision stay in Components.
-        std::vector<rendering::GeometryHandle> registeredGeometries;
-        ModelAnimationMetadata animation;
-        std::vector<std::string> textureDependencies;
-        std::vector<Guid> textureAssetDependencies;
-    };
-    class AcquisitionBatch;
-    std::unordered_map<Guid, CachedModel> m_loadedModels;
-    std::unordered_map<Guid, rendering::TextureHandle> m_loadedTextures;
-    std::unordered_map<std::string, rendering::TextureHandle> m_dependencyTextures;
-    std::unordered_map<const SceneBase*, SceneAssetUsage> m_sceneUsage;
+	struct CachedModel
+	{
+		std::vector<GeometryInfo> placements;
+		// Retention also covers imported meshes with no visible node placement.
+		// This is identity bookkeeping only; Bounds/Revision stay in Components.
+		std::vector<rendering::GeometryHandle> registeredGeometries;
+		ModelAnimationMetadata animation;
+		std::vector<std::string> textureDependencies;
+		std::vector<Guid> textureAssetDependencies;
+	};
+	class AcquisitionBatch;
+	std::unordered_map<Guid, CachedModel> m_loadedModels;
+	std::unordered_map<Guid, rendering::TextureHandle> m_loadedTextures;
+	std::unordered_map<std::string, rendering::TextureHandle> m_dependencyTextures;
+	std::unordered_map<const SceneBase*, SceneAssetUsage> m_sceneUsage;
 	std::unordered_map<Guid, AudioHandle>   m_loadedAudio;		// Lazy-load cache
 
 	std::string m_assetRoot;	// Root directory for assets
 
 	// References to necessary engine systems for asset loading
-    rendering::Renderer* m_renderer = nullptr;
-    RenderAssetResources* m_renderAssets = nullptr;
+	rendering::Renderer* m_renderer = nullptr;
+	RenderAssetResources* m_renderAssets = nullptr;
 	AudioManager* m_pAudioManager = nullptr;
 
 private:

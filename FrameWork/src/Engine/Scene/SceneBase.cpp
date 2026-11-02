@@ -28,17 +28,17 @@ SceneBase::~SceneBase()
 	{
 		DiscardUnpublishedCandidate();
 	}
-    else if (!m_isFinalized)
-    {
-        Finalize();
-    }
+	else if (!m_isFinalized)
+	{
+		Finalize();
+	}
 
-    if (!m_deferAssetRelease && m_pEngineContext && m_pEngineContext->pAssetManager)
-    {
-        // Component instances are already destroyed. A copied Handle never
-        // kept these registrations alive; the Scene record did.
-        m_pEngineContext->pAssetManager->ReleaseScene(this);
-    }
+	if (!m_deferAssetRelease && m_pEngineContext && m_pEngineContext->pAssetManager)
+	{
+		// Component instances are already destroyed. A copied Handle never
+		// kept these registrations alive; the Scene record did.
+		m_pEngineContext->pAssetManager->ReleaseScene(this);
+	}
 }
 
 // Initialization
@@ -153,27 +153,27 @@ void SceneBase::LateUpdate(float deltaTime)
 
 // Render
 bool SceneBase::AppendRenderData(
-    rendering::FrameRenderData& frame,
-    const rendering::ViewOutput& output,
-    const CameraInfo* overrideCameraInfo,
-    RenderViewPolicy viewPolicy,
-    rendering::ViewId sceneViewId,
-    rendering::ViewId overlayViewId)
+	rendering::FrameRenderData& frame,
+	const rendering::ViewOutput& output,
+	const CameraInfo* overrideCameraInfo,
+	RenderViewPolicy viewPolicy,
+	rendering::ViewId sceneViewId,
+	rendering::ViewId overlayViewId)
 {
-    const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
-    m_pRenderSystem->FlushRegisters();
-    // No Camera is still a valid background + Screen UI Frame. Only World and
-    // Shadow are omitted by extraction; Renderer owns final Render/Present.
-    return m_pRenderSystem->AppendFrame(
-        frame,
-        output,
-        camera,
-        viewPolicy,
-        sceneViewId,
-        overlayViewId,
-        static_cast<std::uint32_t>(m_viewportSize.x),
-        static_cast<std::uint32_t>(m_viewportSize.y),
-        m_directionalLight);
+	const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
+	m_pRenderSystem->FlushRegisters();
+	// No Camera is still a valid background + Screen UI Frame. Only World and
+	// Shadow are omitted by extraction; Renderer owns final Render/Present.
+	return m_pRenderSystem->AppendFrame(
+		frame,
+		output,
+		camera,
+		viewPolicy,
+		sceneViewId,
+		overlayViewId,
+		static_cast<std::uint32_t>(m_viewportSize.x),
+		static_cast<std::uint32_t>(m_viewportSize.y),
+		m_directionalLight);
 }
 
 // Finalization
@@ -242,7 +242,7 @@ const std::vector<Actor*>& SceneBase::PrepareUnpublishedCandidateForCommit()
 	}
 
 	m_unpublishedCommitActors = GetAllActors();
-    PrepareComponentPublication(m_unpublishedCommitActors);
+	PrepareComponentPublication(m_unpublishedCommitActors);
 
 	for (Actor* actor : m_unpublishedCommitActors)
 	{
@@ -1254,27 +1254,27 @@ bool SceneBase::RollbackRestoredActors(const std::vector<ActorHandle>& restoredH
 
 void SceneBase::PrepareComponentPublication(const std::vector<Actor*>& actors)
 {
-    std::size_t componentCount = 0;
+	std::size_t componentCount = 0;
 
-    for (Actor* actor : actors)
-    {
-        if (actor)
-        {
-            componentCount += actor->GetAllComponents().size();
-        }
-    }
+	for (Actor* actor : actors)
+	{
+		if (actor)
+		{
+			componentCount += actor->GetAllComponents().size();
+		}
+	}
 
-    m_pRenderSystem->PrepareRegistrationCapacity(componentCount);
-    m_pCollisionSystem->PrepareRegistrationCapacity(componentCount);
+	m_pRenderSystem->PrepareRegistrationCapacity(componentCount);
+	m_pCollisionSystem->PrepareRegistrationCapacity(componentCount);
 
-    for (Actor* actor : actors)
-    {
-        if (actor)
-        {
-            if (Canvas* canvas = actor->GetComponentByClass<Canvas>())
-            {
-                canvas->PrepareRegistrationCapacity(componentCount);
-            }
-        }
-    }
+	for (Actor* actor : actors)
+	{
+		if (actor)
+		{
+			if (Canvas* canvas = actor->GetComponentByClass<Canvas>())
+			{
+				canvas->PrepareRegistrationCapacity(componentCount);
+			}
+		}
+	}
 }

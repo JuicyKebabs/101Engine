@@ -49,11 +49,11 @@ REGISTER_GAME_COMPONENT(GameManager)
 
 std::optional<TypeMetadata> GameManager::BuildMetadata()
 {
-    TypeMetadataBuilder<GameManager> builder("GameManager");
+	TypeMetadataBuilder<GameManager> builder("GameManager");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in GameManager.
-    // builder.Property("speed", &GameManager::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in GameManager.
+	// builder.Property("speed", &GameManager::m_speed);
 
 	builder.Property("restTime", &GameManager::m_restTime).Optional();
 	builder.Property("restTarget", &GameManager::m_restTarget).Optional();
@@ -65,7 +65,7 @@ std::optional<TypeMetadata> GameManager::BuildMetadata()
 	builder.Property("failedImageActor", &GameManager::m_failedImageActor).Optional();
 	builder.Property("titlePromptImageActor", &GameManager::m_titlePromptImageActor).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void GameManager::Start() 
@@ -152,9 +152,9 @@ void GameManager::Update()
 {
 	auto inputInfo = InputManager::GetInstance().GetInputInfo();
 
-    switch (m_gameState)
-    {
-    case GameState::Tutorial:
+	switch (m_gameState)
+	{
+	case GameState::Tutorial:
 		if (inputInfo.mouse.left.trigger)
 		{
 			m_player->SetCanMove(true);
@@ -174,8 +174,8 @@ void GameManager::Update()
 			m_gameState = GameState::Playing;
 		}
 
-        break;
-    case GameState::Playing:
+		break;
+	case GameState::Playing:
 
 		m_restTime -= TimeManager::GetInstance().GetDeltaTime();
 
@@ -231,11 +231,11 @@ void GameManager::Update()
 			m_gameState = GameState::Result;
 		}
 
-        break;
+		break;
 
-    case GameState::Result:
-        if (inputInfo.mouse.left.trigger)
-        {
+	case GameState::Result:
+		if (inputInfo.mouse.left.trigger)
+		{
 			auto guid = m_nextScene.GetGuid();
 
 			if (!guid.IsValid())
@@ -245,12 +245,12 @@ void GameManager::Update()
 			}
 
 			ChangeScene(guid);
-        }
+		}
 
-        break;
-    default:
-        break;
-    }
+		break;
+	default:
+		break;
+	}
 
 }
 

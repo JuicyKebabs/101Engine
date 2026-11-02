@@ -179,12 +179,12 @@ EditorUI::EditResult EditorUI::ColorField(std::string_view label, Vector4& value
 
 	// Render the color edit field for the Vector4 color value
 	Vector4 displayColor = EngineRendering::LinearToSrgb(value);
-    const bool changed = ImGui::ColorEdit4("##Value", &displayColor.x, ImGuiColorEditFlags_AlphaBar);
+	const bool changed = ImGui::ColorEdit4("##Value", &displayColor.x, ImGuiColorEditFlags_AlphaBar);
 
-    if (changed)
-    {
-        value = EngineRendering::SrgbToLinear(displayColor);
-    }
+	if (changed)
+	{
+		value = EngineRendering::SrgbToLinear(displayColor);
+	}
 
 	// Check if the item is currently active (being edited)
 	const bool activated = ImGui::IsItemActivated();

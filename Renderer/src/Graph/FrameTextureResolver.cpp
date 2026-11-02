@@ -15,31 +15,31 @@ namespace rendering::graph
 // Re-query the declared owner to verify that live identity and descriptors still match the import.
 // This is validation of a borrow, not permission to silently switch to a resized resource during Execute.
 Result QueryBinding(
-    backend::Backend& backend,
-    const GraphTextureBinding& borrowed,
-    GraphTextureBinding& output)
+	backend::Backend& backend,
+	const GraphTextureBinding& borrowed,
+	GraphTextureBinding& output)
 {
-    output = borrowed;
+	output = borrowed;
 
-    if (std::holds_alternative<std::monostate>(borrowed.owner))
-    {
-        backend::BackBufferInfo current;
-        auto result = backend.QueryTextureInfo(borrowed.Resource(), current);
+	if (std::holds_alternative<std::monostate>(borrowed.owner))
+	{
+		backend::BackBufferInfo current;
+		auto result = backend.QueryTextureInfo(borrowed.Resource(), current);
 
-        if (!result.IsSuccess())
-        {
-            return result;
-        }
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
 
-        output.resource = current.Resource();
-        output.rtv = current.Rtv();
-        output.viewFormat = current.ViewFormat();
-        output.initialState = current.SubmittedState();
-        output.presentable = true;
-        output.contentsValid = false;
-        output.srv = {};
-        output.dsv = {};
-    }
+		output.resource = current.Resource();
+		output.rtv = current.Rtv();
+		output.viewFormat = current.ViewFormat();
+		output.initialState = current.SubmittedState();
+		output.presentable = true;
+		output.contentsValid = false;
+		output.srv = {};
+		output.dsv = {};
+	}
 	else if (auto content = std::get_if<detail::TextureContent*>(&borrowed.owner))
 	{
 		if (!*content || !(*content)->gpuData ||
@@ -106,8 +106,8 @@ Result QueryBinding(
 // Publish submitted State and content validity back to the same physical owner.
 // The use Fence is stamped by the executor; this function itself does not wait for completion.
 void CommitBinding(backend::Backend& backend,
-    const GraphTextureBinding& binding,
-    D3D12_RESOURCE_STATES state,
+	const GraphTextureBinding& binding,
+	D3D12_RESOURCE_STATES state,
 	bool contentsValid) noexcept
 {
 	if (std::holds_alternative<std::monostate>(binding.owner))

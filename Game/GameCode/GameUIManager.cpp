@@ -44,11 +44,11 @@ REGISTER_GAME_COMPONENT(GameUIManager)
 
 std::optional<TypeMetadata> GameUIManager::BuildMetadata()
 {
-    TypeMetadataBuilder<GameUIManager> builder("GameUIManager");
+	TypeMetadataBuilder<GameUIManager> builder("GameUIManager");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in GameUIManager.
-    // builder.Property("speed", &GameUIManager::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in GameUIManager.
+	// builder.Property("speed", &GameUIManager::m_speed);
 
 	builder.Property("GameManagerActor", &GameUIManager::m_gameManagerActor).Optional();
 	builder.Property("Digit100sActor", &GameUIManager::m_digit100sActor).Optional();
@@ -57,7 +57,7 @@ std::optional<TypeMetadata> GameUIManager::BuildMetadata()
 	builder.Property("Digit01sActor", &GameUIManager::m_digit01sActor).Optional();
 	builder.Property("Digit001sActor", &GameUIManager::m_digit001sActor).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void GameUIManager::Start()

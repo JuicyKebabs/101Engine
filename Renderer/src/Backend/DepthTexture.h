@@ -21,9 +21,9 @@ public:
 	{
 		return m_dsvHandle;
 	}
-    // A sampling descriptor exists only for explicitly shader-readable depth.
-    D3D12_CPU_DESCRIPTOR_HANDLE Srv() const noexcept { return m_srvHandle; }
-    bool AllowsSampling() const noexcept { return m_srvHandle.ptr != 0; }
+	// A sampling descriptor exists only for explicitly shader-readable depth.
+	D3D12_CPU_DESCRIPTOR_HANDLE Srv() const noexcept { return m_srvHandle; }
+	bool AllowsSampling() const noexcept { return m_srvHandle.ptr != 0; }
 
 	D3D12_RESOURCE_STATES submittedState = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 	bool contentsValid = false;
@@ -31,8 +31,8 @@ public:
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
 	DescriptorHeap m_dsvHeap;
-    DescriptorHeap m_srvHeap;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_srvHandle{};
+	DescriptorHeap m_srvHeap;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_srvHandle{};
 	D3D12_CPU_DESCRIPTOR_HANDLE m_dsvHandle{};
 };
 

@@ -117,23 +117,23 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 				pickMatrix *= worldToCanvas;
 			}
 
-            if (spriteRenderer->GetBillboardType() != BillboardType::None)
-            {
-                auto rendererWorld = EngineRendering::ToRenderer(pickMatrix);
-                const auto cameraPosition = EngineRendering::ToRenderer(cameraInfo.position);
-                const auto cameraUp = EngineRendering::ToRenderer(cameraInfo.up);
+			if (spriteRenderer->GetBillboardType() != BillboardType::None)
+			{
+				auto rendererWorld = EngineRendering::ToRenderer(pickMatrix);
+				const auto cameraPosition = EngineRendering::ToRenderer(cameraInfo.position);
+				const auto cameraUp = EngineRendering::ToRenderer(cameraInfo.up);
 
-                if (spriteRenderer->GetBillboardType() == BillboardType::Spherical)
-                {
-                    rendererWorld = rendererWorld.ToBillboard(cameraPosition, cameraUp);
-                }
-                else
-                {
-                    rendererWorld = rendererWorld.ToCylindricalBillboard(cameraPosition, cameraUp);
-                }
+				if (spriteRenderer->GetBillboardType() == BillboardType::Spherical)
+				{
+					rendererWorld = rendererWorld.ToBillboard(cameraPosition, cameraUp);
+				}
+				else
+				{
+					rendererWorld = rendererWorld.ToCylindricalBillboard(cameraPosition, cameraUp);
+				}
 
-                pickMatrix = EngineRendering::FromRenderer(rendererWorld);
-            }
+				pickMatrix = EngineRendering::FromRenderer(rendererWorld);
+			}
 
 			hit = IntersectSprite(
 				ray,
@@ -401,16 +401,16 @@ bool ScenePicker::IntersectMesh(
 
 		// Transform the mesh's bounding center from local space to world space
 		const Matrix4x4 placementWorld = renderTemplate.localToModel * worldMatrix;
-        const Vector3 worldCenter = placementWorld.TransformPoint(meshDesc.boundsCenter);
-        float scaleSquared = 0;
+		const Vector3 worldCenter = placementWorld.TransformPoint(meshDesc.boundsCenter);
+		float scaleSquared = 0;
 
-        for (std::size_t row = 0; row < 3; ++row)
-        {
-            for (std::size_t column = 0; column < 3; ++column)
-            {
-                scaleSquared += placementWorld.m[row][column] * placementWorld.m[row][column];
-            }
-        }
+		for (std::size_t row = 0; row < 3; ++row)
+		{
+			for (std::size_t column = 0; column < 3; ++column)
+			{
+				scaleSquared += placementWorld.m[row][column] * placementWorld.m[row][column];
+			}
+		}
 
 		// Scale the mesh's bounding radius by the maximum scale to get the world radius
 		const float worldRadius = meshDesc.boundsRadius * std::sqrt(scaleSquared);
