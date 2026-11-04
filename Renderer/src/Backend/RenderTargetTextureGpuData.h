@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.7.
 // Physical owner for one render-target Content revision.
 // The color image has two views (RTV for writing, SRV for sampling), not two color allocations.
 // The matching Depth belongs to this output; Graph and draw code borrow this complete set.

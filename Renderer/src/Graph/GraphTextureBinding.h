@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.15.
 // One Render-long connection between a Graph identity and an external resource owner.
 // The owner variant identifies where to re-query and commit state; it does not own the pointer.
 // Writing and sampling the same output must resolve to the same imported Graph identity.

@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.29.
 // One Render-long borrowed gateway to frame data, registries, Graph bindings and Backend.
 // Original Object indices are stable throughout declaration and recording.
 // Current View information is a short recording context, not a shared mutable Camera resource.

@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.32.
 // Build Scene passes first and Overlay passes afterwards, preserving order within each group.
 // Scene owns clear/Depth behavior; Overlay preserves UI submission order and has no Depth attachment.
 // A current-frame output cannot be read before its producer, even if last frame had valid pixels.

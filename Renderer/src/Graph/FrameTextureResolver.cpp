@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.16.
 // Resolve and commit through the real owner rather than caching detached descriptors.
 // Preflight re-queries the same resource that was declared; replacement during Render is forbidden.
 // State and initialized contents are separate facts and are committed only after successful submission.

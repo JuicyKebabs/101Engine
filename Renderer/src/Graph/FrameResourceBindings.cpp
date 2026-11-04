@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.18.
 // Declare exact resource identities before Compile and reuse them during draw recording.
 // Render targets can be both attachments and sampled inputs across different passes.
 // Their Depth remains output-specific and is omitted from Overlay passes.

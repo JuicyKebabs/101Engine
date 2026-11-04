@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.13.
 // Owns GPU execution and the existing linear per-frame allocation window.
 // Output replacement and capacity growth are legal only outside active or uncertain GPU use.
 // The Renderer remains responsible for public sequencing and resource registries.

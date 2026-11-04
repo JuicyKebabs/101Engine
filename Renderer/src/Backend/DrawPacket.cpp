@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.24.
 // Final native validation and recording for both Geometry and procedural draws.
 // Bind the required state explicitly, including scissor and removal of old VB/IB bindings.
 // No resource preparation, ownership transfer or late capacity growth belongs at this point.

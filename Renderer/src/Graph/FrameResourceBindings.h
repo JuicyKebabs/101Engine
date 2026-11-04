@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.17.
 // Per-Render map connecting registry-owned resources and Graph imports.
 // Material reads and View writes reuse one import when they refer to the same physical image.
 // All resource pointers are borrowed until the containing Render/Execute finishes.

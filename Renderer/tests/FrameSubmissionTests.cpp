@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.35.
 // Follow the new submission contract without weakening value-ownership checks.
 // Multiple Views are supported; two Scene Views writing the same color output are still rejected.
 
@@ -221,9 +220,8 @@ void VerifyFrameSubmission()
 	Check(renderer.DestroyTexture(texture.handle));
 	const auto destroyedDependencies = renderer.Render();
 	CheckProcessed(destroyedDependencies);
-	// R8 replaces both destroyed Geometry references with resident error cubes.
 	// The third actual draw is the private HDR display transform.
-	Require(destroyedDependencies.drawnObjects == 3, "R8 fallback/display draws were not recorded.");
+	Require(destroyedDependencies.drawnObjects == 3, "fallback/display draws were not recorded.");
 	Require(destroyedDependencies.diagnostics.size() == 2, "Destroyed Geometry was not diagnosed per Object.");
 	CheckSkipped(renderer);
 

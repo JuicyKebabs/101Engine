@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.23.
 // Validated native draw description, borrowed only while recording the current graphics list.
 // VB necessity and indexed/non-indexed mode are independent: ordinary non-indexed Meshes still use VB.
 // Every packet contains the effective scissor so one draw cannot inherit another draw's clipping.

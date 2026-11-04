@@ -1,4 +1,3 @@
-// R8: exercise the public CPU contract independently from GPU upload timing.
 // Failed updates and failed queries must not destroy the last accepted snapshot.
 #include "Renderer/Renderer.h"
 

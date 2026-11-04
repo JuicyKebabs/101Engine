@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.31.
 // PlannedPass stores source indices only; FrameRenderData continues owning Object values.
 // Scene selection/sorting and Overlay order produce explicit Pass declarations.
 // The generated order is deliberate, not a new general-purpose pass scheduler.

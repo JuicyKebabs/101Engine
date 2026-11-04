@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.28.
 // Record native state only while the command list is in its recording window.
 // Viewport coordinates are validated against the current output extent, not a cached Window size.
 // This file does not decide Engine Canvas coordinates, DPI semantics or Sky ownership.

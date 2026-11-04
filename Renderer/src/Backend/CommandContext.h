@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.27.
 // Native command-list operations consume validated Renderer-owned input values.
 // A View establishes its viewport; each Draw establishes its scissor.
 // These are different rasterizer states and must not leak across Views or Objects.

@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.20.
 // Reflection is the contract between accepted Shader bytecode and common Draw inputs.
 // SV_VertexID is supplied by the pipeline and is not a user Vertex Buffer input.
 // The existing corrected MergeMetadata binding comparison is preserved, not reimplemented here.
@@ -474,7 +473,7 @@ Result ReflectColorOutputs(ID3D12ShaderReflection& reflection, const D3D12_SHADE
 		if (targetDesc.SystemValueType != D3D_NAME_TARGET || targetDesc.SemanticIndex != 0 ||
 			targetDesc.ComponentType != D3D10_REGISTER_COMPONENT_FLOAT32)
 		{
-			return {false, "ReflectShader: R4 supports a single floating color output"};
+			return {false, "ReflectShader: only a single floating color output is supported"};
 		}
 
 		// Count the number of components in the output mask (e.g., float4 has 4 components).

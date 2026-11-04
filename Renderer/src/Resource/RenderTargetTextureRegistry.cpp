@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.10.
 // Registration publishes a complete GPU set; Resize swaps complete revisions transactionally.
 // Destroy releases storage at the same completed boundary as Resize.
 // All returned Content pointers are short borrows; Render prevents mutation during those borrows.

@@ -188,7 +188,7 @@ int WINAPI wWinMain(
 	const HWND window = CreateWindowExW(
 		0,
 		WindowClassName,
-		L"R4: M shared color / O material override / P pipeline override",
+		L"RendererSandbox",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
