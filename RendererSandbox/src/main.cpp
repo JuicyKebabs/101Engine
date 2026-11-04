@@ -335,7 +335,7 @@ int WINAPI wWinMain(
 			rendering::GeometryDesc geometryDesc{ vertices, indices };
 
 			const auto geometry = renderer.RegisterGeometry(geometryDesc);
-			result = geometry.status;
+			result = geometry.result;
 			geometryHandle = geometry.handle;
 		}
 
@@ -350,7 +350,7 @@ int WINAPI wWinMain(
 			textureDesc.mips = mips;
 
 			const auto texture = renderer.RegisterTexture(textureDesc);
-			result = texture.status;
+			result = texture.result;
 			textureHandle = texture.handle;
 		}
 
