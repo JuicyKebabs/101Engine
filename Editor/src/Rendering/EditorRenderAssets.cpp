@@ -1,16 +1,10 @@
 #include "Engine/Actor/ActorHierarchyActivity.h"
 #include "EditorRenderAssets.h"
 
-#include "RendererAssets/AssetFiles.h"
+#include "EditorShaderLoader.h"
 #include "Engine/Graphics/RenderingConversions.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Component/Collider.h"
-#include "Engine/Core/Debug/Debug.h"
-#include <d3dcompiler.h>
-#include <wrl/client.h>
-#include <fstream>
-#include <sstream>
-#include <stdexcept>
 
 namespace
 {
@@ -87,48 +81,6 @@ EditorRenderAssets::~EditorRenderAssets()
 	}
 }
 
-rendering::Result EditorRenderAssets::RegisterShader(
-	const std::string& source,
-	rendering::ShaderStage stage,
-	std::size_t index)
-{
-	Microsoft::WRL::ComPtr<ID3DBlob> bytecode;
-	Microsoft::WRL::ComPtr<ID3DBlob> diagnostics;
-	const char* profile = stage == rendering::ShaderStage::Vertex ? "vs_5_0" : "ps_5_0";
-	const HRESULT compiled = D3DCompile(
-		source.data(),
-		source.size(),
-		nullptr,
-		nullptr,
-		nullptr,
-		"main",
-		profile,
-		D3DCOMPILE_ENABLE_STRICTNESS,
-		0,
-		&bytecode,
-		&diagnostics);
-
-	if (FAILED(compiled))
-	{
-		const std::string message = diagnostics
-			? std::string(static_cast<const char*>(diagnostics->GetBufferPointer()), diagnostics->GetBufferSize())
-			: "shader compilation failed";
-		return Failure(message);
-	}
-
-	rendering::ShaderDesc description;
-	description.stage = stage;
-	description.bytecode = std::span(static_cast<const std::byte*>(bytecode->GetBufferPointer()), bytecode->GetBufferSize());
-	const auto registration = m_renderer.RegisterShader(description);
-
-	if (registration.result.IsSuccess())
-	{
-		m_shaders[index] = registration.handle;
-	}
-
-	return registration.result;
-}
-
 rendering::Result EditorRenderAssets::RegisterPipeline(
 	std::size_t index,
 	std::size_t vertexShader,
@@ -156,103 +108,49 @@ rendering::Result EditorRenderAssets::RegisterPipeline(
 
 rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& shaderDirectory)
 {
-	// MeshVS is exactly the same compiled program as visible Engine objects.
-	// Its b5 LocalQuadTransform therefore also positions the selection mask.
-	const std::array<const char*, 2> files{"MeshVS.cso", "FullscreenVS.cso"};
+	//---------------------------------------------------------------------------------
+	// Register vertex shaders (Renderer built-in) for the editor's auxiliary passes.
+	//---------------------------------------------------------------------------------
+	const std::size_t vsCount = 2;
+	const std::array<const char*, vsCount> vertexShaders{"MeshVS.cso", "FullscreenVS.cso"};
 
-	for (std::size_t index = 0; index < files.size(); ++index)
+	for (std::size_t index = 0; index < vertexShaders.size(); ++index)
 	{
-		std::vector<std::byte> bytes;
-		auto loaded = rendering::assets::LoadShader(shaderDirectory, files[index], bytes);
-
-		if (!loaded.IsSuccess())
+		auto registered = LoadAndRegisterShader(m_renderer, shaderDirectory, vertexShaders[index], rendering::ShaderStage::Vertex);
+		
+		if (!registered.result.IsSuccess())
 		{
-			return loaded;
+			return registered.result;
 		}
 
-		rendering::ShaderDesc description;
-		description.stage = rendering::ShaderStage::Vertex;
-		description.bytecode = bytes;
-		const auto registration = m_renderer.RegisterShader(description);
-
-		if (!registration.result.IsSuccess())
-		{
-			return registration.result;
-		}
-
-		m_shaders[index] = registration.handle;
+		m_shaders[index] = registered.handle;
 	}
 
-	const std::string pixelInput = R"HLSL(
-struct Input
-{
-    float4 position : SV_POSITION;
-    float3 normal : NORMAL;
-    float2 uv : TEXCOORD0;
-    float4 color : COLOR0;
-    float3 worldPosition : TEXCOORD1;
-};
-cbuffer MaterialParams : register(b5)
-{
-    float4 BaseColor;
-    float4 UVTransform;
-    float4 LocalQuadTransform;
-};
-)HLSL";
-	const std::string solidMask = pixelInput + R"HLSL(
-float4 main(Input input) : SV_TARGET { return float4(1, 1, 1, 1); }
-)HLSL";
-	const std::string alphaMask = pixelInput + R"HLSL(
-Texture2D BaseTexture : register(t0);
-SamplerState LinearWrap : register(s0);
-float4 main(Input input) : SV_TARGET
-{
-    float alpha = BaseTexture.Sample(LinearWrap, input.uv * UVTransform.xy + UVTransform.zw).a;
-    clip(alpha * BaseColor.a * input.color.a - 0.05f);
-    return float4(1, 1, 1, 1);
-}
-)HLSL";
-	const std::string outline = R"HLSL(
-Texture2D SelectionMask : register(t0);
-struct Input { float4 position : SV_POSITION; float2 uv : TEXCOORD0; };
-float4 main(Input input) : SV_TARGET
-{
-    uint width;
-    uint height;
-    SelectionMask.GetDimensions(width, height);
-    int2 pixel = int2(input.position.xy);
-    float center = SelectionMask.Load(int3(pixel, 0)).a;
-    float nearby = 0;
+	//---------------------------------------------------------------------------------
+	// Register original pixel shaders for the editor's auxiliary passes.
+	//---------------------------------------------------------------------------------
+	std::string solidMask = "SolidMask.cso";
+	std::string alphaMask = "AlphaMask.cso";
+	std::string outline = "Outline.cso";
+	std::string collider = "Collider.cso";
 
-    // Match a two-pixel outline while reading only numeric mask Alpha. An
-    // emergency Geometry texture's RGB checker cannot introduce mask holes.
-    for (int y = -2; y <= 2; ++y)
-    {
-        for (int x = -2; x <= 2; ++x)
-        {
-            int2 samplePixel = clamp(pixel + int2(x, y), int2(0, 0), int2(width - 1, height - 1));
-            nearby = max(nearby, SelectionMask.Load(int3(samplePixel, 0)).a);
-        }
-    }
-
-    return float4(1.0f, 0.3185468f, 0.0331048f, saturate(nearby - center));
-}
-)HLSL";
-	const std::string collider = pixelInput + R"HLSL(
-float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
-)HLSL";
-	const std::array<std::string, 4> sources{solidMask, alphaMask, outline, collider};
-
-	for (std::size_t index = 0; index < sources.size(); ++index)
+	const std::array<std::string, 4> pixelShaders{solidMask, alphaMask, outline, collider};
+	
+	for (std::size_t index = 0; index < pixelShaders.size(); ++index)
 	{
-		auto compiled = RegisterShader(sources[index], rendering::ShaderStage::Pixel, index + 2);
+		auto registered = LoadAndRegisterShader(m_renderer, shaderDirectory, pixelShaders[index], rendering::ShaderStage::Pixel);
 
-		if (!compiled.IsSuccess())
+		if (!registered.result.IsSuccess())
 		{
-			return compiled;
+			return registered.result;
 		}
+
+		m_shaders[index + vsCount] = registered.handle;
 	}
 
+	//---------------------------------------------------------------------------------
+	// Register pipelines for the editor's auxiliary passes.
+	//---------------------------------------------------------------------------------
 	for (std::size_t index = 0; index < m_pipelines.size(); ++index)
 	{
 		const bool isOutline = index == 2;
@@ -271,6 +169,9 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
 		}
 	}
 
+	//---------------------------------------------------------------------------------
+	// Create render target textures for scene color.
+	//---------------------------------------------------------------------------------
 	rendering::RenderTargetTextureDesc target;
 	target.width = m_width;
 	target.height = m_height;
@@ -283,6 +184,10 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
 	}
 
 	m_sceneColor = color.handle;
+
+	//---------------------------------------------------------------------------------
+	// Create render target textures for selection mask.
+	//---------------------------------------------------------------------------------
 	target.format = rendering::TextureFormat::RGBA8_UNorm;
 	// Numeric coverage: Alpha zero means unselected. Match allocation advice
 	// to the actual auxiliary Clear without changing the Outline algorithm.
@@ -295,6 +200,10 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
 	}
 
 	m_selectionMask = mask.handle;
+
+	//---------------------------------------------------------------------------------
+	// Create materials for selection outline visualization.
+	//---------------------------------------------------------------------------------
 	rendering::MaterialDesc outlineDescription;
 	outlineDescription.pipeline = m_pipelines[2];
 	AddParameter(outlineDescription, "SelectionMask", m_selectionMask);
@@ -306,6 +215,10 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
 	}
 
 	m_outlineMaterial = outlineRegistration.handle;
+
+	//---------------------------------------------------------------------------------
+	// Create materials for collider visualization.
+	//---------------------------------------------------------------------------------
 	rendering::MaterialDesc colliderDescription;
 	colliderDescription.pipeline = m_pipelines[3];
 	rendering::Vector4 identity;
@@ -320,12 +233,19 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
 	}
 
 	m_colliderMaterial = colliderRegistration.handle;
+
+	//---------------------------------------------------------------------------------
+	// Create debug geometry for colliders.
+	//---------------------------------------------------------------------------------
 	const std::array<DefaultMesh, 3> types{DefaultMesh::Cube, DefaultMesh::Sphere, DefaultMesh::Cylinder};
 
 	for (std::size_t index = 0; index < types.size(); ++index)
 	{
+		// Get the default model for the current mesh type.
 		const Model model = GetDefaultModel(types[index]);
 		const Mesh& mesh = model.at(0);
+
+		// Convert the mesh vertices to the rendering engine's vertex format.
 		std::vector<rendering::MeshVertex> vertices;
 		vertices.reserve(mesh.vertices.size());
 
@@ -341,14 +261,15 @@ float4 main(Input input) : SV_TARGET { return float4(0.1f, 1.0f, 0.1f, 1.0f); }
 			vertices.push_back(vertex);
 		}
 
+		// Register the geometry with the renderer and store the handle for later use.
 		rendering::GeometryDesc description;
 		description.vertices = vertices;
 		description.indices = mesh.indices;
 		const auto registered = m_renderer.RegisterGeometry(description);
 
-		if (!registered.status.IsSuccess())
+		if (!registered.result.IsSuccess())
 		{
-			return registered.status;
+			return registered.result;
 		}
 
 		m_debugGeometry[index] = registered.handle;
@@ -438,6 +359,9 @@ rendering::Result EditorRenderAssets::AppendSelection(
 		return {};
 	}
 
+	//-------------------------------------------------------------
+	// Create an auxiliary pass for the selection mask.
+	//-------------------------------------------------------------
 	rendering::AuxiliaryPass mask;
 	mask.id = 10;
 	mask.sourceViewId = sourceView;
@@ -447,8 +371,11 @@ rendering::Result EditorRenderAssets::AppendSelection(
 	mask.colorLoad = rendering::AuxiliaryColorLoad::Clear;
 	// Existing selection behavior includes occluded objects. No Scene Depth.
 	mask.useSourceDepth = false;
+
 	std::size_t materialSlot = 0;
 
+	// Find selected Actor in the extracted render objects and
+	// change the it's Material to a mask Material for the auxiliary pass.
 	for (const auto& record : scene.GetRenderSystem()->GetExtractedObjects())
 	{
 		if (record.actorGuid != selectedActor || record.viewId != sourceView || !record.material)
@@ -457,6 +384,9 @@ rendering::Result EditorRenderAssets::AppendSelection(
 		}
 
 		rendering::MaterialHandle maskMaterial;
+
+		// Create a mask Material for this object, using the original Material's description.
+		// (because their is no MaterialInstance concept in the Renderer....)
 		auto prepared = AppendMaskMaterial(
 			record.material->description,
 			record.alphaMask,
@@ -469,8 +399,8 @@ rendering::Result EditorRenderAssets::AppendSelection(
 		}
 
 		rendering::AuxiliaryDraw draw;
-		draw.objectIndex = record.objectIndex;
-		draw.materialOverride = maskMaterial;
+		draw.objectIndex = record.objectIndex;	// Do not duplicate the object; just reference it in the auxiliary pass.
+		draw.materialOverride = maskMaterial;	// do not change the original Material; just override it for this auxiliary pass.
 		mask.draws.push_back(draw);
 	}
 
@@ -479,25 +409,35 @@ rendering::Result EditorRenderAssets::AppendSelection(
 		return {};
 	}
 
+	// Add fullscreen object to the frame render data for the mask auxiliary pass.
+	// This is used to render the selection mask to the selection mask render target.
 	rendering::RenderObject fullscreen;
 	fullscreen.material = m_outlineMaterial;
 	fullscreen.targetViews.push_back(11);
+
+	// Fullscreen triangle geometry is a procedural draw; no vertex/index buffers are needed.
 	rendering::ProceduralGeometry triangle;
 	triangle.vertexCount = 3;
 	fullscreen.procedural = triangle;
-	const std::size_t outlineObject = frame.objects.size();
+
 	frame.objects.push_back(fullscreen);
 
+	//-------------------------------------------------------------
+	// Create an auxiliary pass for the outline effect.
+	//-------------------------------------------------------------
 	rendering::AuxiliaryPass outline;
 	outline.id = 11;
 	outline.sourceViewId = sourceView;
 	outline.name = "Editor.SelectionOutline";
 	outline.stage = mask.stage;
 
+	const std::size_t outlineObject = frame.objects.size() -1;	// Next object index.
+
 	rendering::AuxiliaryDraw draw;
 	draw.objectIndex = outlineObject;
 	outline.draws.push_back(draw);
 
+	// Add the auxiliary passes to the frame render data.
 	frame.auxiliaryPasses.push_back(std::move(mask));
 	frame.auxiliaryPasses.push_back(std::move(outline));
 

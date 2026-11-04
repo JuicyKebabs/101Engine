@@ -121,6 +121,8 @@ Result DrawResources::PrepareConstantBindings(
 	viewConstants.shadowViewProjection = pass.shadow.viewProjection;
 	viewConstants.shadowInformation.x = pass.shadow.enabled ? 1.0f : 0.0f;
 
+	// Normalize depth bias within the far clip range of the shadow camera.
+	// Hard coding will be improved by slope-based biasing in the future.
 	constexpr float depthBiasWorld = 0.04f;
 	viewConstants.shadowInformation.y = depthBiasWorld / (400.0f - 0.1f);
 

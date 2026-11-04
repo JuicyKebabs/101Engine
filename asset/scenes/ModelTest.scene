@@ -91,38 +91,54 @@
             "tag": "MainCamera"
         },
         {
-            "actorId": "{419FD598-5F70-4900-A132-98A9DE7B4B09}",
+            "actorId": "{B0A5D0E4-9746-44DA-96A2-BD0857A89507}",
             "components": [
                 {
                     "data": {
                         "name": "",
                         "position": [
                             0.0,
-                            -3.950000047683716,
+                            4.349999904632568,
                             0.0
                         ],
                         "rotation": [
-                            0.7071068286895752,
                             0.0,
+                            0.3826834559440613,
                             0.0,
-                            0.7071068286895752
+                            0.9238795042037964
                         ],
                         "scale": [
-                            50.0,
-                            50.0,
+                            1.0,
+                            1.0,
                             1.0
                         ]
                     },
                     "type": "Transform"
+                },
+                {
+                    "data": {
+                        "castShadow": true,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{B0A4AC1C-322D-4D44-91C4-A6773BFBC157}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
                 }
             ],
             "is_active": true,
-            "name": "Wave",
+            "name": "Model",
             "parentId": null,
             "tag": "None"
         },
         {
-            "actorId": "{BA7EB3F6-B3E5-4EF1-A4A0-978ADC98FA5E}",
+            "actorId": "{F246256E-59D4-4559-A209-F7766BA2CE00}",
             "components": [
                 {
                     "data": {
@@ -139,18 +155,34 @@
                             1.0
                         ],
                         "scale": [
+                            500.0,
                             1.0,
-                            1.0,
-                            1.0
+                            500.0
                         ]
                     },
                     "type": "Transform"
+                },
+                {
+                    "data": {
+                        "castShadow": true,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
                 }
             ],
             "is_active": true,
-            "name": "Sky",
+            "name": "Floor",
             "parentId": null,
-            "tag": "InitialSky"
+            "tag": "None"
         }
     ],
     "directional_light": {

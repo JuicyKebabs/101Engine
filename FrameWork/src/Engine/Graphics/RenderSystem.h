@@ -54,8 +54,7 @@ public:
 	void PrepareRegistrationCapacity(std::size_t additionalComponents);
 	void FlushRegisters();
 
-	// One extraction walk updates Component snapshots and appends one Object
-	// array. Camera/Light visibility and transparent sorting remain Renderer work.
+	// Render extraction: append all registered Components to the given FrameRenderData.
 	bool AppendFrame(
 		rendering::FrameRenderData& frame,
 		const rendering::ViewOutput& output,

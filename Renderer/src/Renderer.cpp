@@ -405,7 +405,7 @@ RenderResult Renderer::Render()
 
 	const auto disposition =
 		!result.IsSuccess() ? RenderDisposition::NotProcessed
-							: (hadSubmission ? RenderDisposition::Processed : RenderDisposition::SkippedNoSubmission);
+		: (hadSubmission ? RenderDisposition::Processed : RenderDisposition::SkippedNoSubmission);
 
 	const auto completedDraws = result.IsSuccess() ? drawn : 0;
 	RenderResult rendered;
@@ -416,12 +416,11 @@ RenderResult Renderer::Render()
 	return rendered;
 }
 
-Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vector<DrawDiagnostic>& diagnostics,
-                                             std::size_t& drawn)
+Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vector<DrawDiagnostic>& diagnostics, std::size_t& drawn)
 {
-	//--------------------------------------------------
+	//----------------------------------------------------------------------------------------------
 	// 1. Cut down unusable outputs.
-	//--------------------------------------------------
+	//----------------------------------------------------------------------------------------------
 	Result pruned = sceneOutputResources->PruneOutputs(backend, drawResources.value());
 
 	if (!pruned.IsSuccess())
@@ -429,21 +428,26 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return pruned;
 	}
 
-	//--------------------------------------------------
+	//----------------------------------------------------------------------------------------------
 	// 2. Prepare temporal components for rendering.
-	//--------------------------------------------------
-	graph::RenderGraph graph;
-	graph::GraphExecutor executor(graph, backend);
-	FrameRenderer frameRenderer;
-	graph::FrameResourceBindings bindings(backend, graph, executor);
-	detail::FrameDrawServices services;
-	services.draws = &*drawResources;
-	services.backend = &backend;
-	services.depth = &*sceneDepth;
-	services.bindings = &bindings;
-	services.sceneResources = &*sceneOutputResources;
+	//----------------------------------------------------------------------------------------------
+	graph::RenderGraph graph;											// Manager of all passes and resources for this frame.
+	graph::GraphExecutor executor(graph, backend);						// Executes the compiled graph and submits commands to the GPU.
+	FrameRenderer frameRenderer;										// Build the pass plan and record each pass in the graph.
+	graph::FrameResourceBindings bindings(backend, graph, executor);	// Bindings for all resources used in this frame.
+	detail::FrameDrawServices services;									// Services for the FrameDrawContext, including registries and backend access.
+	
+	services.draws = &*drawResources;					// Registry of all DrawObjects and their resources.
+	services.backend = &backend;						// Access to the DX12 backend for resource creation and command submission.
+	services.depth = &*sceneDepth;						//Depth texture used for depth testing and writing during rendering.
+	services.bindings = &bindings;						// Pointer to the FrameResourceBindings.
+	services.sceneResources = &*sceneOutputResources;	// Registry of all RenderTargetTexture resources used for output rendering.
 
-	detail::FrameDrawContext context(frame, services, diagnostics, drawn);
+	detail::FrameDrawContext context(frame, services, diagnostics, drawn);	// Context for selecting, uploading, and recording all draws in this frame.
+
+	//----------------------------------------------------------------------------------------------
+	// 3. Build the pass plan.
+	//----------------------------------------------------------------------------------------------
 
 	// Each View receives its own source-index list; Object values remain in current.
 	// Selection occurs before Upload so shared resources can be deduplicated across Views.
@@ -455,6 +459,9 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return selected;
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// 4. Gather and upload all selected resources.
+	//----------------------------------------------------------------------------------------------
 	std::vector<GeometryUploadTarget> geometries;
 	std::vector<TextureUploadTarget> textures;
 
@@ -498,6 +505,9 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return uploaded;
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// 5. Check that all selected resources are ready for GPU use.
+	//----------------------------------------------------------------------------------------------
 	std::uint64_t constantBytes = 0;
 	std::uint64_t descriptorCount = 0;
 
@@ -528,6 +538,10 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return capacity;
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// 6. Prepare for recording commands.
+	//----------------------------------------------------------------------------------------------
+
 	// All dynamic storage growth is complete. From here, Buffer/Heap addresses are stable for this frame.
 	// Declare resources and Compile before recording native commands.
 	Result begun = backend.BeginFrameResources();
@@ -537,12 +551,19 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return begun;
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// 7. Register resource bindings for each planned pass.
+	//----------------------------------------------------------------------------------------------
 	Result built = frameRenderer.BuildViews(frame, context, lists, graph);
 
 	if (!built.IsSuccess())
 	{
 		return built;
 	}
+
+	//----------------------------------------------------------------------------------------------
+	// 8. Compile the graph (confirm all dependencies and state transitions of graph resources).
+	//----------------------------------------------------------------------------------------------
 
 	Result compiled = graph.Compile();
 
@@ -551,6 +572,9 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return compiled;
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// 9. Record every compiled pass and submit the command list to the GPU.
+	//----------------------------------------------------------------------------------------------
 	Result executed = executor.Execute();
 
 	if (!executed.IsSuccess())
@@ -558,8 +582,9 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return executed;
 	}
 
-	// Present each used Window once even when several Overlay Views target it.
-	// Offscreen-only frames must not Present an omitted Window.
+	//----------------------------------------------------------------------------------------------
+	// 10. Present all Window outputs in the frame.
+	//----------------------------------------------------------------------------------------------
 	std::vector<std::uint64_t> presentedWindows;
 
 	for (const auto& view : frame.views)
@@ -586,68 +611,6 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		}
 
 		presentedWindows.push_back(window->value);
-	}
-
-	return {};
-}
-
-ResourceRegistrationResult<GeometryHandle> Renderer::RegisterGeometry(const GeometryDesc& desc)
-{
-	Result available = m_pImpl->CheckPublicCall();
-
-	if (!available.IsSuccess())
-	{
-		return {std::move(available), {}};
-	}
-
-	return m_pImpl->drawResources->Register(desc);
-}
-
-ResourceRegistrationResult<TextureHandle> Renderer::RegisterTexture(const TextureDesc& desc)
-{
-	Result available = m_pImpl->CheckPublicCall();
-
-	if (!available.IsSuccess())
-	{
-		return {std::move(available), {}};
-	}
-
-	return m_pImpl->drawResources->Register(desc);
-}
-
-Result Renderer::DestroyGeometry(GeometryHandle handle)
-{
-	Result available = m_pImpl->CheckPublicCall();
-
-	if (!available.IsSuccess())
-	{
-		return available;
-	}
-
-	const auto result = m_pImpl->drawResources->Destroy(handle);
-
-	if (!result.IsSuccess())
-	{
-		return {false, "DestroyGeometry: handle does not identify a registered geometry in this renderer initialization."};
-	}
-
-	return {};
-}
-
-Result Renderer::DestroyTexture(TextureHandle handle)
-{
-	Result available = m_pImpl->CheckPublicCall();
-
-	if (!available.IsSuccess())
-	{
-		return available;
-	}
-
-	const auto result = m_pImpl->drawResources->Destroy(handle);
-
-	if (!result.IsSuccess())
-	{
-		return {false, "DestroyTexture: handle does not identify a registered texture in this renderer initialization."};
 	}
 
 	return {};
@@ -991,6 +954,30 @@ template <class F> auto ResourceCall(F&& function) -> decltype(function())
 }
 } // namespace
 
+ResourceRegistrationResult<GeometryHandle> Renderer::RegisterGeometry(const GeometryDesc& desc)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return { std::move(available),{} };
+	}
+
+	return m_pImpl->drawResources->Register(desc);
+}
+
+ResourceRegistrationResult<TextureHandle> Renderer::RegisterTexture(const TextureDesc& desc)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return { std::move(available),{} };
+	}
+
+	return m_pImpl->drawResources->Register(desc);
+}
+
 ResourceRegistrationResult<ShaderHandle> Renderer::RegisterShader(const ShaderDesc& desc)
 {
 	return ResourceCall(
@@ -1131,6 +1118,44 @@ Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) 
 		});
 }
 
+Result Renderer::DestroyGeometry(GeometryHandle handle)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return available;
+	}
+
+	const auto result = m_pImpl->drawResources->Destroy(handle);
+
+	if (!result.IsSuccess())
+	{
+		return { false, "DestroyGeometry: handle does not identify a registered geometry in this renderer initialization." };
+	}
+
+	return {};
+}
+
+Result Renderer::DestroyTexture(TextureHandle handle)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return available;
+	}
+
+	const auto result = m_pImpl->drawResources->Destroy(handle);
+
+	if (!result.IsSuccess())
+	{
+		return { false, "DestroyTexture: handle does not identify a registered texture in this renderer initialization." };
+	}
+
+	return {};
+}
+
 Result Renderer::DestroyShader(ShaderHandle handle)
 {
 	return ResourceCall(
@@ -1181,8 +1206,7 @@ Result Renderer::DestroyMaterial(MaterialHandle handle)
 
 // Create a GPU-generated output in its dedicated owner.
 // A handle is returned only for a complete color/descriptor/Depth set; contents are initially invalid.
-ResourceRegistrationResult<RenderTargetTextureHandle> Renderer::CreateRenderTargetTexture(
-	const RenderTargetTextureDesc& description)
+ResourceRegistrationResult<RenderTargetTextureHandle> Renderer::CreateRenderTargetTexture(const RenderTargetTextureDesc& description)
 {
 	return ResourceCall(
 		[&]()

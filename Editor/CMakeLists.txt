@@ -56,3 +56,58 @@ add_custom_command(TARGET 101Editor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:101Renderer> $<TARGET_FILE_DIR:101Editor>
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/Renderer/shaders" "$<TARGET_FILE_DIR:101Editor>/shaders"
 )
+
+# Editor private shader compile
+set(EDITOR_SHADER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+set(EDITOR_SHADER_OUTPUTS "")
+
+foreach(EDITOR_SHADER EditorVS EditorPS SolidMaskPS AlphaMask OutlinePS Collider)
+    if(EDITOR_SHADER STREQUAL "EditorVS")
+        set(EDITOR_SHADER_PROFILE vs_5_0)
+    else()
+        set(EDITOR_SHADER_PROFILE ps_5_0)
+    endif()
+
+    if(EDITOR_SHADER STREQUAL "SolidMaskPS")
+        set(EDITOR_SHADER_FILE "SolidMask")
+    elseif(EDITOR_SHADER STREQUAL "OutlinePS")
+        set(EDITOR_SHADER_FILE "Outline")
+    else()
+        set(EDITOR_SHADER_FILE "${EDITOR_SHADER}")
+    endif()
+
+    set(EDITOR_SHADER_SOURCE
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${EDITOR_SHADER}.hlsl")
+    set(EDITOR_SHADER_OUTPUT
+        "${EDITOR_SHADER_DIRECTORY}/${EDITOR_SHADER_FILE}.cso")
+
+    add_custom_command(
+        OUTPUT "${EDITOR_SHADER_OUTPUT}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${EDITOR_SHADER_DIRECTORY}"
+        COMMAND "${RENDERER_FXC}"
+            /nologo
+            /T ${EDITOR_SHADER_PROFILE}
+            /E main
+            /Fo "${EDITOR_SHADER_OUTPUT}"
+            "${EDITOR_SHADER_SOURCE}"
+        DEPENDS
+            "${EDITOR_SHADER_SOURCE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/shaders/EditorCommon.hlsli"
+        VERBATIM
+    )
+
+    list(APPEND EDITOR_SHADER_OUTPUTS "${EDITOR_SHADER_OUTPUT}")
+endforeach()
+
+add_custom_target(EditorShaderAssets
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:101Editor>/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${EDITOR_SHADER_OUTPUTS}
+        "$<TARGET_FILE_DIR:101Editor>/shaders"
+    DEPENDS ${EDITOR_SHADER_OUTPUTS}
+    VERBATIM
+)
+
+add_dependencies(101Editor EditorShaderAssets)

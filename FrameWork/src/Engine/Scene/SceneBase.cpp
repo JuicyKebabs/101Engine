@@ -56,14 +56,14 @@ void SceneBase::PreUpdate(float deltaTime)
 	}
 
 	m_actorPool.ForEach([deltaTime](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		actor->PreUpdate(deltaTime);
-	});
+			actor->PreUpdate(deltaTime);
+		});
 }
 
 // Update
@@ -75,30 +75,30 @@ void SceneBase::Update(float deltaTime)
 	}
 
 	m_actorPool.ForEach([deltaTime](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		actor->Update(deltaTime);
-	});
+			actor->Update(deltaTime);
+		});
 
 	// Flush transforms recursively from root actors
 	m_actorPool.ForEach([this](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		if (!actor->GetParentHandle().IsNull())
-		{
-			return; // only recurse from roots to maintain correct order
-		}
+			if (!actor->GetParentHandle().IsNull())
+			{
+				return; // only recurse from roots to maintain correct order
+			}
 
-		actor->FlushTransform();
-	});
+			actor->FlushTransform();
+		});
 }
 
 // Late update
@@ -110,31 +110,31 @@ void SceneBase::LateUpdate(float deltaTime)
 	}
 
 	m_actorPool.ForEach([deltaTime](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		actor->LateUpdate(deltaTime);
-	});
+			actor->LateUpdate(deltaTime);
+		});
 
 	// Flush transforms/collider
 	m_actorPool.ForEach([this](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		if (!actor->GetParentHandle().IsNull())
-		{
-			return;
-		}
+			if (!actor->GetParentHandle().IsNull())
+			{
+				return;
+			}
 
-		actor->FlushTransform();
-		actor->FlushColliderTransforms();
-	});
+			actor->FlushTransform();
+			actor->FlushColliderTransforms();
+		});
 
 	// Check colliders
 	m_pCollisionSystem->CheckColliders();
@@ -162,6 +162,7 @@ bool SceneBase::AppendRenderData(
 {
 	const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
 	m_pRenderSystem->FlushRegisters();
+
 	// No Camera is still a valid background + Screen UI Frame. Only World and
 	// Shadow are omitted by extraction; Renderer owns final Render/Present.
 	return m_pRenderSystem->AppendFrame(

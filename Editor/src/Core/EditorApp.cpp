@@ -1,15 +1,12 @@
 #include <windows.h>
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <filesystem>
-#include <mmsystem.h>
-#include <tchar.h>
 #include <shellapi.h>
+
 #include "Core/EditorApp.h"
 #include "Renderer/Win32WindowOutputDesc.h"
 #include "Engine/Core/Path/ExecutablePath.h"
-#include "Engine/Graphics/RenderingConversions.h"
 #include <stdexcept>
 #include "Engine/Input/InputManager.h"
 #include "imgui.h"
@@ -24,12 +21,9 @@
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/Camera.h"
 #include "Engine/Component/MeshRenderer.h"
-#include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Component/RectTransform.h"
-#include "Engine/Component/Collider.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIRenderer.h"
-#include "Engine/UI/UIimage.h"
 #include "Engine/Scene/SceneLoader.h"
 #include "Engine/Scene/SceneWriter.h"
 #include "Engine/Core/Debug/Debug.h"
@@ -67,8 +61,10 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
 	WPARAM wParam,
 	LPARAM lParam);
 
-static const int WINDOW_WIDTH  = 1280;
-static const int WINDOW_HEIGHT = 720;
+static const int WINDOW_WIDTH  = 1920;
+static const int WINDOW_HEIGHT = 1080;
+
+static const std::filesystem::path SHADER_DIRECTORY = GetExecutableDirectory() / L"shaders";
 
 namespace
 {
@@ -139,12 +135,7 @@ bool EditorApp::Initialize()
 				return true;
 			}
 
-			if (ImGui::GetCurrentContext() &&
-				ImGui_ImplWin32_WndProcHandler(
-					hwnd,
-					message,
-					wParam,
-					lParam))
+			if (ImGui::GetCurrentContext() &&ImGui_ImplWin32_WndProcHandler(hwnd,message,wParam,lParam))
 			{
 				outResult = TRUE;
 				return true;
@@ -183,7 +174,7 @@ bool EditorApp::Initialize()
 		return false;
 	}
 
-	InitImGui();                    // Initialize ImGui
+	InitImGui();	// Initialize ImGui
 
 	std::string settingsError;
 
@@ -1245,11 +1236,13 @@ bool EditorApp::InitInstance()
 	configuration.enableDebugLayer = true;
 #endif
 
+	// Initialize the renderer with the specified configuration and check for success
 	if (!CheckRenderingResult(m_pRenderer->Initialize(configuration)))
 	{
 		return false;
 	}
 
+	// Create output for the window.
 	rendering::Win32WindowOutputDesc outputDescription;
 	outputDescription.window = m_window.GetHandle();
 	outputDescription.width = WINDOW_WIDTH;
@@ -1261,17 +1254,19 @@ bool EditorApp::InitInstance()
 		return false;
 	}
 
-	m_windowOutput = output.handle;
-	const auto shaderDirectory = GetExecutableDirectory() / L"shaders";
+	m_windowOutput = output.handle;	// Store the window output handle for later use
 
-	if (!m_renderAssets->Initialize(*m_pRenderer, shaderDirectory))
+	// Prepare the render assets for the editor, including shaders and other resources.
+	if (!m_renderAssets->Initialize(*m_pRenderer, SHADER_DIRECTORY))
 	{
 		return false;
 	}
 
+	// Initialize the editor-specific render assets, which may include additional 
+	// shaders or resources needed for the editor UI and scene rendering or debugging tools.
 	m_editorRenderAssets = std::make_unique<EditorRenderAssets>(*m_pRenderer);
 
-	if (!CheckRenderingResult(m_editorRenderAssets->Initialize(shaderDirectory)))
+	if (!CheckRenderingResult(m_editorRenderAssets->Initialize(SHADER_DIRECTORY)))
 	{
 		return false;
 	}
@@ -1287,14 +1282,14 @@ bool EditorApp::InitInstance()
 
 void EditorApp::InitImGui()
 {
-	//--------------------------
+	//--------------------------------------------------------------
 	// Initialize ImGui context
-	//--------------------------
+	//--------------------------------------------------------------
 	IMGUI_CHECKVERSION();
 
-	//---------------------------
+	//--------------------------------------------------------------
 	// Apply custom editor theme
-	//---------------------------
+	//--------------------------------------------------------------
 	ImGui::CreateContext();
 
 	EditorTheme::ApplyStyle();
@@ -1303,6 +1298,7 @@ void EditorApp::InitImGui()
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigDpiScaleFonts = true;
 
+	// 
 	namespace fs = std::filesystem;
 	const fs::path iniPath = PathManager::ResolveW("Saved/Editor/imgui.ini");
 	std::error_code directoryError;
@@ -1323,19 +1319,19 @@ void EditorApp::InitImGui()
 	m_shouldBuildDefaultDockLayout = !fs::exists(iniPath);
 	io.IniFilename = m_imguiIniPath.empty() ? nullptr : m_imguiIniPath.c_str();
 
-	//---------------------------------
+	//--------------------------------------------------------------
 	// Load custom font for the editor
-	//---------------------------------
+	//--------------------------------------------------------------
 	EditorFontConfig fontConfig;
 	fontConfig.filePath = "C:/Windows/Fonts/Meiryo.ttc";
-	fontConfig.sizePixels = 16.0f;
-	fontConfig.fontIndex = 2;
+	fontConfig.sizePixels = 18.0f;
+	fontConfig.fontIndex = 0;
 
 	EditorTheme::LoadFont(io, fontConfig);
 
-	//-------------------------------------------
-	// Initialize ImGui for Win32 and DirectX 12
-	//-------------------------------------------
+	//--------------------------------------------------------------
+	// Initialize ImGui for Win32 and Scene rendering
+	//--------------------------------------------------------------
 	ImGui_ImplWin32_Init(m_window.GetHandle());
 
 	io.BackendRendererName = "101Engine.Renderer";
@@ -1343,7 +1339,8 @@ void EditorApp::InitImGui()
 	io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
 	m_imguiAdapter = std::make_unique<rendering::editor::EditorImGuiAdapter>(*m_pRenderer);
 
-	if (!CheckRenderingResult(m_imguiAdapter->Initialize()))
+	// Initialize the resources for the scene rendering.
+	if (!CheckRenderingResult(m_imguiAdapter->Initialize(SHADER_DIRECTORY)))
 	{
 		throw std::runtime_error("Editor ImGui adapter initialization failed.");
 	}
@@ -1581,14 +1578,18 @@ void EditorApp::Render()
 	}
 
 	SceneBase* activeScene = GetActiveScene();
+
 	rendering::FrameRenderData frame;
 	frame.time = static_cast<float>(timeGetTime()) / 1000.0f;
+
+	// Get the render target output for the scene color from the editor render assets.
 	rendering::ViewOutput sceneOutput = m_editorRenderAssets->SceneColor();
 
 	if (activeScene)
 	{
 		if (m_editorMode == EditorMode::Play)
 		{
+			// Use original scene output for Play Mode, as the editor viewport is not used in this mode.
 			if (!activeScene->AppendRenderData(frame, sceneOutput))
 			{
 				return;
@@ -1596,6 +1597,8 @@ void EditorApp::Render()
 		}
 		else
 		{
+			// Construct FrameRenderData for the editor viewport,
+			// including the scene and any editor-specific overlays.
 			AppendEditorViewport(frame, activeScene);
 		}
 	}
@@ -1607,6 +1610,8 @@ void EditorApp::Render()
 		return;
 	}
 
+	// If there are no views in the frame, create a default
+	// background overlay view to ensure something is rendered.
 	if (frame.views.empty())
 	{
 		rendering::RenderView background;
@@ -1616,25 +1621,31 @@ void EditorApp::Render()
 		frame.views.push_back(background);
 	}
 
+	// View for rendering ImGui overlays on top of the scene and editor UI.
 	rendering::RenderView editor;
 	editor.id = 100;
-	editor.output = m_windowOutput;
-	editor.kind = rendering::ViewKind::Overlay;
+	editor.output = m_windowOutput;				// Back buffer for the window output, not the scene render target.
+	editor.kind = rendering::ViewKind::Overlay;	// Screen Overlay for ImGui rendering (Scene has already been rendered to viewport).
 	frame.views.push_back(editor);
 
+	// Append ImGui draw data to the frame for rendering.
 	if (!CheckRenderingResult(m_imguiAdapter->Append(*ImGui::GetDrawData(), editor.id, frame)))
 	{
 		return;
 	}
 
+	// Submit the frame render data to the renderer for processing and rendering.
 	if (!CheckRenderingResult(m_pRenderer->SubmitFrameRenderData(std::move(frame))))
 	{
 		return;
 	}
 
+	// Render the frame and check the result for any diagnostics or errors.
 	const auto result = m_pRenderer->Render();
+
 	CheckRenderingResult(result.status);
 
+	// Log any diagnostics from the rendering process for debugging purposes.
 	for (const auto& diagnostic : result.diagnostics)
 	{
 		DBG("Editor draw: %s", diagnostic.message.c_str());
@@ -1650,13 +1661,16 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 		return;
 	}
 
+	// Change the render policy based on whether the viewport is in Canvas mode or not.
 	const bool canvasPreview = viewport->GetViewMode() == EditorViewportMode::Canvas;
+
 	RenderViewPolicy policy;
 	policy.canvasPreview = canvasPreview;
+
 	Canvas* editingCanvas = nullptr;
 
 	if (canvasPreview)
-	{
+	{// For canvas preview.
 		auto& canvasContext = viewport->GetCanvasEditContext();
 		editingCanvas = canvasContext.ResolveCanvas(*activeScene);
 
@@ -1676,11 +1690,13 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 		policy.renderSpaceFilter = editingCanvas ? RenderSpaceFilter::All : RenderSpaceFilter::ScreenOnly;
 	}
 	else
-	{
+	{// For normal 3D scene view.
 		policy.renderSpaceFilter = RenderSpaceFilter::WorldOnly;
 	}
 
 	const CameraInfo camera = BuildViewportCameraInfo(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
+	
+	// Get the render target output for the scene color from the editor render assets.
 	rendering::ViewOutput output = m_editorRenderAssets->SceneColor();
 
 	if (!activeScene->AppendRenderData(
@@ -1692,11 +1708,13 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 		return;
 	}
 
+	// Append the selected actor to the frame render data for visualizing outline in the editor viewport.
 	EditorSelection* selection = GetActiveSelection();
-	const rendering::ViewId sourceView = canvasPreview ? 2 : 1;
+	const rendering::ViewId sourceView = canvasPreview ? 2 : 1;	// Decide target view ID based on whether it's canvas preview or normal 3D scene view.
 
 	if (selection)
 	{
+		// Append the selected actor to the frame render data for visualizing outline in the editor viewport.
 		if (!CheckRenderingResult(m_editorRenderAssets->AppendSelection(
 			frame,
 			*activeScene,
@@ -1708,8 +1726,11 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 		}
 	}
 
+	// Debug drawing og colliders.
+	// Only when the user has enabled the option in 3D scene view (not Canvas mode)
 	if (m_showColliders && !canvasPreview)
 	{
+		// Append colliders to the frame render data for visualization in the editor viewport.
 		m_editorRenderAssets->AppendColliders(frame, *activeScene, sourceView);
 	}
 }
@@ -2197,17 +2218,17 @@ void EditorApp::RenderSceneViewPanel()
 	std::optional<EditorDocumentId> closeDocumentRequest;
 
 	DocumentTabBar::Callbacks documentCallbacks;
-	documentCallbacks.canInteract = m_editorMode == EditorMode::Edit &&
-		!m_documentWorkflow.IsExitPending();
+	documentCallbacks.canInteract = m_editorMode == EditorMode::Edit && !m_documentWorkflow.IsExitPending();
+
 	documentCallbacks.onActivate = [&activateDocumentRequest](EditorDocumentId id)
-	{
-		activateDocumentRequest = id;
-	};
+		{
+			activateDocumentRequest = id;
+		};
 
 	documentCallbacks.onClose = [&closeDocumentRequest](EditorDocumentId id)
-	{
-		closeDocumentRequest = id;
-	};
+		{
+			closeDocumentRequest = id;
+		};
 
 	// Build the overlay data for the scene view panel based on the current view mode and any selected screen canvas
 	ViewportOverlayData overlayData;

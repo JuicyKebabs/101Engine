@@ -390,19 +390,19 @@ bool MeshRenderer::SynchronizeRenderResources()
 		const auto queried = context->pRenderer->GetGeometryData(renderTemplate.meshDesc.meshHandle, snapshot);
 
 		if (queried.IsSuccess() && snapshot.revision != renderTemplate.meshDesc.boundsRevision)
-		{
+		{// Update the bounds in the render template if the revision has changed
 			renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
 			renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
 			renderTemplate.meshDesc.boundsRevision = snapshot.revision;
 			m_isProxyDirty = true;
 		}
 		else if (!queried.IsSuccess())
-		{
+		{// If the geometry data is not available, reset the bounds to default values
 			renderTemplate.meshDesc.boundsRevision = 0;
 		}
 
 		if (context->pRenderAssets && renderTemplate.materialDesc.screen != screen)
-		{
+		{// Update the material description if the render space has changed
 			auto description = renderTemplate.materialDesc.description;
 			description.pipeline = context->pRenderAssets->MeshPipeline(screen);
 			const auto updated = context->pRenderer->UpdateMaterial(renderTemplate.materialDesc.handle, description);

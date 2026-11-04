@@ -10,6 +10,13 @@
 #include <variant>
 #include <vector>
 
+//----------------------------------------------------------------------------------------
+// FrameRenderData
+// A single submission of all the Views and Objects to be drawn in one Render() call.
+//The host constructs this value and passes it to SubmitFrameRenderData() in every frame.
+//----------------------------------------------------------------------------------------
+
+
 namespace rendering
 {
 
@@ -107,7 +114,7 @@ struct RenderObject
 	// Content revision is separate from owner/slot/generation identity.
 	std::uint64_t boundsGeometryRevision = 0;
 
-	// Opt-in projection. Engine defaults differ by Component type.
+	// Optional settings for this draw.
 	bool castShadow = false;
 	BillboardMode billboard = BillboardMode::None;
 	std::optional<ProceduralGeometry> procedural;
@@ -160,14 +167,14 @@ enum class AuxiliaryColorLoad
 	Load
 };
 
-// A value-only request. The host knows selection/Collider meaning; Renderer
-// owns attachment resolution, Graph ordering, commands and GPU lifetime.
+// An auxiliary pass is a complete render of selected Objects into a separate output.
 struct AuxiliaryPass
 {
 	ViewId id = 0;
 	ViewId sourceViewId = 0;
 	std::string name;
 	AuxiliaryStage stage = AuxiliaryStage::BeforeDisplayTransform;
+
 	// nullopt means the source View's current color (private HDR for Scene).
 	std::optional<RenderTargetTextureHandle> colorOutput;
 	AuxiliaryColorLoad colorLoad = AuxiliaryColorLoad::Load;

@@ -1,16 +1,11 @@
-// Editor-owned translation of ImGui CPU values to Renderer registrations.
-// One host Window; no native descriptors or command callbacks cross this boundary.
 #include "EditorImGuiAdapter.h"
-
-#include <d3dcompiler.h>
 #include "Engine/Graphics/RenderingConversions.h"
-#include <wrl/client.h>
+#include "EditorShaderLoader.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
-#include <new>
 #include <stdexcept>
 
 namespace rendering::editor
@@ -27,125 +22,27 @@ Result AdapterFailure(const std::string& message)
 	return failure;
 }
 
-Result CompileProbeShader(const char* source, const char* profile, std::vector<std::byte>& bytecode)
-{
-	Microsoft::WRL::ComPtr<ID3DBlob> compiled;
-	Microsoft::WRL::ComPtr<ID3DBlob> errors;
-	const auto status = D3DCompile(
-		source,
-		std::strlen(source),
-		nullptr,
-		nullptr,
-		nullptr,
-		"main",
-		profile,
-		0,
-		0,
-		&compiled,
-		&errors);
-
-	if (FAILED(status))
-	{
-		std::string message = "probe shader compilation failed";
-
-		if (errors)
-		{
-			message.assign(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize());
-		}
-
-		return AdapterFailure(message);
-	}
-
-	const auto* begin = static_cast<const std::byte*>(compiled->GetBufferPointer());
-	bytecode.assign(begin, begin + compiled->GetBufferSize());
-	return {};
 }
 
-}
-
-// Compile this probe's fixed client-side Shader once, then register ordinary Renderer resources.
-// This is not Shader Reload in the Renderer. The static sampler convention uses s1 for LinearClamp.
-// If any step fails, Shutdown still owns the responsibility to destroy preceding successful registrations.
-Result EditorImGuiAdapter::Initialize()
+Result EditorImGuiAdapter::Initialize(const std::filesystem::path& shaderDirectory)
 {
-	const char* vertexSource = R"HLSL(
-struct Input
-{
-    float3 position : POSITION;
-    float2 uv : TEXCOORD0;
-    float4 color : COLOR0;
-};
-
-struct Output
-{
-    float4 position : SV_POSITION;
-    float2 uv : TEXCOORD0;
-    float4 color : COLOR0;
-};
-
-Output main(Input input)
-{
-    Output output;
-    output.position = float4(input.position, 1);
-    output.uv = input.uv;
-    output.color = input.color;
-    return output;
-}
-)HLSL";
-	const char* pixelSource = R"HLSL(
-Texture2D Image : register(t0);
-SamplerState LinearClamp : register(s1);
-
-struct Input
-{
-    float4 position : SV_POSITION;
-    float2 uv : TEXCOORD0;
-    float4 color : COLOR0;
-};
-
-float4 main(Input input) : SV_TARGET
-{
-    return Image.Sample(LinearClamp, input.uv) * input.color;
-}
-)HLSL";
-
-	std::vector<std::byte> bytecode;
-	Result result = CompileProbeShader(vertexSource, "vs_5_0", bytecode);
-
-	if (!result.IsSuccess())
+	auto result = LoadAndRegisterShader(m_renderer, shaderDirectory, "EditorVS.cso", ShaderStage::Vertex);
+	
+	if (!result.result.IsSuccess())
 	{
-		return result;
+		return result.result;
+	}
+	
+	m_vertexShader = result.handle;
+
+	auto pixelResult = LoadAndRegisterShader(m_renderer, shaderDirectory, "EditorPS.cso", ShaderStage::Pixel);
+
+	if (!pixelResult.result.IsSuccess())
+	{
+		return pixelResult.result;
 	}
 
-	ShaderDesc shaderDescription;
-	shaderDescription.stage = ShaderStage::Vertex;
-	shaderDescription.bytecode = bytecode;
-	const auto vertex = m_renderer.RegisterShader(shaderDescription);
-
-	if (!vertex.result.IsSuccess())
-	{
-		return vertex.result;
-	}
-
-	m_vertexShader = vertex.handle;
-
-	result = CompileProbeShader(pixelSource, "ps_5_0", bytecode);
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	shaderDescription.stage = ShaderStage::Pixel;
-	shaderDescription.bytecode = bytecode;
-	const auto pixel = m_renderer.RegisterShader(shaderDescription);
-
-	if (!pixel.result.IsSuccess())
-	{
-		return pixel.result;
-	}
-
-	m_pixelShader = pixel.handle;
+	m_pixelShader = pixelResult.handle;
 
 	PipelineDesc pipelineDescription;
 	pipelineDescription.vertexShader = m_vertexShader;
@@ -169,7 +66,7 @@ float4 main(Input input) : SV_TARGET
 // If a later CPU map allocation threw after registration, the adapter could lose the handle to destroy.
 // The identifier is published only after registration succeeds; external Scene outputs remain borrowed.
 Result EditorImGuiAdapter::AddImage(
-	MaterialValue source,
+	MaterialValue source,			// TextureHandle or RenderTargetTextureHandle, depending on the overload
 	TextureHandle uploadedTexture,
 	bool ownsTexture,
 	ImTextureID& identifier)
@@ -195,6 +92,7 @@ Result EditorImGuiAdapter::AddImage(
 
 		preparedImage = inserted.first;
 
+		// Create a MaterialParameter for the Texture input.
 		MaterialParameter parameter;
 		parameter.name = "Image";
 		parameter.value = std::move(source);
@@ -221,6 +119,8 @@ Result EditorImGuiAdapter::AddImage(
 		return AdapterFailure("image registration size is unsupported");
 	}
 
+	// Register the Material for this image. 
+	// The adapter owns the Material and Texture handles.
 	const auto material = m_renderer.RegisterMaterial(description);
 
 	if (!material.result.IsSuccess())
@@ -229,11 +129,14 @@ Result EditorImGuiAdapter::AddImage(
 		return material.result;
 	}
 
+	// Save material handles 
 	preparedImage->second.material = material.handle;
 	preparedImage->second.uploadedTexture = uploadedTexture;
 	preparedImage->second.ownsTexture = ownsTexture;
+
 	identifier = m_nextIdentifier;
 	++m_nextIdentifier;
+
 	return {};
 }
 
@@ -356,9 +259,9 @@ Result EditorImGuiAdapter::ProcessTexture(ImTextureData& texture)
 	{
 		const auto registered = m_renderer.RegisterTexture(description);
 
-		if (!registered.status.IsSuccess())
+		if (!registered.result.IsSuccess())
 		{
-			return registered.status;
+			return registered.result;
 		}
 
 		ImTextureID identifier = ImTextureID_Invalid;
@@ -412,6 +315,10 @@ Result EditorImGuiAdapter::StoreDrawList(
 	const ImDrawData& drawData,
 	std::size_t listIndex)
 {
+	//----------------------------------------------------------------------------------------------
+	// Allocate a GeometryHandle slot before registration
+	// so allocation failure cannot leave an untracked Geometry.
+	//----------------------------------------------------------------------------------------------
 	if (listIndex >= m_geometries.size())
 	{
 		try
@@ -428,13 +335,17 @@ Result EditorImGuiAdapter::StoreDrawList(
 			return AdapterFailure("geometry Handle storage size is unsupported");
 		}
 	}
-
+	//----------------------------------------------------------------------------------------------
+	// Convert ImGui vertex positions, UVs, and colors into the MeshVertex format for the Renderer.
+	//----------------------------------------------------------------------------------------------
 	std::vector<MeshVertex> vertices;
 	vertices.reserve(static_cast<std::size_t>(drawList.VtxBuffer.Size));
 
 	for (const auto& source : drawList.VtxBuffer)
 	{
 		MeshVertex vertex;
+
+		// Converting ImGui's coordinate system to the NDC (normalized device coordinates) used by the Renderer.
 		vertex.position.x = (source.pos.x - drawData.DisplayPos.x) * 2 / drawData.DisplaySize.x - 1;
 		vertex.position.y = 1 - (source.pos.y - drawData.DisplayPos.y) * 2 / drawData.DisplaySize.y;
 
@@ -452,6 +363,9 @@ Result EditorImGuiAdapter::StoreDrawList(
 		vertices.push_back(vertex);
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// Store indices  for the Renderer.
+	//----------------------------------------------------------------------------------------------
 	std::vector<std::uint32_t> indices;
 	indices.reserve(static_cast<std::size_t>(drawList.IdxBuffer.Size));
 
@@ -460,6 +374,9 @@ Result EditorImGuiAdapter::StoreDrawList(
 		indices.push_back(index);
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// Prepare a GeometryDesc and register or update the Geometry resource with the Renderer.
+	//----------------------------------------------------------------------------------------------
 	GeometryDesc description;
 	description.vertices = vertices;
 	description.indices = indices;
@@ -471,11 +388,12 @@ Result EditorImGuiAdapter::StoreDrawList(
 
 	const auto registered = m_renderer.RegisterGeometry(description);
 
-	if (!registered.status.IsSuccess())
+	if (!registered.result.IsSuccess())
 	{
-		return registered.status;
+		return registered.result;
 	}
 
+	// Store the GeometryHandle for future updates and reference in RenderObjects.
 	m_geometries[listIndex] = registered.handle;
 	return {};
 }
@@ -486,6 +404,9 @@ Result EditorImGuiAdapter::StoreDrawList(
 // Reject separate OS Viewports and arbitrary callbacks instead of hiding undeclared GPU work.
 Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, FrameRenderData& frame)
 {
+	//--------------------------------------------------------------------
+	// Validation of ImGui draw data and adapter state before processing.
+	//--------------------------------------------------------------------
 	if (!drawData.Valid)
 	{
 		return AdapterFailure("draw data is not valid");
@@ -521,6 +442,7 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 		return AdapterFailure("display transform must be finite");
 	}
 
+	// Framebuffer dimensions are used to clamp the clip rectangle and must be within the Renderer limits.
 	const float framebufferWidth = drawData.DisplaySize.x * drawData.FramebufferScale.x;
 	const float framebufferHeight = drawData.DisplaySize.y * drawData.FramebufferScale.y;
 
@@ -542,16 +464,20 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 		}
 	}
 
+	//----------------------------------------------------------------------------------------------
+	// Convert ImGui DrawLists into RenderObjects for the Renderer.
+	//----------------------------------------------------------------------------------------------
 	std::vector<RenderObject> objects;
 
 	for (int listIndex = 0; listIndex < drawData.CmdListsCount; ++listIndex)
 	{
+		// Get a single ImDrawList for this index.
 		const auto& drawList = *drawData.CmdLists[listIndex];
 
+		// CmdBuffer validation.
 		for (const auto& command : drawList.CmdBuffer)
 		{
-			const bool unsupportedCallback = command.UserCallback &&
-				command.UserCallback != ImDrawCallback_ResetRenderState;
+			const bool unsupportedCallback = command.UserCallback && command.UserCallback != ImDrawCallback_ResetRenderState;
 
 			if (unsupportedCallback)
 			{
@@ -559,11 +485,13 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 			}
 		}
 
+		// Skip empty DrawLists.
 		if (drawList.VtxBuffer.empty() || drawList.IdxBuffer.empty())
 		{
 			continue;
 		}
 
+		// Store the DrawList's vertex and index data in a Geometry resource for the Renderer.
 		Result result = StoreDrawList(drawList, drawData, static_cast<std::size_t>(listIndex));
 
 		if (!result.IsSuccess())
@@ -571,6 +499,7 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 			return result;
 		}
 
+		// Iterate over each ImDrawCmd in the DrawList's command buffer to create RenderObjects.
 		for (const auto& command : drawList.CmdBuffer)
 		{
 			if (command.UserCallback)
@@ -589,6 +518,7 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 				continue;
 			}
 
+			// Find the ImageEntry of the Material for this draw command's texture ID.
 			const auto image = m_images.find(command.GetTexID());
 
 			if (image == m_images.end())
@@ -609,11 +539,13 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 				return AdapterFailure("clip rectangle must be finite");
 			}
 
+			// Transform clip rectangle from ImGui coordinates to framebuffer coordinates.
 			const float clipLeft = (command.ClipRect.x - drawData.DisplayPos.x) * drawData.FramebufferScale.x;
 			const float clipTop = (command.ClipRect.y - drawData.DisplayPos.y) * drawData.FramebufferScale.y;
 			const float clipRight = (command.ClipRect.z - drawData.DisplayPos.x) * drawData.FramebufferScale.x;
 			const float clipBottom = (command.ClipRect.w - drawData.DisplayPos.y) * drawData.FramebufferScale.y;
 
+			// Clamp the clip rectangle to the framebuffer dimensions.
 			ScissorRect scissor;
 			scissor.left = static_cast<std::int32_t>(std::floor(std::clamp(clipLeft, 0.0f, framebufferWidth)));
 			scissor.top = static_cast<std::int32_t>(std::floor(std::clamp(clipTop, 0.0f, framebufferHeight)));
@@ -625,6 +557,7 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 				continue;
 			}
 
+			// Create a RenderObject for this draw command, referencing the stored Geometry and Material.
 			RenderObject object;
 			object.geometry = m_geometries[static_cast<std::size_t>(listIndex)];
 			object.material = image->second.material;
@@ -637,6 +570,7 @@ Result EditorImGuiAdapter::Append(const ImDrawData& drawData, ViewId view, Frame
 		}
 	}
 
+	// Append the newly created RenderObjects to the frame's object list for rendering.
 	frame.objects.insert(frame.objects.end(), objects.begin(), objects.end());
 	return {};
 }

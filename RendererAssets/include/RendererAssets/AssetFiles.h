@@ -87,11 +87,9 @@ struct TextureData
 	void Description(TextureDesc& description, std::vector<TextureMipDesc>& views) const;
 };
 
-Result LoadModel(const std::filesystem::path& absoluteBaseDirectory,
-	const std::filesystem::path& file, ModelData& output);
-Result LoadTexture(const std::filesystem::path& absoluteBaseDirectory,
-	const std::filesystem::path& file, TextureData& output, bool colorTexture = true);
-Result LoadShader(const std::filesystem::path& absoluteBaseDirectory,
-	const std::filesystem::path& file, std::vector<std::byte>& output);
+// Helper API to load a resources from a file.
+Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::filesystem::path& file, ModelData& output);
+Result LoadTexture(const std::filesystem::path& absoluteBaseDirectory, const std::filesystem::path& file, TextureData& output, bool colorTexture = true);
+Result LoadShader(const std::filesystem::path& absoluteBaseDirectory, const std::filesystem::path& file, std::vector<std::byte>& output);
 
 }

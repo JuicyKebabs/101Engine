@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.8.
-// Build color, CPU descriptor heaps and Depth privately, then publish the complete set.
-// Local RAII owners clean up an incomplete candidate; no partial output is exposed.
-// Creation allocates storage but does not make its pixels initialized or shader-readable.
-
 #include "RenderTargetTextureGpuData.h"
 #include "ApiResult.h"
 #include "Failure.h"
@@ -14,10 +9,11 @@ namespace rendering::backend
 
 // Every local owner below is provisional until the final commit.
 // Returning early destroys the candidate color/heaps/Depth without exposing any partial public output.
-Result RenderTargetTextureGpuData::Initialize(
-	ID3D12Device* device,
-	const RenderTargetTextureDesc& description)
+Result RenderTargetTextureGpuData::Initialize(ID3D12Device* device, const RenderTargetTextureDesc& description)
 {
+	//------------------------------------------------------------------------------------------------
+	// 1. Validate the input parameters and description.
+	//------------------------------------------------------------------------------------------------
 	if (!device || m_color)
 	{
 		return detail::Fail("RenderTargetTexture: device and empty destination are required.");
@@ -63,8 +59,12 @@ Result RenderTargetTextureGpuData::Initialize(
 		return detail::Fail("RenderTargetTexture: unsupported generated color format.");
 	}
 
+	//------------------------------------------------------------------------------------------------
+	// 2. Create the GPU resource for the render target texture.
+	//------------------------------------------------------------------------------------------------
+
 	D3D12_HEAP_PROPERTIES heapProperties{};
-	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;	// Create a GPU-only resource for the render target texture.
 
 	D3D12_RESOURCE_DESC colorDescription{};
 	colorDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -74,7 +74,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	colorDescription.MipLevels = 1;
 	colorDescription.Format = nativeFormat;
 	colorDescription.SampleDesc.Count = 1;
-	colorDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	colorDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;	// Allow render target usage for this texture.
 
 	// This is an allocation hint, not a GPU Clear or initialization operation.
 	// This tells the driver the common Clear value for efficient allocation/layout decisions.
@@ -90,6 +90,7 @@ Result RenderTargetTextureGpuData::Initialize(
 		optimizedClear.Color[channel] = description.optimizedClearColor[channel];
 	}
 
+	// Create the GPU resource for the render target texture.
 	Microsoft::WRL::ComPtr<ID3D12Resource> color;
 	HRESULT created = device->CreateCommittedResource(
 		&heapProperties,
@@ -104,6 +105,10 @@ Result RenderTargetTextureGpuData::Initialize(
 		return MakeApiFailure("CreateCommittedResource(RenderTargetTexture)", created);
 	}
 
+	//------------------------------------------------------------------------------------------------
+	// 3. Create the descriptor heaps for the render target view (RTV) and shader resource view (SRV).
+	//------------------------------------------------------------------------------------------------
+	// RTV
 	auto rtvHeap = std::make_unique<DescriptorHeap>();
 	Result prepared = rtvHeap->Initialize(
 		device,
@@ -129,6 +134,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	renderTargetView.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	device->CreateRenderTargetView(color.Get(), &renderTargetView, rtv);
 
+	// SRV
 	// This is CPU descriptor storage, not the shader-visible frame heap.
 	// Sampling copies the SRV into FrameResources later; copying a descriptor does not copy the pixels.
 	auto srvHeap = std::make_unique<DescriptorHeap>();
@@ -156,6 +162,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	shaderResourceView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	shaderResourceView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	shaderResourceView.Texture2D.MipLevels = 1;
+
 	device->CreateShaderResourceView(color.Get(), &shaderResourceView, srv);
 
 	const HRESULT descriptorStatus = device->GetDeviceRemovedReason();

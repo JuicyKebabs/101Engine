@@ -71,8 +71,7 @@ class AssetManager::AcquisitionBatch
 {
 public:
 	AcquisitionBatch(AssetManager& owner, const SceneBase& scene)
-		: m_owner(owner), m_destination(owner.m_sceneUsage.try_emplace(&scene).first->second),
-          m_usage(m_destination)
+		: m_owner(owner), m_destination(owner.m_sceneUsage.try_emplace(&scene).first->second), m_usage(m_destination)
 	{}
 
 	~AcquisitionBatch()

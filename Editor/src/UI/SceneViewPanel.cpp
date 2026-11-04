@@ -126,10 +126,10 @@ void SceneViewPanel::Render(
 	// Get the available size of the content region in the ImGui window
 	const ImVec2 availableSize = ImGui::GetContentRegionAvail();
 
-	if (availableSize.x <= 0.0f		||
-		availableSize.y <= 0.0f		||
-		sceneTextureHandle == ImTextureID_Invalid	||
-		textureWidth == 0			||
+	if (availableSize.x <= 0.0f ||
+		availableSize.y <= 0.0f ||
+		sceneTextureHandle == ImTextureID_Invalid ||
+		textureWidth == 0 ||
 		textureHeight == 0
 		)
 	{
@@ -151,7 +151,7 @@ void SceneViewPanel::Render(
 		m_isViewportResized = true;
 	}
 
-	// Resolution of the source texture 
+	// Aspect ratio calculations to maintain the original texture's aspect ratio while fitting within the available size
 	const float sourceAspect = static_cast<float>(textureWidth) / static_cast<float>(textureHeight);
 
 	// Calculate the size of the image based on width and the aspect ratio of the source texture

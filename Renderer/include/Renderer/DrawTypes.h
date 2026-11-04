@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.3.
-// Public draw/material vocabulary shared by frame submission and reflected shader inputs.
-// Material sampling accepts either texture handle type without merging their owners.
-// Reflection and diagnostics describe the final draw contract; shader reload remains deferred.
-
 #pragma once
 #include "Math.h"
 #include "ResourceHandle.h"
@@ -73,7 +68,8 @@ enum class ValueType
 // The alternative still selects a different CPU owner and different mutation API.
 // Adding this public alternative requires clients to rebuild against the matching header/DLL.
 using MaterialValue = 
-	std::variant<float, Vector2, Vector3, Vector4, std::int32_t, std::array<std::int32_t, 2>,
+	std::variant<
+		float, Vector2, Vector3, Vector4, std::int32_t, std::array<std::int32_t, 2>,
 		std::array<std::int32_t, 3>, std::array<std::int32_t, 4>, std::uint32_t,
 		std::array<std::uint32_t, 2>, std::array<std::uint32_t, 3>,
 		std::array<std::uint32_t, 4>, bool, Matrix4x4, TextureHandle, RenderTargetTextureHandle>;

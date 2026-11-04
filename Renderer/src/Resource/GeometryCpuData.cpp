@@ -20,6 +20,9 @@ namespace
 // overflow when individually finite positions are close to FLT_MAX.
 Result CalculateBounds(GeometryCpuData& data)
 {
+	//---------------------------------------------------------------
+	// 1. Calculate min and max values for each axis.
+	//---------------------------------------------------------------
 	std::array<double, 3> minimum;
 	std::array<double, 3> maximum;
 	minimum.fill((std::numeric_limits<double>::max)());
@@ -36,13 +39,17 @@ Result CalculateBounds(GeometryCpuData& data)
 		}
 	}
 
+	//---------------------------------------------------------------
+	// 2. Calculate the center of the bounding sphere.
+	//---------------------------------------------------------------
 	Vector3 center;
 	center.x = static_cast<float>((minimum[0] + maximum[0]) * 0.5);
 	center.y = static_cast<float>((minimum[1] + maximum[1]) * 0.5);
 	center.z = static_cast<float>((minimum[2] + maximum[2]) * 0.5);
 
-	// Calculate from the rounded center that the caller will actually receive.
-	// This includes the center's float conversion error in the radius.
+	//---------------------------------------------------------------
+	// 3. Calculate the radius of the bounding sphere.
+	//---------------------------------------------------------------
 	double radius = 0;
 
 	for (const MeshVertex& vertex : data.vertices)
@@ -50,14 +57,21 @@ Result CalculateBounds(GeometryCpuData& data)
 		const double horizontal = static_cast<double>(vertex.position.x) - center.x;
 		const double vertical = static_cast<double>(vertex.position.y) - center.y;
 		const double depth = static_cast<double>(vertex.position.z) - center.z;
+
+		// hypot calculates sqrt(x^2 + y^2 + z^2) without intermediate overflow.
 		const double distance = std::hypot(horizontal, vertical, depth);
 		radius = (std::max)(radius, distance);
 	}
 
+	//---------------------------------------------------------------
+	// 4. Round the radius to the next representable float value.
+	//---------------------------------------------------------------
 	float roundedRadius = static_cast<float>(radius);
 
 	if (static_cast<double>(roundedRadius) < radius)
 	{
+		// Avoid the case where the next representable float is smaller than the original radius due to rounding errors.
+		// std::nextafter increments the float to the next representable value towards positive infinity.
 		roundedRadius = std::nextafter(roundedRadius, (std::numeric_limits<float>::infinity)());
 	}
 

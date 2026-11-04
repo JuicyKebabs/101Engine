@@ -77,6 +77,9 @@ public:
 	RENDERER_API Result UpdateGeometry(GeometryHandle handle,const GeometryDesc& desc);
 	RENDERER_API Result UpdateTexture(TextureHandle handle, const TextureDesc& desc);
 	RENDERER_API Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
+	// Later imprementaion....
+	// RENDERER_API Result UpdatePipeline(PipelineHandle handle, const PipelineDesc& desc);
+	// RENDERER_API Result UpdateShader(ShaderHandle handle, const ShaderDesc& desc);
 
 	// Query accepted local Bounds and matching Content revision as an owned value.
 	// Destroy-requested registrations reject new queries; upload readiness is unrelated.

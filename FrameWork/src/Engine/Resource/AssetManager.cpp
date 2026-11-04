@@ -59,6 +59,7 @@ bool AssetManager::Initialize(
 			"Cannot reinitialize AssetManager while Scene resource ownership is live.");
 	}
 
+	// Scan the asset directory and build the catalog of assets.
 	if (!ScanAssetDirectory(projectDir, "", outError))
 	{
 		return false;
@@ -85,7 +86,8 @@ bool AssetManager::NotifyAssetChanged(const std::string& relativePath, AssetCata
 	const fs::path path(relativePath);
 
 	if (path.empty() || path.is_absolute() || path.has_root_name() ||
-		std::find(path.begin(), path.end(), fs::path("..")) != path.end() || path.lexically_normal() == ".")
+		std::find(path.begin(), path.end(), fs::path("..")) != path.end() ||
+		path.lexically_normal() == ".")
 	{
 		return FailCatalog(
 			outError,
@@ -110,12 +112,11 @@ bool AssetManager::NotifyAssetContentReplaced(const Guid& guid)
 	const AssetChange change{ AssetChangeKind::Modified, entry->second.type, guid, entry->second.relativePath };
 	const auto latest =
 		std::find_if(
-			m_pendingChanges.rbegin(),
-			m_pendingChanges.rend(),
+			m_pendingChanges.rbegin(), m_pendingChanges.rend(),
 			[&](const AssetChange& existing)
-		{
-			return existing.guid == change.guid && existing.relativePath == change.relativePath;
-		});
+			{
+				return existing.guid == change.guid && existing.relativePath == change.relativePath;
+			});
 
 	if (latest == m_pendingChanges.rend() || *latest != change)
 	{
@@ -482,7 +483,6 @@ AudioHandle AssetManager::GetAudioHandle(const Guid& guid)
 
 AudioHandle AssetManager::GetAudioHandleByPath(const std::string& relativePath)
 {
-	const AssetEntry* entry = GetAssetEntryByPath(
-		fs::path(relativePath).lexically_normal().generic_string());
+	const AssetEntry* entry = GetAssetEntryByPath(fs::path(relativePath).lexically_normal().generic_string());
 	return entry ? GetAudioHandle(entry->guid) : InvalidAudioHandle;
 }

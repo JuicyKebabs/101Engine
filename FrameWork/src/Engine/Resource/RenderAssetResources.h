@@ -5,6 +5,12 @@
 #include <array>
 #include <filesystem>
 
+//----------------------------------------------------------------------------------------------------
+// RenderAssetResources
+// A small set of standard resources that the Engine uses for its own rendering.
+// These resources are not owned by any Scene, and they are not released until the Engine shuts down.
+//----------------------------------------------------------------------------------------------------
+
 // App-lifetime standard resources, outside all Scene-owned resource sets.
 // Renderer owns every GPU object; this owner only retains typed registrations.
 class RenderAssetResources
@@ -30,8 +36,10 @@ public:
 
 private:
 	rendering::Renderer* m_renderer = nullptr;
+
 	std::array<rendering::ShaderHandle, 3> m_shaders{};
 	std::array<rendering::PipelineHandle, 4> m_pipelines{};
-	rendering::GeometryHandle m_quad;
-	rendering::TextureHandle m_white;
+
+	rendering::GeometryHandle m_quad;	// Standard quad geometry
+	rendering::TextureHandle m_white;	// Default white texture (The texture for missing is prepared in Renderer)
 };

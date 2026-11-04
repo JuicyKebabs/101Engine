@@ -244,12 +244,26 @@ Result ReserveInternalId(const FrameRenderData& frame, const std::vector<Planned
 
 	for (;;)
 	{
-		const bool ordinaryUse = std::any_of(frame.views.begin(), frame.views.end(),
-                                             [candidate](const RenderView& view) { return view.id == candidate; });
-		const bool auxiliaryUse = std::any_of(frame.auxiliaryPasses.begin(), frame.auxiliaryPasses.end(),
-                                              [candidate](const AuxiliaryPass& pass) { return pass.id == candidate; });
-		const bool internalUse = std::any_of(lists.begin(), lists.end(), [candidate](const PlannedPass& list)
-                                             { return list.renderView.id == candidate; });
+		const bool ordinaryUse = std::any_of(
+			frame.views.begin(), frame.views.end(),
+			[candidate](const RenderView& view)
+			{
+				return view.id == candidate;
+			});
+
+		const bool auxiliaryUse = std::any_of(
+			frame.auxiliaryPasses.begin(), frame.auxiliaryPasses.end(),
+			[candidate](const AuxiliaryPass& pass)
+			{
+				return pass.id == candidate;
+			});
+
+		const bool internalUse = std::any_of(
+			lists.begin(), lists.end(),
+			[candidate](const PlannedPass& list)
+			{
+				return list.renderView.id == candidate;
+			});
 
 		if (!ordinaryUse && !auxiliaryUse && !internalUse)
 		{
@@ -337,9 +351,9 @@ Result AppendShadowPass(
 	return {};
 }
 
-Result AppendAuxiliaryPasses(FrameRenderData& frame, detail::FrameDrawContext& context, std::size_t viewIndex,
-                             detail::SceneOutputImages* images, const ShadowInputs& shadow,
-                             std::vector<PlannedPass>& lists)
+Result AppendAuxiliaryPasses(
+	FrameRenderData& frame, detail::FrameDrawContext& context, std::size_t viewIndex,
+	detail::SceneOutputImages* images, const ShadowInputs& shadow, std::vector<PlannedPass>& lists)
 {
 	const RenderView& source = frame.views[viewIndex];
 	for (const AuxiliaryPass& pass : frame.auxiliaryPasses)
@@ -438,8 +452,9 @@ Result AppendAuxiliaryPasses(FrameRenderData& frame, detail::FrameDrawContext& c
 	return {};
 }
 
-Result AppendDisplayPass(FrameRenderData& frame, detail::FrameDrawContext& context, std::size_t viewIndex,
-                         detail::SceneOutputImages& images, std::vector<PlannedPass>& lists)
+Result AppendDisplayPass(
+	FrameRenderData& frame, detail::FrameDrawContext& context, std::size_t viewIndex,
+	detail::SceneOutputImages& images, std::vector<PlannedPass>& lists)
 {
 	const RenderView& source = frame.views[viewIndex];
 	PlannedPass display;
@@ -486,8 +501,10 @@ Result AppendDisplayPass(FrameRenderData& frame, detail::FrameDrawContext& conte
 
 } // namespace
 
-Result FrameRenderer::BuildPassPlan(FrameRenderData& frame, detail::FrameDrawContext& context,
-									std::vector<PlannedPass>& lists) const
+Result FrameRenderer::BuildPassPlan(
+	FrameRenderData& frame,
+	detail::FrameDrawContext& context,
+	std::vector<PlannedPass>& lists) const
 {
 	// Ordinary source Views remain stable. Internal full-screen Objects append
 	// to the same owning array and use private IDs, so they cannot enter Scene
@@ -603,8 +620,11 @@ Result FrameRenderer::BuildPassPlan(FrameRenderData& frame, detail::FrameDrawCon
 	return {};
 }
 
-Result FrameRenderer::AddStepPass(const FrameRenderData& frame, const PlannedPass& list,
-                                  detail::FrameDrawContext& context, graph::RenderGraph& graph) const
+Result FrameRenderer::AddStepPass(
+	const FrameRenderData& frame,
+	const PlannedPass& list,
+	detail::FrameDrawContext& context,
+	graph::RenderGraph& graph) const
 {
 	const PassRecordingInputs inputs = MakePassRecordingInputs(frame, list);
 	graph::ViewTargets targets;
@@ -699,8 +719,11 @@ Result FrameRenderer::AddStepPass(const FrameRenderData& frame, const PlannedPas
 	return graph.AddPass(std::move(*pass));
 }
 
-Result FrameRenderer::BuildViews(const FrameRenderData& frame, detail::FrameDrawContext& context,
-                                 const std::vector<PlannedPass>& lists, graph::RenderGraph& graph) const
+Result FrameRenderer::BuildViews(
+	const FrameRenderData& frame,
+	detail::FrameDrawContext& context,
+	const std::vector<PlannedPass>& lists,
+	graph::RenderGraph& graph) const
 {
 	// A known current-frame clear supplies a valid binding for disabled shadows.
 	// A graph execution/submission failure still aborts the Frame as a whole.

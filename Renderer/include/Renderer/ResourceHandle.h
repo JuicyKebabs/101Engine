@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.1.
-// Logical identity only: owner, slot and generation reject cross-Renderer and stale references.
-// RenderTargetTexture has its own tag; it is never a CPU-upload Texture with a usage flag.
-// Copying a handle does not retain a Content revision or extend GPU object lifetime.
-
 #pragma once
 
 #include <cstdint>
@@ -53,11 +48,12 @@ using PipelineHandle = detail::ResourceHandle<detail::PipelineTag>;
 using MaterialHandle = detail::ResourceHandle<detail::MaterialTag>;
 
 // Static assertions to ensure the size of the resource handles is as expected.
-static_assert(sizeof(GeometryHandle) == 12);
-static_assert(sizeof(TextureHandle) == 12);
-static_assert(sizeof(RenderTargetTextureHandle) == 12);
-static_assert(sizeof(ShaderHandle) == 12);
-static_assert(sizeof(PipelineHandle) == 12);
-static_assert(sizeof(MaterialHandle) == 12);
+static constexpr std::size_t ResourceHandleSize = sizeof(std::uint32_t) * 3;
+static_assert(sizeof(GeometryHandle) == ResourceHandleSize);
+static_assert(sizeof(TextureHandle) == ResourceHandleSize);
+static_assert(sizeof(RenderTargetTextureHandle) == ResourceHandleSize);
+static_assert(sizeof(ShaderHandle) == ResourceHandleSize);
+static_assert(sizeof(PipelineHandle) == ResourceHandleSize);
+static_assert(sizeof(MaterialHandle) == ResourceHandleSize);
 
 }

@@ -150,6 +150,8 @@ Result PrepareTextureUpload(
 		std::vector<UINT64> rowBytes(count);
 		UINT64 totalBytes = 0;
 
+		// Calculate the layout of each mip level in the upload buffer 
+		// and the total size needed for the upload.
 		device->GetCopyableFootprints(
 			&desc,
 			0,
@@ -220,17 +222,20 @@ Result PrepareTextureUpload(
 
 		auto* destination = static_cast<std::byte*>(mapped);
 
+		// Copy each mip level's pixel data to the mapped upload buffer.
 		for (UINT level = 0; level < count; ++level)
-		{
-			const auto& source = cpu.mips[level];
+		{// For each mip level.
+
+			const auto& source = cpu.mips[level];		
 			const auto& layout = upload->layouts[level];
 
 			for (UINT row = 0; row < rows[level]; ++row)
-			{
-				std::memcpy(
-				destination + static_cast<std::size_t>(layout.Offset) + static_cast<std::size_t>(row) * layout.Footprint.RowPitch,
-				source.pixels.data() + static_cast<std::size_t>(row) * source.rowPitch,
-				static_cast<std::size_t>(rowBytes[level]));
+			{// For each row in the mip level.
+				auto destinationRow = destination + static_cast<std::size_t>(layout.Offset) + static_cast<std::size_t>(row) * layout.Footprint.RowPitch;
+				auto sourceRow = source.pixels.data() + static_cast<std::size_t>(row) * source.rowPitch;
+				auto bytesPerRow = static_cast<std::size_t>(rowBytes[level]);
+
+				std::memcpy(destinationRow, sourceRow, bytesPerRow);
 			}
 		}
 
