@@ -77,8 +77,18 @@ namespace
 		const ReflectionRestoreContext& restore,
 		const ReflectionSaveContext& save)
 	{
-		if (!ReflectionDeserializer::Deserialize(metadata, type, source, object, restore) ||
-			!ReflectionSerializer::Serialize(metadata, type, object, normalized, save))
+		if (!ReflectionDeserializer::Deserialize(
+			metadata,
+			type,
+			source,
+			object,
+			restore) ||
+			!ReflectionSerializer::Serialize(
+				metadata,
+				type,
+				object,
+				normalized,
+				save))
 		{
 			return false;
 		}
@@ -86,8 +96,18 @@ namespace
 		// A stable default is the basis for every subsequent Override comparison.
 		json repeated;
 
-		if (!ReflectionDeserializer::Deserialize(metadata, type, normalized, object, restore) ||
-			!ReflectionSerializer::Serialize(metadata, type, object, repeated, save))
+		if (!ReflectionDeserializer::Deserialize(
+			metadata,
+			type,
+			normalized,
+			object,
+			restore) ||
+			!ReflectionSerializer::Serialize(
+				metadata,
+				type,
+				object,
+				repeated,
+				save))
 		{
 			return false;
 		}
@@ -110,7 +130,8 @@ std::unique_ptr<const ActorImprint> ActorImprintAssetDeserializer::Deserialize(
 	{
 		// Validate the top-level fields and version.
 		if (!ValidateFields(
-				source, {"version", "definitionRevision", "rootActorLocalObjectId", "nextLocalObjectId", "actors"}))
+			source,
+			{"version", "definitionRevision", "rootActorLocalObjectId", "nextLocalObjectId", "actors"}))
 		{
 			return nullptr;
 		}
@@ -179,8 +200,14 @@ std::unique_ptr<const ActorImprint> ActorImprintAssetDeserializer::Deserialize(
 				actorJson["parentLocalObjectId"].is_null() ? 0 : actorJson["parentLocalObjectId"].get<LocalObjectId>(),
 				{}, {}};
 
-			if (!Normalize(GetActorMetadata(), typeid(Actor), candidate.get(), actorJson["properties"],
-					actor.properties, restore, save))
+			if (!Normalize(
+				GetActorMetadata(),
+				typeid(Actor),
+				candidate.get(),
+				actorJson["properties"],
+				actor.properties,
+				restore,
+				save))
 			{
 				return nullptr;
 			}
@@ -216,8 +243,14 @@ std::unique_ptr<const ActorImprint> ActorImprintAssetDeserializer::Deserialize(
 				ActorImprint::ComponentDefinition definition{
 					componentJson["localObjectId"].get<LocalObjectId>(), name, *type, {}};
 
-				if (!owned || !Normalize(*metadata, *type, owned, componentJson["properties"], definition.properties,
-								  restore, save))
+				if (!owned || !Normalize(
+					*metadata,
+					*type,
+					owned,
+					componentJson["properties"],
+					definition.properties,
+					restore,
+					save))
 				{
 					return nullptr;
 				}
@@ -231,17 +264,23 @@ std::unique_ptr<const ActorImprint> ActorImprintAssetDeserializer::Deserialize(
 				return nullptr;
 			}
 
-			std::sort(actor.components.begin(), actor.components.end(), [](const auto& a, const auto& b)
-			{
-				return a.id < b.id;
-			});
+			std::sort(
+				actor.components.begin(),
+				actor.components.end(),
+				[](const auto& a, const auto& b)
+				{
+					return a.id < b.id;
+				});
 			actors.push_back(std::move(actor));
 		}
 
 		std::sort(actors.begin(), actors.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
 		return std::unique_ptr<const ActorImprint>(
-			new ActorImprint(revision, source["rootActorLocalObjectId"].get<LocalObjectId>(),
-				source["nextLocalObjectId"].get<LocalObjectId>(), std::move(actors)));
+			new ActorImprint(
+				revision,
+				source["rootActorLocalObjectId"].get<LocalObjectId>(),
+				source["nextLocalObjectId"].get<LocalObjectId>(),
+				std::move(actors)));
 	}
 	catch (const std::exception& exception)
 	{

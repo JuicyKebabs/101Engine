@@ -203,10 +203,13 @@ namespace
 
 		if (value.is_object())
 		{
-			return std::all_of(value.begin(), value.end(), [](const auto& member)
-			{
-				return IsPersistentJsonValue(member);
-			});
+			return std::all_of(
+				value.begin(),
+				value.end(),
+				[](const auto& member)
+				{
+					return IsPersistentJsonValue(member);
+				});
 		}
 
 		return false;
@@ -282,10 +285,13 @@ namespace
 
 	bool NormalizeEntries(std::vector<ActorImprintPropertyOverrideEntry>& properties)
 	{
-		std::sort(properties.begin(), properties.end(), [](const auto& left, const auto& right)
-		{
-			return left.path.ToString() < right.path.ToString();
-		});
+		std::sort(
+			properties.begin(),
+			properties.end(),
+			[](const auto& left, const auto& right)
+			{
+				return left.path.ToString() < right.path.ToString();
+			});
 
 		for (std::size_t i = 0; i < properties.size(); ++i)
 		{
@@ -375,10 +381,13 @@ bool ActorImprintPropertyOverrides::Diff(
 			}
 		}
 
-		std::sort(properties.begin(), properties.end(), [](const auto* left, const auto* right)
-		{
-			return left->GetPath().ToString() < right->GetPath().ToString();
-		});
+		std::sort(
+			properties.begin(),
+			properties.end(),
+			[](const auto* left, const auto* right)
+			{
+				return left->GetPath().ToString() < right->GetPath().ToString();
+			});
 
 		ActorImprintPropertyOverrideTarget result;
 		result.targetLocalObjectId = targetLocalObjectId;
@@ -445,10 +454,13 @@ bool ActorImprintPropertyOverrides::Merge(
 		}
 
 		auto properties = overrides.properties;
-		std::sort(properties.begin(), properties.end(), [](const auto& left, const auto& right)
-		{
-			return left.path.ToString() < right.path.ToString();
-		});
+		std::sort(
+			properties.begin(),
+			properties.end(),
+			[](const auto& left, const auto& right)
+			{
+				return left.path.ToString() < right.path.ToString();
+			});
 		json completed = normalizedDefault;
 		std::vector<ActorImprintPropertyOverrideEntry> applied;
 		ActorImprintPropertyOverrideMigration migration;
@@ -472,6 +484,7 @@ bool ActorImprintPropertyOverrides::Merge(
 					++migration.staleMissingPath;
 					continue;
 				}
+
 			{
 				DBG("Override path does not identify an existing reflected property.");
 				return false;
@@ -493,6 +506,7 @@ bool ActorImprintPropertyOverrides::Merge(
 					++migration.staleIncompatible;
 					continue;
 				}
+
 			{
 				DBG("Override JSON representation is incompatible with the reflected property.");
 				return false;

@@ -21,56 +21,71 @@ bool UIImage::SetTextureAsset(const Guid& assetId)
 }
 
 UIImage::AssetPrepareResult UIImage::PrepareTextureAssetState(
-    const Guid& assetId, PreparedTextureAssetState& output) const
+	const Guid& assetId,
+	PreparedTextureAssetState& output) const
 {
-    PreparedTextureAssetState prepared;
-    prepared.assetId = assetId;
-    if (!assetId.IsValid())
-    {
-        output = std::move(prepared);
-        return AssetPrepareResult::Ready;
-    }
+	PreparedTextureAssetState prepared;
+	prepared.assetId = assetId;
 
-    Actor* actor = GetOwner();
-    SceneBase* scene = actor ? actor->GetOwner() : nullptr;
-    const EngineContext* context = GetEngineContext();
-    if (!scene || !context || !context->pAssetManager)
-    {
-        return AssetPrepareResult::Failed;
-    }
+	if (!assetId.IsValid())
+	{
+		output = std::move(prepared);
+		return AssetPrepareResult::Ready;
+	}
 
-    const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
-    if (entry && entry->type != AssetType::Texture)
-    {
-        return AssetPrepareResult::Failed;
-    }
+	Actor* actor = GetOwner();
+	SceneBase* scene = actor ? actor->GetOwner() : nullptr;
+	const EngineContext* context = GetEngineContext();
 
-    SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
-    UIRenderElement element;
-    element.materialDesc.textureHandle = context->pAssetManager->GetTextureHandle(*scene, assetId);
-    element.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
-    if (context->pRenderAssets)
-    {
-        Vector2 centerPivot;
-        centerPivot.x = 0.5f;
-        centerPivot.y = 0.5f;
-        element.materialDesc.description = context->pRenderAssets->MakeMaterial(false,
-            element.materialDesc.screen, element.materialDesc.textureHandle,
-            m_uvScale, m_uvOffset, centerPivot, m_flipX, m_flipY);
-        element.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene, element.materialDesc.description);
-    }
+	if (!scene || !context || !context->pAssetManager)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
-    prepared.renderTemplate.push_back(std::move(element));
-    acquisition.Commit();
-    output = std::move(prepared);
-    return AssetPrepareResult::Ready;
+	const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
+
+	if (entry && entry->type != AssetType::Texture)
+	{
+		return AssetPrepareResult::Failed;
+	}
+
+	SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
+
+	UIRenderElement element;
+	element.materialDesc.textureHandle = context->pAssetManager->GetTextureHandle(*scene, assetId);
+	element.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
+
+	if (context->pRenderAssets)
+	{
+
+		Vector2 centerPivot;
+		centerPivot.x = 0.5f;
+		centerPivot.y = 0.5f;
+
+		element.materialDesc.description = context->pRenderAssets->MakeMaterial(
+			false,
+			element.materialDesc.screen,
+			element.materialDesc.textureHandle,
+			m_uvScale,
+			m_uvOffset,
+			centerPivot,
+			m_flipX,
+			m_flipY);
+
+		element.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene, element.materialDesc.description);
+	}
+
+	prepared.renderTemplate.push_back(std::move(element));
+	acquisition.Commit();
+	output = std::move(prepared);
+	return AssetPrepareResult::Ready;
 }
 
 void UIImage::CommitTextureAssetState(PreparedTextureAssetState&& state)
 {
 	m_textureAssetId = state.assetId;
 	m_renderTemplate.swap(state.renderTemplate);
-    m_materialDirty = false;
+	m_materialDirty = false;
 	m_pendingTextureAssetId.reset();
 	m_isProxyDirty = true;
 }
@@ -138,10 +153,10 @@ AssetReference<TextureAsset> UIImage::GetTextureAssetReference() const
 {
 	AssetReference<TextureAsset> value;
 	AssetReferenceValue reference;
-    reference.guid = GetTextureAssetId();
-    reference.expectedType = AssetType::Texture;
-    reference.resolved = m_textureAssetId.IsValid();
-    value.SetValue(reference);
+	reference.guid = GetTextureAssetId();
+	reference.expectedType = AssetType::Texture;
+	reference.resolved = m_textureAssetId.IsValid();
+	value.SetValue(reference);
 	return value;
 }
 
@@ -163,6 +178,7 @@ bool UIImage::SetPendingTextureAssetReference(const AssetReference<TextureAsset>
 bool UIImage::TrySetTextureAssetReference(const AssetReference<TextureAsset>& value)
 {
 	Actor* owner = GetOwner();
+
 	// Preserve deferred deserialization while allowing validated Inspector
 	// selections to prepare their runtime state immediately.
 	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))

@@ -5,12 +5,12 @@
 class GameUIManager : public Behavior
 {
 public:
-    void Start() override;
-    void PreUpdate() override;
-    void Update() override;
-    void LateUpdate() override;
-    void Destroy() override;
-    static std::optional<TypeMetadata> BuildMetadata();
+	void Start() override;
+	void PreUpdate() override;
+	void Update() override;
+	void LateUpdate() override;
+	void Destroy() override;
+	static std::optional<TypeMetadata> BuildMetadata();
 
 private:
 	ActorReference m_gameManagerActor;  // GameManagerアクターへの参照

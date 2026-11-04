@@ -37,6 +37,7 @@ std::optional<PropertyPath> PropertyPath::FromString(std::string_view path)
 	// Split the path into its members
 	std::vector<std::string> members;
 	std::size_t begin = 1;
+
 	while (begin <= path.size())
 	{
 		const std::size_t end = path.find('/', begin);

@@ -25,12 +25,14 @@ namespace
 		};
 
 		const Vector2 currentScale = image.GetUVScale();
+
 		if (currentScale.x != uvScale.x || currentScale.y != uvScale.y)
 		{
 			image.SetUVScale(uvScale);
 		}
 
 		const Vector2 currentOffset = image.GetUVOffset();
+
 		if (currentOffset.x != uvOffset.x || currentOffset.y != uvOffset.y)
 		{
 			image.SetUVOffset(uvOffset);
@@ -42,11 +44,11 @@ REGISTER_GAME_COMPONENT(GameUIManager)
 
 std::optional<TypeMetadata> GameUIManager::BuildMetadata()
 {
-    TypeMetadataBuilder<GameUIManager> builder("GameUIManager");
+	TypeMetadataBuilder<GameUIManager> builder("GameUIManager");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in GameUIManager.
-    // builder.Property("speed", &GameUIManager::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in GameUIManager.
+	// builder.Property("speed", &GameUIManager::m_speed);
 
 	builder.Property("GameManagerActor", &GameUIManager::m_gameManagerActor).Optional();
 	builder.Property("Digit100sActor", &GameUIManager::m_digit100sActor).Optional();
@@ -55,7 +57,7 @@ std::optional<TypeMetadata> GameUIManager::BuildMetadata()
 	builder.Property("Digit01sActor", &GameUIManager::m_digit01sActor).Optional();
 	builder.Property("Digit001sActor", &GameUIManager::m_digit001sActor).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void GameUIManager::Start()
@@ -83,6 +85,7 @@ void GameUIManager::LateUpdate()
 		ResolveImage(*scene, m_digit01sActor),
 		ResolveImage(*scene, m_digit001sActor)
 	};
+
 	if (std::any_of(std::begin(images), std::end(images), [](UIImage* image) { return image == nullptr; }))
 	{
 		return;
@@ -97,6 +100,7 @@ void GameUIManager::LateUpdate()
 	const int centiseconds = restTime <= 0.0f
 		? 0
 		: std::clamp(std::max(1, static_cast<int>(std::ceil(clampedTime * 100.0 - 0.005))), 1, 99999);
+
 	const int digits[] = {
 		centiseconds / 10000,
 		centiseconds / 1000 % 10,
@@ -104,6 +108,7 @@ void GameUIManager::LateUpdate()
 		centiseconds / 10 % 10,
 		centiseconds % 10
 	};
+
 	for (size_t i = 0; i < std::size(images); ++i)
 	{
 		SetDigit(*images[i], digits[i]);

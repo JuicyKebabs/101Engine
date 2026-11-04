@@ -47,17 +47,20 @@ public:
 		m_template = desc.renderTemplate;
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
+
 		SetUVScale(desc.uvScale);
 		SetUVOffset(desc.uvOffset);
 		SetPivot(desc.pivot);
 		SetBillboardType(desc.billboardType);
 		SetFlipX(desc.flipX);
 		SetFlipY(desc.flipY);
+
 		SetColor(desc.color);
 		SetVisible(desc.visible);
 		SetName(desc.name);
+
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 
 	bool SetTextureAsset(const Guid& assetId);							// Set the texture asset for this sprite through AssetManager
@@ -77,38 +80,38 @@ public:
 	{
 		m_uvScale = uvScale;
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 	void SetUVOffset(const Vector2& uvOffset)
 	{
 		m_uvOffset = uvOffset;
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 	void SetPivot(const Vector2& pivot)
 	{
 		m_pivot = pivot;
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 	void SetBillboardType(BillboardType type) 
 	{
 		m_billboardType = type;
 		m_template.billboardType = type;
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 	void SetFlipX(bool flip)
 	{
 		m_flipX = flip;
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 	void SetFlipY(bool flip)
 	{
 		m_flipY = flip;
 		m_isProxyDirty = true;
-        m_materialDirty = true;
+		m_materialDirty = true;
 	}
 
 	// Getters
@@ -124,7 +127,7 @@ public:
 
 	// Serialization and deserialization methods
 	bool ResolveReferences(SceneBase& scene) override;
-    bool SynchronizeRenderResources() override;
+	bool SynchronizeRenderResources() override;
 
 private:
 	struct PreparedTextureAssetState
@@ -133,7 +136,7 @@ private:
 		SpriteRenderTemplate renderTemplate;
 	};
 
-    bool m_materialDirty = false;
+	bool m_materialDirty = false;
 	Vector2 m_uvScale{ 1,1 };								// UV scale for texture mapping
 	Vector2 m_uvOffset{ 0,0 };								// UV offset for texture mapping
 	Vector2 m_pivot{ 0.5f, 0.5f };							// Pivot point for the sprite

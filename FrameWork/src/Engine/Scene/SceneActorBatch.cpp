@@ -139,26 +139,27 @@ void SceneActorBatch::PrepareCommit(Actor* root, Actor* externalParent)
 		externalParent->m_childHandles.reserve(externalParent->m_childHandles.size() + 1);
 	}
 
-    if (m_destination.m_pEngineContext && m_destination.m_pEngineContext->pAssetManager)
-    {
-        m_assetTransfer = m_destination.m_pEngineContext->pAssetManager->PrepareSceneTransfer(m_candidate, m_destination);
-    }
+	if (m_destination.m_pEngineContext && m_destination.m_pEngineContext->pAssetManager)
+	{
+		m_assetTransfer = m_destination.m_pEngineContext->pAssetManager->PrepareSceneTransfer(m_candidate, m_destination);
+	}
 
 	m_root = root;
 	m_externalParent = externalParent;
-    const auto candidateActors = m_candidate.GetAllActors();
-    m_destination.PrepareComponentPublication(candidateActors);
-    // Existing governing Canvases may receive new UI renderers during attach.
-    for (Actor* actor : candidateActors)
-    {
-        if (auto* renderer = actor->GetComponentByClass<UIRenderer>())
-        {
-            if (Canvas* canvas = renderer->GetGoverningCanvas())
-            {
-                canvas->PrepareRegistrationCapacity(candidateActors.size());
-            }
-        }
-    }
+	const auto candidateActors = m_candidate.GetAllActors();
+	m_destination.PrepareComponentPublication(candidateActors);
+
+	// Existing governing Canvases may receive new UI renderers during attach.
+	for (Actor* actor : candidateActors)
+	{
+		if (auto* renderer = actor->GetComponentByClass<UIRenderer>())
+		{
+			if (Canvas* canvas = renderer->GetGoverningCanvas())
+			{
+				canvas->PrepareRegistrationCapacity(candidateActors.size());
+			}
+		}
+	}
 
 	m_prepared = true;
 }
@@ -170,10 +171,10 @@ void SceneActorBatch::Commit() noexcept
 		std::terminate();
 	}
 
-    if (m_assetTransfer)
-    {
-        m_destination.m_pEngineContext->pAssetManager->CommitSceneTransfer(*m_assetTransfer);
-    }
+	if (m_assetTransfer)
+	{
+		m_destination.m_pEngineContext->pAssetManager->CommitSceneTransfer(*m_assetTransfer);
+	}
 
 	for (const auto handle : m_handles)
 	{

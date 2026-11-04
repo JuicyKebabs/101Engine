@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.5.
-// Public Renderer boundary: native resources and descriptors stay behind typed handles.
-// Calls are single-threaded and public API reentry during Render is rejected.
-// Resource mutation before Render affects a submitted frame; GPU lifetime is tracked separately.
-
 #pragma once
 #include <memory>
 
@@ -59,14 +54,14 @@ public:
 	// Submit takes ownership of Frame values only after acceptance. Render consumes one submission.
 	// Resource contents are resolved during Render: intervening Updates affect that submission.
 	// Unavailable draw dependencies use scoped error substitutions with diagnostics;
-    // incompatible draws and unavailable output attachments still fail validation.
+	// incompatible draws and unavailable output attachments still fail validation.
 	// Call from one thread; public API reentry during Render is prohibited.
 	RENDERER_API Result SubmitFrameRenderData(FrameRenderData&& frame);
 	RENDERER_API RenderResult Render();
 
 	// Registration APIs for resources
-	RENDERER_API GeometryRegistrationResult RegisterGeometry(const GeometryDesc& desc);
-	RENDERER_API TextureRegistrationResult RegisterTexture(const TextureDesc& desc);
+	RENDERER_API ResourceRegistrationResult<GeometryHandle> RegisterGeometry(const GeometryDesc& desc);
+	RENDERER_API ResourceRegistrationResult<TextureHandle> RegisterTexture(const TextureDesc& desc);
 	RENDERER_API ResourceRegistrationResult<ShaderHandle> RegisterShader(const ShaderDesc& desc);
 	RENDERER_API ResourceRegistrationResult<PipelineHandle> RegisterPipeline(const PipelineDesc& desc);
 	RENDERER_API ResourceRegistrationResult<MaterialHandle> RegisterMaterial(const MaterialDesc& desc);
@@ -82,10 +77,13 @@ public:
 	RENDERER_API Result UpdateGeometry(GeometryHandle handle,const GeometryDesc& desc);
 	RENDERER_API Result UpdateTexture(TextureHandle handle, const TextureDesc& desc);
 	RENDERER_API Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
+	// Later imprementaion....
+	// RENDERER_API Result UpdatePipeline(PipelineHandle handle, const PipelineDesc& desc);
+	// RENDERER_API Result UpdateShader(ShaderHandle handle, const ShaderDesc& desc);
 
-    // Query accepted local Bounds and matching Content revision as an owned value.
-    // Destroy-requested registrations reject new queries; upload readiness is unrelated.
-    RENDERER_API Result GetGeometryData(GeometryHandle handle, GeometryData& output) const;
+	// Query accepted local Bounds and matching Content revision as an owned value.
+	// Destroy-requested registrations reject new queries; upload readiness is unrelated.
+	RENDERER_API Result GetGeometryData(GeometryHandle handle, GeometryData& output) const;
 
 	// Query APIs for resources
 	RENDERER_API Result GetShaderMetadata(ShaderHandle handle,ShaderMetadata& output) const;

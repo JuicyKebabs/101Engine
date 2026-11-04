@@ -61,10 +61,12 @@ void CollisionSystem::Unregister(Collider* collider) noexcept
 	for (Collider* registeredCollider : m_pCollidersList)
 	{
 		auto& collisionInfos = registeredCollider->GetCollisionInfos();
-		std::erase_if(collisionInfos, [collider](const CollisionInfo& information)
-		{
-			return information.opponent == collider;
-		});
+		std::erase_if(
+			collisionInfos,
+			[collider](const CollisionInfo& information)
+			{
+				return information.opponent == collider;
+			});
 
 		if (collisionInfos.empty())
 		{
@@ -82,9 +84,11 @@ void CollisionSystem::CheckColliders()
 	// Unregister can erase the current entry and compact this vector. Advance
 	// only when retaining that entry; no iterator/reference survives an erase.
 	std::size_t colliderIndex = 0;
+
 	while (colliderIndex < m_pCollidersList.size())
 	{
 		Collider* collider = m_pCollidersList[colliderIndex];
+
 		if (collider->deleteFlag() || collider->IsDestroyed())
 		{
 			Unregister(collider);
@@ -92,6 +96,7 @@ void CollisionSystem::CheckColliders()
 		}
 
 		Actor* owner = collider->GetOwner();
+
 		if (!owner || owner->IsDestroyed())
 		{
 			// Pending Actor destruction already ends participation, even though
@@ -553,9 +558,27 @@ OBB CollisionSystem::CreateOBB(Collider* collider, float alpha)
 	Matrix4x4 R = collider->GetWorldTransformCurrent().rotation.ToRotationMatrix();
 
 	//ローカル座標系の基底ベクトルを回転させて各軸の方向ベクトルを求める
-	obb.axis[0] = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), R));
-	obb.axis[1] = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), R));
-	obb.axis[2] = XMVector3Normalize(XMVector3TransformNormal(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R));
+	obb.axis[0] = XMVector3Normalize(XMVector3TransformNormal(
+		XMVectorSet(
+			1.0f,
+			0.0f,
+			0.0f,
+			0.0f),
+		R));
+	obb.axis[1] = XMVector3Normalize(XMVector3TransformNormal(
+		XMVectorSet(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f),
+		R));
+	obb.axis[2] = XMVector3Normalize(XMVector3TransformNormal(
+		XMVectorSet(
+			0.0f,
+			0.0f,
+			1.0f,
+			0.0f),
+		R));
 
 	return obb;
 }
@@ -625,6 +648,7 @@ int CollisionSystem::CalculateSubsteps(Collider* colliderA, Collider* colliderB)
 	//ステップ長を計算するラムダ式
 	auto stepLen = [&](Collider* collider) {
 		ColliderType type = collider->GetType();	//コライダータイプ取得
+
 		switch (type)
 		{
 		case ColliderType::BOX:		//ボックスコライダー
@@ -993,8 +1017,10 @@ ContactResult CollisionSystem::CollisionCapsuleToCapsule(
 	//最短距離の二乗を取得
 	XMVECTOR closestA, closestB;	//コライダーA・B上の最短点
 	float distSq = CollisionSystem::GetMinDistanceSquaredSegmentToSegment(
-		segA.pointA, segA.pointB,	//セグメントAの端点
-		segB.pointA, segB.pointB,	//セグメントBの端点
+		segA.pointA,
+		segA.pointB,	//セグメントAの端点
+		segB.pointA,
+		segB.pointB,	//セグメントBの端点
 		closestA,					//セグメントA上の最短点
 		closestB					//セグメントB上の最短点
 	);
@@ -1028,7 +1054,11 @@ ContactResult CollisionSystem::CollisionCapsuleToCapsule(
 	else if (dist == 0.0f)
 	{//最短距離が完全に0の場合の処理
 		//適当な法線ベクトルを設定
-		normal = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		normal = XMVectorSet(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f);
 	}
 	else
 	{
@@ -1200,7 +1230,11 @@ ContactResult CollisionSystem::CollisionBoxToSphere(
 		}
 		else
 		{//最短距離が極端に小さい場合
-			normal = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); //適当な法線ベクトル
+			normal = XMVectorSet(
+				0.0f,
+				1.0f,
+				0.0f,
+				0.0f); //適当な法線ベクトル
 		}
 
 		//貫入深さの計算
@@ -1282,7 +1316,11 @@ ContactResult CollisionSystem::CollisionSphereToCapsule(
 	}
 	else
 	{//最短距離が極端に小さい場合
-		normal = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); //適当な法線ベクトル
+		normal = XMVectorSet(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f); //適当な法線ベクトル
 	}
 
 	depth = radiusSum - dist;								//貫入深さ計算
@@ -1294,12 +1332,14 @@ ContactResult CollisionSystem::CollisionSphereToCapsule(
 		XMVectorGetY(sphereCenter) + XMVectorGetY(normal) * radius,
 		XMVectorGetZ(sphereCenter) + XMVectorGetZ(normal) * radius
 	};
+
 	Vector3 surfaceCapsule; //カプセルの表面上の点
 	surfaceCapsule = {
 		XMVectorGetX(closestPoint) - XMVectorGetX(normal) * cupSeg.radius,
 		XMVectorGetY(closestPoint) - XMVectorGetY(normal) * cupSeg.radius,
 		XMVectorGetZ(closestPoint) - XMVectorGetZ(normal) * cupSeg.radius
 	};
+
 	point = XMVectorScale(
 		XMVectorAdd(
 			XMLoadFloat3(&surfacePoint),
@@ -1474,7 +1514,11 @@ ContactResult CollisionSystem::CollisonOBBtoCapsule(const OBB& obb, const Capsul
 			}
 			else
 			{
-				collisionNormals = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); //適当な法線ベクトル
+				collisionNormals = XMVectorSet(
+					0.0f,
+					1.0f,
+					0.0f,
+					0.0f); //適当な法線ベクトル
 			}
 		}
 	}
@@ -1646,7 +1690,11 @@ ContactResult CollisionSystem::CollisionSpheresSegments(const SphereSegment& seg
 	if (dist < epsilon)
 	{//中心点がほぼ同じ位置にある場合の処理
 		//適当な法線ベクトルを設定
-		normal = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		normal = XMVectorSet(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f);
 	}
 	else
 	{
@@ -1768,6 +1816,7 @@ float CollisionSystem::GetMinDistanceSquaredPointToOBB(
 
 	//点のOBBのローカル座標系での位置を計算
 	float local[3]; //OBBのローカル座標系での点の位置
+
 	//各軸について内積計算
 	for (int i = 0; i < 3; ++i)
 	{
@@ -1817,6 +1866,7 @@ bool CollisionSystem::PairExistsinList(const CollisionPair& pair, const std::vec
 void CollisionSystem::SetCollisionState(Collider* self, Collider* opponent, COLLISION_STATE state)
 {
 	auto& infoList = self->GetCollisionInfos();
+
 	//衝突情報リストから相手コライダーを探して状態を設定
 	for (auto& info : infoList)
 	{
@@ -1853,18 +1903,21 @@ void CollisionSystem::PushCollisionInfo(Collider* colliderA, Collider* colliderB
 	CollisionInfo infoB;					//衝突情報
 	infoB.opponent = colliderA;				//衝突相手のコライダー
 	infoB.contactPoint = contactP;			//衝突点
+
 	infoB.contactNormal =					//反転法線
 	{
 		-normalF.x,
 		-normalF.y,
 		-normalF.z
 	};
+
 	infoB.penetrationDepth =				//反転貫入深さ
 	{
 		-penetration.x,
 		-penetration.y,
 		-penetration.z
 	};
+
 	colliderB->AddCollisionInfo(infoB);		//衝突情報を追加
 
 	colliderA->SetDetected(true);
@@ -2104,7 +2157,8 @@ bool CollisionSystem::RaycastSphere(const RaycastSegment& ray, Collider* collide
 	//レイの始点と方向ベクトル取得
 	XMVECTOR rayOrigin = XMLoadFloat3(&ray.startPoint);				//レイの始点ベクトル
 	XMVECTOR rayDirection = XMVectorSubtract(						//レイの方向ベクトル
-		XMLoadFloat3(&ray.endPoint), rayOrigin);
+		XMLoadFloat3(&ray.endPoint),
+		rayOrigin);
 	float rayLength = XMVectorGetX(XMVector3Length(rayDirection)); //レイの長さ
 
 	if (rayLength <= 1e-6f)
@@ -2198,10 +2252,12 @@ bool CollisionSystem::RaycastCapsule(const RaycastSegment& ray, Collider* collid
 
 	XMVECTOR outP, outQ; //セグメントP・Q上の最短点
 	float distSq = GetMinDistanceSquaredSegmentToSegment(
-		rayOrigin, rayEnd,						//セグメントP：レイ
+		rayOrigin,
+		rayEnd,						//セグメントP：レイ
 		XMLoadFloat3(&capsule.pointA),			//セグメントQ：カプセルセグメント(端点A)
 		XMLoadFloat3(&capsule.pointB),			//セグメントQ：カプセルセグメント(端点B)
-		outP, outQ								//各セグメント上の最短点
+		outP,
+		outQ								//各セグメント上の最短点
 	);
 
 	float radius = capsule.radius; //カプセルの半径
@@ -2228,7 +2284,11 @@ bool CollisionSystem::RaycastCapsule(const RaycastSegment& ray, Collider* collid
 	}
 	else
 	{//最短距離がほぼ0の場合の処理
-		hitNormal = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); //適当な法線ベクトル
+		hitNormal = XMVectorSet(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f); //適当な法線ベクトル
 	}
 
 	//衝突点から法線方向に半径分移動して、カプセル表面上の点を計算

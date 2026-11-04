@@ -52,7 +52,13 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 
 			{
 				EditorUI::DisabledScope disableDelete(!callbacks.canDelete);
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+				ImGui::PushStyleColor(
+					ImGuiCol_Button,
+					ImVec4(
+						0.6f,
+						0.1f,
+						0.1f,
+						1.0f));
 
 				if (ImGui::SmallButton(deleteId.c_str()))
 				{
@@ -109,7 +115,11 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 		if (m_inUseByScene)
 		{// If the script is in use by actors in the scene, show a warning message
 			ImGui::TextColored(
-				ImVec4(1.0f, 0.8f, 0.0f, 1.0f),
+				ImVec4(
+					1.0f,
+					0.8f,
+					0.0f,
+					1.0f),
 				"Warning: '%s' is currently attached to actors in the scene.",
 				m_pendingDeleteName.c_str());
 			ImGui::Text(
@@ -123,8 +133,20 @@ void ScriptsPanel::Render(const Callbacks& callbacks, SceneBase* scene)
 		ImGui::Separator();
 
 		// Delete button(Red)
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+		ImGui::PushStyleColor(
+			ImGuiCol_Button,
+			ImVec4(
+				0.6f,
+				0.1f,
+				0.1f,
+				1.0f));
+		ImGui::PushStyleColor(
+			ImGuiCol_ButtonHovered,
+			ImVec4(
+				0.8f,
+				0.2f,
+				0.2f,
+				1.0f));
 
 		if (ImGui::Button("Delete", ImVec2(120, 0)))
 		{

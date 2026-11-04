@@ -141,8 +141,10 @@ std::unique_ptr<Actor> ActorDeserializer::DeserializeActorRecord(
 		// Attach the component to the Actor
 		if (!actor->AddComponent(std::move(component)))
 		{
-			DBG("ActorDeserializer::DeserializeActorRecord: Failed to add component '%s' to Actor '%s'.",
-				componentTypeName.c_str(), desc.name.c_str());
+			DBG(
+				"ActorDeserializer::DeserializeActorRecord: Failed to add component '%s' to Actor '%s'.",
+				componentTypeName.c_str(),
+				desc.name.c_str());
 			return Fail("/components/" + std::to_string(componentIndex), "Actor rejected the Component configuration.");
 		}
 

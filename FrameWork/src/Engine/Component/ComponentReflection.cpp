@@ -80,6 +80,7 @@ bool SerializeReflectedComponent(
 	DirectActorReferenceContext directActorContext;
 	DirectAssetReferenceContext directAssetContext;
 	MissingAssetReferenceContext missingAssetContext;
+
 	ReflectionSaveContext context{
 		.actorReferenceCodec = &actorCodec,
 		.actorReferenceContext = &directActorContext,
@@ -106,7 +107,12 @@ bool SerializeReflectedComponent(
 		}
 	}
 
-	return ReflectionSerializer::Serialize(*metadata, typeid(component), &component, outJson, context);
+	return ReflectionSerializer::Serialize(
+		*metadata,
+		typeid(component),
+		&component,
+		outJson,
+		context);
 }
 
 bool DeserializeReflectedComponent(
@@ -149,11 +155,17 @@ bool DeserializeReflectedComponent(
 	};
 
 	if (!ReflectionDeserializer::Deserialize(
-		*metadata, type, json, candidate.get(), context))
+		*metadata,
+		type,
+		json,
+		candidate.get(),
+		context))
 	{
 		return false;
 	}
 
 	return metadata->CopySerializableState(
-		type, candidate.get(), &component);
+		type,
+		candidate.get(),
+		&component);
 }

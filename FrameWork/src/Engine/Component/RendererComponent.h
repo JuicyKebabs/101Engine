@@ -64,10 +64,10 @@ public:
 		m_sortOrderInCanvas = order;
 		m_isProxyDirty = true;
 	}
-    // Shadow intent is an Engine Component value; Renderer defaults false.
-    void SetCastShadow(bool value) { m_castShadow = value; }
-    bool GetCastShadow() const { return m_castShadow; }
-    virtual bool SynchronizeRenderResources() { return true; }
+	// Shadow intent is an Engine Component value; Renderer defaults false.
+	void SetCastShadow(bool value) { m_castShadow = value; }
+	bool GetCastShadow() const { return m_castShadow; }
+	virtual bool SynchronizeRenderResources() { return true; }
 
 	// Getters
 	bool GetVisible() const { return m_isVisible; }
@@ -105,7 +105,7 @@ private:
 	// Sort order for this renderer (used for sorting in the render queue)
 	uint32_t m_sortOrderInCanvas = 0;
 
-    bool m_castShadow = false;
+	bool m_castShadow = false;
 
 private:
 	virtual void OnAttachOverride() = 0;

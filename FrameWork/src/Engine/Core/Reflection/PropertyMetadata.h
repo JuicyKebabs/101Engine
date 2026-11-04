@@ -735,7 +735,11 @@ public:
 
 	// Select one field in a Component-owned aggregate without recursively reflecting the aggregate.
 	template<class Getter, class Setter, class Aggregate, class Value>
-	auto Property(std::string name, Getter getter, Setter setter, Value Aggregate::* member)
+	auto Property(
+		std::string name,
+		Getter getter,
+		Setter setter,
+		Value Aggregate::* member)
 	{
 		if (!member)
 		{

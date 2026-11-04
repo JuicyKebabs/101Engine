@@ -18,8 +18,7 @@ namespace rendering::graph
 class GraphExecutor
 {
 public:
-	GraphExecutor(RenderGraph& graph, backend::Backend& backend) noexcept
-		: m_graph(graph), m_backend(backend) {}
+	GraphExecutor(RenderGraph& graph, backend::Backend& backend) noexcept : m_graph(graph), m_backend(backend) {}
 	GraphExecutor(const GraphExecutor&) = delete;
 	GraphExecutor& operator=(const GraphExecutor&) = delete;
 	GraphExecutor(GraphExecutor&&) = delete;
@@ -27,12 +26,12 @@ public:
 
 	// Store the borrowed texture both for GraphExecutor and RenderGraph.
 	// This enables GraphExecutor to connect the logical operation by RenderGraph to the actual backend operation.
-	Result ImportTexture(
-		const GraphTextureBinding& texture,
-		const std::string& name,
-		GraphTextureHandle& output);
+	Result ImportTexture(const GraphTextureBinding& texture, const std::string& name, GraphTextureHandle& output);
 
 	Result Execute();
+
+	// Short borrow, invalidated by a subsequent ImportTexture.
+	const GraphTextureBinding* FindPhysicalBinding(ID3D12Resource* resource) const noexcept;
 
 private:
 	struct StateCommit
@@ -57,4 +56,4 @@ private:
 	Result RecordTransitions(const std::vector<PlannedTransition>& transitions);
 };
 
-}
+} // namespace rendering::graph

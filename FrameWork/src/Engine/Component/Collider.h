@@ -114,7 +114,9 @@ public:
 	Matrix4x4 GetWorldMatrix() const
 	{
 		return Matrix4x4::CreateTRS(
-			m_worldTransformCurrent.position, m_worldTransformCurrent.rotation, m_worldTransformCurrent.scale);
+			m_worldTransformCurrent.position,
+			m_worldTransformCurrent.rotation,
+			m_worldTransformCurrent.scale);
 	}
 	TagId GetOwnerTag() const
 	{

@@ -132,8 +132,16 @@ bool ProjectSettings::Load(
 
 		ProjectSettings candidate;
 
-		if (!ReadGuid(root, "editor", candidate.m_editorStartupSceneGuid, outError) ||
-			!ReadGuid(root, "game", candidate.m_gameStartupSceneGuid, outError) ||
+		if (!ReadGuid(
+			root,
+			"editor",
+			candidate.m_editorStartupSceneGuid,
+			outError) ||
+			!ReadGuid(
+				root,
+				"game",
+				candidate.m_gameStartupSceneGuid,
+				outError) ||
 			!ReadTags(root, candidate.m_userTags, outError))
 		{
 			return false;

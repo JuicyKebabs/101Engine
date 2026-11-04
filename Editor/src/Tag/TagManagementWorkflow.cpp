@@ -152,7 +152,11 @@ TagManagementResult TagManagementWorkflow::Rename(
 	}
 
 	std::string normalized;
-	result = ValidateAvailable(newName, settings, normalized, oldName);
+	result = ValidateAvailable(
+		newName,
+		settings,
+		normalized,
+		oldName);
 
 	if (!result)
 	{

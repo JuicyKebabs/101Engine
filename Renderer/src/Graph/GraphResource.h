@@ -58,7 +58,7 @@ enum class GraphTextureFormat
 {
 	RGBA8_UNorm,
 	RGBA8_sRGB,
-    RGBA16_Float,
+	RGBA16_Float,
 	D32_Float
 };
 

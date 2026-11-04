@@ -81,7 +81,11 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 				pickMatrix *= worldToCanvas;
 			}
 
-			hit = IntersectMesh(ray, *meshRenderer, pickMatrix, distance);
+			hit = IntersectMesh(
+				ray,
+				*meshRenderer,
+				pickMatrix,
+				distance);
 
 			if (hit)
 			{
@@ -113,25 +117,30 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 				pickMatrix *= worldToCanvas;
 			}
 
-            if (spriteRenderer->GetBillboardType() != BillboardType::None)
-            {
-                auto rendererWorld = EngineRendering::ToRenderer(pickMatrix);
-                const auto cameraPosition = EngineRendering::ToRenderer(cameraInfo.position);
-                const auto cameraUp = EngineRendering::ToRenderer(cameraInfo.up);
+			if (spriteRenderer->GetBillboardType() != BillboardType::None)
+			{
+				auto rendererWorld = EngineRendering::ToRenderer(pickMatrix);
+				const auto cameraPosition = EngineRendering::ToRenderer(cameraInfo.position);
+				const auto cameraUp = EngineRendering::ToRenderer(cameraInfo.up);
 
-                if (spriteRenderer->GetBillboardType() == BillboardType::Spherical)
-                {
-                    rendererWorld = rendererWorld.ToBillboard(cameraPosition, cameraUp);
-                }
-                else
-                {
-                    rendererWorld = rendererWorld.ToCylindricalBillboard(cameraPosition, cameraUp);
-                }
+				if (spriteRenderer->GetBillboardType() == BillboardType::Spherical)
+				{
+					rendererWorld = rendererWorld.ToBillboard(cameraPosition, cameraUp);
+				}
+				else
+				{
+					rendererWorld = rendererWorld.ToCylindricalBillboard(cameraPosition, cameraUp);
+				}
 
-                pickMatrix = EngineRendering::FromRenderer(rendererWorld);
-            }
+				pickMatrix = EngineRendering::FromRenderer(rendererWorld);
+			}
 
-			hit = IntersectSprite(ray, cameraInfo, *spriteRenderer, pickMatrix, distance);
+			hit = IntersectSprite(
+				ray,
+				cameraInfo,
+				*spriteRenderer,
+				pickMatrix,
+				distance);
 
 			if (hit)
 			{
@@ -163,7 +172,11 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 				pickMatrix *= worldToCanvas;
 			}
 
-			hit = IntersectUI(ray, *uiRenderer, pickMatrix, distance);
+			hit = IntersectUI(
+				ray,
+				*uiRenderer,
+				pickMatrix,
+				distance);
 
 			if (hit)
 			{
@@ -241,8 +254,17 @@ SceneRay ScenePicker::BuildRay(
 	// by unprojecting the viewport coordinates at the near plane (z = 0.0)
 	const DirectX::XMVECTOR nearPoint =
 		DirectX::XMVector3Unproject(
-			DirectX::XMVectorSet(viewportUV.x, viewportUV.y, 0.0f, 1.0f),
-			0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+			DirectX::XMVectorSet(
+				viewportUV.x,
+				viewportUV.y,
+				0.0f,
+				1.0f),
+			0.0f,
+			0.0f,
+			1.0f,
+			1.0f,
+			0.0f,
+			1.0f,
 			cameraInfo.projMatrix,
 			cameraInfo.viewMatrix,
 			DirectX::XMMatrixIdentity()
@@ -252,8 +274,17 @@ SceneRay ScenePicker::BuildRay(
 	// by unprojecting the viewport coordinates at the far plane (z = 1.0)
 	const DirectX::XMVECTOR farPoint =
 		DirectX::XMVector3Unproject(
-			DirectX::XMVectorSet(viewportUV.x, viewportUV.y, 1.0f, 1.0f),
-			0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+			DirectX::XMVectorSet(
+				viewportUV.x,
+				viewportUV.y,
+				1.0f,
+				1.0f),
+			0.0f,
+			0.0f,
+			1.0f,
+			1.0f,
+			0.0f,
+			1.0f,
 			cameraInfo.projMatrix,
 			cameraInfo.viewMatrix,
 			DirectX::XMMatrixIdentity()
@@ -370,16 +401,16 @@ bool ScenePicker::IntersectMesh(
 
 		// Transform the mesh's bounding center from local space to world space
 		const Matrix4x4 placementWorld = renderTemplate.localToModel * worldMatrix;
-        const Vector3 worldCenter = placementWorld.TransformPoint(meshDesc.boundsCenter);
-        float scaleSquared = 0;
+		const Vector3 worldCenter = placementWorld.TransformPoint(meshDesc.boundsCenter);
+		float scaleSquared = 0;
 
-        for (std::size_t row = 0; row < 3; ++row)
-        {
-            for (std::size_t column = 0; column < 3; ++column)
-            {
-                scaleSquared += placementWorld.m[row][column] * placementWorld.m[row][column];
-            }
-        }
+		for (std::size_t row = 0; row < 3; ++row)
+		{
+			for (std::size_t column = 0; column < 3; ++column)
+			{
+				scaleSquared += placementWorld.m[row][column] * placementWorld.m[row][column];
+			}
+		}
 
 		// Scale the mesh's bounding radius by the maximum scale to get the world radius
 		const float worldRadius = meshDesc.boundsRadius * std::sqrt(scaleSquared);
@@ -387,7 +418,11 @@ bool ScenePicker::IntersectMesh(
 		float distance = 0.0f;
 
 		// Check if the ray intersects the bounding sphere of the mesh
-		if (!IntersectSphere(ray, worldCenter, worldRadius, distance))
+		if (!IntersectSphere(
+			ray,
+			worldCenter,
+			worldRadius,
+			distance))
 		{
 			continue;
 		}

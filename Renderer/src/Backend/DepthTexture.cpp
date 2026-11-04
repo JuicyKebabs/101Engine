@@ -4,7 +4,11 @@
 namespace rendering::backend
 {
 
-Result DepthTexture::Ensure(ID3D12Device* device, UINT width, UINT height, bool allowSampling)
+Result DepthTexture::Ensure(
+	ID3D12Device* device,
+	UINT width,
+	UINT height,
+	bool allowSampling)
 {
 	if (!device)
 	{
@@ -16,6 +20,7 @@ Result DepthTexture::Ensure(ID3D12Device* device, UINT width, UINT height, bool 
 		return { false, "DepthTexture: width and height must be non-zero." };
 	}
 
+	// Reconstruction is not supported.
 	if (m_resource)
 	{
 		auto desc = m_resource->GetDesc();
@@ -40,10 +45,11 @@ Result DepthTexture::Ensure(ID3D12Device* device, UINT width, UINT height, bool 
 	resourceDesc.Format = allowSampling ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_D32_FLOAT;
 	resourceDesc.SampleDesc.Count = 1;
 	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    if (!allowSampling)
-    {
-        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
-    }
+
+	if (!allowSampling)
+	{
+		resourceDesc.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+	}
 
 	D3D12_CLEAR_VALUE clearValue{};
 	clearValue.Format = DXGI_FORMAT_D32_FLOAT;
@@ -65,7 +71,11 @@ Result DepthTexture::Ensure(ID3D12Device* device, UINT width, UINT height, bool 
 		return MakeApiFailure("DepthTexture: CreateCommittedResource", hr);
 	}
 
-	Result result = m_dsvHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+	Result result = m_dsvHeap.Initialize(
+		device,
+		D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+		1,
+		false);
 
 	if (!result.IsSuccess())
 	{
@@ -91,35 +101,45 @@ Result DepthTexture::Ensure(ID3D12Device* device, UINT width, UINT height, bool 
 		return MakeApiFailure("DepthTexture: CreateDepthStencilView", hr);
 	}
 
-    if (allowSampling)
-    {
-        // The same typeless storage has a typed DSV and a typed scalar SRV.
-        // State transitions and Graph dependency validation remain mandatory.
-        result = m_srvHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, false);
-        if (!result.IsSuccess())
-        {
-            return result;
-        }
+	// Initialization for sampling.
+	if (allowSampling)
+	{
+		// The same typeless storage has a typed DSV and a typed scalar SRV.
+		// State transitions and Graph dependency validation remain mandatory.
+		result = m_srvHeap.Initialize(
+			device,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+			1,
+			false);
 
-        result = m_srvHeap.GetCpuHandle(0, m_srvHandle);
-        if (!result.IsSuccess())
-        {
-            return result;
-        }
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC sampleDescription;
-        sampleDescription = {};
-        sampleDescription.Format = DXGI_FORMAT_R32_FLOAT;
-        sampleDescription.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        sampleDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        sampleDescription.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(resource.Get(), &sampleDescription, m_srvHandle);
-        const HRESULT sampleStatus = device->GetDeviceRemovedReason();
-        if (FAILED(sampleStatus))
-        {
-            return MakeApiFailure("DepthTexture: CreateShaderResourceView", sampleStatus);
-        }
-    }
+		result = m_srvHeap.GetCpuHandle(0, m_srvHandle);
+
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC sampleDescription;
+		sampleDescription = {};
+		sampleDescription.Format = DXGI_FORMAT_R32_FLOAT;
+		sampleDescription.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		sampleDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		sampleDescription.Texture2D.MipLevels = 1;
+
+		device->CreateShaderResourceView(resource.Get(), &sampleDescription, m_srvHandle);
+
+		const HRESULT sampleStatus = device->GetDeviceRemovedReason();
+
+		if (FAILED(sampleStatus))
+		{
+			return MakeApiFailure("DepthTexture: CreateShaderResourceView", sampleStatus);
+		}
+	}
 
 	m_resource = std::move(resource);
 	return {};

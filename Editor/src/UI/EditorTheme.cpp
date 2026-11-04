@@ -5,9 +5,17 @@
 
 namespace
 {
-	ImVec4 Color(float r, float g, float b, float a)
+	ImVec4 Color(
+		float r,
+		float g,
+		float b,
+		float a)
 	{
-		return ImVec4(r, g, b, a);
+		return ImVec4(
+			r,
+			g,
+			b,
+			a);
 	}
 
 	ImFont* AddFallbackFont(
@@ -57,35 +65,119 @@ void EditorTheme::ApplyStyle()
 	ImVec4* colors = style.Colors;
 
 	// Neutral gray foundation
-	colors[ImGuiCol_Text] = Color(0.88f, 0.89f, 0.91f, 1.0f);
-	colors[ImGuiCol_TextDisabled] = Color(0.49f, 0.51f, 0.55f, 1.0f);
-	colors[ImGuiCol_WindowBg] = Color(0.095f, 0.10f, 0.11f, 1.0f);
-	colors[ImGuiCol_ChildBg] = Color(0.095f, 0.10f, 0.11f, 1.0f);
-	colors[ImGuiCol_PopupBg] = Color(0.12f, 0.125f, 0.14f, 0.98f);
-	colors[ImGuiCol_Border] = Color(0.24f, 0.25f, 0.28f, 1.0f);
-	colors[ImGuiCol_BorderShadow] = Color(0.0f, 0.0f, 0.0f, 0.0f);
+	colors[ImGuiCol_Text] = Color(
+		0.88f,
+		0.89f,
+		0.91f,
+		1.0f);
+	colors[ImGuiCol_TextDisabled] = Color(
+		0.49f,
+		0.51f,
+		0.55f,
+		1.0f);
+	colors[ImGuiCol_WindowBg] = Color(
+		0.095f,
+		0.10f,
+		0.11f,
+		1.0f);
+	colors[ImGuiCol_ChildBg] = Color(
+		0.095f,
+		0.10f,
+		0.11f,
+		1.0f);
+	colors[ImGuiCol_PopupBg] = Color(
+		0.12f,
+		0.125f,
+		0.14f,
+		0.98f);
+	colors[ImGuiCol_Border] = Color(
+		0.24f,
+		0.25f,
+		0.28f,
+		1.0f);
+	colors[ImGuiCol_BorderShadow] = Color(
+		0.0f,
+		0.0f,
+		0.0f,
+		0.0f);
 
 	// Input fields
-	colors[ImGuiCol_FrameBg] = Color(0.16f, 0.17f, 0.19f, 1.0f);
-	colors[ImGuiCol_FrameBgHovered] = Color(0.21f, 0.22f, 0.25f, 1.0f);
-	colors[ImGuiCol_FrameBgActive] = Color(0.24f, 0.27f, 0.31f, 1.0f);
+	colors[ImGuiCol_FrameBg] = Color(
+		0.16f,
+		0.17f,
+		0.19f,
+		1.0f);
+	colors[ImGuiCol_FrameBgHovered] = Color(
+		0.21f,
+		0.22f,
+		0.25f,
+		1.0f);
+	colors[ImGuiCol_FrameBgActive] = Color(
+		0.24f,
+		0.27f,
+		0.31f,
+		1.0f);
 
 	// Window and menu headers
-	colors[ImGuiCol_TitleBg] = Color(0.075f, 0.08f, 0.09f, 1.0f);
-	colors[ImGuiCol_TitleBgActive] = Color(0.13f, 0.14f, 0.16f, 1.0f);
-	colors[ImGuiCol_TitleBgCollapsed] = Color(0.075f, 0.08f, 0.09f, 1.0f);
-	colors[ImGuiCol_MenuBarBg] = Color(0.12f, 0.125f, 0.14f, 1.0f);
+	colors[ImGuiCol_TitleBg] = Color(
+		0.075f,
+		0.08f,
+		0.09f,
+		1.0f);
+	colors[ImGuiCol_TitleBgActive] = Color(
+		0.13f,
+		0.14f,
+		0.16f,
+		1.0f);
+	colors[ImGuiCol_TitleBgCollapsed] = Color(
+		0.075f,
+		0.08f,
+		0.09f,
+		1.0f);
+	colors[ImGuiCol_MenuBarBg] = Color(
+		0.12f,
+		0.125f,
+		0.14f,
+		1.0f);
 
 	// Scrollbars
-	colors[ImGuiCol_ScrollbarBg] = Color(0.08f, 0.085f, 0.095f, 1.0f);
-	colors[ImGuiCol_ScrollbarGrab] = Color(0.25f, 0.26f, 0.29f, 1.0f);
-	colors[ImGuiCol_ScrollbarGrabHovered] = Color(0.34f, 0.35f, 0.39f, 1.0f);
-	colors[ImGuiCol_ScrollbarGrabActive] = Color(0.40f, 0.42f, 0.46f, 1.0f);
+	colors[ImGuiCol_ScrollbarBg] = Color(
+		0.08f,
+		0.085f,
+		0.095f,
+		1.0f);
+	colors[ImGuiCol_ScrollbarGrab] = Color(
+		0.25f,
+		0.26f,
+		0.29f,
+		1.0f);
+	colors[ImGuiCol_ScrollbarGrabHovered] = Color(
+		0.34f,
+		0.35f,
+		0.39f,
+		1.0f);
+	colors[ImGuiCol_ScrollbarGrabActive] = Color(
+		0.40f,
+		0.42f,
+		0.46f,
+		1.0f);
 
 	// Restrained blue-gray accent
-	const ImVec4 accent = Color(0.34f, 0.52f, 0.70f, 1.0f);
-	const ImVec4 accentHovered = Color(0.40f, 0.60f, 0.79f, 1.0f);
-	const ImVec4 accentActive = Color(0.29f, 0.46f, 0.64f, 1.0f);
+	const ImVec4 accent = Color(
+		0.34f,
+		0.52f,
+		0.70f,
+		1.0f);
+	const ImVec4 accentHovered = Color(
+		0.40f,
+		0.60f,
+		0.79f,
+		1.0f);
+	const ImVec4 accentActive = Color(
+		0.29f,
+		0.46f,
+		0.64f,
+		1.0f);
 
 	colors[ImGuiCol_CheckMark] = accent;
 	colors[ImGuiCol_CheckboxSelectedBg] = accentActive;
@@ -94,41 +186,117 @@ void EditorTheme::ApplyStyle()
 	colors[ImGuiCol_InputTextCursor] = accentHovered;
 
 	// Buttons
-	colors[ImGuiCol_Button] = Color(0.19f, 0.20f, 0.23f, 1.0f);
-	colors[ImGuiCol_ButtonHovered] = Color(0.26f, 0.31f, 0.36f, 1.0f);
-	colors[ImGuiCol_ButtonActive] = Color(0.29f, 0.40f, 0.51f, 1.0f);
+	colors[ImGuiCol_Button] = Color(
+		0.19f,
+		0.20f,
+		0.23f,
+		1.0f);
+	colors[ImGuiCol_ButtonHovered] = Color(
+		0.26f,
+		0.31f,
+		0.36f,
+		1.0f);
+	colors[ImGuiCol_ButtonActive] = Color(
+		0.29f,
+		0.40f,
+		0.51f,
+		1.0f);
 
 	// Headers, selectable items and tree nodes
-	colors[ImGuiCol_Header] = Color(0.17f, 0.18f, 0.21f, 1.0f);
-	colors[ImGuiCol_HeaderHovered] = Color(0.25f, 0.30f, 0.35f, 1.0f);
-	colors[ImGuiCol_HeaderActive] = Color(0.28f, 0.39f, 0.50f, 1.0f);
+	colors[ImGuiCol_Header] = Color(
+		0.17f,
+		0.18f,
+		0.21f,
+		1.0f);
+	colors[ImGuiCol_HeaderHovered] = Color(
+		0.25f,
+		0.30f,
+		0.35f,
+		1.0f);
+	colors[ImGuiCol_HeaderActive] = Color(
+		0.28f,
+		0.39f,
+		0.50f,
+		1.0f);
 
 	// Separators
-	colors[ImGuiCol_Separator] = Color(0.24f, 0.25f, 0.28f, 1.0f);
+	colors[ImGuiCol_Separator] = Color(
+		0.24f,
+		0.25f,
+		0.28f,
+		1.0f);
 	colors[ImGuiCol_SeparatorHovered] = accentHovered;
 	colors[ImGuiCol_SeparatorActive] = accentActive;
 
 	// Tabs
-	colors[ImGuiCol_Tab] = Color(0.13f, 0.14f, 0.16f, 1.0f);
-	colors[ImGuiCol_TabHovered] = Color(0.25f, 0.32f, 0.39f, 1.0f);
-	colors[ImGuiCol_TabSelected] = Color(0.21f, 0.27f, 0.33f, 1.0f);
+	colors[ImGuiCol_Tab] = Color(
+		0.13f,
+		0.14f,
+		0.16f,
+		1.0f);
+	colors[ImGuiCol_TabHovered] = Color(
+		0.25f,
+		0.32f,
+		0.39f,
+		1.0f);
+	colors[ImGuiCol_TabSelected] = Color(
+		0.21f,
+		0.27f,
+		0.33f,
+		1.0f);
 	colors[ImGuiCol_TabSelectedOverline] = accent;
-	colors[ImGuiCol_TabDimmed] = Color(0.10f, 0.105f, 0.12f, 1.0f);
-	colors[ImGuiCol_TabDimmedSelected] = Color(0.16f, 0.17f, 0.20f, 1.0f);
+	colors[ImGuiCol_TabDimmed] = Color(
+		0.10f,
+		0.105f,
+		0.12f,
+		1.0f);
+	colors[ImGuiCol_TabDimmedSelected] = Color(
+		0.16f,
+		0.17f,
+		0.20f,
+		1.0f);
 
 	// Tables and docking
-	colors[ImGuiCol_TableHeaderBg] = Color(0.16f, 0.17f, 0.19f, 1.0f);
-	colors[ImGuiCol_TableBorderStrong] = Color(0.25f, 0.26f, 0.29f, 1.0f);
-	colors[ImGuiCol_TableBorderLight] = Color(0.18f, 0.19f, 0.21f, 1.0f);
-	colors[ImGuiCol_DockingPreview] = Color(0.34f, 0.52f, 0.70f, 0.65f);
-	colors[ImGuiCol_DockingEmptyBg] = Color(0.075f, 0.08f, 0.09f, 1.0f);
-	colors[ImGuiCol_TextSelectedBg] = Color(0.34f, 0.52f, 0.70f, 0.35f);
+	colors[ImGuiCol_TableHeaderBg] = Color(
+		0.16f,
+		0.17f,
+		0.19f,
+		1.0f);
+	colors[ImGuiCol_TableBorderStrong] = Color(
+		0.25f,
+		0.26f,
+		0.29f,
+		1.0f);
+	colors[ImGuiCol_TableBorderLight] = Color(
+		0.18f,
+		0.19f,
+		0.21f,
+		1.0f);
+	colors[ImGuiCol_DockingPreview] = Color(
+		0.34f,
+		0.52f,
+		0.70f,
+		0.65f);
+	colors[ImGuiCol_DockingEmptyBg] = Color(
+		0.075f,
+		0.08f,
+		0.09f,
+		1.0f);
+	colors[ImGuiCol_TextSelectedBg] = Color(
+		0.34f,
+		0.52f,
+		0.70f,
+		0.35f);
 
 	colors[ImGuiCol_DragDropTarget] = accentHovered;
 
 	colors[ImGuiCol_NavCursor] = accentHovered;
 
-	colors[ImGuiCol_ModalWindowDimBg] = Color(0.02f, 0.02f, 0.025f, 0.72f);
+	colors[ImGuiCol_ModalWindowDimBg] = Color(
+		0.02f,
+		0.02f,
+		0.025f,
+		0.72f);
 }
 
 bool EditorTheme::LoadFont(

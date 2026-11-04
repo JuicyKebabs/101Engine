@@ -143,8 +143,11 @@ ActorImprintReloadResult ActorImprintSystem::Reload(
 		return result;
 	}
 
-	ReloadStateGuard transaction(m_reloading, m_buildingReloadCandidate,
-		m_reloadHandle, m_reloadDefinition);
+	ReloadStateGuard transaction(
+		m_reloading,
+		m_buildingReloadCandidate,
+		m_reloadHandle,
+		m_reloadDefinition);
 
 	struct StagedScene
 	{
@@ -156,6 +159,7 @@ ActorImprintReloadResult ActorImprintSystem::Reload(
 	};
 
 	std::vector<StagedScene> stagedScenes;
+
 	try
 	{
 		stagedScenes.reserve(liveScenes.size());
@@ -252,7 +256,9 @@ ActorImprintReloadResult ActorImprintSystem::Reload(
 		for (StagedScene& staged : stagedScenes)
 		{
 			SceneLoadResult load = SceneLoader::LoadPreparedCandidate(
-				staged.snapshot, *(*staged.owner)->GetEngineContext(), "<actor-imprint-reload>");
+				staged.snapshot,
+				*(*staged.owner)->GetEngineContext(),
+				"<actor-imprint-reload>");
 
 			if (!load)
 			{
@@ -271,7 +277,8 @@ ActorImprintReloadResult ActorImprintSystem::Reload(
 				viewportWidth <= maximumViewport && viewportHeight <= maximumViewport)
 			{
 				staged.candidate->SetViewportSize(
-					static_cast<UINT>(viewportWidth), static_cast<UINT>(viewportHeight));
+					static_cast<UINT>(viewportWidth),
+					static_cast<UINT>(viewportHeight));
 			}
 		}
 

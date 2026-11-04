@@ -28,17 +28,17 @@ SceneBase::~SceneBase()
 	{
 		DiscardUnpublishedCandidate();
 	}
-    else if (!m_isFinalized)
-    {
-        Finalize();
-    }
+	else if (!m_isFinalized)
+	{
+		Finalize();
+	}
 
-    if (!m_deferAssetRelease && m_pEngineContext && m_pEngineContext->pAssetManager)
-    {
-        // Component instances are already destroyed. A copied Handle never
-        // kept these registrations alive; the Scene record did.
-        m_pEngineContext->pAssetManager->ReleaseScene(this);
-    }
+	if (!m_deferAssetRelease && m_pEngineContext && m_pEngineContext->pAssetManager)
+	{
+		// Component instances are already destroyed. A copied Handle never
+		// kept these registrations alive; the Scene record did.
+		m_pEngineContext->pAssetManager->ReleaseScene(this);
+	}
 }
 
 // Initialization
@@ -56,14 +56,14 @@ void SceneBase::PreUpdate(float deltaTime)
 	}
 
 	m_actorPool.ForEach([deltaTime](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		actor->PreUpdate(deltaTime);
-	});
+			actor->PreUpdate(deltaTime);
+		});
 }
 
 // Update
@@ -75,30 +75,30 @@ void SceneBase::Update(float deltaTime)
 	}
 
 	m_actorPool.ForEach([deltaTime](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		actor->Update(deltaTime);
-	});
+			actor->Update(deltaTime);
+		});
 
 	// Flush transforms recursively from root actors
 	m_actorPool.ForEach([this](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		if (!actor->GetParentHandle().IsNull())
-		{
-			return; // only recurse from roots to maintain correct order
-		}
+			if (!actor->GetParentHandle().IsNull())
+			{
+				return; // only recurse from roots to maintain correct order
+			}
 
-		actor->FlushTransform();
-	});
+			actor->FlushTransform();
+		});
 }
 
 // Late update
@@ -110,31 +110,31 @@ void SceneBase::LateUpdate(float deltaTime)
 	}
 
 	m_actorPool.ForEach([deltaTime](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		actor->LateUpdate(deltaTime);
-	});
+			actor->LateUpdate(deltaTime);
+		});
 
 	// Flush transforms/collider
 	m_actorPool.ForEach([this](Actor* actor)
-	{
-		if (!actor->IsActive() || actor->IsDestroyed())
 		{
-			return;
-		}
+			if (!actor->IsActive() || actor->IsDestroyed())
+			{
+				return;
+			}
 
-		if (!actor->GetParentHandle().IsNull())
-		{
-			return;
-		}
+			if (!actor->GetParentHandle().IsNull())
+			{
+				return;
+			}
 
-		actor->FlushTransform();
-		actor->FlushColliderTransforms();
-	});
+			actor->FlushTransform();
+			actor->FlushColliderTransforms();
+		});
 
 	// Check colliders
 	m_pCollisionSystem->CheckColliders();
@@ -152,17 +152,29 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-bool SceneBase::AppendRenderData(rendering::FrameRenderData& frame, const rendering::ViewOutput& output,
-    const CameraInfo* overrideCameraInfo, RenderViewPolicy viewPolicy,
-    rendering::ViewId sceneViewId, rendering::ViewId overlayViewId)
+bool SceneBase::AppendRenderData(
+	rendering::FrameRenderData& frame,
+	const rendering::ViewOutput& output,
+	const CameraInfo* overrideCameraInfo,
+	RenderViewPolicy viewPolicy,
+	rendering::ViewId sceneViewId,
+	rendering::ViewId overlayViewId)
 {
-    const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
-    m_pRenderSystem->FlushRegisters();
-    // No Camera is still a valid background + Screen UI Frame. Only World and
-    // Shadow are omitted by extraction; Renderer owns final Render/Present.
-    return m_pRenderSystem->AppendFrame(frame, output, camera, viewPolicy, sceneViewId,
-        overlayViewId, static_cast<std::uint32_t>(m_viewportSize.x),
-        static_cast<std::uint32_t>(m_viewportSize.y), m_directionalLight);
+	const CameraInfo* camera = overrideCameraInfo ? overrideCameraInfo : m_pCameraSystem->GetCameraInfo();
+	m_pRenderSystem->FlushRegisters();
+
+	// No Camera is still a valid background + Screen UI Frame. Only World and
+	// Shadow are omitted by extraction; Renderer owns final Render/Present.
+	return m_pRenderSystem->AppendFrame(
+		frame,
+		output,
+		camera,
+		viewPolicy,
+		sceneViewId,
+		overlayViewId,
+		static_cast<std::uint32_t>(m_viewportSize.x),
+		static_cast<std::uint32_t>(m_viewportSize.y),
+		m_directionalLight);
 }
 
 // Finalization
@@ -231,7 +243,7 @@ const std::vector<Actor*>& SceneBase::PrepareUnpublishedCandidateForCommit()
 	}
 
 	m_unpublishedCommitActors = GetAllActors();
-    PrepareComponentPublication(m_unpublishedCommitActors);
+	PrepareComponentPublication(m_unpublishedCommitActors);
 
 	for (Actor* actor : m_unpublishedCommitActors)
 	{
@@ -741,7 +753,11 @@ bool SceneBase::SetCanvasRenderMode(Canvas* canvas, CanvasRenderMode renderMode)
 	}
 
 	// Set the render mode of the topmost canvas
-	if (!CanApplyUIHierarchy(owner, nullptr, owner, renderMode))
+	if (!CanApplyUIHierarchy(
+		owner,
+		nullptr,
+		owner,
+		renderMode))
 	{
 		return false;
 	}
@@ -1074,6 +1090,7 @@ bool SceneBase::ApplyUIHierarchyConstraints(
 
 	// Iterative traversal also serves deep Imprint candidates without stack growth.
 	std::vector<std::pair<Actor*, Canvas*>> pending{ { root, governingCanvas } };
+
 	while (!pending.empty())
 	{
 		auto [actor, governing] = pending.back();
@@ -1093,7 +1110,8 @@ bool SceneBase::ApplyUIHierarchyConstraints(
 		}
 
 		const auto requiredKind = RequiredUITransformKind(
-			governing != nullptr, actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
+			governing != nullptr,
+			actorCanvas ? std::optional(actorCanvas->GetRenderMode()) : std::nullopt);
 		const bool definitionOwned = m_imprintInstances.FindMember(actor->GetHandle()) != nullptr;
 
 		if (allowTransformConversion && !definitionOwned)
@@ -1135,6 +1153,7 @@ bool SceneBase::ApplyUIHierarchyConstraints(
 			pending.emplace_back(*it, actorCanvas ? actorCanvas : governing);
 		}
 	}
+
 	return true;
 }
 
@@ -1147,7 +1166,11 @@ bool SceneBase::ApplyAllUIHierarchyConstraints(Actor** outInvalidActor)
 
 	for (Actor* root : GetRootActors())
 	{
-		if (!ApplyUIHierarchyConstraints(root, nullptr, true, outInvalidActor))
+		if (!ApplyUIHierarchyConstraints(
+			root,
+			nullptr,
+			true,
+			outInvalidActor))
 		{
 			return false;
 		}
@@ -1232,25 +1255,27 @@ bool SceneBase::RollbackRestoredActors(const std::vector<ActorHandle>& restoredH
 
 void SceneBase::PrepareComponentPublication(const std::vector<Actor*>& actors)
 {
-    std::size_t componentCount = 0;
-    for (Actor* actor : actors)
-    {
-        if (actor)
-        {
-            componentCount += actor->GetAllComponents().size();
-        }
-    }
+	std::size_t componentCount = 0;
 
-    m_pRenderSystem->PrepareRegistrationCapacity(componentCount);
-    m_pCollisionSystem->PrepareRegistrationCapacity(componentCount);
-    for (Actor* actor : actors)
-    {
-        if (actor)
-        {
-            if (Canvas* canvas = actor->GetComponentByClass<Canvas>())
-            {
-                canvas->PrepareRegistrationCapacity(componentCount);
-            }
-        }
-    }
+	for (Actor* actor : actors)
+	{
+		if (actor)
+		{
+			componentCount += actor->GetAllComponents().size();
+		}
+	}
+
+	m_pRenderSystem->PrepareRegistrationCapacity(componentCount);
+	m_pCollisionSystem->PrepareRegistrationCapacity(componentCount);
+
+	for (Actor* actor : actors)
+	{
+		if (actor)
+		{
+			if (Canvas* canvas = actor->GetComponentByClass<Canvas>())
+			{
+				canvas->PrepareRegistrationCapacity(componentCount);
+			}
+		}
+	}
 }

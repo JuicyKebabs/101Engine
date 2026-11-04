@@ -1,11 +1,10 @@
-// Editor-owned translation of ImGui CPU values to Renderer registrations.
-// One host Window; no native descriptors or command callbacks cross this boundary.
 #pragma once
 
 #include "Renderer/Renderer.h"
 #include "imgui.h"
 
 #include <unordered_map>
+#include <filesystem>
 
 namespace rendering::editor
 {
@@ -19,7 +18,7 @@ class EditorImGuiAdapter
 public:
 	explicit EditorImGuiAdapter(Renderer& renderer) : m_renderer(renderer) {}
 
-	Result Initialize();
+	Result Initialize(const std::filesystem::path& shaderDirectory);
 	Result Shutdown();
 	Result ProcessTexture(ImTextureData& texture);
 	Result RegisterImage(TextureHandle texture, ImTextureID& identifier);
@@ -34,7 +33,11 @@ private:
 		bool ownsTexture = false;
 	};
 
-	Result AddImage(MaterialValue source, TextureHandle uploadedTexture, bool ownsTexture, ImTextureID& identifier);
+	Result AddImage(
+		MaterialValue source,
+		TextureHandle uploadedTexture,
+		bool ownsTexture,
+		ImTextureID& identifier);
 	Result CopyTexturePixels(const ImTextureData& texture, std::vector<std::byte>& pixels) const;
 	Result StoreDrawList(const ImDrawList& drawList, const ImDrawData& drawData, std::size_t listIndex);
 

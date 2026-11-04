@@ -21,6 +21,7 @@ std::optional<GameCodeHotReloadConfig> ResolveGameCodeHotReloadConfig(
 	result.compilerFlags = configuration == "Debug"
 		? "/MDd /Od /D_DEBUG /D_ITERATOR_DEBUG_LEVEL=2"
 		: "/MD /O2 /Ob2 /DNDEBUG /D_ITERATOR_DEBUG_LEVEL=0";
+
 	result.objectDirectory = (build / "GameCode_hotreload" / configuration / "obj").string();
 	result.frameworkLibrary = (libraries / "101Framework.lib").string();
 	result.stagedDll = (output / "GameCode.staged.dll").string();

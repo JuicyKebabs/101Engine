@@ -59,9 +59,21 @@ std::wstring PathManager::ResolveW(const std::string& relativePath)
 		return std::wstring();
 	}
 
-	int len = MultiByteToWideChar(CP_ACP, 0, resolved.c_str(), (int)resolved.size(), nullptr, 0);
+	int len = MultiByteToWideChar(
+		CP_ACP,
+		0,
+		resolved.c_str(),
+		(int)resolved.size(),
+		nullptr,
+		0);
 	std::wstring result(len, 0);
-	MultiByteToWideChar(CP_ACP, 0, resolved.c_str(), (int)resolved.size(), result.data(), len);
+	MultiByteToWideChar(
+		CP_ACP,
+		0,
+		resolved.c_str(),
+		(int)resolved.size(),
+		result.data(),
+		len);
 	return result;
 }
 

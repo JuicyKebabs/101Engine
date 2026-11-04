@@ -29,15 +29,15 @@ namespace
 {
 	int g_failures = 0;
 
-    template<class Handle>
-    Handle SyntheticHandle(std::uint32_t slot)
-    {
-        Handle handle;
-        handle.ownerId = 100;
-        handle.slotIndex = slot;
-        handle.generation = 1;
-        return handle;
-    }
+	template<class Handle>
+	Handle SyntheticHandle(std::uint32_t slot)
+	{
+		Handle handle;
+		handle.ownerId = 100;
+		handle.slotIndex = slot;
+		handle.generation = 1;
+		return handle;
+	}
 
 
 	void Check(bool condition, const std::string& name)
@@ -212,24 +212,24 @@ namespace
 			"Nested, Actor, Enum, and Asset properties keep their logical metadata types");
 	}
 
-    void TestRendererFixedMaterialContract()
-    {
-        MeshRenderer mesh;
-        SpriteRenderer sprite;
-        UIImage image;
-        nlohmann::json meshRecord;
-        nlohmann::json spriteRecord;
-        nlohmann::json imageRecord;
-        Check(mesh.Serialize(meshRecord) && sprite.Serialize(spriteRecord) && image.Serialize(imageRecord),
-            "Renderer schemas serialize");
-        Check(!meshRecord.contains("blendMode") && !spriteRecord.contains("blendMode") && !imageRecord.contains("blendMode"),
-            "R8 Components no longer persist Pipeline BlendMode");
-        Check(meshRecord["castShadow"] == true && spriteRecord["castShadow"] == false,
-            "Mesh and Sprite persist their distinct Shadow defaults");
-        Check(!meshRecord.contains("textureOverrideAssetId"), "Mesh TextureOverride was removed");
-        meshRecord["blendMode"] = 0;
-        Check(!mesh.Deserialize(meshRecord), "Old BlendMode requires explicit data migration");
-    }
+	void TestRendererFixedMaterialContract()
+	{
+		MeshRenderer mesh;
+		SpriteRenderer sprite;
+		UIImage image;
+		nlohmann::json meshRecord;
+		nlohmann::json spriteRecord;
+		nlohmann::json imageRecord;
+		Check(mesh.Serialize(meshRecord) && sprite.Serialize(spriteRecord) && image.Serialize(imageRecord),
+			"Renderer schemas serialize");
+		Check(!meshRecord.contains("blendMode") && !spriteRecord.contains("blendMode") && !imageRecord.contains("blendMode"),
+			"R8 Components no longer persist Pipeline BlendMode");
+		Check(meshRecord["castShadow"] == true && spriteRecord["castShadow"] == false,
+			"Mesh and Sprite persist their distinct Shadow defaults");
+		Check(!meshRecord.contains("textureOverrideAssetId"), "Mesh TextureOverride was removed");
+		meshRecord["blendMode"] = 0;
+		Check(!mesh.Deserialize(meshRecord), "Old BlendMode requires explicit data migration");
+	}
 
 
 
@@ -1382,28 +1382,28 @@ namespace
 			"Recoverable missing mesh reference survives serialization");
 	}
 
-    void TestMeshRendererLiveMissingAssetKeepsIdentity()
-    {
-        AssetManager assets;
-        EngineContext context;
-        context.pAssetManager = &assets;
-        SceneBase scene;
-        scene.Initialize(context);
-        Actor::InitDesc description;
-        description.name = "Missing Asset";
-        auto actor = ActorFactory::CreateEmptyActor(description);
-        auto* renderer = actor->AddComponent<MeshRenderer>();
-        scene.AddRootActor(std::move(actor));
-        AssetReference<MeshAsset> reference;
-        AssetReferenceValue value;
-        value.guid = GuidGenerator::Generate();
-        value.expectedType = AssetType::Mesh;
-        value.resolved = true;
-        reference.SetValue(value);
-        Check(renderer->TrySetMeshAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
-        Check(renderer->GetAssetId() == value.guid && renderer->IsConfigured(),
-            "Missing visual Asset retains persistent identity and drawable intent");
-    }
+	void TestMeshRendererLiveMissingAssetKeepsIdentity()
+	{
+		AssetManager assets;
+		EngineContext context;
+		context.pAssetManager = &assets;
+		SceneBase scene;
+		scene.Initialize(context);
+		Actor::InitDesc description;
+		description.name = "Missing Asset";
+		auto actor = ActorFactory::CreateEmptyActor(description);
+		auto* renderer = actor->AddComponent<MeshRenderer>();
+		scene.AddRootActor(std::move(actor));
+		AssetReference<MeshAsset> reference;
+		AssetReferenceValue value;
+		value.guid = GuidGenerator::Generate();
+		value.expectedType = AssetType::Mesh;
+		value.resolved = true;
+		reference.SetValue(value);
+		Check(renderer->TrySetMeshAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
+		Check(renderer->GetAssetId() == value.guid && renderer->IsConfigured(),
+			"Missing visual Asset retains persistent identity and drawable intent");
+	}
 
 	void TestMeshRendererSetParamsClearsAssetAssociation()
 	{
@@ -1527,7 +1527,7 @@ namespace
 		Check(restored.Deserialize(serialized),
 			"SpriteRenderer accepts a valid deferred texture Guid");
 		Check(restored.GetTextureAssetId() == textureAssetId &&
-            restored.GetRenderTemplate().materialDesc.textureHandle == InvalidTextureHandle,
+			restored.GetRenderTemplate().materialDesc.textureHandle == InvalidTextureHandle,
 			"SpriteRenderer exposes its pending texture without creating runtime resources");
 
 		nlohmann::json restoredJson;
@@ -1645,28 +1645,28 @@ namespace
 			"Missing sprite texture remains visible without runtime resources");
 	}
 
-    void TestSpriteRendererLiveMissingAssetKeepsIdentity()
-    {
-        AssetManager assets;
-        EngineContext context;
-        context.pAssetManager = &assets;
-        SceneBase scene;
-        scene.Initialize(context);
-        Actor::InitDesc description;
-        description.name = "Missing Asset";
-        auto actor = ActorFactory::CreateEmptyActor(description);
-        auto* renderer = actor->AddComponent<SpriteRenderer>();
-        scene.AddRootActor(std::move(actor));
-        AssetReference<TextureAsset> reference;
-        AssetReferenceValue value;
-        value.guid = GuidGenerator::Generate();
-        value.expectedType = AssetType::Texture;
-        value.resolved = true;
-        reference.SetValue(value);
-        Check(renderer->TrySetTextureAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
-        Check(renderer->GetTextureAssetId() == value.guid && renderer->IsConfigured(),
-            "Missing visual Asset retains persistent identity and drawable intent");
-    }
+	void TestSpriteRendererLiveMissingAssetKeepsIdentity()
+	{
+		AssetManager assets;
+		EngineContext context;
+		context.pAssetManager = &assets;
+		SceneBase scene;
+		scene.Initialize(context);
+		Actor::InitDesc description;
+		description.name = "Missing Asset";
+		auto actor = ActorFactory::CreateEmptyActor(description);
+		auto* renderer = actor->AddComponent<SpriteRenderer>();
+		scene.AddRootActor(std::move(actor));
+		AssetReference<TextureAsset> reference;
+		AssetReferenceValue value;
+		value.guid = GuidGenerator::Generate();
+		value.expectedType = AssetType::Texture;
+		value.resolved = true;
+		reference.SetValue(value);
+		Check(renderer->TrySetTextureAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
+		Check(renderer->GetTextureAssetId() == value.guid && renderer->IsConfigured(),
+			"Missing visual Asset retains persistent identity and drawable intent");
+	}
 
 	void TestSpriteRendererSetParamsClearsAssetAssociation()
 	{
@@ -2144,28 +2144,28 @@ namespace
 			"Missing UIImage texture remains visible without runtime resources");
 	}
 
-    void TestUIImageLiveMissingAssetKeepsIdentity()
-    {
-        AssetManager assets;
-        EngineContext context;
-        context.pAssetManager = &assets;
-        SceneBase scene;
-        scene.Initialize(context);
-        Actor::InitDesc description;
-        description.name = "Missing Asset";
-        auto actor = ActorFactory::CreateEmptyActor(description);
-        auto* renderer = actor->AddComponent<UIImage>();
-        scene.AddRootActor(std::move(actor));
-        AssetReference<TextureAsset> reference;
-        AssetReferenceValue value;
-        value.guid = GuidGenerator::Generate();
-        value.expectedType = AssetType::Texture;
-        value.resolved = true;
-        reference.SetValue(value);
-        Check(renderer->TrySetTextureAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
-        Check(renderer->GetTextureAssetId() == value.guid && renderer->IsConfigured(),
-            "Missing visual Asset retains persistent identity and drawable intent");
-    }
+	void TestUIImageLiveMissingAssetKeepsIdentity()
+	{
+		AssetManager assets;
+		EngineContext context;
+		context.pAssetManager = &assets;
+		SceneBase scene;
+		scene.Initialize(context);
+		Actor::InitDesc description;
+		description.name = "Missing Asset";
+		auto actor = ActorFactory::CreateEmptyActor(description);
+		auto* renderer = actor->AddComponent<UIImage>();
+		scene.AddRootActor(std::move(actor));
+		AssetReference<TextureAsset> reference;
+		AssetReferenceValue value;
+		value.guid = GuidGenerator::Generate();
+		value.expectedType = AssetType::Texture;
+		value.resolved = true;
+		reference.SetValue(value);
+		Check(renderer->TrySetTextureAssetReference(reference), "Missing visual Asset accepts explicit Invalid fallback");
+		Check(renderer->GetTextureAssetId() == value.guid && renderer->IsConfigured(),
+			"Missing visual Asset retains persistent identity and drawable intent");
+	}
 
 	void TestUIImageSetParamsClearsTextureAssociation()
 	{

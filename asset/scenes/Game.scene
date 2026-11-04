@@ -2508,7 +2508,7 @@
             "components": [
                 {
                     "data": {
-                        "name": "",
+                        "name": "FloorTransform",
                         "position": [
                             0.0,
                             -0.5,
@@ -2538,7 +2538,7 @@
                             1.0
                         ],
                         "meshAssetId": "{B2C1C7D2-A905-4951-92EE-9D85CE3FA93C}",
-                        "name": "",
+                        "name": "FloorMesh",
                         "sortOrderInCanvas": 0,
                         "visible": true
                     },
@@ -3781,37 +3781,6 @@
             "name": "Arm",
             "parentId": "{773DF552-323A-4B31-B9CB-5ACD2D94B272}",
             "tag": "None"
-        },
-        {
-            "actorId": "{CCD0E87E-E99B-4EF2-98E0-FFD49395C68B}",
-            "components": [
-                {
-                    "data": {
-                        "name": "",
-                        "position": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "rotation": [
-                            0.0,
-                            0.0,
-                            0.0,
-                            1.0
-                        ],
-                        "scale": [
-                            1.0,
-                            1.0,
-                            1.0
-                        ]
-                    },
-                    "type": "Transform"
-                }
-            ],
-            "is_active": false,
-            "name": "Sky",
-            "parentId": null,
-            "tag": "InitialSky"
         },
         {
             "actorId": "{D238E8F4-635B-4580-B939-5FDC41B8036E}",

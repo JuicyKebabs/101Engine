@@ -1,7 +1,7 @@
 // R7 implementation guide: section 4.26.
 // Grow complete replacement allocations before recording, then allocate monotonically.
-// Constants, descriptor slots and retained references have separate capacities and hard limits.
-// GPU completion is required before resetting offsets or releasing references.
+// Constants and descriptor slots have separate capacities and hard limits.
+// GPU completion is required before resetting offsets.
 
 #include "FrameResources.h"
 #include "Failure.h"
@@ -19,11 +19,11 @@ namespace
 
 constexpr UINT MaximumConstantBytes = 64 * 1024 * 1024;
 constexpr UINT MaximumDescriptorCount = 65536;
-constexpr UINT MaximumRetainedCount = 262144;
 
 Result ClassifyDeviceFailure(Device& device, Result failure)
 {
 	Result deviceStatus = device.CheckStatus();
+
 	if (!deviceStatus.IsSuccess())
 	{
 		deviceStatus.message = failure.message + "\n" + deviceStatus.message;
@@ -34,10 +34,11 @@ Result ClassifyDeviceFailure(Device& device, Result failure)
 }
 
 // Grow geometrically up to a validated hard limit and never shrink on a smaller later frame.
-// Retained high-water capacity is different from live allocations or leaked references.
+// Capacity is retained for reuse; allocation offsets are reset after completion.
 UINT GrowthCapacity(UINT current, UINT required, UINT maximum)
 {
-	UINT capacity = (std::max)(current, UINT{ 1 });
+	UINT capacity = (std::max)(current, UINT{1});
+
 	while (capacity < required)
 	{
 		capacity = capacity > maximum / 2 ? maximum : capacity * 2;
@@ -46,13 +47,9 @@ UINT GrowthCapacity(UINT current, UINT required, UINT maximum)
 	return capacity;
 }
 
-}
+} // namespace
 
-Result FrameResources::Initialize(
-	Device* device,
-	UINT constantBytes,
-	UINT descriptorCount,
-	UINT retainedCount)
+Result FrameResources::Initialize(Device* device, UINT constantBytes, UINT descriptorCount)
 {
 	if (!device || !device->IsInitialized())
 	{
@@ -64,13 +61,14 @@ Result FrameResources::Initialize(
 		return detail::Fail("FrameResources: already initialized.");
 	}
 
-	if (constantBytes == 0 || descriptorCount == 0 || retainedCount == 0)
+	if (constantBytes == 0 || descriptorCount == 0)
 	{
 		return detail::Fail("FrameResources: initial capacities must be nonzero.");
 	}
 
 	m_device = device;
-	Result prepared = EnsureCapacity(constantBytes, descriptorCount, retainedCount);
+	Result prepared = EnsureCapacity(constantBytes, descriptorCount);
+
 	if (!prepared.IsSuccess())
 	{
 		Finalize();
@@ -80,16 +78,17 @@ Result FrameResources::Initialize(
 }
 
 // Precondition: previous GPU use is complete and this frame has allocated nothing yet.
-// Create replacement Buffer/Heap privately, reserve keep-alive storage, then commit all ownership.
+// Create replacement Buffer/Heap privately, then commit all ownership.
 // If preparation fails, old allocations remain intact and no previously handed-out addresses change.
-Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount, UINT retainedCount)
+Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount)
 {
 	if (!m_device || !m_device->IsInitialized())
 	{
 		return detail::Fail("FrameResources: Device is unavailable.");
 	}
 
-	const bool hasAllocations = m_constantOffset != 0 || m_descriptorOffset != 0 || !m_retainedObjects.empty();
+	const bool hasAllocations = m_constantOffset != 0 || m_descriptorOffset != 0;
+
 	if (hasAllocations)
 	{
 		return detail::Fail("FrameResources: capacity cannot change after allocation begins.");
@@ -100,23 +99,20 @@ Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount, 
 		return detail::Fail("FrameResources: constant or Descriptor hard limit exceeded.");
 	}
 
-	if (retainedCount > MaximumRetainedCount)
-	{
-		return detail::Fail("FrameResources: retained-reference hard limit exceeded.");
-	}
-
 	const UINT currentConstantBytes = m_constants ? static_cast<UINT>(m_constants->GetSize()) : 0;
 	const UINT desiredConstantBytes = GrowthCapacity(currentConstantBytes, constantBytes, MaximumConstantBytes);
 	const UINT desiredDescriptors = GrowthCapacity(m_descriptorCapacity, descriptorCount, MaximumDescriptorCount);
-	const UINT desiredRetained = GrowthCapacity(m_retainedCapacity, retainedCount, MaximumRetainedCount);
 
 	try
 	{
 		std::unique_ptr<Buffer> replacementConstants;
+
 		if (!m_constants || desiredConstantBytes > currentConstantBytes)
 		{
 			replacementConstants = std::make_unique<Buffer>();
-			Result created = replacementConstants->Initialize(m_device->GetNativeDevice(), desiredConstantBytes, BufferMemory::Upload);
+			Result created = replacementConstants->Initialize(m_device->GetNativeDevice(), desiredConstantBytes,
+                                                              BufferMemory::Upload);
+
 			if (!created.IsSuccess())
 			{
 				return ClassifyDeviceFailure(*m_device, std::move(created));
@@ -124,20 +120,18 @@ Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount, 
 		}
 
 		std::unique_ptr<DescriptorHeap> replacementDescriptors;
+
 		if (!m_descriptors || desiredDescriptors > m_descriptorCapacity)
 		{
 			replacementDescriptors = std::make_unique<DescriptorHeap>();
 			Result created = replacementDescriptors->Initialize(
 				m_device->GetNativeDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, desiredDescriptors, true);
+
 			if (!created.IsSuccess())
 			{
 				return ClassifyDeviceFailure(*m_device, std::move(created));
 			}
 		}
-
-		// Finish the last potentially throwing CPU capacity operation before exchanging either GPU owner.
-		// Doing this after exchanging the Buffer would leave a partial capacity update on allocation failure.
-		m_retainedObjects.reserve(desiredRetained);
 
 		// No GPU references have been handed out, so all replacements can commit together.
 		if (replacementConstants)
@@ -151,7 +145,6 @@ Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount, 
 		}
 
 		m_descriptorCapacity = desiredDescriptors;
-		m_retainedCapacity = desiredRetained;
 		return {};
 	}
 	catch (const std::bad_alloc&)
@@ -171,7 +164,6 @@ void FrameResources::Finalize() noexcept
 	m_constants.reset();
 	m_device = nullptr;
 	m_descriptorCapacity = 0;
-	m_retainedCapacity = 0;
 }
 
 // The caller, not this small helper, proves Fence completion.
@@ -180,7 +172,6 @@ void FrameResources::ResetAfterCompletion() noexcept
 {
 	m_constantOffset = 0;
 	m_descriptorOffset = 0;
-	m_retainedObjects.clear();
 }
 
 // Reserve a fresh 256-byte-aligned range and zero its padding.
@@ -202,22 +193,27 @@ Result FrameResources::AllocateConstants(std::span<const std::byte> data, Consta
 	}
 
 	const UINT paddedBytes = (static_cast<UINT>(data.size()) + alignment - 1) & ~(alignment - 1);
+
 	if (m_constantOffset > m_constants->GetSize() || paddedBytes > m_constants->GetSize() - m_constantOffset)
 	{
 		return detail::Fail("Frame constant capacity exceeded.");
 	}
 
 	Result written = m_constants->WriteAt(m_constantOffset, data);
+
 	if (!written.IsSuccess())
 	{
 		return ClassifyDeviceFailure(*m_device, std::move(written));
 	}
 
 	const UINT paddingBytes = paddedBytes - static_cast<UINT>(data.size());
+
 	if (paddingBytes != 0)
 	{
 		const std::array<std::byte, alignment> zeros{};
-		written = m_constants->WriteAt(m_constantOffset + data.size(), std::span<const std::byte>(zeros.data(), paddingBytes));
+		written = m_constants->WriteAt(m_constantOffset + data.size(),
+                                       std::span<const std::byte>(zeros.data(), paddingBytes));
+
 		if (!written.IsSuccess())
 		{
 			return ClassifyDeviceFailure(*m_device, std::move(written));
@@ -254,46 +250,25 @@ Result FrameResources::CopyDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_
 	D3D12_CPU_DESCRIPTOR_HANDLE destinationCpu{};
 	D3D12_GPU_DESCRIPTOR_HANDLE destinationGpu{};
 	Result found = m_descriptors->GetCpuHandle(m_descriptorOffset, destinationCpu);
+
 	if (!found.IsSuccess())
 	{
 		return found;
 	}
 
 	found = m_descriptors->GetGpuHandle(m_descriptorOffset, destinationGpu);
+
 	if (!found.IsSuccess())
 	{
 		return found;
 	}
 
-	m_device->GetNativeDevice()->CopyDescriptorsSimple(
-		1, destinationCpu, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_device->GetNativeDevice()->CopyDescriptorsSimple(1, destinationCpu, source,
+                                                       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	output = destinationGpu;
 	++m_descriptorOffset;
 	return {};
 }
 
-// A COM reference keeps the native object alive independently of registry Content replacement.
-// The reserved list cannot grow beyond the preflight capacity; release only at completion-gated Reset.
-Result FrameResources::KeepAlive(IUnknown* object)
-{
-	if (!m_device || !m_device->IsInitialized())
-	{
-		return detail::Fail("FrameResources: Device is unavailable.");
-	}
-
-	if (!object)
-	{
-		return detail::Fail("FrameResources: cannot retain a null object.");
-	}
-
-	if (m_retainedObjects.size() >= m_retainedCapacity)
-	{
-		return detail::Fail("Frame retained capacity exceeded.");
-	}
-
-	m_retainedObjects.emplace_back(object);
-	return {};
-}
-
-}
+} // namespace rendering::backend

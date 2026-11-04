@@ -251,42 +251,53 @@ void UIRenderer::SetCanvasActorReference(const ActorReference& value)
 
 bool UIRenderer::SynchronizeRenderResources()
 {
-    const EngineContext* context = GetEngineContext();
-    if (!context || !context->pRenderer || !context->pRenderAssets)
-    {
-        return true;
-    }
+	const EngineContext* context = GetEngineContext();
 
-    const bool screen = GetRenderSpace() == RenderSpace::Screen;
-    for (UIRenderElement& element : m_renderTemplate)
-    {
-        auto& material = element.materialDesc;
-        if (!m_materialDirty && material.screen == screen)
-        {
-            continue;
-        }
+	if (!context || !context->pRenderer || !context->pRenderAssets)
+	{
+		return true;
+	}
 
-        if (material.handle == rendering::MaterialHandle{})
-        {
-            continue;
-        }
+	const bool screen = GetRenderSpace() == RenderSpace::Screen;
 
-        Vector2 centerPivot;
-        centerPivot.x = 0.5f;
-        centerPivot.y = 0.5f;
-        auto description = context->pRenderAssets->MakeMaterial(false, screen, material.textureHandle,
-            m_uvScale, m_uvOffset, centerPivot, m_flipX, m_flipY);
-        const auto updated = context->pRenderer->UpdateMaterial(material.handle, description);
-        if (!updated.IsSuccess())
-        {
-            DBG("UIImage Material update: %s", updated.message.c_str());
-            return false;
-        }
+	for (UIRenderElement& element : m_renderTemplate)
+	{
+		auto& material = element.materialDesc;
 
-        material.description = std::move(description);
-        material.screen = screen;
-    }
+		if (!m_materialDirty && material.screen == screen)
+		{
+			continue;
+		}
 
-    m_materialDirty = false;
-    return true;
+		if (material.handle == rendering::MaterialHandle{})
+		{
+			continue;
+		}
+
+		Vector2 centerPivot;
+		centerPivot.x = 0.5f;
+		centerPivot.y = 0.5f;
+		auto description = context->pRenderAssets->MakeMaterial(
+			false,
+			screen,
+			material.textureHandle,
+			m_uvScale,
+			m_uvOffset,
+			centerPivot,
+			m_flipX,
+			m_flipY);
+		const auto updated = context->pRenderer->UpdateMaterial(material.handle, description);
+
+		if (!updated.IsSuccess())
+		{
+			DBG("UIImage Material update: %s", updated.message.c_str());
+			return false;
+		}
+
+		material.description = std::move(description);
+		material.screen = screen;
+	}
+
+	m_materialDirty = false;
+	return true;
 }

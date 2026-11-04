@@ -12,7 +12,11 @@ namespace fs = std::filesystem;
 
 namespace
 {
-	bool FailCatalog(AssetCatalogError* error, AssetCatalogErrorCode code, std::string path, std::string message)
+	bool FailCatalog(
+		AssetCatalogError* error,
+		AssetCatalogErrorCode code,
+		std::string path,
+		std::string message)
 	{
 		DBG("AssetManager: %s: %s", path.c_str(), message.c_str());
 
@@ -28,36 +32,45 @@ namespace
 bool AssetManager::Initialize(
 	const std::string& projectDir,
 	rendering::Renderer* renderer,
-    RenderAssetResources* renderAssets,
+	RenderAssetResources* renderAssets,
 	AssetCatalogError* outError)
 {
-	return Initialize(projectDir, renderer, renderAssets, nullptr, outError);
+	return Initialize(
+		projectDir,
+		renderer,
+		renderAssets,
+		nullptr,
+		outError);
 }
 
 bool AssetManager::Initialize(
 	const std::string& projectDir,
 	rendering::Renderer* renderer,
-    RenderAssetResources* renderAssets,
+	RenderAssetResources* renderAssets,
 	AudioManager* pAudioManager,
 	AssetCatalogError* outError)
 {
-    if (!m_sceneUsage.empty())
-    {
-        return FailCatalog(outError, AssetCatalogErrorCode::IoError, projectDir,
-            "Cannot reinitialize AssetManager while Scene resource ownership is live.");
-    }
+	if (!m_sceneUsage.empty())
+	{
+		return FailCatalog(
+			outError,
+			AssetCatalogErrorCode::IoError,
+			projectDir,
+			"Cannot reinitialize AssetManager while Scene resource ownership is live.");
+	}
 
+	// Scan the asset directory and build the catalog of assets.
 	if (!ScanAssetDirectory(projectDir, "", outError))
 	{
 		return false;
 	}
 
 	m_renderer = renderer;
-    m_renderAssets = renderAssets;
+	m_renderAssets = renderAssets;
 	m_pAudioManager = pAudioManager;
 	m_loadedModels.clear();
-    m_dependencyTextures.clear();
-    m_sceneUsage.clear();
+	m_dependencyTextures.clear();
+	m_sceneUsage.clear();
 	m_loadedTextures.clear();
 	m_loadedAudio.clear();
 	return true;
@@ -73,10 +86,14 @@ bool AssetManager::NotifyAssetChanged(const std::string& relativePath, AssetCata
 	const fs::path path(relativePath);
 
 	if (path.empty() || path.is_absolute() || path.has_root_name() ||
-		std::find(path.begin(), path.end(), fs::path("..")) != path.end() || path.lexically_normal() == ".")
+		std::find(path.begin(), path.end(), fs::path("..")) != path.end() ||
+		path.lexically_normal() == ".")
 	{
 		return FailCatalog(
-			outError, AssetCatalogErrorCode::InvalidPath, relativePath, "Expected an asset-root relative path.");
+			outError,
+			AssetCatalogErrorCode::InvalidPath,
+			relativePath,
+			"Expected an asset-root relative path.");
 	}
 
 	// Force Modified even when an explicit save preserves file size/timestamp.
@@ -94,10 +111,12 @@ bool AssetManager::NotifyAssetContentReplaced(const Guid& guid)
 
 	const AssetChange change{ AssetChangeKind::Modified, entry->second.type, guid, entry->second.relativePath };
 	const auto latest =
-		std::find_if(m_pendingChanges.rbegin(), m_pendingChanges.rend(), [&](const AssetChange& existing)
-	{
-		return existing.guid == change.guid && existing.relativePath == change.relativePath;
-	});
+		std::find_if(
+			m_pendingChanges.rbegin(), m_pendingChanges.rend(),
+			[&](const AssetChange& existing)
+			{
+				return existing.guid == change.guid && existing.relativePath == change.relativePath;
+			});
 
 	if (latest == m_pendingChanges.rend() || *latest != change)
 	{
@@ -129,7 +148,10 @@ bool AssetManager::ScanAssetDirectory(
 		if (rootDir.empty() || !fs::is_directory(rootDir))
 		{
 			return FailCatalog(
-				outError, AssetCatalogErrorCode::IoError, rootDir, "Asset root is not an existing directory.");
+				outError,
+				AssetCatalogErrorCode::IoError,
+				rootDir,
+				"Asset root is not an existing directory.");
 		}
 
 		std::string newRoot = fs::absolute(rootDir).lexically_normal().string();
@@ -168,7 +190,10 @@ bool AssetManager::ScanAssetDirectory(
 
 				if (!existing)
 				{
-					return FailCatalog(outError, AssetCatalogErrorCode::InvalidMetadata, relativePath + ".meta",
+					return FailCatalog(
+						outError,
+						AssetCatalogErrorCode::InvalidMetadata,
+						relativePath + ".meta",
 						"Existing metadata is invalid; its identity was not replaced.");
 				}
 
@@ -181,7 +206,10 @@ bool AssetManager::ScanAssetDirectory(
 				if (!id.IsValid())
 				{
 					return FailCatalog(
-						outError, AssetCatalogErrorCode::InvalidMetadata, relativePath, "GUID generation failed.");
+						outError,
+						AssetCatalogErrorCode::InvalidMetadata,
+						relativePath,
+						"GUID generation failed.");
 				}
 
 				missingMetadata.emplace_back(path.string(), id);
@@ -191,7 +219,10 @@ bool AssetManager::ScanAssetDirectory(
 
 			if (duplicate != catalog.end())
 			{
-				return FailCatalog(outError, AssetCatalogErrorCode::DuplicateGuid, relativePath + ".meta",
+				return FailCatalog(
+					outError,
+					AssetCatalogErrorCode::DuplicateGuid,
+					relativePath + ".meta",
 					"GUID also belongs to " + duplicate->second.relativePath + "; catalog was not updated.");
 			}
 
@@ -206,7 +237,10 @@ bool AssetManager::ScanAssetDirectory(
 			if (!MetaFile::Save(path, id, MetaFile::WriteMode::CreateNew))
 			{
 				return FailCatalog(
-					outError, AssetCatalogErrorCode::IoError, path + ".meta", "Could not create new asset metadata.");
+					outError,
+					AssetCatalogErrorCode::IoError,
+					path + ".meta",
+					"Could not create new asset metadata.");
 			}
 		}
 
@@ -219,8 +253,10 @@ bool AssetManager::ScanAssetDirectory(
 
 			const fs::path path = fs::path(newRoot) / entry.relativePath;
 			const fs::path meta = path.string() + ".meta";
-			fileStates.emplace(id, FileState{ fs::last_write_time(path), fs::file_size(path),
-				fs::last_write_time(meta), fs::file_size(meta) });
+			fileStates.emplace(
+				id,
+				FileState{ fs::last_write_time(path), fs::file_size(path),
+					fs::last_write_time(meta), fs::file_size(meta) });
 		}
 
 		std::vector<AssetChange> changes;
@@ -258,23 +294,29 @@ bool AssetManager::ScanAssetDirectory(
 			}
 		}
 
-		std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b)
-		{
-			if (a.relativePath != b.relativePath)
+		std::sort(
+			changes.begin(),
+			changes.end(),
+			[](const auto& a, const auto& b)
 			{
-				return a.relativePath < b.relativePath;
-			}
+				if (a.relativePath != b.relativePath)
+				{
+					return a.relativePath < b.relativePath;
+				}
 
-			return a.kind < b.kind;
-		});
+				return a.kind < b.kind;
+			});
 		auto pending = m_pendingChanges;
 
 		for (const auto& change : changes)
 		{
-			const auto latest = std::find_if(pending.rbegin(), pending.rend(), [&](const AssetChange& existing)
-			{
-				return existing.guid == change.guid && existing.relativePath == change.relativePath;
-			});
+			const auto latest = std::find_if(
+				pending.rbegin(),
+				pending.rend(),
+				[&](const AssetChange& existing)
+				{
+					return existing.guid == change.guid && existing.relativePath == change.relativePath;
+				});
 
 			if (latest == pending.rend() || *latest != change)
 			{
@@ -292,7 +334,11 @@ bool AssetManager::ScanAssetDirectory(
 	}
 	catch (const std::exception& exception)
 	{
-		return FailCatalog(outError, AssetCatalogErrorCode::IoError, rootDir, exception.what());
+		return FailCatalog(
+			outError,
+			AssetCatalogErrorCode::IoError,
+			rootDir,
+			exception.what());
 	}
 }
 
@@ -367,6 +413,7 @@ std::string AssetManager::GetAssetPath(const Guid& guid) const
 	}
 
 	const AssetEntry* entry = GetAssetEntry(guid);
+
 	if (!entry)
 	{
 		return std::string{};
@@ -392,7 +439,8 @@ std::vector<AssetEntry> AssetManager::GetAssetEntries(AssetType type) const
 
 	// Sort the entries by their relative paths for consistent ordering
 	std::sort(
-		entries.begin(), entries.end(), 
+		entries.begin(),
+		entries.end(),
 		[](const AssetEntry& a, const AssetEntry& b) {
 			return a.relativePath < b.relativePath;
 		}
@@ -435,7 +483,6 @@ AudioHandle AssetManager::GetAudioHandle(const Guid& guid)
 
 AudioHandle AssetManager::GetAudioHandleByPath(const std::string& relativePath)
 {
-	const AssetEntry* entry = GetAssetEntryByPath(
-		fs::path(relativePath).lexically_normal().generic_string());
+	const AssetEntry* entry = GetAssetEntryByPath(fs::path(relativePath).lexically_normal().generic_string());
 	return entry ? GetAudioHandle(entry->guid) : InvalidAudioHandle;
 }

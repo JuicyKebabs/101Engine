@@ -149,11 +149,13 @@ Result SwapChain::Initialize(
 
 	// Move the created objects into the member variables
 	m_swapChain = std::move(swapChain);
+
 	for (UINT index = 0; index < BufferCount; ++index)
 	{
 		m_backBuffers[index].resource = std::move(backBuffers[index]);
 		m_backBuffers[index].submittedState = D3D12_RESOURCE_STATE_PRESENT;
 	}
+
 	m_buffersReady = true;
 
 	OutputDebugStringA("[101Renderer] SwapChain initialized.\n");
@@ -164,6 +166,7 @@ Result SwapChain::Initialize(
 void SwapChain::Finalize() noexcept
 {
 	m_buffersReady = false;
+
 	for (auto& backBuffer : m_backBuffers)
 	{
 		backBuffer.resource.Reset();
@@ -179,16 +182,23 @@ void SwapChain::Finalize() noexcept
 Result SwapChain::RebuildBackBuffers(ID3D12Device* device)
 {
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, BufferCount> resources;
+
 	for (UINT index = 0; index < BufferCount; ++index)
 	{
 		const HRESULT acquired = m_swapChain->GetBuffer(index, IID_PPV_ARGS(resources[index].GetAddressOf()));
+
 		if (FAILED(acquired))
 		{
 			return MakeApiFailure("ResizeWindowOutput: GetBuffer", acquired);
 		}
 	}
 
-	Result prepared = m_rtvHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, BufferCount, false);
+	Result prepared = m_rtvHeap.Initialize(
+		device,
+		D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+		BufferCount,
+		false);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -197,10 +207,12 @@ Result SwapChain::RebuildBackBuffers(ID3D12Device* device)
 	D3D12_RENDER_TARGET_VIEW_DESC renderTargetView{};
 	renderTargetView.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	renderTargetView.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
 	for (UINT index = 0; index < BufferCount; ++index)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE descriptor{};
 		prepared = m_rtvHeap.GetCpuHandle(index, descriptor);
+
 		if (!prepared.IsSuccess())
 		{
 			return prepared;
@@ -210,6 +222,7 @@ Result SwapChain::RebuildBackBuffers(ID3D12Device* device)
 	}
 
 	const HRESULT descriptorStatus = device->GetDeviceRemovedReason();
+
 	if (FAILED(descriptorStatus))
 	{
 		return MakeApiFailure("ResizeWindowOutput: CreateRenderTargetView", descriptorStatus);
@@ -220,6 +233,7 @@ Result SwapChain::RebuildBackBuffers(ID3D12Device* device)
 		m_backBuffers[index].resource = std::move(resources[index]);
 		m_backBuffers[index].submittedState = D3D12_RESOURCE_STATE_PRESENT;
 	}
+
 	m_buffersReady = true;
 	return {};
 }
@@ -241,6 +255,7 @@ Result SwapChain::Resize(ID3D12Device* device, std::uint32_t width, std::uint32_
 
 	const bool extentSupported = width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
 		height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+
 	if (!extentSupported)
 	{
 		return detail::Fail("ResizeWindowOutput: dimensions exceed the supported 2D limit.");
@@ -251,6 +266,7 @@ Result SwapChain::Resize(ID3D12Device* device, std::uint32_t width, std::uint32_
 		std::uint32_t currentWidth = 0;
 		std::uint32_t currentHeight = 0;
 		Result queried = GetSize(currentWidth, currentHeight);
+
 		if (!queried.IsSuccess())
 		{
 			return queried;
@@ -267,14 +283,22 @@ Result SwapChain::Resize(ID3D12Device* device, std::uint32_t width, std::uint32_
 	// DXGI requires all back-buffer references to be released before ResizeBuffers.
 	// The logical Window handle survives even when replacement is incomplete.
 	m_buffersReady = false;
+
 	for (auto& buffer : m_backBuffers)
 	{
 		buffer.resource.Reset();
 		buffer.submittedState = D3D12_RESOURCE_STATE_PRESENT;
 	}
+
 	m_rtvHeap.Finalize();
 
-	const HRESULT resized = m_swapChain->ResizeBuffers(BufferCount, width, height, BackBufferFormat, 0);
+	const HRESULT resized = m_swapChain->ResizeBuffers(
+		BufferCount,
+		width,
+		height,
+		BackBufferFormat,
+		0);
+
 	if (FAILED(resized))
 	{
 		return MakeApiFailure("ResizeWindowOutput: ResizeBuffers", resized);
@@ -292,6 +316,7 @@ Result SwapChain::GetSize(std::uint32_t& width, std::uint32_t& height) const
 
 	BackBufferInfo current;
 	Result queried = GetCurrentTexture(current);
+
 	if (!queried.IsSuccess())
 	{
 		return queried;

@@ -9,10 +9,12 @@
 std::vector<AssetEntry> SceneAssetPanel::GetVisibleEntries(const AssetManager& assets)
 {
 	auto entries = assets.GetAssetEntries(AssetType::Scene);
-	std::erase_if(entries, [](const AssetEntry& entry)
-	{
-		return !SceneAssetWorkflow::IsManagedAssetPath(entry.relativePath);
-	});
+	std::erase_if(
+		entries,
+		[](const AssetEntry& entry)
+		{
+			return !SceneAssetWorkflow::IsManagedAssetPath(entry.relativePath);
+		});
 	return entries;
 }
 
@@ -45,12 +47,20 @@ void SceneAssetPanel::Render(
 
 			if (ImGui::BeginPopupContextItem("SceneItemContext"))
 			{
-				if (ImGui::MenuItem("Open", nullptr, false, callbacks.canModify) && callbacks.onOpen)
+				if (ImGui::MenuItem(
+					"Open",
+					nullptr,
+					false,
+					callbacks.canModify) && callbacks.onOpen)
 				{
 					callbacks.onOpen(entry.guid);
 				}
 
-				if (ImGui::MenuItem("Rename...", nullptr, false, callbacks.canModify))
+				if (ImGui::MenuItem(
+					"Rename...",
+					nullptr,
+					false,
+					callbacks.canModify))
 				{
 					m_renameGuid = entry.guid;
 					const std::string stem = std::filesystem::path(entry.relativePath).stem().string();
@@ -58,13 +68,19 @@ void SceneAssetPanel::Render(
 					m_openRenamePopup = true;
 				}
 
-				if (ImGui::MenuItem("Set as Editor Startup Scene", nullptr, isStartup,
+				if (ImGui::MenuItem(
+					"Set as Editor Startup Scene",
+					nullptr,
+					isStartup,
 					callbacks.canModify && !isStartup) && callbacks.onSetEditorStartup)
 				{
 					callbacks.onSetEditorStartup(entry.guid);
 				}
 
-				if (ImGui::MenuItem("Set as Game Startup Scene", nullptr, entry.guid == gameStartupSceneGuid,
+				if (ImGui::MenuItem(
+					"Set as Game Startup Scene",
+					nullptr,
+					entry.guid == gameStartupSceneGuid,
 					callbacks.canModify && entry.guid != gameStartupSceneGuid) && callbacks.onSetGameStartup)
 				{
 					callbacks.onSetGameStartup(entry.guid);
@@ -84,7 +100,11 @@ void SceneAssetPanel::Render(
 		if (ImGui::BeginPopupContextWindow("ScenesEmptyContext",
 			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
-			if (ImGui::MenuItem("Create Scene...", nullptr, false, callbacks.canModify))
+			if (ImGui::MenuItem(
+				"Create Scene...",
+				nullptr,
+				false,
+				callbacks.canModify))
 			{
 				m_openCreatePopup = true;
 			}

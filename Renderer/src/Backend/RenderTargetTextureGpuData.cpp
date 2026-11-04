@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.8.
-// Build color, CPU descriptor heaps and Depth privately, then publish the complete set.
-// Local RAII owners clean up an incomplete candidate; no partial output is exposed.
-// Creation allocates storage but does not make its pixels initialized or shader-readable.
-
 #include "RenderTargetTextureGpuData.h"
 #include "ApiResult.h"
 #include "Failure.h"
@@ -14,10 +9,11 @@ namespace rendering::backend
 
 // Every local owner below is provisional until the final commit.
 // Returning early destroys the candidate color/heaps/Depth without exposing any partial public output.
-Result RenderTargetTextureGpuData::Initialize(
-	ID3D12Device* device,
-	const RenderTargetTextureDesc& description)
+Result RenderTargetTextureGpuData::Initialize(ID3D12Device* device, const RenderTargetTextureDesc& description)
 {
+	//------------------------------------------------------------------------------------------------
+	// 1. Validate the input parameters and description.
+	//------------------------------------------------------------------------------------------------
 	if (!device || m_color)
 	{
 		return detail::Fail("RenderTargetTexture: device and empty destination are required.");
@@ -30,39 +26,45 @@ Result RenderTargetTextureGpuData::Initialize(
 
 	const bool extentSupported = description.width <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
 		description.height <= D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+
 	if (!extentSupported)
 	{
 		return detail::Fail("RenderTargetTexture: dimensions exceed the supported 2D limit.");
 	}
 
-    // Reject invalid CPU input before any allocation. HDR values may exceed
-    // [0,1], so finite validation is intentional; clamping would change policy.
-    for (float channel : description.optimizedClearColor)
-    {
-        if (!std::isfinite(channel))
-        {
-            return detail::Fail("RenderTargetTexture: optimized Clear color must be finite.");
-        }
-    }
+	// Reject invalid CPU input before any allocation. HDR values may exceed
+	// [0,1], so finite validation is intentional; clamping would change policy.
+	for (float channel : description.optimizedClearColor)
+	{
+		if (!std::isfinite(channel))
+		{
+			return detail::Fail("RenderTargetTexture: optimized Clear color must be finite.");
+		}
+	}
 
-    DXGI_FORMAT nativeFormat = DXGI_FORMAT_UNKNOWN;
-    switch (description.format)
-    {
-    case TextureFormat::RGBA8_UNorm:
-        nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-        break;
-    case TextureFormat::RGBA8_sRGB:
-        nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        break;
-    case TextureFormat::RGBA16_Float:
-        nativeFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-        break;
-    default:
-        return detail::Fail("RenderTargetTexture: unsupported generated color format.");
-    }
+	DXGI_FORMAT nativeFormat = DXGI_FORMAT_UNKNOWN;
+
+	switch (description.format)
+	{
+	case TextureFormat::RGBA8_UNorm:
+		nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		break;
+	case TextureFormat::RGBA8_sRGB:
+		nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		break;
+	case TextureFormat::RGBA16_Float:
+		nativeFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+		break;
+	default:
+		return detail::Fail("RenderTargetTexture: unsupported generated color format.");
+	}
+
+	//------------------------------------------------------------------------------------------------
+	// 2. Create the GPU resource for the render target texture.
+	//------------------------------------------------------------------------------------------------
 
 	D3D12_HEAP_PROPERTIES heapProperties{};
-	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;	// Create a GPU-only resource for the render target texture.
 
 	D3D12_RESOURCE_DESC colorDescription{};
 	colorDescription.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -72,7 +74,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	colorDescription.MipLevels = 1;
 	colorDescription.Format = nativeFormat;
 	colorDescription.SampleDesc.Count = 1;
-	colorDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	colorDescription.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;	// Allow render target usage for this texture.
 
 	// This is an allocation hint, not a GPU Clear or initialization operation.
 	// This tells the driver the common Clear value for efficient allocation/layout decisions.
@@ -80,13 +82,15 @@ Result RenderTargetTextureGpuData::Initialize(
 	// The actual initialization is a later Graph attachment Clear on the GPU.
 	D3D12_CLEAR_VALUE optimizedClear{};
 	optimizedClear.Format = colorDescription.Format;
-    // Use the same typed Format as the RTV. The caller supplies ordinary
-    // values, not D3D12 types or an Editor-specific resource classification.
-    for (std::size_t channel = 0; channel < description.optimizedClearColor.size(); ++channel)
-    {
-        optimizedClear.Color[channel] = description.optimizedClearColor[channel];
-    }
 
+	// Use the same typed Format as the RTV. The caller supplies ordinary
+	// values, not D3D12 types or an Editor-specific resource classification.
+	for (std::size_t channel = 0; channel < description.optimizedClearColor.size(); ++channel)
+	{
+		optimizedClear.Color[channel] = description.optimizedClearColor[channel];
+	}
+
+	// Create the GPU resource for the render target texture.
 	Microsoft::WRL::ComPtr<ID3D12Resource> color;
 	HRESULT created = device->CreateCommittedResource(
 		&heapProperties,
@@ -95,13 +99,23 @@ Result RenderTargetTextureGpuData::Initialize(
 		D3D12_RESOURCE_STATE_COMMON,
 		&optimizedClear,
 		IID_PPV_ARGS(color.GetAddressOf()));
+
 	if (FAILED(created))
 	{
 		return MakeApiFailure("CreateCommittedResource(RenderTargetTexture)", created);
 	}
 
+	//------------------------------------------------------------------------------------------------
+	// 3. Create the descriptor heaps for the render target view (RTV) and shader resource view (SRV).
+	//------------------------------------------------------------------------------------------------
+	// RTV
 	auto rtvHeap = std::make_unique<DescriptorHeap>();
-	Result prepared = rtvHeap->Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1, false);
+	Result prepared = rtvHeap->Initialize(
+		device,
+		D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+		1,
+		false);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -109,6 +123,7 @@ Result RenderTargetTextureGpuData::Initialize(
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtv{};
 	prepared = rtvHeap->GetCpuHandle(0, rtv);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -119,10 +134,16 @@ Result RenderTargetTextureGpuData::Initialize(
 	renderTargetView.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	device->CreateRenderTargetView(color.Get(), &renderTargetView, rtv);
 
+	// SRV
 	// This is CPU descriptor storage, not the shader-visible frame heap.
 	// Sampling copies the SRV into FrameResources later; copying a descriptor does not copy the pixels.
 	auto srvHeap = std::make_unique<DescriptorHeap>();
-	prepared = srvHeap->Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, false);
+	prepared = srvHeap->Initialize(
+		device,
+		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+		1,
+		false);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -130,6 +151,7 @@ Result RenderTargetTextureGpuData::Initialize(
 
 	D3D12_CPU_DESCRIPTOR_HANDLE srv{};
 	prepared = srvHeap->GetCpuHandle(0, srv);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -140,9 +162,11 @@ Result RenderTargetTextureGpuData::Initialize(
 	shaderResourceView.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	shaderResourceView.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	shaderResourceView.Texture2D.MipLevels = 1;
+
 	device->CreateShaderResourceView(color.Get(), &shaderResourceView, srv);
 
 	const HRESULT descriptorStatus = device->GetDeviceRemovedReason();
+
 	if (FAILED(descriptorStatus))
 	{
 		return MakeApiFailure("CreateViews(RenderTargetTexture): device removed", descriptorStatus);
@@ -152,6 +176,7 @@ Result RenderTargetTextureGpuData::Initialize(
 	// Even equal-sized outputs cannot share depth values because their Cameras and Objects may differ.
 	auto depth = std::make_unique<DepthTexture>();
 	prepared = depth->Ensure(device, description.width, description.height);
+
 	if (!prepared.IsSuccess())
 	{
 		return prepared;
@@ -164,9 +189,11 @@ Result RenderTargetTextureGpuData::Initialize(
 	m_depth = std::move(depth);
 	m_rtv = rtv;
 	m_srv = srv;
+
 	viewFormat = nativeFormat;
 	width = description.width;
 	height = description.height;
+
 	return {};
 }
 

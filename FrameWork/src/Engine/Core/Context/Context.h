@@ -11,11 +11,11 @@ class CollisionSystem;
 // No native Device, CommandList, descriptor allocator or old GPU manager escapes.
 struct EngineContext
 {
-    rendering::Renderer* pRenderer = nullptr;
-    RenderAssetResources* pRenderAssets = nullptr;
-    AssetManager* pAssetManager = nullptr;
-    ActorImprintSystem* pActorImprintSystem = nullptr;
-    AudioManager* pAudioManager = nullptr;
+	rendering::Renderer* pRenderer = nullptr;
+	RenderAssetResources* pRenderAssets = nullptr;
+	AssetManager* pAssetManager = nullptr;
+	ActorImprintSystem* pActorImprintSystem = nullptr;
+	AudioManager* pAudioManager = nullptr;
 };
 
 struct FrameContext
@@ -24,5 +24,5 @@ struct FrameContext
 
 struct GameContext : public EngineContext
 {
-    CollisionSystem* pCollisionManager = nullptr;
+	CollisionSystem* pCollisionManager = nullptr;
 };

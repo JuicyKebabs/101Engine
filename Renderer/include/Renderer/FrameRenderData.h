@@ -1,8 +1,3 @@
-// R7 implementation guide: section 4.4.
-// CPU-owned frame values and non-owning resource identities are deliberately separate.
-// Submit moves the frame values, but Render resolves the latest accepted resource revisions.
-// Each View selects original Object indices; no FrozenObject conversion or parallel update is added.
-
 #pragma once
 
 #include "ResourceHandle.h"
@@ -14,6 +9,13 @@
 #include <optional>
 #include <variant>
 #include <vector>
+
+//----------------------------------------------------------------------------------------
+// FrameRenderData
+// A single submission of all the Views and Objects to be drawn in one Render() call.
+//The host constructs this value and passes it to SubmitFrameRenderData() in every frame.
+//----------------------------------------------------------------------------------------
+
 
 namespace rendering
 {
@@ -28,37 +30,37 @@ using ViewOutput = std::variant<WindowOutputHandle, RenderTargetTextureHandle>;
 // Overlay preserves submission order, omits Depth and loads color only after an earlier frame pass wrote it.
 enum class ViewKind
 {
-    Scene,
-    Overlay
+	Scene,
+	Overlay
 };
 
 // This explicit per-Object mode controls Renderer-side facing during each View.
 // The Engine must submit the original World, not an already billboarded proxy World.
 enum class BillboardMode
 {
-    None,
-    Spherical,
-    Cylindrical
+	None,
+	Spherical,
+	Cylindrical
 };
 
 // Pixel-space viewport in the selected output.
 // It maps projected coordinates to pixels; it does not limit a Scene attachment Clear.
 struct Viewport
 {
-    float x = 0;
-    float y = 0;
-    float width = 0;
-    float height = 0;
+	float x = 0;
+	float y = 0;
+	float width = 0;
+	float height = 0;
 };
 
 // Pixel-space half-open clipping rectangle used by the rasterizer.
 // It is intersected with the View/output; every Draw records its effective rectangle.
 struct ScissorRect
 {
-    std::int32_t left = 0;
-    std::int32_t top = 0;
-    std::int32_t right = 0;
-    std::int32_t bottom = 0;
+	std::int32_t left = 0;
+	std::int32_t top = 0;
+	std::int32_t right = 0;
+	std::int32_t bottom = 0;
 };
 
 // World-space sphere: the submitter includes any vertex deformation.
@@ -67,15 +69,15 @@ struct ScissorRect
 // A missing bound means no frustum culling, not an invisible Object.
 struct BoundingSphere
 {
-    Vector3 center;
-    float radius = 0;
+	Vector3 center;
+	float radius = 0;
 };
 
 // Explicit no-VB/no-IB path, typically driven by SV_VertexID.
 // A nonzero vertexCount is required; the normal Geometry handle and DrawRange must be absent/default.
 struct ProceduralGeometry
 {
-    std::uint32_t vertexCount = 0;
+	std::uint32_t vertexCount = 0;
 };
 
 // For registered Geometry, first/count select indices when indexed, otherwise vertices.
@@ -83,34 +85,41 @@ struct ProceduralGeometry
 // Procedural draws instead take the complete count from ProceduralGeometry.
 struct DrawRange
 {
-    std::uint32_t first = 0;
-    // Zero selects the remaining registered Geometry. Procedural uses vertexCount.
-    std::uint32_t count = 0;
-    std::int32_t baseVertex = 0;
+	std::uint32_t first = 0;
+
+	// Zero selects the remaining registered Geometry. Procedural uses vertexCount.
+	std::uint32_t count = 0;
+	std::int32_t baseVertex = 0;
 };
 
+// A unit of the drawing an object in a specific View.
+// Describe what is drawn, how it looks, where it is, and which Views it appears in.
 // One immutable submitted value may appear in multiple View index lists.
 // Billboard changes only temporary draw constants; the stored World is never overwritten.
 struct RenderObject
 {
-    GeometryHandle geometry;
-    MaterialHandle material;
-    Matrix4x4 world = Matrix4x4::Identity();
-    Vector4 tint{ 1, 1, 1, 1 };
-    // Empty means every View. Overlay participants should use explicit membership.
-    std::vector<ViewId> targetViews;
-    // No persistent Content pointers are stored with Object membership.
-    // Each resource handle is resolved against its owner during Render.
-    std::optional<BoundingSphere> bounds;
-    // Zero means unknown provenance, so registered Geometry Bounds cannot cull.
-    // Content revision is separate from owner/slot/generation identity.
-    std::uint64_t boundsGeometryRevision = 0;
-    // Opt-in projection. Engine defaults differ by Component type.
-    bool castShadow = false;
-    BillboardMode billboard = BillboardMode::None;
-    std::optional<ProceduralGeometry> procedural;
-    DrawRange drawRange;
-    std::optional<ScissorRect> scissor;
+	GeometryHandle geometry;
+	MaterialHandle material;
+	Matrix4x4 world = Matrix4x4::Identity();
+	Vector4 tint{ 1, 1, 1, 1 };
+
+	// Empty means every View. Overlay participants should use explicit membership.
+	std::vector<ViewId> targetViews;
+
+	// No persistent Content pointers are stored with Object membership.
+	// Each resource handle is resolved against its owner during Render.
+	std::optional<BoundingSphere> bounds;
+
+	// Zero means unknown provenance, so registered Geometry Bounds cannot cull.
+	// Content revision is separate from owner/slot/generation identity.
+	std::uint64_t boundsGeometryRevision = 0;
+
+	// Optional settings for this draw.
+	bool castShadow = false;
+	BillboardMode billboard = BillboardMode::None;
+	std::optional<ProceduralGeometry> procedural;
+	DrawRange drawRange;
+	std::optional<ScissorRect> scissor;
 };
 
 // Camera/projection/settings are owned frame values.
@@ -118,57 +127,60 @@ struct RenderObject
 // Resize does not automatically rewrite a previously submitted projection matrix.
 struct RenderView
 {
-    ViewOutput output;
-    Matrix4x4 view = Matrix4x4::Identity();
-    Matrix4x4 projection = Matrix4x4::Identity();
-    Vector3 cameraPosition;
-    // Multiplicative exposure in linear HDR space; Engine currently uses 1.0.
-    // This numeric default is an implementation proposal, not a user-specified value.
-    float exposure = 1.0f;
-    DrawSettings drawSettings;
-    ViewId id = 0;
-    ViewKind kind = ViewKind::Scene;
-    // Omitted means the current complete output extent, resolved during Render.
-    std::optional<Viewport> viewport;
-    // The default matches the output allocation's optimized-clear hint.
-    // Other clear colors remain valid, but the DX12 debug layer may report a performance warning.
-    std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
+	ViewOutput output;
+	Matrix4x4 view = Matrix4x4::Identity();
+	Matrix4x4 projection = Matrix4x4::Identity();
+	Vector3 cameraPosition;
+
+	// Multiplicative exposure in linear HDR space; Engine currently uses 1.0.
+	// This numeric default is an implementation proposal, not a user-specified value.
+	float exposure = 1.0f;
+	DrawSettings drawSettings;
+	ViewId id = 0;
+	ViewKind kind = ViewKind::Scene;
+
+	// Omitted means the current complete output extent, resolved during Render.
+	std::optional<Viewport> viewport;
+
+	// The default matches the output allocation's optimized-clear hint.
+	// Other clear colors remain valid, but the DX12 debug layer may report a performance warning.
+	std::array<float, 4> clearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
 };
 
 // An auxiliary draw refers to the original Object, preserving one owning array.
 // A per-draw Material substitution changes only that execution's resolution.
 struct AuxiliaryDraw
 {
-    std::size_t objectIndex = 0;
-    std::optional<MaterialHandle> materialOverride;
+	std::size_t objectIndex = 0;
+	std::optional<MaterialHandle> materialOverride;
 };
 
 enum class AuxiliaryStage
 {
-    BeforeDisplayTransform,
-    AfterOverlay
+	BeforeDisplayTransform,
+	AfterOverlay
 };
 
 enum class AuxiliaryColorLoad
 {
-    Clear,
-    Load
+	Clear,
+	Load
 };
 
-// A value-only request. The host knows selection/Collider meaning; Renderer
-// owns attachment resolution, Graph ordering, commands and GPU lifetime.
+// An auxiliary pass is a complete render of selected Objects into a separate output.
 struct AuxiliaryPass
 {
-    ViewId id = 0;
-    ViewId sourceViewId = 0;
-    std::string name;
-    AuxiliaryStage stage = AuxiliaryStage::BeforeDisplayTransform;
-    // nullopt means the source View's current color (private HDR for Scene).
-    std::optional<RenderTargetTextureHandle> colorOutput;
-    AuxiliaryColorLoad colorLoad = AuxiliaryColorLoad::Load;
-    std::array<float, 4> clearColor{};
-    bool useSourceDepth = false;
-    std::vector<AuxiliaryDraw> draws;
+	ViewId id = 0;
+	ViewId sourceViewId = 0;
+	std::string name;
+	AuxiliaryStage stage = AuxiliaryStage::BeforeDisplayTransform;
+
+	// nullopt means the source View's current color (private HDR for Scene).
+	std::optional<RenderTargetTextureHandle> colorOutput;
+	AuxiliaryColorLoad colorLoad = AuxiliaryColorLoad::Load;
+	std::array<float, 4> clearColor{};
+	bool useSourceDepth = false;
+	std::vector<AuxiliaryDraw> draws;
 };
 
 // Submit owns these values. Resource contents are selected during Render.
@@ -178,15 +190,15 @@ struct AuxiliaryPass
 // Updates, Destroy or Resize between Submit and Render therefore affect resource resolution.
 struct FrameRenderData
 {
-    std::vector<RenderObject> objects;
-    std::vector<RenderView> views;
-    std::vector<AuxiliaryPass> auxiliaryPasses;
-    std::optional<DirectionalLight> directionalLight;
-    float time = 0;
+	std::vector<RenderObject> objects;
+	std::vector<RenderView> views;
+	std::vector<AuxiliaryPass> auxiliaryPasses;
+	std::optional<DirectionalLight> directionalLight;
+	float time = 0;
 
 private:
-    friend class Renderer;
-    bool hasPendingSubmission = false;
+	friend class Renderer;
+	bool hasPendingSubmission = false;
 };
 
 }

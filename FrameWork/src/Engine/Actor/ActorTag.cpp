@@ -8,7 +8,12 @@ namespace
 	std::wstring ToWide(std::string_view value)
 	{
 		const int size = MultiByteToWideChar(
-			CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
+			CP_UTF8,
+			MB_ERR_INVALID_CHARS,
+			value.data(),
+			static_cast<int>(value.size()),
+			nullptr,
+			0);
 
 		if (size <= 0)
 		{
@@ -16,8 +21,13 @@ namespace
 		}
 
 		std::wstring result(static_cast<std::size_t>(size), L'\0');
-		MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
-			static_cast<int>(value.size()), result.data(), size);
+		MultiByteToWideChar(
+			CP_UTF8,
+			MB_ERR_INVALID_CHARS,
+			value.data(),
+			static_cast<int>(value.size()),
+			result.data(),
+			size);
 		return result;
 	}
 }
@@ -83,16 +93,25 @@ bool TagRegistry::NormalizeUserTagName(std::string_view input, std::string& outp
 	}
 
 	if (MultiByteToWideChar(
-			CP_UTF8, MB_ERR_INVALID_CHARS, output.data(), static_cast<int>(output.size()), nullptr, 0) == 0)
+		CP_UTF8,
+		MB_ERR_INVALID_CHARS,
+		output.data(),
+		static_cast<int>(output.size()),
+		nullptr,
+		0) == 0)
 	{
 		return fail("Tag name must be valid UTF-8.");
 	}
 
 	std::string folded = output;
-	std::transform(folded.begin(), folded.end(), folded.begin(), [](unsigned char c)
-	{
-		return static_cast<char>(std::tolower(c));
-	});
+	std::transform(
+		folded.begin(),
+		folded.end(),
+		folded.begin(),
+		[](unsigned char c)
+		{
+			return static_cast<char>(std::tolower(c));
+		});
 
 	if (folded == "none" || folded == "maincamera" || folded == "initialsky")
 	{
@@ -109,8 +128,12 @@ bool TagRegistry::NamesEqualCaseInsensitive(std::string_view left, std::string_v
 
 	if ((left.empty() || !wideLeft.empty()) && (right.empty() || !wideRight.empty()))
 	{
-		return CompareStringOrdinal(wideLeft.data(), static_cast<int>(wideLeft.size()), wideRight.data(),
-				   static_cast<int>(wideRight.size()), TRUE) == CSTR_EQUAL;
+		return CompareStringOrdinal(
+			wideLeft.data(),
+			static_cast<int>(wideLeft.size()),
+			wideRight.data(),
+			static_cast<int>(wideRight.size()),
+			TRUE) == CSTR_EQUAL;
 	}
 
 	return left == right;
@@ -281,7 +304,9 @@ std::vector<std::pair<TagId, std::string>> TagRegistry::GetRegisteredTags() cons
 		}
 	}
 
-	std::sort(tags.begin() + 1, tags.end(),
+	std::sort(
+		tags.begin() + 1,
+		tags.end(),
 		[](const auto& left, const auto& right) { return left.second < right.second; });
 	return tags;
 }

@@ -1,14 +1,9 @@
-// R7 implementation guide: section 4.33.
-// Public orchestration and long-lived ownership for the independent Renderer.
-// Submit owns values; Render selects current resource contents and consumes that submission once.
-// Queue completion, end of CPU borrowing and retired-resource collection are separate steps.
-// R7 does not add Shader Reload, a material editor, parallel mutation or multiple in-flight frames.
-
 #include "Renderer/Renderer.h"
 #include "Backend/Backend.h"
 #include "Backend/DepthTexture.h"
 #include "FrameRenderer.h"
-#include "SceneFrameResources.h"
+#include "FrameDrawContext.h"
+#include "SceneOutputResources.h"
 #include "Resource/ResourceSlotTable.h"
 #include "Resource/GeometryRegistry.h"
 #include "Resource/TextureRegistry.h"
@@ -20,11 +15,8 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <array>
-#include <cassert>
 #include <algorithm>
 #include <memory>
-#include <new>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -36,9 +28,10 @@ namespace rendering
 
 constexpr std::uint32_t InvalidResourceOwnerId = (std::numeric_limits<std::uint32_t>::max)();
 
+// Reserve a unique resource owner ID for each Renderer instance.
 uint32_t ReserveResourceOwnerId() noexcept
 {
-	static std::atomic<uint32_t> nextId{ 0 };	// This ID is shared across all Renderer instances in a DLL.
+	static std::atomic<uint32_t> nextId{0}; // This ID is shared across all Renderer instances in a DLL.
 
 	uint32_t candidate = nextId.load(std::memory_order_relaxed);
 
@@ -60,27 +53,26 @@ namespace
 using GeometryUploadTarget = detail::GeometryUploadTarget;
 using TextureUploadTarget = detail::TextureUploadTarget;
 
-template<class Target, class Upload>
-struct UploadWork
+template <class Target, class Upload> struct UploadWork
 {
 	Target target;
 	std::unique_ptr<Upload> upload;
 	bool prepared = false;
 };
 
+} // namespace
 
-}
-
+//-----------------------------------------------------------
+// Private implementation details of the Renderer class.
+// Declarated in cpp file for hiding from the public header.
+//-----------------------------------------------------------
 struct Renderer::impl
 {
 	// Implementation details of the Renderer class go here.
 	backend::Backend backend;
-	std::optional<detail::GeometryRegistry> geometryResources;
-	std::optional<detail::TextureRegistry> textureResources;
-	std::optional<detail::RenderTargetTextureRegistry> renderTargetResources;
 	std::optional<detail::DrawResources> drawResources;
 	std::optional<backend::DepthTexture> sceneDepth;
-    std::optional<detail::SceneFrameResources> sceneFrameResources;
+	std::optional<detail::SceneOutputResources> sceneOutputResources;
 	uint32_t resourceOwnerId = InvalidResourceOwnerId;
 	std::optional<FrameRenderData> submittedFrame;
 
@@ -88,42 +80,47 @@ struct Renderer::impl
 	bool isRendering = false;
 	FailureKind stoppedFailure = FailureKind::General;
 
+	Result ProcessSubmittedFrame(FrameRenderData&& frame, std::vector<DrawDiagnostic>& diagnostics, std::size_t& drawn);
+
 	Result CheckPublicCall() const
 	{
 		if (!initialized)
 		{
-			return { false, "Renderer is not initialized." };
+			return {false, "Renderer is not initialized."};
 		}
 
 		if (stoppedFailure != FailureKind::General)
 		{
-			return { false, "Renderer is stopped after a fatal GPU failure.", stoppedFailure };
+			return {false, "Renderer is stopped after a fatal GPU failure.", stoppedFailure};
 		}
 
 		if (isRendering)
 		{
-			return { false, "Renderer does not allow API reentry during Render." };
+			return {false, "Renderer does not allow API reentry during Render."};
 		}
 
 		return {};
 	}
 
-	Result UploadSelectedResources(std::span<const GeometryUploadTarget> geometries, std::span<const TextureUploadTarget> textures);
-	
-    Result ObserveFailure(Result result)
-    {
-        if (!result.IsSuccess() && result.failureKind != FailureKind::General)
-        {
-            stoppedFailure = result.failureKind;
-        }
-        return result;
-    }
+	Result UploadSelectedResources(
+		std::span<const GeometryUploadTarget> geometries,
+		std::span<const TextureUploadTarget> textures);
+
+	Result ObserveFailure(Result result)
+	{
+		if (!result.IsSuccess() && result.failureKind != FailureKind::General)
+		{
+			// Store the failure kind for later reference.
+			stoppedFailure = result.failureKind;
+		}
+
+		return result;
+	}
 
 	Result CollectDestroyedResources();
 };
 
-Renderer::Renderer()
-	: m_pImpl(std::make_unique<impl>())
+Renderer::Renderer() : m_pImpl(std::make_unique<impl>())
 {
 	OutputDebugStringW(L"[101Renderer] Renderer constructed.\n");
 }
@@ -139,7 +136,7 @@ Result Renderer::Initialize(const RendererConfiguration& configuration)
 	// Avoiding reinitialization
 	if (m_pImpl->initialized)
 	{
-		return Result{ false, "Renderer is already initialized." };
+		return Result{false, "Renderer is already initialized."};
 	}
 
 	// Reserve a unique resource owner ID for this Renderer instance.
@@ -147,7 +144,7 @@ Result Renderer::Initialize(const RendererConfiguration& configuration)
 
 	if (ownerId == InvalidResourceOwnerId)
 	{
-		return { false, "Resource owner ID space is exhausted." };
+		return {false, "Resource owner ID space is exhausted."};
 	}
 
 	// Initialize the backend with the provided configuration.
@@ -158,43 +155,46 @@ Result Renderer::Initialize(const RendererConfiguration& configuration)
 		return result;
 	}
 
-	m_pImpl->geometryResources.emplace(ownerId);
-	m_pImpl->textureResources.emplace(ownerId);
-	m_pImpl->renderTargetResources.emplace(ownerId);
+	// Send the owner ID to each resource registry for tracking ownership.
 	m_pImpl->drawResources.emplace(ownerId);
 	m_pImpl->sceneDepth.emplace();
-    m_pImpl->sceneFrameResources.emplace();
+	m_pImpl->sceneOutputResources.emplace();
 	m_pImpl->resourceOwnerId = ownerId;
-    m_pImpl->initialized = true;
+	m_pImpl->initialized = true;
 
-    // Do not expose a usable Renderer that cannot display missing project data.
-    // All provisional resident registrations are released by Finalize on failure.
-    Result residentResult = m_pImpl->drawResources->InitializeFallbacks(
-        *m_pImpl->geometryResources, *m_pImpl->textureResources);
-    if (residentResult.IsSuccess())
-    {
-        GeometryUploadTarget geometryTarget;
-        geometryTarget.handle = m_pImpl->drawResources->fallbackGeometry;
-        geometryTarget.content = m_pImpl->geometryResources->FindRegisteredContent(geometryTarget.handle);
-        TextureUploadTarget textureTarget;
-        textureTarget.handle = m_pImpl->drawResources->fallbackTexture;
-        textureTarget.content = m_pImpl->textureResources->FindRegisteredContent(textureTarget.handle);
-        residentResult = m_pImpl->UploadSelectedResources(std::span(&geometryTarget, 1), std::span(&textureTarget, 1));
-    }
+	// Do not expose a usable Renderer that cannot display missing project data.
+	// All provisional resident registrations are released by Finalize on failure.
+	Result residentResult = m_pImpl->drawResources->InitializeFallbacks();
 
-    if (residentResult.IsSuccess())
-    {
-        residentResult = m_pImpl->sceneFrameResources->Initialize(m_pImpl->backend, *m_pImpl->drawResources);
-    }
+	if (residentResult.IsSuccess())
+	{
+		// Register the fallback geometry and texture for upload to the GPU.
+		GeometryUploadTarget geometryTarget;
+		geometryTarget.handle = m_pImpl->drawResources->fallbackGeometry;
+		geometryTarget.content = m_pImpl->drawResources->FindContent(geometryTarget.handle);
 
-    if (!residentResult.IsSuccess())
-    {
-        residentResult = m_pImpl->ObserveFailure(std::move(residentResult));
-        Finalize();
-        return residentResult;
-    }
+		TextureUploadTarget textureTarget;
+		textureTarget.handle = m_pImpl->drawResources->fallbackTexture;
+		textureTarget.content = m_pImpl->drawResources->FindContent(textureTarget.handle);
 
-    return {};
+		residentResult = m_pImpl->UploadSelectedResources(std::span(&geometryTarget, 1), std::span(&textureTarget, 1));
+	}
+
+	if (residentResult.IsSuccess())
+	{
+		// Initialize the SceneOutputResources, which manages GPU resources for output rendering.
+		residentResult = m_pImpl->sceneOutputResources->Initialize(m_pImpl->backend, *m_pImpl->drawResources);
+	}
+
+	if (!residentResult.IsSuccess())
+	{
+		// Finalize the Renderer when initialization fails, and return the failure result.
+		residentResult = m_pImpl->ObserveFailure(std::move(residentResult));
+		Finalize();
+		return residentResult;
+	}
+
+	return {};
 }
 
 void Renderer::Finalize()
@@ -222,12 +222,9 @@ void Renderer::Finalize()
 	m_pImpl->submittedFrame.reset();
 	m_pImpl->backend.Finalize();
 
-	m_pImpl->geometryResources.reset();
-	m_pImpl->textureResources.reset();
-	m_pImpl->renderTargetResources.reset();
 	m_pImpl->drawResources.reset();
 	m_pImpl->sceneDepth.reset();
-    m_pImpl->sceneFrameResources.reset();
+	m_pImpl->sceneOutputResources.reset();
 
 	m_pImpl->resourceOwnerId = InvalidResourceOwnerId;
 	m_pImpl->stoppedFailure = FailureKind::General;
@@ -239,64 +236,75 @@ void Renderer::Finalize()
 WindowOutputCreationResult Renderer::CreateWindowOutput(const Win32WindowOutputDesc& outputDesc)
 {
 	Result available = m_pImpl->CheckPublicCall();
+
 	if (!available.IsSuccess())
 	{
-		return { std::move(available), {} };
+		return {std::move(available), {}};
 	}
 
 	// Create the window output using the backend and return the result.
 	return m_pImpl->backend.CreateWindowOutput(outputDesc);
 }
 
-// Validate everything that determines acceptance before moving the caller's frame.
-// An accepted frame owns Camera/Object values but not fixed Content revisions.
-// The submission is consumed exactly once even if its later Render fails.
 Result Renderer::SubmitFrameRenderData(FrameRenderData&& frame)
 {
-    auto& state = *m_pImpl;
-    Result result = state.CheckPublicCall();
-    if (!result.IsSuccess())
-    {
-        return result;
-    }
-    if (state.submittedFrame && state.submittedFrame->hasPendingSubmission)
-    {
-        return detail::Fail("SubmitFrameRenderData: a submission is already pending.");
-    }
+	auto& state = *m_pImpl;
+	Result result = state.CheckPublicCall();
 
-    result = ValidateViewStructure(frame);
-    if (!result.IsSuccess())
-    {
-        return result;
-    }
-    for (const auto& view : frame.views)
-    {
-        if (const auto* window = std::get_if<WindowOutputHandle>(&view.output))
-        {
-            if (!state.backend.IsWindowOutputValid(*window))
-            {
-                return detail::Fail("SubmitFrameRenderData: invalid Window output.");
-            }
-        }
-        else
-        {
-            const auto handle = std::get<RenderTargetTextureHandle>(view.output);
-            if (!state.renderTargetResources->FindForNewUse(handle))
-            {
-                return detail::Fail("SubmitFrameRenderData: invalid RenderTarget output.");
-            }
-        }
-    }
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
 
-    result = detail::ValidateFrameInputs(frame);
-    if (!result.IsSuccess())
-    {
-        return result;
-    }
-    static_assert(std::is_nothrow_move_constructible_v<FrameRenderData>);
-    frame.hasPendingSubmission = true;
-    state.submittedFrame.emplace(std::move(frame));
-    return {};
+	// Allow once to submit in a frame while Render is not executing.
+	if (state.submittedFrame && state.submittedFrame->hasPendingSubmission)
+	{
+		return detail::Fail("SubmitFrameRenderData: a submission is already pending.");
+	}
+
+	// Validate all views in the frame before accepting the submission.
+	result = ValidateViewStructure(frame);
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	for (const auto& view : frame.views)
+	{
+		// Validate that the output for each kind of views.
+		if (const auto* window = std::get_if<WindowOutputHandle>(&view.output))
+		{ // Window output(back buffer)
+			if (!state.backend.IsWindowOutputValid(*window))
+			{
+				return detail::Fail("SubmitFrameRenderData: invalid Window output.");
+			}
+		}
+		else
+		{ // Render target texture output
+			const auto handle = std::get<RenderTargetTextureHandle>(view.output);
+
+			// Try to get handle from the registry for being used.
+			if (!state.drawResources->FindContent(handle))
+			{
+				return detail::Fail("SubmitFrameRenderData: invalid RenderTarget output.");
+			}
+		}
+	}
+
+	// Validate values in the FrameRenderData.
+	result = detail::ValidateFrameInputs(frame);
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	// Accept submission.
+	frame.hasPendingSubmission = true;
+	state.submittedFrame.emplace(std::move(frame));
+
+	return {};
 }
 
 // One synchronous rendering window owns all temporary borrows and View lists.
@@ -314,13 +322,15 @@ RenderResult Renderer::Render()
 		return rejected;
 	}
 
-
-	// RAII guard to ensure that the isRendering flag is reset 
+	// RAII guard to ensure that the isRendering flag is reset
 	// even if an exception occurs or the function exits early.
 	struct RenderScope
 	{
 		bool* isRendering = nullptr;
-		~RenderScope() { *isRendering = false; }
+		~RenderScope()
+		{
+			*isRendering = false;
+		}
 	};
 
 	state.isRendering = true;
@@ -340,180 +350,10 @@ RenderResult Renderer::Render()
 		FrameRenderData current = std::move(*state.submittedFrame);
 		state.submittedFrame.reset();
 
-		// Process the submitted frame and its resources within one borrowed Context scope.
-		// This encapsulates the rendering logic.
-        const auto process = [&]() -> Result
-            {
-                Result pruned = state.sceneFrameResources->Prune(state.backend,
-                    *state.renderTargetResources, *state.drawResources);
-                if (!pruned.IsSuccess())
-                {
-                    return pruned;
-                }
-
-                graph::RenderGraph graph;
-                graph::GraphExecutor executor(graph, state.backend);
-                graph::FrameResourceBindings bindings(state.backend, graph, executor);
-                detail::FrameDrawContext context(current, *state.drawResources,
-                    *state.geometryResources, *state.textureResources, state.backend,
-                    *state.sceneDepth, bindings, diagnostics, drawn, &*state.renderTargetResources, &*state.sceneFrameResources);
-                FrameRenderer frameRenderer;
-                // Each View receives its own source-index list; Object values remain in current.
-                // Selection occurs before Upload so shared resources can be deduplicated across Views.
-                std::vector<ViewRenderList> lists;
-                Result selected = frameRenderer.SelectViews(current, context, lists);
-                if (!selected.IsSuccess())
-                {
-                    return selected;
-                }
-
-                std::vector<GeometryUploadTarget> geometries;
-                std::vector<TextureUploadTarget> textures;
-                if (current.views.empty())
-                {
-                    detail::RenderList uploadOnly;
-                    DrawSettings settings;
-                    selected = frameRenderer.SelectSceneDraws(current, context, uploadOnly);
-                    if (!selected.IsSuccess())
-                    {
-                        return selected;
-                    }
-                    selected = context.CollectUploadTargets(uploadOnly, settings, geometries, textures);
-                    if (!selected.IsSuccess())
-                    {
-                        return selected;
-                    }
-                }
-                for (const auto& list : lists)
-                {
-                    context.SetActiveView(list.effectiveView.id);
-                    context.SetSceneInputs(&current.views[list.viewIndex], list.sampledShadow,
-                        list.shadowViewProjection, list.shadowEnabled);
-                    for (std::size_t drawIndex = 0; drawIndex < list.objectIndices.size(); ++drawIndex)
-                    {
-                        detail::RenderList singleDraw;
-                        singleDraw.push_back(list.objectIndices[drawIndex]);
-                        selected = context.CollectUploadTargets(singleDraw, list.SettingsFor(drawIndex), geometries, textures);
-                        if (!selected.IsSuccess())
-                        {
-                            return selected;
-                        }
-                    }
-                }
-                // Upload is independent work and may already reach the GPU.
-                // A later Graph Compile/recording failure prevents the graphics list, but does not cancel this Upload.
-                Result uploaded = state.UploadSelectedResources(geometries, textures);
-                if (!uploaded.IsSuccess())
-                {
-                    return uploaded;
-                }
-
-                if (lists.size() > 262144 / 3)
-                {
-                    return detail::Fail("Frame has too many View resources.");
-                }
-                std::uint64_t constantBytes = 0;
-                std::uint64_t descriptorCount = 0;
-                // Include View attachment holds plus each selected draw's conservative requirements.
-                // This is bounded before conversion to UINT and before BeginFrameResources hands out any addresses.
-                std::uint64_t retainedCount = lists.size() * 3 + 1;
-                for (auto& list : lists)
-                {
-                    context.SetActiveView(list.effectiveView.id);
-                    context.SetSceneInputs(&current.views[list.viewIndex], list.sampledShadow,
-                        list.shadowViewProjection, list.shadowEnabled);
-                    detail::RenderList preparedIndices;
-                    std::vector<DrawSettings> preparedSettings;
-                    for (std::size_t drawIndex = 0; drawIndex < list.objectIndices.size(); ++drawIndex)
-                    {
-                        detail::RenderList singleDraw;
-                        singleDraw.push_back(list.objectIndices[drawIndex]);
-                        const DrawSettings& settings = list.SettingsFor(drawIndex);
-                        Result prepared = context.CheckPreparedDraws(singleDraw, settings);
-                        if (!prepared.IsSuccess())
-                        {
-                            return prepared;
-                        }
-
-                        prepared = context.EstimateRequirements(singleDraw, settings,
-                            constantBytes, descriptorCount, retainedCount);
-                        if (!prepared.IsSuccess())
-                        {
-                            return prepared;
-                        }
-
-                        if (!singleDraw.empty())
-                        {
-                            preparedIndices.push_back(singleDraw.front());
-                            if (!list.perDrawSettings.empty())
-                            {
-                                preparedSettings.push_back(settings);
-                            }
-                        }
-                    }
-
-                    list.objectIndices.swap(preparedIndices);
-                    list.perDrawSettings.swap(preparedSettings);
-                }
-                Result capacity = state.backend.EnsureFrameCapacity(static_cast<UINT>(constantBytes),
-                    static_cast<UINT>(descriptorCount), static_cast<UINT>(retainedCount));
-                if (!capacity.IsSuccess())
-                {
-                    return capacity;
-                }
-
-                // All dynamic storage growth is complete. From here, Buffer/Heap addresses are stable for this frame.
-                // Declare resources and Compile before recording native commands.
-                Result begun = state.backend.BeginFrameResources();
-                if (!begun.IsSuccess())
-                {
-                    return begun;
-                }
-                Result built = frameRenderer.BuildViews(current, context, lists, graph);
-                if (!built.IsSuccess())
-                {
-                    return built;
-                }
-                Result compiled = graph.Compile();
-                if (!compiled.IsSuccess())
-                {
-                    return compiled;
-                }
-                Result executed = executor.Execute();
-                if (!executed.IsSuccess())
-                {
-                    return executed;
-                }
-
-                // Present each used Window once even when several Overlay Views target it.
-                // Offscreen-only frames must not Present an omitted Window.
-                std::vector<std::uint64_t> presentedWindows;
-                for (const auto& view : current.views)
-                {
-                    const auto* window = std::get_if<WindowOutputHandle>(&view.output);
-                    if (!window)
-                    {
-                        continue;
-                    }
-                    const auto duplicate = std::find(presentedWindows.begin(), presentedWindows.end(), window->value);
-                    if (duplicate != presentedWindows.end())
-                    {
-                        continue;
-                    }
-                    Result presented = state.backend.Present(*window);
-                    if (!presented.IsSuccess())
-                    {
-                        return presented;
-                    }
-                    presentedWindows.push_back(window->value);
-                }
-                return {};
-            };
-
 		// Call the process lambda and return its result.
 		try
 		{
-			result = process();
+			result = state.ProcessSubmittedFrame(std::move(current), diagnostics, drawn);
 		}
 		catch (const std::bad_alloc&)
 		{
@@ -523,36 +363,35 @@ RenderResult Renderer::Render()
 		{
 			result = detail::Fail("Render: size unsupported");
 		}
-
 	}
 
 	// Stop the renderer if a fatal failure occurred during rendering process.
 	const auto stopIfFatal = [&](const Result& status)
+	{
+		if (!status.IsSuccess() && status.failureKind != FailureKind::General)
 		{
-			if (!status.IsSuccess() && status.failureKind != FailureKind::General)
-			{
-				state.stoppedFailure = status.failureKind;
-			}
-		};
+			state.stoppedFailure = status.failureKind;
+		}
+	};
 
 	stopIfFatal(result);
 
 	// Cleanup failure is not hidden by an earlier draw error, and fatal classification is never downgraded.
 	// This executes after the Graph/context/list borrows have left their process scope.
 	const auto mergeCleanup = [&](Result cleanup)
+	{
+		stopIfFatal(cleanup);
+
+		if (!cleanup.IsSuccess())
 		{
-			stopIfFatal(cleanup);
-
-			if (!cleanup.IsSuccess())
+			if (!result.IsSuccess())
 			{
-				if (!result.IsSuccess())
-				{
-					cleanup.message = result.message + "\n" + cleanup.message;
-				}
-
-				result = std::move(cleanup);
+				cleanup.message = result.message + "\n" + cleanup.message;
 			}
-		};
+
+			result = std::move(cleanup);
+		}
+	};
 
 	if (state.stoppedFailure == FailureKind::General)
 	{
@@ -564,9 +403,10 @@ RenderResult Renderer::Render()
 		mergeCleanup(state.CollectDestroyedResources());
 	}
 
-	const auto disposition = !result.IsSuccess() ? RenderDisposition::NotProcessed :
-		(hadSubmission ? RenderDisposition::Processed : RenderDisposition::SkippedNoSubmission);
-	
+	const auto disposition =
+		!result.IsSuccess() ? RenderDisposition::NotProcessed
+		: (hadSubmission ? RenderDisposition::Processed : RenderDisposition::SkippedNoSubmission);
+
 	const auto completedDraws = result.IsSuccess() ? drawn : 0;
 	RenderResult rendered;
 	rendered.status = std::move(result);
@@ -576,76 +416,213 @@ RenderResult Renderer::Render()
 	return rendered;
 }
 
-GeometryRegistrationResult Renderer::RegisterGeometry(const GeometryDesc& desc)
+Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vector<DrawDiagnostic>& diagnostics, std::size_t& drawn)
 {
-	Result available = m_pImpl->CheckPublicCall();
-	if (!available.IsSuccess())
+	//----------------------------------------------------------------------------------------------
+	// 1. Cut down unusable outputs.
+	//----------------------------------------------------------------------------------------------
+	Result pruned = sceneOutputResources->PruneOutputs(backend, drawResources.value());
+
+	if (!pruned.IsSuccess())
 	{
-		return { std::move(available), {} };
+		return pruned;
 	}
 
-	return m_pImpl->geometryResources->Register(desc);
-}
+	//----------------------------------------------------------------------------------------------
+	// 2. Prepare temporal components for rendering.
+	//----------------------------------------------------------------------------------------------
+	graph::RenderGraph graph;											// Manager of all passes and resources for this frame.
+	graph::GraphExecutor executor(graph, backend);						// Executes the compiled graph and submits commands to the GPU.
+	FrameRenderer frameRenderer;										// Build the pass plan and record each pass in the graph.
+	graph::FrameResourceBindings bindings(backend, graph, executor);	// Bindings for all resources used in this frame.
+	detail::FrameDrawServices services;									// Services for the FrameDrawContext, including registries and backend access.
+	
+	services.draws = &*drawResources;					// Registry of all DrawObjects and their resources.
+	services.backend = &backend;						// Access to the DX12 backend for resource creation and command submission.
+	services.depth = &*sceneDepth;						//Depth texture used for depth testing and writing during rendering.
+	services.bindings = &bindings;						// Pointer to the FrameResourceBindings.
+	services.sceneResources = &*sceneOutputResources;	// Registry of all RenderTargetTexture resources used for output rendering.
 
-TextureRegistrationResult Renderer::RegisterTexture(const TextureDesc& desc)
-{
-	Result available = m_pImpl->CheckPublicCall();
-	if (!available.IsSuccess())
+	detail::FrameDrawContext context(frame, services, diagnostics, drawn);	// Context for selecting, uploading, and recording all draws in this frame.
+
+	//----------------------------------------------------------------------------------------------
+	// 3. Build the pass plan.
+	//----------------------------------------------------------------------------------------------
+
+	// Each View receives its own source-index list; Object values remain in current.
+	// Selection occurs before Upload so shared resources can be deduplicated across Views.
+	std::vector<PlannedPass> lists;
+	Result selected = frameRenderer.BuildPassPlan(frame, context, lists);
+
+	if (!selected.IsSuccess())
 	{
-		return { std::move(available), {} };
+		return selected;
 	}
-	return m_pImpl->textureResources->Register(desc);
-}
 
-Result Renderer::DestroyGeometry(GeometryHandle handle)
-{
-	Result available = m_pImpl->CheckPublicCall();
-	if (!available.IsSuccess())
+	//----------------------------------------------------------------------------------------------
+	// 4. Gather and upload all selected resources.
+	//----------------------------------------------------------------------------------------------
+	std::vector<GeometryUploadTarget> geometries;
+	std::vector<TextureUploadTarget> textures;
+
+	if (frame.views.empty())
 	{
-		return available;
+		std::vector<PlannedDraw> uploadOnly;
+
+		for (std::size_t index = 0; index < frame.objects.size(); ++index)
+		{
+			PlannedDraw draw;
+			draw.objectIndex = index;
+			uploadOnly.push_back(draw);
+		}
+
+		PassRecordingInputs inputs;
+		selected = context.CollectUploadTargets(uploadOnly, inputs, geometries, textures);
+
+		if (!selected.IsSuccess())
+		{
+			return selected;
+		}
 	}
 
-	const auto result = m_pImpl->geometryResources->RequestDestroy(handle);
-
-	if (result != detail::ResourceHandleValidationResult::Success)
+	for (const PlannedPass& pass : lists)
 	{
-		return {
-			false,
-			"DestroyGeometry: handle does not identify a registered geometry "
-			"in this renderer initialization."
-		};
+		const PassRecordingInputs inputs = MakePassRecordingInputs(frame, pass);
+		selected = context.CollectUploadTargets(pass.draws, inputs, geometries, textures);
+
+		if (!selected.IsSuccess())
+		{
+			return selected;
+		}
+	}
+
+	// Upload completes at this boundary, including frames with no Views.
+	// Later Graph failures leave no uncollected upload work.
+	Result uploaded = UploadSelectedResources(geometries, textures);
+
+	if (!uploaded.IsSuccess())
+	{
+		return uploaded;
+	}
+
+	//----------------------------------------------------------------------------------------------
+	// 5. Check that all selected resources are ready for GPU use.
+	//----------------------------------------------------------------------------------------------
+	std::uint64_t constantBytes = 0;
+	std::uint64_t descriptorCount = 0;
+
+	// Validate capacity before any GPU addresses are handed to commands.
+
+	for (PlannedPass& pass : lists)
+	{
+		const PassRecordingInputs inputs = MakePassRecordingInputs(frame, pass);
+		Result prepared = context.CheckPreparedDraws(pass.draws, inputs);
+
+		if (!prepared.IsSuccess())
+		{
+			return prepared;
+		}
+
+		prepared = context.EstimateRequirements(pass.draws, inputs, constantBytes, descriptorCount);
+
+		if (!prepared.IsSuccess())
+		{
+			return prepared;
+		}
+	}
+
+	Result capacity = backend.EnsureFrameCapacity(static_cast<UINT>(constantBytes), static_cast<UINT>(descriptorCount));
+
+	if (!capacity.IsSuccess())
+	{
+		return capacity;
+	}
+
+	//----------------------------------------------------------------------------------------------
+	// 6. Prepare for recording commands.
+	//----------------------------------------------------------------------------------------------
+
+	// All dynamic storage growth is complete. From here, Buffer/Heap addresses are stable for this frame.
+	// Declare resources and Compile before recording native commands.
+	Result begun = backend.BeginFrameResources();
+
+	if (!begun.IsSuccess())
+	{
+		return begun;
+	}
+
+	//----------------------------------------------------------------------------------------------
+	// 7. Register resource bindings for each planned pass.
+	//----------------------------------------------------------------------------------------------
+	Result built = frameRenderer.BuildViews(frame, context, lists, graph);
+
+	if (!built.IsSuccess())
+	{
+		return built;
+	}
+
+	//----------------------------------------------------------------------------------------------
+	// 8. Compile the graph (confirm all dependencies and state transitions of graph resources).
+	//----------------------------------------------------------------------------------------------
+
+	Result compiled = graph.Compile();
+
+	if (!compiled.IsSuccess())
+	{
+		return compiled;
+	}
+
+	//----------------------------------------------------------------------------------------------
+	// 9. Record every compiled pass and submit the command list to the GPU.
+	//----------------------------------------------------------------------------------------------
+	Result executed = executor.Execute();
+
+	if (!executed.IsSuccess())
+	{
+		return executed;
+	}
+
+	//----------------------------------------------------------------------------------------------
+	// 10. Present all Window outputs in the frame.
+	//----------------------------------------------------------------------------------------------
+	std::vector<std::uint64_t> presentedWindows;
+
+	for (const auto& view : frame.views)
+	{
+		const auto* window = std::get_if<WindowOutputHandle>(&view.output);
+
+		if (!window)
+		{
+			continue;
+		}
+
+		const auto duplicate = std::find(presentedWindows.begin(), presentedWindows.end(), window->value);
+
+		if (duplicate != presentedWindows.end())
+		{
+			continue;
+		}
+
+		Result presented = backend.Present(*window);
+
+		if (!presented.IsSuccess())
+		{
+			return presented;
+		}
+
+		presentedWindows.push_back(window->value);
 	}
 
 	return {};
 }
 
-Result Renderer::DestroyTexture(TextureHandle handle)
+Result Renderer::impl::UploadSelectedResources(
+	std::span<const GeometryUploadTarget> geometries,
+	std::span<const TextureUploadTarget> textures)
 {
-	Result available = m_pImpl->CheckPublicCall();
-	if (!available.IsSuccess())
+	if (!initialized || !drawResources)
 	{
-		return available;
-	}
-
-	const auto result = m_pImpl->textureResources->RequestDestroy(handle);
-
-	if (result != detail::ResourceHandleValidationResult::Success)
-	{
-		return {
-			false,
-			"DestroyTexture: handle does not identify a registered texture "
-			"in this renderer initialization."
-		};
-	}
-
-	return {};
-}
-
-Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTarget> geometries, std::span<const TextureUploadTarget> textures)
-{
-	if (!initialized || !geometryResources || !textureResources)
-	{
-		return { false, "UploadSelectedResources: Renderer is not initialized." };
+		return {false, "UploadSelectedResources: Renderer is not initialized."};
 	}
 
 	//-------------------------------------------------------------------------------------------------
@@ -654,6 +631,7 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 	//    Destination resources remain owned by their registries.
 	//-------------------------------------------------------------------------------------------------
 	Result result = backend.CollectUploads();
+
 	if (!result.IsSuccess())
 	{
 		return result;
@@ -663,66 +641,68 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 	using TextureWork = UploadWork<TextureUploadTarget, backend::TextureUploadData>;
 	std::vector<GeometryWork> geometryWork;
 	std::vector<TextureWork> textureWork;
+
 	//-------------------------------------------------------------------------------------------------
 	// 2. Gather the resources for upload.
 	//    Validate the selected content without replacing it or rejecting an accepted Destroy request.
 	//-------------------------------------------------------------------------------------------------
-	const auto gather = [](auto targets, auto& registry, auto& work) -> Result
+	const auto gather = [](auto targets, detail::DrawResources& registry, auto& work) -> Result
+	{
+		work.reserve(targets.size());
+
+		for (const auto& target : targets)
 		{
-			work.reserve(targets.size());
-
-			for (const auto& target : targets)
+			// Check if registry still has the same content for the given handle.
+			if (!target.content || !(registry.FindContent(target.handle) == target.content))
 			{
-				// Check if registry still has the same content for the given handle.
-				if (!target.content || !registry.OwnsContent(target.handle, target.content))
-				{
-					return { false, "Upload target no longer matches its registered content." };
-				}
-
-				// Only pending content can be uploaded.
-				if (target.content->state.preparationState != detail::ResourcePreparationState::Pending)
-				{
-					continue;
-				}
-
-				// Check duplication of the same target in the work list.
-				const auto duplicate = std::find_if(work.begin(), work.end(), [&](const auto& item)
-					{
-						return item.target.handle == target.handle;
-					});
-
-				if (duplicate != work.end())
-				{
-					continue;
-				}
-
-				if (target.content->gpuData || target.content->uploadFenceValue != 0)
-				{
-					return { false, "Pending upload target has unexpected GPU preparation state." };
-				}
-
-				work.push_back({ target });
+				return {false, "Upload target no longer matches its registered content."};
 			}
 
-			return {};
-		};
+			// Only pending content can be uploaded.
+			if (target.content->state.preparationState != detail::ResourcePreparationState::Pending)
+			{
+				continue;
+			}
+
+			// Check duplication of the same target in the work list.
+			const auto duplicate = std::find_if(work.begin(), work.end(),
+												[&](const auto& item) { return item.target.handle == target.handle; });
+
+			if (duplicate != work.end())
+			{
+				continue;
+			}
+
+			if (target.content->gpuData)
+			{
+				return {false, "Pending upload target has unexpected GPU preparation state."};
+			}
+
+			typename std::remove_reference_t<decltype(work)>::value_type item;
+			item.target = target;
+			work.push_back(std::move(item));
+		}
+
+		return {};
+	};
 
 	try
 	{
 		// Gather the selected geometries and textures for upload preparation.
-		result = gather(geometries, *geometryResources, geometryWork);
+		result = gather(geometries, *drawResources, geometryWork);
+
 		if (result.IsSuccess())
 		{
-			result = gather(textures, *textureResources, textureWork);
+			result = gather(textures, *drawResources, textureWork);
 		}
 	}
 	catch (const std::bad_alloc&)
 	{
-		return { false, "Upload work allocation failed." };
+		return {false, "Upload work allocation failed."};
 	}
 	catch (const std::length_error&)
 	{
-		return { false, "Upload work size is unsupported." };
+		return {false, "Upload work size is unsupported."};
 	}
 
 	if (!result.IsSuccess())
@@ -732,23 +712,23 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 
 	// Only before recording or after discarding this invocation's unsubmitted commands.
 	const auto resetPrepared = [&]()
+	{
+		const auto reset = [](auto& work)
 		{
-			const auto reset = [](auto& work)
+			for (auto& item : work)
+			{
+				if (item.prepared)
 				{
-					for (auto& item : work)
-					{
-						if (item.prepared)
-						{
-							item.upload.reset();
-							item.target.content->gpuData.reset();
-							item.prepared = false;
-						}
-					}
-				};
-
-			reset(geometryWork);
-			reset(textureWork);
+					item.upload.reset();
+					item.target.content->gpuData.reset();
+					item.prepared = false;
+				}
+			}
 		};
+
+		reset(geometryWork);
+		reset(textureWork);
+	};
 
 	//-------------------------------------------------------------------------------------------------
 	// 3. Prepare destination resources in the Default heap and upload buffers.
@@ -757,44 +737,44 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 	//-------------------------------------------------------------------------------------------------
 	bool hasPrepared = false;
 
-	const auto prepare = [&](auto& work, auto& registry, auto prepareFunction) -> Result
+	const auto prepare = [&](auto& work, detail::DrawResources& registry, auto prepareFunction) -> Result
+	{
+		for (auto& item : work)
 		{
-			for (auto& item : work)
+			auto& content = *item.target.content;
+			Result prepared = (backend.*prepareFunction)(content.cpuData, content.gpuData, item.upload);
+
+			if (!prepared.IsSuccess())
 			{
-				auto& content = *item.target.content;
-				Result prepared = (backend.*prepareFunction)(content.cpuData, content.gpuData, item.upload);
-
-				if (!prepared.IsSuccess())
+				if (prepared.failureKind != FailureKind::General)
 				{
-					if (prepared.failureKind != FailureKind::General)
-					{
-						return prepared;
-					}
-
-					OutputDebugStringA("[101Renderer] Resource preparation failed: ");
-					OutputDebugStringA(prepared.message.c_str());
-					OutputDebugStringA("\n");
-
-					if (!registry.MarkPreparationFailed(item.target.handle, content))
-					{
-						return { false, "Failed preparation state update was rejected." };
-					}
-
-					continue;
+					return prepared;
 				}
 
-				item.prepared = true;
-				hasPrepared = true;
+				OutputDebugStringA("[101Renderer] Resource preparation failed: ");
+				OutputDebugStringA(prepared.message.c_str());
+				OutputDebugStringA("\n");
+
+				if (!registry.MarkPreparationFailed(item.target.handle, content))
+				{
+					return {false, "Failed preparation state update was rejected."};
+				}
+
+				continue;
 			}
 
-			return {};
-		};
+			item.prepared = true;
+			hasPrepared = true;
+		}
 
-	result = prepare(geometryWork, *geometryResources, &backend::Backend::PrepareGeometry);
+		return {};
+	};
+
+	result = prepare(geometryWork, *drawResources, &backend::Backend::PrepareGeometry);
 
 	if (result.IsSuccess())
 	{
-		result = prepare(textureWork, *textureResources, &backend::Backend::PrepareTexture);
+		result = prepare(textureWork, *drawResources, &backend::Backend::PrepareTexture);
 	}
 
 	if (!result.IsSuccess())
@@ -821,43 +801,43 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 	}
 
 	const auto cancelAndReset = [&](Result failure) -> Result
+	{
+		Result canceled = backend.CancelUploads();
+
+		if (!canceled.IsSuccess())
 		{
-			Result canceled = backend.CancelUploads();
+			// Preserve destinations if their commands could not be discarded.
+			canceled.failureKind = FailureKind::GpuCompletionUnknown;
+			return canceled;
+		}
 
-			if (!canceled.IsSuccess())
-			{
-				// Preserve destinations if their commands could not be discarded.
-				canceled.failureKind = FailureKind::GpuCompletionUnknown;
-				return canceled;
-			}
-
-			resetPrepared();
-			return failure;
-		};
+		resetPrepared();
+		return failure;
+	};
 
 	//-------------------------------------------------------------------------------------------------
 	// 5. Record copy commands and resource transitions.
 	//    Each successful Add transfers upload ownership to UploadBatch.
 	//-------------------------------------------------------------------------------------------------
 	const auto record = [&](auto& work, auto addFunction) -> Result
+	{
+		for (auto& item : work)
 		{
-			for (auto& item : work)
+			if (!item.prepared)
 			{
-				if (!item.prepared)
-				{
-					continue;
-				}
-
-				Result added = (backend.*addFunction)(*item.target.content->gpuData, item.upload);
-
-				if (!added.IsSuccess())
-				{
-					return added;
-				}
+				continue;
 			}
 
-			return {};
-		};
+			Result added = (backend.*addFunction)(*item.target.content->gpuData, item.upload);
+
+			if (!added.IsSuccess())
+			{
+				return added;
+			}
+		}
+
+		return {};
+	};
 
 	result = record(geometryWork, &backend::Backend::AddGeometryUpload);
 
@@ -872,11 +852,10 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	// 6. Submit the upload commands and enqueue a fence signal.
-	//    Mark prepared contents Ready after successful Execute + Signal.
-	//    Ready does not imply CPU-observed GPU completion.
-	//-------------------------------------------------------------------------------------------------	
-	const auto submission = backend.SubmitUploads();
+	// 6. Submit the upload commands and confirm the batch has completed.
+	//    Only then publish prepared contents as Ready.
+	//-------------------------------------------------------------------------------------------------
+	const auto submission = backend.SubmitUploadsAndWait();
 
 	if (!submission.status.IsSuccess())
 	{
@@ -889,113 +868,114 @@ Result Renderer::impl::UploadSelectedResources(std::span<const GeometryUploadTar
 		return cancelAndReset(submission.status);
 	}
 
-	if (!submission.executionIssued || submission.fenceValue == 0 || submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
+	if (!submission.executionIssued || submission.fenceValue == 0 ||
+		submission.fenceValue == (std::numeric_limits<std::uint64_t>::max)())
 	{
-		return { false, "Upload submission returned inconsistent success information.", FailureKind::GpuCompletionUnknown };
+		return {false, "Upload submission returned inconsistent success information.",
+				FailureKind::GpuCompletionUnknown};
 	}
 
-	const auto markReady = [&](auto& work, auto& registry) -> Result
+	const auto markReady = [&](auto& work, detail::DrawResources& registry) -> Result
+	{
+		for (auto& item : work)
 		{
-			for (auto& item : work)
+			if (!item.prepared)
 			{
-				if (!item.prepared)
-				{
-					continue;
-				}
-
-				if (!registry.MarkReadyAfterUploadSubmission(item.target.handle, *item.target.content, submission.fenceValue))
-				{
-					return { false, "Ready update failed after upload submission.", FailureKind::GpuCompletionUnknown };
-				}
+				continue;
 			}
 
-			return {};
-		};
+			if (!registry.MarkPrepared(item.target.handle, *item.target.content))
+			{
+				return {false, "Ready update failed after upload submission.", FailureKind::GpuCompletionUnknown};
+			}
+		}
 
-	result = markReady(geometryWork, *geometryResources);
+		return {};
+	};
+
+	result = markReady(geometryWork, *drawResources);
 
 	if (!result.IsSuccess())
 	{
 		return result;
 	}
 
-	return markReady(textureWork, *textureResources);
+	return markReady(textureWork, *drawResources);
 }
 
 // Called after temporary CPU borrows have ended, or between public updates outside Render.
 // A pending Submit is only a value owner and does not itself retain old Content revisions.
-// Use the completed Fence, never the next/submitted Fence, to reclaim retired native storage.
+// Both upload and draw batches have completed before this boundary.
 Result Renderer::impl::CollectDestroyedResources()
 {
-	if (stoppedFailure != FailureKind::General
-		|| backend.HasPendingFrameResources())
+	if (stoppedFailure != FailureKind::General || backend.HasPendingFrameResources())
 	{
 		return {};
 	}
 
-	// Collect completed uploads and release their upload buffers.
-	Result result = backend.CollectUploads();
-
-	if (!result.IsSuccess() || backend.HasPendingUploads())
-	{
-		return result;
-	}
-
-	// Destroy resources for the given completed fence value.
-	// This does not wait for GPU completion.
-	std::uint64_t completed = 0;
-	result = backend.QueryCompletedGraphicsFence(completed);
-
-	if (!result.IsSuccess())
-	{
-		return result;
-	}
-
-	geometryResources->CollectRetired(completed);
-	textureResources->CollectRetired(completed);
-	drawResources->Collect(completed);
-	renderTargetResources->Collect(completed);
-	geometryResources->CollectDestroyed(completed);
-	textureResources->CollectDestroyed(completed);
-
+	drawResources->CollectgeometryDestroyed();
+	drawResources->CollectTextureDestroyed();
 	return {};
 }
 
 namespace
 {
-	// Helper function to handle resource registration and update calls with exception handling.
-	template <class F> 
-	auto ResourceCall(F&& function) -> decltype(function())
-	{
-		using R = decltype(function());
+// Helper function to handle resource registration and update calls with exception handling.
+template <class F> auto ResourceCall(F&& function) -> decltype(function())
+{
+	using R = decltype(function());
 
-		try
+	try
+	{
+		return function();
+	}
+	catch (const std::bad_alloc&)
+	{
+		if constexpr (std::is_same_v<R, Result>)
 		{
-			return function();
+			return {false, "Resource allocation failed"};
 		}
-		catch (const std::bad_alloc&)
+		else
 		{
-			if constexpr (std::is_same_v<R, Result>)
-			{
-				return { false, "Resource allocation failed" };
-			}
-			else
-			{
-				return { { false, "Resource allocation failed" },{} };
-			}
-		}
-		catch (const std::length_error&)
-		{
-			if constexpr (std::is_same_v<R, Result>)
-			{
-				return { false, "Resource size unsupported" };
-			}
-			else
-			{
-				return { { false, "Resource size unsupported" },{} };
-			}
+			return {{false, "Resource allocation failed"}, {}};
 		}
 	}
+	catch (const std::length_error&)
+	{
+		if constexpr (std::is_same_v<R, Result>)
+		{
+			return {false, "Resource size unsupported"};
+		}
+		else
+		{
+			return {{false, "Resource size unsupported"}, {}};
+		}
+	}
+}
+} // namespace
+
+ResourceRegistrationResult<GeometryHandle> Renderer::RegisterGeometry(const GeometryDesc& desc)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return { std::move(available),{} };
+	}
+
+	return m_pImpl->drawResources->Register(desc);
+}
+
+ResourceRegistrationResult<TextureHandle> Renderer::RegisterTexture(const TextureDesc& desc)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return { std::move(available),{} };
+	}
+
+	return m_pImpl->drawResources->Register(desc);
 }
 
 ResourceRegistrationResult<ShaderHandle> Renderer::RegisterShader(const ShaderDesc& desc)
@@ -1007,10 +987,10 @@ ResourceRegistrationResult<ShaderHandle> Renderer::RegisterShader(const ShaderDe
 
 			if (!result.IsSuccess())
 			{
-				return { result,{} };
+				return {result, {}};
 			}
 
-			return m_pImpl->drawResources->RegisterShader(desc);
+			return m_pImpl->drawResources->Register(desc);
 		});
 }
 
@@ -1023,10 +1003,10 @@ ResourceRegistrationResult<PipelineHandle> Renderer::RegisterPipeline(const Pipe
 
 			if (!result.IsSuccess())
 			{
-				return { result,{} };
+				return {result, {}};
 			}
 
-			return m_pImpl->drawResources->RegisterPipeline(desc);
+			return m_pImpl->drawResources->Register(desc);
 		});
 }
 
@@ -1039,15 +1019,14 @@ ResourceRegistrationResult<MaterialHandle> Renderer::RegisterMaterial(const Mate
 
 			if (!result.IsSuccess())
 			{
-				return { result,{} };
+				return {result, {}};
 			}
 
-			return m_pImpl->drawResources->RegisterMaterial(desc);
+			return m_pImpl->drawResources->Register(desc);
 		});
 }
 
-// Try nonblocking collection before accepting another CPU revision.
-// This prevents repeated updates without rendering from retaining already-unused revisions indefinitely.
+// Resource updates run outside Render, after the previous GPU work has completed.
 Result Renderer::UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc)
 {
 	return ResourceCall(
@@ -1060,18 +1039,13 @@ Result Renderer::UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc)
 				return result;
 			}
 
-            result = m_pImpl->ObserveFailure(m_pImpl->CollectDestroyedResources());
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-
 			return m_pImpl->drawResources->UpdateMaterial(handle, desc);
 		});
 }
 
 // The Registry copies the caller's CPU arrays before returning.
-// GPU preparation is deferred; its failure will diagnose/skip the accepted revision rather than use old pixels/vertices.
+// GPU preparation is deferred; its failure will diagnose/skip the accepted revision rather than use old
+// pixels/vertices.
 Result Renderer::UpdateGeometry(GeometryHandle handle, const GeometryDesc& desc)
 {
 	return ResourceCall(
@@ -1084,13 +1058,7 @@ Result Renderer::UpdateGeometry(GeometryHandle handle, const GeometryDesc& desc)
 				return result;
 			}
 
-            result = m_pImpl->ObserveFailure(m_pImpl->CollectDestroyedResources());
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-
-			return m_pImpl->geometryResources->Update(handle, desc);
+			return m_pImpl->drawResources->Update(handle, desc);
 		});
 }
 
@@ -1108,25 +1076,20 @@ Result Renderer::UpdateTexture(TextureHandle handle, const TextureDesc& desc)
 				return result;
 			}
 
-            result = m_pImpl->ObserveFailure(m_pImpl->CollectDestroyedResources());
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-
-			return m_pImpl->textureResources->Update(handle, desc);
+			return m_pImpl->drawResources->Update(handle, desc);
 		});
 }
 
 Result Renderer::GetGeometryData(GeometryHandle handle, GeometryData& output) const
 {
-    Result available = m_pImpl->CheckPublicCall();
-    if (!available.IsSuccess())
-    {
-        return available;
-    }
+	Result available = m_pImpl->CheckPublicCall();
 
-    return m_pImpl->geometryResources->GetData(handle, output);
+	if (!available.IsSuccess())
+	{
+		return available;
+	}
+
+	return m_pImpl->drawResources->GetGeometryData(handle, output);
 }
 
 Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) const
@@ -1141,11 +1104,11 @@ Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) 
 				return result;
 			}
 
-			const auto* shader = m_pImpl->drawResources->shaders.FindForNewUse(handle);
+			const auto* shader = m_pImpl->drawResources->FindContent(handle);
 
 			if (!shader)
 			{
-				return { false, "Shader metadata target unavailable" };
+				return {false, "Shader metadata target unavailable"};
 			}
 
 			auto copy = shader->metadata;
@@ -1153,6 +1116,44 @@ Result Renderer::GetShaderMetadata(ShaderHandle handle, ShaderMetadata& output) 
 
 			return {};
 		});
+}
+
+Result Renderer::DestroyGeometry(GeometryHandle handle)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return available;
+	}
+
+	const auto result = m_pImpl->drawResources->Destroy(handle);
+
+	if (!result.IsSuccess())
+	{
+		return { false, "DestroyGeometry: handle does not identify a registered geometry in this renderer initialization." };
+	}
+
+	return {};
+}
+
+Result Renderer::DestroyTexture(TextureHandle handle)
+{
+	Result available = m_pImpl->CheckPublicCall();
+
+	if (!available.IsSuccess())
+	{
+		return available;
+	}
+
+	const auto result = m_pImpl->drawResources->Destroy(handle);
+
+	if (!result.IsSuccess())
+	{
+		return { false, "DestroyTexture: handle does not identify a registered texture in this renderer initialization." };
+	}
+
+	return {};
 }
 
 Result Renderer::DestroyShader(ShaderHandle handle)
@@ -1167,7 +1168,7 @@ Result Renderer::DestroyShader(ShaderHandle handle)
 				return result;
 			}
 
-			return m_pImpl->drawResources->shaders.Destroy(handle);
+			return m_pImpl->drawResources->Destroy(handle);
 		});
 }
 
@@ -1183,7 +1184,7 @@ Result Renderer::DestroyPipeline(PipelineHandle handle)
 				return result;
 			}
 
-			return m_pImpl->drawResources->pipelines.Destroy(handle);
+			return m_pImpl->drawResources->Destroy(handle);
 		});
 }
 
@@ -1199,7 +1200,7 @@ Result Renderer::DestroyMaterial(MaterialHandle handle)
 				return result;
 			}
 
-			return m_pImpl->drawResources->materials.Destroy(handle);
+			return m_pImpl->drawResources->Destroy(handle);
 		});
 }
 
@@ -1207,18 +1208,21 @@ Result Renderer::DestroyMaterial(MaterialHandle handle)
 // A handle is returned only for a complete color/descriptor/Depth set; contents are initially invalid.
 ResourceRegistrationResult<RenderTargetTextureHandle> Renderer::CreateRenderTargetTexture(const RenderTargetTextureDesc& description)
 {
-    return ResourceCall([&]()
-        {
-            ResourceRegistrationResult<RenderTargetTextureHandle> created;
-            created.result = m_pImpl->CheckPublicCall();
-            if (!created.result.IsSuccess())
-            {
-                return created;
-            }
-            created = m_pImpl->renderTargetResources->Create(m_pImpl->backend.GetNativeDevice(), description);
-            created.result = m_pImpl->ObserveFailure(std::move(created.result));
-            return created;
-        });
+	return ResourceCall(
+		[&]()
+		{
+			ResourceRegistrationResult<RenderTargetTextureHandle> created;
+			created.result = m_pImpl->CheckPublicCall();
+
+			if (!created.result.IsSuccess())
+			{
+				return created;
+			}
+
+			created = m_pImpl->drawResources->CreateRenderTargetTexture(m_pImpl->backend.GetNativeDevice(), description);
+			created.result = m_pImpl->ObserveFailure(std::move(created.result));
+			return created;
+		});
 }
 
 // Wait for known idle outside Render before changing the physical output.
@@ -1226,53 +1230,64 @@ ResourceRegistrationResult<RenderTargetTextureHandle> Renderer::CreateRenderTarg
 // Material handles stay valid, but cached Info/projection values are the caller's responsibility.
 Result Renderer::ResizeRenderTargetTexture(RenderTargetTextureHandle handle, std::uint32_t width, std::uint32_t height)
 {
-    return ResourceCall([&]()
-        {
-            Result result = m_pImpl->CheckPublicCall();
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-            if (!m_pImpl->renderTargetResources->FindForNewUse(handle))
-            {
-                return detail::Fail("ResizeRenderTargetTexture: invalid output.");
-            }
-            if (width == 0 || height == 0)
-            {
-                return detail::Fail("ResizeRenderTargetTexture: zero dimensions are invalid.");
-            }
-            result = m_pImpl->ObserveFailure(m_pImpl->backend.WaitIdle());
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-            result = m_pImpl->renderTargetResources->Resize(m_pImpl->backend.GetNativeDevice(), handle, width, height);
-            return m_pImpl->ObserveFailure(std::move(result));
-        });
+	return ResourceCall(
+		[&]()
+		{
+			Result result = m_pImpl->CheckPublicCall();
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			if (!m_pImpl->drawResources->FindContent(handle))
+			{
+				return detail::Fail("ResizeRenderTargetTexture: invalid output.");
+			}
+
+			if (width == 0 || height == 0)
+			{
+				return detail::Fail("ResizeRenderTargetTexture: zero dimensions are invalid.");
+			}
+
+			result = m_pImpl->ObserveFailure(m_pImpl->backend.WaitIdle());
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			result = m_pImpl->drawResources->ResizeRenderTargetTexture(m_pImpl->backend.GetNativeDevice(), handle, width, height);
+			return m_pImpl->ObserveFailure(std::move(result));
+		});
 }
 
 // Stop future resolution through this handle immediately.
 // The owner still retains physical contents until the submitted write/read Fence is complete.
 Result Renderer::DestroyRenderTargetTexture(RenderTargetTextureHandle handle)
 {
-    Result result = m_pImpl->CheckPublicCall();
-    if (!result.IsSuccess())
-    {
-        return result;
-    }
-    return m_pImpl->renderTargetResources->Destroy(handle);
+	Result result = m_pImpl->CheckPublicCall();
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	return m_pImpl->drawResources->Destroy(handle);
 }
 
 // Return metadata by value without exposing borrowed native descriptors or owner pointers.
 // A failed query preserves the caller's output variable.
 Result Renderer::GetRenderTargetTextureInfo(RenderTargetTextureHandle handle, RenderTargetTextureInfo& output) const
 {
-    Result result = m_pImpl->CheckPublicCall();
-    if (!result.IsSuccess())
-    {
-        return result;
-    }
-    return m_pImpl->renderTargetResources->QueryInfo(handle, output);
+	Result result = m_pImpl->CheckPublicCall();
+
+	if (!result.IsSuccess())
+	{
+		return result;
+	}
+
+	return m_pImpl->drawResources->QueryRenderTargetTextureInfo(handle, output);
 }
 
 // Window Resize has a different failure guarantee from ordinary image replacement.
@@ -1280,22 +1295,27 @@ Result Renderer::GetRenderTargetTextureInfo(RenderTargetTextureHandle handle, Re
 // A partial DXGI failure leaves readiness paused for a positive-size retry with the same handle.
 Result Renderer::ResizeWindowOutput(WindowOutputHandle handle, std::uint32_t width, std::uint32_t height)
 {
-    return ResourceCall([&]()
-        {
-            Result result = m_pImpl->CheckPublicCall();
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-            result = m_pImpl->ObserveFailure(m_pImpl->backend.ResizeWindowOutput(handle, width, height));
-            if (!result.IsSuccess())
-            {
-                return result;
-            }
-            // WaitIdle succeeded; no Graph borrows the old Window Depth.
-            m_pImpl->sceneDepth.emplace();
-            return result;
-        });
+	return ResourceCall(
+		[&]()
+		{
+			Result result = m_pImpl->CheckPublicCall();
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			result = m_pImpl->ObserveFailure(m_pImpl->backend.ResizeWindowOutput(handle, width, height));
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			// WaitIdle succeeded; no Graph borrows the old Window Depth.
+			m_pImpl->sceneDepth.emplace();
+			return result;
+		});
 }
 
-}
+} // namespace rendering

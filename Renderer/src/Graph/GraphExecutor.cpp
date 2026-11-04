@@ -28,53 +28,53 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 
 	if (!resource || (!texture.Rtv().ptr && !texture.srv.ptr && !texture.dsv.ptr))
 	{
-		return { false, "DescribeTexture: native texture or required View is unavailable." };
+		return {false, "DescribeTexture: native texture or required View is unavailable."};
 	}
 
 	// Resource description validation
-    const auto native = resource->GetDesc();
-    const bool srgbBackBufferView = native.Format == DXGI_FORMAT_R8G8B8A8_UNORM &&
-        texture.ViewFormat() == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    const bool typelessDepthView = native.Format == DXGI_FORMAT_R32_TYPELESS &&
-        texture.ViewFormat() == DXGI_FORMAT_D32_FLOAT;
-    const bool compatibleViewFormat = native.Format == texture.ViewFormat() || srgbBackBufferView || typelessDepthView;
+	const auto native = resource->GetDesc();
+	const bool srgbBackBufferView =
+		native.Format == DXGI_FORMAT_R8G8B8A8_UNORM && texture.ViewFormat() == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	const bool typelessDepthView =
+		native.Format == DXGI_FORMAT_R32_TYPELESS && texture.ViewFormat() == DXGI_FORMAT_D32_FLOAT;
+	const bool compatibleViewFormat = native.Format == texture.ViewFormat() || srgbBackBufferView || typelessDepthView;
 
-	if (native.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D || native.Width == 0 ||
-		native.Height == 0 || native.Width > static_cast<UINT64>(D3D12_VIEWPORT_BOUNDS_MAX) ||
-		native.Height > static_cast<UINT>(D3D12_VIEWPORT_BOUNDS_MAX) ||
-		native.DepthOrArraySize != 1 || native.MipLevels == 0 || native.SampleDesc.Count != 1 ||
-		native.SampleDesc.Quality != 0 ||
+	if (native.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D || native.Width == 0 || native.Height == 0 ||
+		native.Width > static_cast<UINT64>(D3D12_VIEWPORT_BOUNDS_MAX) ||
+		native.Height > static_cast<UINT>(D3D12_VIEWPORT_BOUNDS_MAX) || native.DepthOrArraySize != 1 ||
+		native.MipLevels == 0 || native.SampleDesc.Count != 1 || native.SampleDesc.Quality != 0 ||
 		(texture.Rtv().ptr && !(native.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)) ||
 		(texture.dsv.ptr && !(native.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) ||
 		(texture.srv.ptr && (native.Flags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE)) ||
 		((texture.Rtv().ptr || texture.dsv.ptr) && native.MipLevels != 1) ||
-		(native.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) ||
-        !compatibleViewFormat)
+		(native.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) || !compatibleViewFormat)
 	{
-		return { false, "DescribeTexture: unsupported native texture extent, flags, format or sample conditions." };
+		return {false, "DescribeTexture: unsupported native texture extent, flags, format or sample conditions."};
 	}
 
 	switch (texture.ViewFormat())
 	{
 	case DXGI_FORMAT_R8G8B8A8_UNORM:
-		desc.format = GraphTextureFormat::RGBA8_UNorm; break;
+		desc.format = GraphTextureFormat::RGBA8_UNorm;
+		break;
 
 	case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-		desc.format = GraphTextureFormat::RGBA8_sRGB; break;
+		desc.format = GraphTextureFormat::RGBA8_sRGB;
+		break;
 
 	case DXGI_FORMAT_R16G16B16A16_FLOAT:
-        desc.format = GraphTextureFormat::RGBA16_Float;
-        break;
+		desc.format = GraphTextureFormat::RGBA16_Float;
+		break;
 
 	case DXGI_FORMAT_D32_FLOAT:
 		desc.format = GraphTextureFormat::D32_Float;
 		break;
 
 	default:
-		return { false, "unsupported native View format" };
+		return {false, "unsupported native View format"};
 	}
 
-	desc.physical = PhysicalTextureId{ resource };
+	desc.physical = PhysicalTextureId{resource};
 	desc.width = static_cast<std::uint32_t>(native.Width);
 	desc.height = native.Height;
 	desc.mipLevels = native.MipLevels;
@@ -108,19 +108,20 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 	if (state == D3D12_RESOURCE_STATE_COMMON)
 	{
 		// Force initial state of backbuffer to be present.
-		desc.initialState = { texture.IsPresentable() ? TextureStateKind::Present : TextureStateKind::Common };
+		desc.initialState = {texture.IsPresentable() ? TextureStateKind::Present : TextureStateKind::Common};
 	}
 	else if (state == D3D12_RESOURCE_STATE_RENDER_TARGET)
 	{
 		// Render target has to be color attachment state.
-		desc.initialState = { TextureStateKind::ColorAttachment };
+		desc.initialState = {TextureStateKind::ColorAttachment};
 	}
 	else if (state == D3D12_RESOURCE_STATE_DEPTH_WRITE)
 	{
 		// Depth write has to be depth attachment state.
-		desc.initialState = { TextureStateKind::DepthWrite };
+		desc.initialState = {TextureStateKind::DepthWrite};
 	}
-	else if ((state & ~(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) == 0)
+	else if ((state & ~(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) ==
+             0)
 	{
 		// Shader read state has to be shader read state with proper shader stages.
 		ShaderStage stages = ShaderStage::None;
@@ -135,11 +136,11 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 			stages = stages | ShaderStage::Vertex;
 		}
 
-		desc.initialState = { TextureStateKind::ShaderRead, stages };
+		desc.initialState = {TextureStateKind::ShaderRead, stages};
 	}
 	else
 	{
-		return { false, "unsupported native initial state." };
+		return {false, "unsupported native initial state."};
 	}
 
 	desc.initialContentsValid = texture.contentsValid;
@@ -157,7 +158,7 @@ Result ToNativeState(TextureState state, D3D12_RESOURCE_STATES& output)
 	// Only shader read can require shader stages.
 	if (state.kind != TextureStateKind::ShaderRead && state.stages != ShaderStage::None)
 	{
-		return { false, "invalid stages on a non-shader state." };
+		return {false, "invalid stages on a non-shader state."};
 	}
 
 	switch (state.kind)
@@ -178,7 +179,7 @@ Result ToNativeState(TextureState state, D3D12_RESOURCE_STATES& output)
 	case TextureStateKind::ShaderRead:
 		if (!IsValidStages(state.stages))
 		{
-			return { false, "invalid shader stages." };
+			return {false, "invalid shader stages."};
 		}
 
 		if ((static_cast<unsigned>(state.stages) & static_cast<unsigned>(ShaderStage::Vertex)) != 0)
@@ -194,25 +195,35 @@ Result ToNativeState(TextureState state, D3D12_RESOURCE_STATES& output)
 		return {};
 
 	default:
-		return { false, "unknown texture state." };
+		return {false, "unknown texture state."};
 	}
 }
 
-}
+} // namespace
 
 const GraphTextureBinding* GraphExecutor::FindBinding(GraphTextureHandle handle) const noexcept
 {
-	const auto found = std::find_if(
-		m_bindings.begin(), m_bindings.end(),
-		[handle](const GraphTextureBinding& binding) { return binding.handle == handle; });
+	const auto found = std::find_if(m_bindings.begin(), m_bindings.end(),
+									[handle](const GraphTextureBinding& binding) { return binding.handle == handle; });
 
 	return found == m_bindings.end() ? nullptr : &*found;
 }
 
-Result GraphExecutor::ImportTexture(
-	const GraphTextureBinding& texture,
-	const std::string& name,
-	GraphTextureHandle& output)
+const GraphTextureBinding* GraphExecutor::FindPhysicalBinding(ID3D12Resource* resource) const noexcept
+{
+	const auto found = std::find_if(m_bindings.begin(), m_bindings.end(), [resource](const GraphTextureBinding& binding)
+									{ return binding.Resource() == resource; });
+
+	if (found == m_bindings.end())
+	{
+		return nullptr;
+	}
+
+	return &*found;
+}
+
+Result GraphExecutor::ImportTexture(const GraphTextureBinding& texture, const std::string& name,
+									GraphTextureHandle& output)
 {
 	output = {};
 
@@ -227,7 +238,7 @@ Result GraphExecutor::ImportTexture(
 	m_graph.m_plan.reset();
 
 	// Get the latest state of the texture resouce from backend.
-	GraphTextureBinding  owner;
+	GraphTextureBinding owner;
 	Result refreshed = QueryBinding(m_backend, texture, owner);
 
 	if (!refreshed.IsSuccess())
@@ -237,16 +248,16 @@ Result GraphExecutor::ImportTexture(
 
 	// Compare the latest state of the texture resource with the borrowed view/state.
 	if (owner.IsPresentable() != texture.IsPresentable() || owner.Rtv().ptr != texture.Rtv().ptr ||
-		owner.ViewFormat() != texture.ViewFormat() ||
-		owner.SubmittedState() != texture.SubmittedState() || owner.srv.ptr != texture.srv.ptr ||
-		owner.dsv.ptr != texture.dsv.ptr || owner.contentsValid != texture.contentsValid)
+		owner.ViewFormat() != texture.ViewFormat() || owner.SubmittedState() != texture.SubmittedState() ||
+		owner.srv.ptr != texture.srv.ptr || owner.dsv.ptr != texture.dsv.ptr ||
+		owner.contentsValid != texture.contentsValid)
 	{
-		return { false, "GraphExecutor::ImportTexture: stale or mismatched borrowed view/state." };
+		return {false, "GraphExecutor::ImportTexture: stale or mismatched borrowed view/state."};
 	}
 
 	try
 	{
-		ImportedTextureDesc desc;	// The way for graph to hold the texture.
+		ImportedTextureDesc desc; // The way for graph to hold the texture.
 		desc.name = name;
 
 		// Generate the description of the texture resource for the graph to hold.
@@ -258,8 +269,8 @@ Result GraphExecutor::ImportTexture(
 		}
 
 		// Store the borrowed texture for this frame execution (both for executor and graph)
-		m_bindings.push_back(texture);					// Store the borrowed texture for this frame execution.
-		result = m_graph.ImportTexture(desc, output);	// Add the texture to the graph and get a handle for it.
+		m_bindings.push_back(texture);                // Store the borrowed texture for this frame execution.
+		result = m_graph.ImportTexture(desc, output); // Add the texture to the graph and get a handle for it.
 
 		if (!result.IsSuccess())
 		{
@@ -272,13 +283,13 @@ Result GraphExecutor::ImportTexture(
 
 		return {};
 	}
-	catch (const std::bad_alloc&) 
+	catch (const std::bad_alloc&)
 	{
-		return { false, "GraphExecutor::ImportTexture: allocation failed." };
+		return {false, "GraphExecutor::ImportTexture: allocation failed."};
 	}
 	catch (const std::length_error&)
-	{ 
-		return { false, "GraphExecutor::ImportTexture: size is unsupported." };
+	{
+		return {false, "GraphExecutor::ImportTexture: size is unsupported."};
 	}
 }
 
@@ -290,14 +301,14 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 	{
 		if (pass.colors.size() > 1 || (pass.colors.empty() && !pass.depth))
 		{
-			return { false, "GraphExecutor: pass has no attachments or too many color attachments." };
+			return {false, "GraphExecutor: pass has no attachments or too many color attachments."};
 		}
 	}
 
 	// Un-binded texture is not allowed.
 	if (plan.textures.size() != m_bindings.size())
 	{
-		return { false, "GraphExecutor: imported texture has no native binding." };
+		return {false, "GraphExecutor: imported texture has no native binding."};
 	}
 
 	commits.reserve(plan.textures.size());
@@ -311,7 +322,7 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 
 		if (!binding || !imported)
 		{
-			return { false, "GraphExecutor: missing, stale or foreign native binding." };
+			return {false, "GraphExecutor: missing, stale or foreign native binding."};
 		}
 
 		// Check the mismatch between resource and its binding.
@@ -323,12 +334,11 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 			return checked;
 		}
 
-		if (owner.IsPresentable() != binding->IsPresentable() ||
-			owner.Rtv().ptr != binding->Rtv().ptr || owner.ViewFormat() != binding->ViewFormat() ||
-			owner.srv.ptr != binding->srv.ptr || owner.dsv.ptr != binding->dsv.ptr ||
-			owner.contentsValid != binding->contentsValid)
+		if (owner.IsPresentable() != binding->IsPresentable() || owner.Rtv().ptr != binding->Rtv().ptr ||
+			owner.ViewFormat() != binding->ViewFormat() || owner.srv.ptr != binding->srv.ptr ||
+			owner.dsv.ptr != binding->dsv.ptr || owner.contentsValid != binding->contentsValid)
 		{
-			return { false, "GraphExecutor: owner View changed after Import." };
+			return {false, "GraphExecutor: owner View changed after Import."};
 		}
 
 		// Copy binding to a local variable to avoid constness and modify the initial state for comparison.
@@ -347,19 +357,19 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 		// Check if the resource got changed after imported.
 		if (actual.physical != imported->physical || actual.format != imported->format ||
 			actual.dimension != imported->dimension || actual.mipLevels != imported->mipLevels ||
-			actual.arraySize != imported->arraySize ||
-			actual.width != imported->width || actual.height != imported->height ||
-			actual.sampleCount != imported->sampleCount || actual.sampleQuality != imported->sampleQuality ||
-			actual.capabilities != imported->capabilities || actual.initialState != imported->initialState ||
+			actual.arraySize != imported->arraySize || actual.width != imported->width ||
+			actual.height != imported->height || actual.sampleCount != imported->sampleCount ||
+			actual.sampleQuality != imported->sampleQuality || actual.capabilities != imported->capabilities ||
+			actual.initialState != imported->initialState ||
 			actual.initialContentsValid != imported->initialContentsValid)
 		{
-			return { false, "GraphExecutor: native texture conditions changed after Import." };
+			return {false, "GraphExecutor: native texture conditions changed after Import."};
 		}
 
 		// Presentable resource has to be presentable at the end.
 		if (binding->IsPresentable() && final.state.kind != TextureStateKind::Present)
 		{
-			return { false, "GraphExecutor: presentable texture must finish in Present state." };
+			return {false, "GraphExecutor: presentable texture must finish in Present state."};
 		}
 
 		// Store the final state of this resource.
@@ -387,7 +397,7 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 		if (pass.outputLayout.colorFormats.size() != pass.colors.size() ||
 			pass.outputLayout.depthFormat.has_value() != pass.depth.has_value())
 		{
-			return { false, "GraphExecutor: OutputLayout attachment count mismatch" };
+			return {false, "GraphExecutor: OutputLayout attachment count mismatch"};
 		}
 
 		for (std::size_t i = 0; i < pass.colors.size(); ++i)
@@ -399,7 +409,7 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 				pass.outputLayout.sampleCount != imported->sampleCount ||
 				pass.outputLayout.sampleQuality != imported->sampleQuality)
 			{
-				return { false, "GraphExecutor: OutputLayout color mismatch" };
+				return {false, "GraphExecutor: OutputLayout color mismatch"};
 			}
 		}
 
@@ -412,7 +422,7 @@ Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommi
 				pass.outputLayout.sampleCount != imported->sampleCount ||
 				pass.outputLayout.sampleQuality != imported->sampleQuality)
 			{
-				return { false, "GraphExecutor: OutputLayout Depth mismatch" };
+				return {false, "GraphExecutor: OutputLayout Depth mismatch"};
 			}
 		}
 	}
@@ -430,7 +440,7 @@ Result GraphExecutor::RecordTransitions(const std::vector<PlannedTransition>& tr
 
 		if (!binding)
 		{
-			return { false, "GraphExecutor: transition has no native binding." };
+			return {false, "GraphExecutor: transition has no native binding."};
 		}
 
 		D3D12_RESOURCE_STATES before{}, after{};
@@ -473,12 +483,12 @@ Result GraphExecutor::Execute()
 			m_graph.m_executionViolated = true;
 		}
 
-		return { false, "GraphExecutor: this Graph has already attempted execution." };
+		return {false, "GraphExecutor: this Graph has already attempted execution."};
 	}
 
 	if (!m_graph.m_plan)
 	{
-		return { false, "GraphExecutor: no valid compiled plan." };
+		return {false, "GraphExecutor: no valid compiled plan."};
 	}
 
 	// Mark the graph as executing.
@@ -489,10 +499,13 @@ Result GraphExecutor::Execute()
 	struct ExecutionScope
 	{
 		bool& running;
-		~ExecutionScope() { running = false; }
+		~ExecutionScope()
+		{
+			running = false;
+		}
 	};
-	
-	ExecutionScope scope = { m_graph.m_executing };
+
+	ExecutionScope scope = {m_graph.m_executing};
 
 	const auto& plan = *m_graph.m_plan;
 	std::string passName;
@@ -500,7 +513,6 @@ Result GraphExecutor::Execute()
 	try
 	{
 		std::vector<StateCommit> commits;
-		std::vector<std::uint64_t*> drawFences;
 
 		// Final check for plan.
 		// Confirm the state of each texture resource matches the actual resource conditions.
@@ -517,17 +529,7 @@ Result GraphExecutor::Execute()
 			return {};
 		}
 
-		// Keep all the bindings alive for the duration of this frame execution.
-		for (const auto& binding : m_bindings)
-		{
-			result = m_backend.KeepFrameObjectAlive(binding.Resource());
-
-			if (!result.IsSuccess())
-			{
-				return result;
-			}
-		}
-
+		// Resource owners remain stable until this synchronous execution completes.
 		result = m_backend.BeginFrameCommands();
 
 		if (!result.IsSuccess())
@@ -543,12 +545,11 @@ Result GraphExecutor::Execute()
 			const auto& source = m_graph.m_passes[compiled.sourcePass];
 			passName = source.Description().name;
 
-			const auto fail =
-				[&](Result status) -> Result
-				{
-					status.message = "GraphExecutor Pass '" + passName + "': " + status.message;
-					return status;
-				};
+			const auto fail = [&](Result status) -> Result
+			{
+				status.message = "GraphExecutor Pass '" + passName + "': " + status.message;
+				return status;
+			};
 
 			// Record the state transitions for this pass.
 			result = RecordTransitions(compiled.transitions);
@@ -568,11 +569,11 @@ Result GraphExecutor::Execute()
 
 			// Determine the extent of the render target for this pass.
 			const auto extent = compiled.colors.empty() ? compiled.depth->texture : compiled.colors.front().texture;
-			
+
 			const auto* desc = m_graph.FindTexture(extent);
 
-			D3D12_CPU_DESCRIPTOR_HANDLE dsv = compiled.depth ?
-				FindBinding(compiled.depth->texture)->dsv : D3D12_CPU_DESCRIPTOR_HANDLE{};
+			D3D12_CPU_DESCRIPTOR_HANDLE dsv =
+				compiled.depth ? FindBinding(compiled.depth->texture)->dsv : D3D12_CPU_DESCRIPTOR_HANDLE{};
 
 			// Prepare the output of this pass and set it as the current render target.
 			result = commands.SetRasterOutput(rtvs, desc->width, desc->height, dsv);
@@ -609,7 +610,7 @@ Result GraphExecutor::Execute()
 			}
 
 			// Execute the callback for this pass with the render pass context.
-			RenderPassContext context(m_graph, compiled, &commands, &drawFences);
+			RenderPassContext context(m_graph, compiled, &commands);
 			result = source.m_execute(context);
 
 			if (!context.m_status.IsSuccess())
@@ -619,7 +620,7 @@ Result GraphExecutor::Execute()
 
 			if (m_graph.m_executionViolated)
 			{
-				return fail({ false, "Graph mutation or recursive execution was attempted." });
+				return fail({false, "Graph mutation or recursive execution was attempted."});
 			}
 
 			if (!result.IsSuccess())
@@ -655,48 +656,34 @@ Result GraphExecutor::Execute()
 
 		if (!submission.executionIssued)
 		{
-			return { false, "GraphExecutor: successful submission issued no execution." };
+			return {false, "GraphExecutor: successful submission issued no execution."};
 		}
 
 		// All identities and states are prepared. No allocation or validation after Signal.
 		// This loop runs after successful submission/Signal.
-		// Stamp render-target use even when a pass only cleared an attachment and recorded no Objects.
-		// A shader-read-only Fence would miss such writes and allow premature Destroy/Resize reclamation.
 		for (const auto& commit : commits)
 		{
 			CommitBinding(m_backend, *commit.binding, commit.state, commit.contentsValid);
-
-			// Clear-only output also uses its owning revision on the GPU.
-			const auto owner = std::get_if<detail::RenderTargetTextureContent*>(&commit.binding->owner);
-			if (owner)
-			{
-				(*owner)->lastDrawFenceValue = std::max((*owner)->lastDrawFenceValue, submission.fenceValue);
-			}
-		}
-
-		for (auto* fence : drawFences)
-		{
-			*fence = std::max(*fence, submission.fenceValue);
 		}
 
 		return m_backend.WaitForFrameCompletion();
 	}
 	catch (const std::bad_alloc&)
 	{
-		return { false, "GraphExecutor: allocation failed during recording." };
+		return {false, "GraphExecutor: allocation failed during recording."};
 	}
 	catch (const std::length_error&)
-	{ 
-		return { false, "GraphExecutor: recording size is unsupported." };
+	{
+		return {false, "GraphExecutor: recording size is unsupported."};
 	}
 	catch (const std::exception& error)
 	{
-		return { false, "GraphExecutor Pass '" + passName + "': callback/recording exception: " + error.what() };
+		return {false, "GraphExecutor Pass '" + passName + "': callback/recording exception: " + error.what()};
 	}
-	catch (...) 
+	catch (...)
 	{
-		return { false, "GraphExecutor: unknown callback/recording exception." };
+		return {false, "GraphExecutor: unknown callback/recording exception."};
 	}
 }
 
-}
+} // namespace rendering::graph

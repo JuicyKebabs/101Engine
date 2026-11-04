@@ -14,16 +14,17 @@ ActorImprintEditorDocument::ActorImprintEditorDocument(
 {
 	if (m_context)
 	{
-        // Edit can open this Document inside RenderImGui, after the ordinary
-        // EditorUpdate. Synchronize its privately owned hierarchy before the
-        // Document is published so first-frame extraction has valid World and
-        // Bounds values. This flush does not Start or advance gameplay, and it
-        // deliberately leaves the normal per-frame edit order unchanged.
-        SceneBase* workingScene = m_context->GetWorkingScene();
-        if (workingScene)
-        {
-            workingScene->EditorUpdate(0.0f);
-        }
+		// Edit can open this Document inside RenderImGui, after the ordinary
+		// EditorUpdate. Synchronize its privately owned hierarchy before the
+		// Document is published so first-frame extraction has valid World and
+		// Bounds values. This flush does not Start or advance gameplay, and it
+		// deliberately leaves the normal per-frame edit order unchanged.
+		SceneBase* workingScene = m_context->GetWorkingScene();
+
+		if (workingScene)
+		{
+			workingScene->EditorUpdate(0.0f);
+		}
 
 		m_displayName = std::filesystem::path(m_context->GetAssetPath()).filename().string();
 	}
@@ -93,7 +94,9 @@ bool ActorImprintEditorDocument::ExecuteCommand(std::unique_ptr<IEditorCommand> 
 	}
 
 	return IEditorDocument::ExecuteCommand(std::make_unique<ActorImprintEditingCommand>(
-		*scene, m_context->GetObjectMap(), std::move(command)));
+		*scene,
+		m_context->GetObjectMap(),
+		std::move(command)));
 }
 
 std::unique_ptr<SceneBase>* ActorImprintEditorDocument::GetWorkingSceneOwnerSlot()

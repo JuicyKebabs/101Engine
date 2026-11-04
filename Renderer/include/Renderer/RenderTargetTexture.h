@@ -23,10 +23,10 @@ struct RenderTargetTextureDesc
 	std::uint32_t height = 0;
 	TextureFormat format = TextureFormat::RGBA8_UNorm;
 
-    // Creation-time optimization information, not initialized pixels or a Pass Clear.
-    // A different actual Clear remains valid. Resize preserves this representative
-    // value; changing a View's clearColor does not implicitly replace this resource.
-    std::array<float, 4> optimizedClearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
+	// Creation-time optimization information, not initialized pixels or a Pass Clear.
+	// A different actual Clear remains valid. Resize preserves this representative
+	// value; changing a View's clearColor does not implicitly replace this resource.
+	std::array<float, 4> optimizedClearColor{ 0.05f, 0.10f, 0.25f, 1.0f };
 };
 
 // A value snapshot. It neither owns a GPU image nor pins a particular revision.

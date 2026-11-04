@@ -5,14 +5,14 @@
 class Bullet : public Behavior
 {
 public:
-    void Start() override;
-    void PreUpdate() override;
-    void Update() override;
-    void LateUpdate() override;
-    void Destroy() override;
-    static std::optional<TypeMetadata> BuildMetadata();
+	void Start() override;
+	void PreUpdate() override;
+	void Update() override;
+	void LateUpdate() override;
+	void Destroy() override;
+	static std::optional<TypeMetadata> BuildMetadata();
 
-    // 発射
+	// 発射
 	void Launch(const Vector3& position, const Vector3& direction, float speed);
 
 private:

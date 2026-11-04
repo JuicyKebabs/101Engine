@@ -18,9 +18,11 @@ namespace
 		numeric.maximum = 179.0;
 		numeric.storageUnit = NumericUnit::Radians;
 		numeric.displayUnit = NumericUnit::Degrees;
+
 		InspectorMetadata inspector;
 		inspector.label = "Field of View";
 		inspector.numeric = numeric;
+
 		return inspector;
 	}
 }
@@ -41,41 +43,90 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::Camera(std::string st
 		DBG("Camera farZ must be greater than nearZ.");
 		return false;
 	});
+
 	PersistentMetadata::AddComponentName(builder);
 	builder.Property("followMode", &T::GetFollowMode, &T::SetFollowMode).SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("rotationMode", &T::GetRotationMode, &T::SetRotationMode)
 		.SerializedAs(EnumSerializationFormat::Integer);
 	builder.Property("targetActorId", &T::GetTargetActorReference, &T::SetTargetActorReference);
 	builder.Property("followActorId", &T::GetFollowActorReference, &T::SetFollowActorReference);
-	builder.Object("rig", [](auto& rig)
-	{
-		rig.Property("offsetPosition", &T::GetCameraRig, &T::SetCameraRig, &CameraRig::offsetPosition)
-			.Validate(ValueValidation::Finite3);
-		rig.Property("offsetRotation", [](const T& c)
+
+	builder.Object(
+		"rig",
+		[](auto& rig)
 		{
-			return c.GetCameraRig().offsetRotation;
-		}, &T::SetAuthoredRigRotation);
-	});
-	builder.Object("pose", [](auto& pose)
-	{
-		pose.Property("position", &T::GetCameraPose, &T::SetCameraPose, &CameraPose::position)
-			.Validate(ValueValidation::Finite3);
-		pose.Property("rotation", [](const T& c)
+			rig.Property(
+				"offsetPosition",
+				&T::GetCameraRig,
+				&T::SetCameraRig,
+				&CameraRig::offsetPosition)
+				.Validate(ValueValidation::Finite3);
+			rig.Property(
+				"offsetRotation",
+				[](const T& c)
+				{
+					return c.GetCameraRig().offsetRotation;
+				},
+				&T::SetAuthoredRigRotation);
+		});
+
+	builder.Object(
+		"pose",
+		[](auto& pose)
 		{
-			return c.GetCameraPose().rotation;
-		}, &T::SetAuthoredPoseRotation);
-	});
-	builder.Object("lens", [](auto& lens)
-	{
-		lens.Property("fov", &T::GetCameraLens, &T::SetCameraLens, &CameraLens::fov)
-			.Validate(Positive)
-			.Inspector(FovInspector());
-		lens.Property("width", &T::GetCameraLens, &T::SetCameraLens, &CameraLens::width).Validate(Nonnegative);
-		lens.Property("height", &T::GetCameraLens, &T::SetCameraLens, &CameraLens::height).Validate(Nonnegative);
-		lens.Property("nearZ", &T::GetCameraLens, &T::SetCameraLens, &CameraLens::nearZ).Validate(Positive);
-		lens.Property("farZ", &T::GetCameraLens, &T::SetCameraLens, &CameraLens::farZ).Validate(Positive);
-		lens.Property("projectionType", &T::GetCameraLens, &T::SetCameraLens, &CameraLens::projectionType)
-			.SerializedAs(EnumSerializationFormat::Integer);
-	});
+			pose.Property(
+				"position",
+				&T::GetCameraPose,
+				&T::SetCameraPose,
+				&CameraPose::position)
+				.Validate(ValueValidation::Finite3);
+			pose.Property(
+				"rotation",
+				[](const T& c)
+				{
+					return c.GetCameraPose().rotation;
+				},
+				&T::SetAuthoredPoseRotation);
+		});
+
+	builder.Object(
+		"lens",
+		[](auto& lens)
+		{
+			lens.Property(
+				"fov",
+				&T::GetCameraLens,
+				&T::SetCameraLens,
+				&CameraLens::fov)
+				.Validate(Positive)
+				.Inspector(FovInspector());
+			lens.Property(
+				"width",
+				&T::GetCameraLens,
+				&T::SetCameraLens,
+				&CameraLens::width).Validate(Nonnegative);
+			lens.Property(
+				"height",
+				&T::GetCameraLens,
+				&T::SetCameraLens,
+				&CameraLens::height).Validate(Nonnegative);
+			lens.Property(
+				"nearZ",
+				&T::GetCameraLens,
+				&T::SetCameraLens,
+				&CameraLens::nearZ).Validate(Positive);
+			lens.Property(
+				"farZ",
+				&T::GetCameraLens,
+				&T::SetCameraLens,
+				&CameraLens::farZ).Validate(Positive);
+			lens.Property(
+				"projectionType",
+				&T::GetCameraLens,
+				&T::SetCameraLens,
+				&CameraLens::projectionType)
+				.SerializedAs(EnumSerializationFormat::Integer);
+		});
+
 	return PersistentMetadata::Finish(builder);
 }

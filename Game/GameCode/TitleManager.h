@@ -5,12 +5,12 @@
 class TitleManager : public Behavior
 {
 public:
-    void Start() override;
-    void PreUpdate() override;
-    void Update() override;
-    void LateUpdate() override;
-    void Destroy() override;
-    static std::optional<TypeMetadata> BuildMetadata();
+	void Start() override;
+	void PreUpdate() override;
+	void Update() override;
+	void LateUpdate() override;
+	void Destroy() override;
+	static std::optional<TypeMetadata> BuildMetadata();
 
 private:
 	AssetReference<SceneAsset> m_nextScene; // 次のシーンへの参照

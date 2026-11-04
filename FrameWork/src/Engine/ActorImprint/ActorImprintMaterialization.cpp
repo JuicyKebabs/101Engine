@@ -123,7 +123,12 @@ Actor* ActorImprintSystem::Instantiate(
 	ActorImprintHandle imprint,
 	ActorHandle externalParent)
 {
-	return Materialize(scene, imprint, externalParent, nullptr, nullptr);
+	return Materialize(
+		scene,
+		imprint,
+		externalParent,
+		nullptr,
+		nullptr);
 }
 
 Actor* ActorImprintSystem::Instantiate(
@@ -138,7 +143,12 @@ Actor* ActorImprintSystem::Instantiate(
 		return nullptr;
 	}
 
-	return Materialize(scene, handle, externalParent, nullptr, nullptr);
+	return Materialize(
+		scene,
+		handle,
+		externalParent,
+		nullptr,
+		nullptr);
 }
 
 Actor* ActorImprintSystem::RestoreInstance(
@@ -146,7 +156,12 @@ Actor* ActorImprintSystem::RestoreInstance(
 	ActorImprintHandle imprint,
 	const ActorImprintRestoreInput& input)
 {
-	return Materialize(scene, imprint, input.externalParent, &input, nullptr);
+	return Materialize(
+		scene,
+		imprint,
+		input.externalParent,
+		&input,
+		nullptr);
 }
 
 Actor* ActorImprintSystem::RestoreInstanceForSceneCandidate(
@@ -155,7 +170,12 @@ Actor* ActorImprintSystem::RestoreInstanceForSceneCandidate(
 	const ActorImprintRestoreInput& input,
 	const std::unordered_set<Guid>& reservedSceneGuids)
 {
-	return Materialize(scene, imprint, input.externalParent, &input, &reservedSceneGuids);
+	return Materialize(
+		scene,
+		imprint,
+		input.externalParent,
+		&input,
+		&reservedSceneGuids);
 }
 
 Actor* ActorImprintSystem::Materialize(
@@ -202,6 +222,7 @@ Actor* ActorImprintSystem::Materialize(
 		explicit BusyScope(bool& value) : flag(value) { flag = true; }
 		~BusyScope() { flag = false; }
 	} busy(m_materializing);
+
 	try
 	{
 		ActorImprintReferenceCodec::ActorGuids restoredGuids;
@@ -211,8 +232,12 @@ Actor* ActorImprintSystem::Materialize(
 
 		if (restoreInput)
 		{
-			if (!PrepareRestoredActorGuids(*definition, scene, *restoreInput, restoredGuids,
-					reservedSceneGuids))
+			if (!PrepareRestoredActorGuids(
+				*definition,
+				scene,
+				*restoreInput,
+				restoredGuids,
+				reservedSceneGuids))
 			{
 				return nullptr;
 			}
@@ -226,7 +251,11 @@ Actor* ActorImprintSystem::Materialize(
 
 		SceneActorBatch batch(scene);
 		auto detached = ActorImprintDetail::CreateDetachedActors(
-			*definition, scene, restoredGuidInput, overrides, revisionRelation);
+			*definition,
+			scene,
+			restoredGuidInput,
+			overrides,
+			revisionRelation);
 
 		if (!detached)
 		{
@@ -256,8 +285,10 @@ Actor* ActorImprintSystem::Materialize(
 
 			for (const auto& component : actorDefinition.components)
 			{
-				record.components.emplace(component.id, ActorImprintComponentLocator{actorDefinition.id,
-															component.typeName, occurrences[component.typeName]++});
+				record.components.emplace(
+					component.id,
+					ActorImprintComponentLocator{actorDefinition.id,
+																component.typeName, occurrences[component.typeName]++});
 			}
 		}
 
@@ -303,14 +334,19 @@ Actor* ActorImprintSystem::Materialize(
 		}
 
 		batch.PrepareCommit(root, parent);
+
 		// Recoverable validation and Actor/Registry storage preparation end here.
 		// Attach callbacks are non-failing; allocation failure there is fatal.
 		batch.Commit();
+
 		registry.m_instances.swap(instances);
 		registry.m_members.swap(members);
 		registry.m_system = this;
+
 		++m_slots[imprint.index].instances;
+
 		batch.Attach();
+
 		return root;
 	}
 	catch (const std::exception& error)

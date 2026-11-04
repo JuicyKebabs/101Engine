@@ -98,10 +98,13 @@ namespace
 			return false;
 		}
 
-		std::sort(target.properties.begin(), target.properties.end(), [](const auto& left, const auto& right)
-		{
-			return left.path.ToString() < right.path.ToString();
-		});
+		std::sort(
+			target.properties.begin(),
+			target.properties.end(),
+			[](const auto& left, const auto& right)
+			{
+				return left.path.ToString() < right.path.ToString();
+			});
 
 		for (std::size_t i = 0; i < target.properties.size(); ++i)
 		{
@@ -191,10 +194,13 @@ namespace
 			return false;
 		}
 
-		std::sort(record.actorGuids.begin(), record.actorGuids.end(), [](const auto& left, const auto& right)
-		{
-			return left.localObjectId < right.localObjectId;
-		});
+		std::sort(
+			record.actorGuids.begin(),
+			record.actorGuids.end(),
+			[](const auto& left, const auto& right)
+			{
+				return left.localObjectId < right.localObjectId;
+			});
 
 		std::unordered_set<LocalObjectId> targets;
 
@@ -220,17 +226,24 @@ namespace
 			}
 		}
 
-		record.propertyOverrides.erase(std::remove_if(record.propertyOverrides.begin(), record.propertyOverrides.end(),
-										   [](const auto& target)
-		{
-			return target.properties.empty();
-		}),
+		record.propertyOverrides.erase(
+			std::remove_if(
+				record.propertyOverrides.begin(),
+				record.propertyOverrides.end(),
+				[](const auto& target)
+{
+return target.properties.empty();
+}),
 			record.propertyOverrides.end());
-		std::sort(record.propertyOverrides.begin(), record.propertyOverrides.end(),
+
+		std::sort(
+			record.propertyOverrides.begin(),
+			record.propertyOverrides.end(),
 			[](const auto& left, const auto& right)
 		{
 			return left.targetLocalObjectId < right.targetLocalObjectId;
 		});
+
 		return true;
 	}
 }
@@ -258,7 +271,8 @@ bool ActorImprintInstanceRecordReader::Read(
 
 		if (!source["sourceDefinitionRevision"].is_string() ||
 			!DefinitionRevision::TryParse(
-				source["sourceDefinitionRevision"].get<std::string>(), record.sourceDefinitionRevision))
+				source["sourceDefinitionRevision"].get<std::string>(),
+				record.sourceDefinitionRevision))
 		{
 			DBG("Expected a nonzero DefinitionRevision string.");
 			return false;

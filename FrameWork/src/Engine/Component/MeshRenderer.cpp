@@ -13,91 +13,107 @@
 
 bool MeshRenderer::SetMeshAsset(const Guid& assetId)
 {
-    PreparedMeshAssetState prepared;
-    if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
-    {
-        return false;
-    }
+	PreparedMeshAssetState prepared;
 
-    CommitMeshAssetState(std::move(prepared));
-    return true;
+	if (PrepareMeshAssetState(assetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitMeshAssetState(std::move(prepared));
+	return true;
 }
 
 AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, PreparedMeshAssetState& output) const
 {
-    PreparedMeshAssetState prepared;
-    if (!assetId.IsValid())
-    {
-        output = std::move(prepared);
-        return AssetPrepareResult::Ready;
-    }
+	PreparedMeshAssetState prepared;
 
-    Actor* actor = GetOwner();
-    SceneBase* scene = actor ? actor->GetOwner() : nullptr;
-    const EngineContext* context = GetEngineContext();
-    if (!scene || !context || !context->pAssetManager)
-    {
-        return AssetPrepareResult::Failed;
-    }
+	if (!assetId.IsValid())
+	{
+		output = std::move(prepared);
+		return AssetPrepareResult::Ready;
+	}
 
-    const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
-    if (entry && entry->type != AssetType::Mesh)
-    {
-        return AssetPrepareResult::Failed;
-    }
+	Actor* actor = GetOwner();
+	SceneBase* scene = actor ? actor->GetOwner() : nullptr;
+	const EngineContext* context = GetEngineContext();
 
-    // Missing files/individual failed SubMeshes are cached Invalid values.
-    // Holding/copying failure still propagates so Scene preparation can cancel.
-    SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
-    const auto& geometries = context->pAssetManager->GetGeometryInfos(*scene, assetId);
-    prepared.assetId = assetId;
-    prepared.templates.reserve(geometries.size());
-    for (const GeometryInfo& geometry : geometries)
-    {
-        SubmeshRenderTemplate renderTemplate;
-        renderTemplate.meshDesc.meshHandle = geometry.geometry;
-        renderTemplate.localToModel = geometry.localToModel;
-        renderTemplate.materialDesc.textureHandle = geometry.texture;
-        renderTemplate.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
-        if (context->pRenderAssets)
-        {
-            Vector2 uvScale = Vector2::One();
-            Vector2 uvOffset;
-            Vector2 pivot;
-            pivot.x = 0.5f;
-            pivot.y = 0.5f;
-            renderTemplate.materialDesc.description = context->pRenderAssets->MakeMaterial(true,
-                renderTemplate.materialDesc.screen, geometry.texture, uvScale, uvOffset, pivot, false, false);
-            renderTemplate.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene,
-                renderTemplate.materialDesc.description);
-        }
+	if (!scene || !context || !context->pAssetManager)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
-        if (context->pRenderer)
-        {
-            rendering::GeometryData snapshot;
-            const auto queried = context->pRenderer->GetGeometryData(geometry.geometry, snapshot);
-            if (queried.IsSuccess())
-            {
-                renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
-                renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
-                renderTemplate.meshDesc.boundsRevision = snapshot.revision;
-            }
-        }
+	const AssetEntry* entry = context->pAssetManager->GetAssetEntry(assetId);
 
-        prepared.templates.push_back(std::move(renderTemplate));
-    }
+	if (entry && entry->type != AssetType::Mesh)
+	{
+		return AssetPrepareResult::Failed;
+	}
 
-    acquisition.Commit();
-    output = std::move(prepared);
-    return AssetPrepareResult::Ready;
+	// Missing files/individual failed SubMeshes are cached Invalid values.
+	// Holding/copying failure still propagates so Scene preparation can cancel.
+	SceneAssetAcquisition acquisition(*context->pAssetManager, *scene);
+	const auto& geometries = context->pAssetManager->GetGeometryInfos(*scene, assetId);
+
+	prepared.assetId = assetId;
+	prepared.templates.reserve(geometries.size());
+
+	for (const GeometryInfo& geometry : geometries)
+	{
+		SubmeshRenderTemplate renderTemplate;
+		renderTemplate.meshDesc.meshHandle = geometry.geometry;
+		renderTemplate.localToModel = geometry.localToModel;
+		renderTemplate.materialDesc.textureHandle = geometry.texture;
+		renderTemplate.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
+
+		if (context->pRenderAssets)
+		{
+			Vector2 uvScale = Vector2::One();
+			Vector2 uvOffset;
+			Vector2 pivot;
+			pivot.x = 0.5f;
+			pivot.y = 0.5f;
+
+			renderTemplate.materialDesc.description = context->pRenderAssets->MakeMaterial(
+				true,
+				renderTemplate.materialDesc.screen,
+				geometry.texture,
+				uvScale,
+				uvOffset,
+				pivot,
+				false,
+				false);
+			renderTemplate.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene,
+				renderTemplate.materialDesc.description);
+		}
+
+		if (context->pRenderer)
+		{
+			rendering::GeometryData snapshot;
+			const auto queried = context->pRenderer->GetGeometryData(geometry.geometry, snapshot);
+
+			if (queried.IsSuccess())
+			{
+				renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
+				renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
+				renderTemplate.meshDesc.boundsRevision = snapshot.revision;
+			}
+		}
+
+		prepared.templates.push_back(std::move(renderTemplate));
+	}
+
+	acquisition.Commit();
+	output = std::move(prepared);
+	return AssetPrepareResult::Ready;
 }
 
 void MeshRenderer::CommitMeshAssetState(PreparedMeshAssetState&& state)
 {
-    m_meshAssetId = state.assetId;
-    m_templates.swap(state.templates);
-    m_pendingMeshAssetId.reset();
-    m_isProxyDirty = true;
+	m_meshAssetId = state.assetId;
+	m_templates.swap(state.templates);
+	m_pendingMeshAssetId.reset();
+	m_isProxyDirty = true;
 }
 
 Guid MeshRenderer::GetAssetId() const
@@ -233,25 +249,27 @@ void MeshRenderer::RebuildRenderProxy()
 // availability failure is a display fallback; wrong ownership/type remains failure.
 bool MeshRenderer::ResolveReferences(SceneBase& scene)
 {
-    if (!m_pendingMeshAssetId)
-    {
-        return true;
-    }
+	if (!m_pendingMeshAssetId)
+	{
+		return true;
+	}
 
-    Actor* actor = GetOwner();
-    if (!actor || actor->GetOwner() != &scene)
-    {
-        return false;
-    }
+	Actor* actor = GetOwner();
 
-    PreparedMeshAssetState prepared;
-    if (PrepareMeshAssetState(*m_pendingMeshAssetId, prepared) != AssetPrepareResult::Ready)
-    {
-        return false;
-    }
+	if (!actor || actor->GetOwner() != &scene)
+	{
+		return false;
+	}
 
-    CommitMeshAssetState(std::move(prepared));
-    return true;
+	PreparedMeshAssetState prepared;
+
+	if (PrepareMeshAssetState(*m_pendingMeshAssetId, prepared) != AssetPrepareResult::Ready)
+	{
+		return false;
+	}
+
+	CommitMeshAssetState(std::move(prepared));
+	return true;
 }
 
 Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
@@ -271,12 +289,12 @@ Matrix4x4 MeshRenderer::BuildWorldMatrix(Transform* transform) const
 		{
 			const MeshDesc& meshDesc = renderTemplate.meshDesc;
 
-            // Include each model node placement without changing the legacy
-            // unit-transform fit scale. The norm bound also covers node shear.
-            const Matrix4x4& placement = renderTemplate.localToModel;
-            const Vector3 centerInModel = placement.TransformPoint(meshDesc.boundsCenter);
-            const float radiusFromOrigin = centerInModel.Length()
-                + meshDesc.boundsRadius * EngineRendering::ConservativeLinearScale(placement);
+			// Include each model node placement without changing the legacy
+			// unit-transform fit scale. The norm bound also covers node shear.
+			const Matrix4x4& placement = renderTemplate.localToModel;
+			const Vector3 centerInModel = placement.TransformPoint(meshDesc.boundsCenter);
+			const float radiusFromOrigin = centerInModel.Length()
+				+ meshDesc.boundsRadius * EngineRendering::ConservativeLinearScale(placement);
 
 			modelRadius = (std::max)(modelRadius, radiusFromOrigin);
 		}
@@ -308,10 +326,10 @@ AssetReference<MeshAsset> MeshRenderer::GetMeshAssetReference() const
 {
 	AssetReference<MeshAsset> value;
 	AssetReferenceValue reference;
-    reference.guid = GetAssetId();
-    reference.expectedType = AssetType::Mesh;
-    reference.resolved = m_meshAssetId.IsValid();
-    value.SetValue(reference);
+	reference.guid = GetAssetId();
+	reference.expectedType = AssetType::Mesh;
+	reference.resolved = m_meshAssetId.IsValid();
+	value.SetValue(reference);
 	return value;
 }
 
@@ -333,6 +351,7 @@ bool MeshRenderer::SetPendingMeshAssetReference(const AssetReference<MeshAsset>&
 bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& value)
 {
 	Actor* owner = GetOwner();
+
 	// Deserialization produces unresolved references. Keep those pending even if
 	// an existing Component is currently attached to a Scene.
 	if (!owner || !owner->GetOwner() || (value.HasValue() && !value.IsResolved()))
@@ -356,43 +375,47 @@ bool MeshRenderer::TrySetMeshAssetReference(const AssetReference<MeshAsset>& val
 // This is not a second whole-Scene scan or a GPU readiness polling operation.
 bool MeshRenderer::SynchronizeRenderResources()
 {
-    const EngineContext* context = GetEngineContext();
-    if (!context || !context->pRenderer)
-    {
-        return true;
-    }
+	const EngineContext* context = GetEngineContext();
 
-    const bool screen = GetRenderSpace() == RenderSpace::Screen;
-    for (SubmeshRenderTemplate& renderTemplate : m_templates)
-    {
-        rendering::GeometryData snapshot;
-        const auto queried = context->pRenderer->GetGeometryData(renderTemplate.meshDesc.meshHandle, snapshot);
-        if (queried.IsSuccess() && snapshot.revision != renderTemplate.meshDesc.boundsRevision)
-        {
-            renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
-            renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
-            renderTemplate.meshDesc.boundsRevision = snapshot.revision;
-            m_isProxyDirty = true;
-        }
-        else if (!queried.IsSuccess())
-        {
-            renderTemplate.meshDesc.boundsRevision = 0;
-        }
+	if (!context || !context->pRenderer)
+	{
+		return true;
+	}
 
-        if (context->pRenderAssets && renderTemplate.materialDesc.screen != screen)
-        {
-            auto description = renderTemplate.materialDesc.description;
-            description.pipeline = context->pRenderAssets->MeshPipeline(screen);
-            const auto updated = context->pRenderer->UpdateMaterial(renderTemplate.materialDesc.handle, description);
-            if (!updated.IsSuccess())
-            {
-                return false;
-            }
+	const bool screen = GetRenderSpace() == RenderSpace::Screen;
 
-            renderTemplate.materialDesc.description = std::move(description);
-            renderTemplate.materialDesc.screen = screen;
-        }
-    }
+	for (SubmeshRenderTemplate& renderTemplate : m_templates)
+	{
+		rendering::GeometryData snapshot;
+		const auto queried = context->pRenderer->GetGeometryData(renderTemplate.meshDesc.meshHandle, snapshot);
 
-    return true;
+		if (queried.IsSuccess() && snapshot.revision != renderTemplate.meshDesc.boundsRevision)
+		{// Update the bounds in the render template if the revision has changed
+			renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
+			renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
+			renderTemplate.meshDesc.boundsRevision = snapshot.revision;
+			m_isProxyDirty = true;
+		}
+		else if (!queried.IsSuccess())
+		{// If the geometry data is not available, reset the bounds to default values
+			renderTemplate.meshDesc.boundsRevision = 0;
+		}
+
+		if (context->pRenderAssets && renderTemplate.materialDesc.screen != screen)
+		{// Update the material description if the render space has changed
+			auto description = renderTemplate.materialDesc.description;
+			description.pipeline = context->pRenderAssets->MeshPipeline(screen);
+			const auto updated = context->pRenderer->UpdateMaterial(renderTemplate.materialDesc.handle, description);
+
+			if (!updated.IsSuccess())
+			{
+				return false;
+			}
+
+			renderTemplate.materialDesc.description = std::move(description);
+			renderTemplate.materialDesc.screen = screen;
+		}
+	}
+
+	return true;
 }

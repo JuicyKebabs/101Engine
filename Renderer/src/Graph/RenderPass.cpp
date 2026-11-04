@@ -206,7 +206,8 @@ Result RenderPassBuilder::Build(std::optional<RenderPass>& output)&&
 
 			// Check that all clear color values are finite (not NaN or Inf).
 			bool isAllFinite = std::all_of(
-				color.clearColor.begin(), color.clearColor.end(),
+				color.clearColor.begin(),
+				color.clearColor.end(),
 				[](float v) { return std::isfinite(v); });
 
 			if (color.loadOp == AttachmentLoadOp::Clear && !isAllFinite)

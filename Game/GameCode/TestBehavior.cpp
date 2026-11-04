@@ -18,7 +18,7 @@ std::optional<TypeMetadata> TestBehavior::BuildMetadata()
 
 void TestBehavior::Start()
 {
-    DBG("TestBehavior::Start()");
+	DBG("TestBehavior::Start()");
 }
 
 void TestBehavior::Update()
@@ -26,17 +26,17 @@ void TestBehavior::Update()
 	const InputInfo& input = InputManager::GetInstance().GetInputInfo();
 
 	if (input.key.a.down)
-    {
-        Transform* transform = GetOwner()->GetComponentByClass<Transform>();
+	{
+		Transform* transform = GetOwner()->GetComponentByClass<Transform>();
 
-        transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, m_rotationSpeed));
-    }
+		transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, m_rotationSpeed));
+	}
 	else if (input.key.d.down)
-    {
-        Transform* transform = GetOwner()->GetComponentByClass<Transform>();
+	{
+		Transform* transform = GetOwner()->GetComponentByClass<Transform>();
 
-        transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, -m_rotationSpeed));
-    }
+		transform->RotateLocalByEulerDeg(Vector3(0.0f, 0.0f, -m_rotationSpeed));
+	}
 
 	if (!input.key.space.trigger)
 	{
@@ -47,6 +47,7 @@ void TestBehavior::Update()
 	SceneBase* scene = owner ? owner->GetOwner() : nullptr;
 	EngineContext* context = owner ? GetEngineContext() : nullptr;
 	Transform* sourceTransform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+
 	if (!m_actorImprint.HasValue() || !scene || !context || !context->pActorImprintSystem || !sourceTransform)
 	{
 		DBG("TestBehavior: ActorImprint could not be instantiated because the reference or runtime context is invalid.");
@@ -55,12 +56,14 @@ void TestBehavior::Update()
 
 	const Vector3 spawnPosition = sourceTransform->GetWorldPosition();
 	Actor* instanceRoot = context->pActorImprintSystem->Instantiate(*scene, m_actorImprint, {});
+
 	if (!instanceRoot)
 	{
 		return;
 	}
 
 	Transform* instanceTransform = instanceRoot->GetComponentByClass<Transform>();
+
 	if (!instanceTransform)
 	{
 		context->pActorImprintSystem->DestroyInstance(*scene, instanceRoot->GetHandle());

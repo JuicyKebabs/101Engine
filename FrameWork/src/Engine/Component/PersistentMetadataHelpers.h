@@ -12,6 +12,7 @@ namespace PersistentMetadata
 	template<class T> std::unique_ptr<TypeMetadata> Finish(TypeMetadataBuilder<T>& builder)
 	{
 		auto metadata = builder.Build();
+
 		if (!metadata)
 		{
 			return nullptr;

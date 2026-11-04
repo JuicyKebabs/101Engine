@@ -119,17 +119,29 @@ std::optional<DetachedActors> CreateDetachedActors(
 		ReflectionRestoreContext restore{ .actorReferenceCodec = &actorCodec, .assetReferenceCodec = &assetCodec };
 		ComponentRegistry& registry = ComponentRegistry::Get();
 		auto RestoreProperties =
-			[&](const TypeMetadata& metadata, std::type_index type, void* object, const nlohmann::json& properties)
+			[&](
+				const TypeMetadata& metadata,
+				std::type_index type,
+				void* object,
+				const nlohmann::json& properties)
 		{
-			if (ReflectionDeserializer::Deserialize(metadata, type, properties, object, restore))
+			if (ReflectionDeserializer::Deserialize(
+				metadata,
+				type,
+				properties,
+				object,
+				restore))
 			{
 				return true;
 			}
 
 			return false;
 		};
-		auto CompleteProperties = [&](LocalObjectId id, const TypeMetadata& metadata, const nlohmann::json& defaults,
-									  nlohmann::json& completed)
+		auto CompleteProperties = [&](
+			LocalObjectId id,
+			const TypeMetadata& metadata,
+			const nlohmann::json& defaults,
+			nlohmann::json& completed)
 		{
 			const auto target = remainingOverrides.find(id);
 
@@ -139,8 +151,14 @@ std::optional<DetachedActors> CreateDetachedActors(
 				return true;
 			}
 
-			if (!ActorImprintPropertyOverrides::Merge(metadata, defaults, *target->second,
-				revisionRelation, completed, nullptr, nullptr))
+			if (!ActorImprintPropertyOverrides::Merge(
+				metadata,
+				defaults,
+				*target->second,
+				revisionRelation,
+				completed,
+				nullptr,
+				nullptr))
 			{
 				return false;
 			}
@@ -156,8 +174,16 @@ std::optional<DetachedActors> CreateDetachedActors(
 
 			nlohmann::json completed;
 
-			if (!CompleteProperties(record.id, GetActorMetadata(), record.properties, completed) ||
-				!RestoreProperties(GetActorMetadata(), typeid(Actor), &actor, completed))
+			if (!CompleteProperties(
+				record.id,
+				GetActorMetadata(),
+				record.properties,
+				completed) ||
+				!RestoreProperties(
+					GetActorMetadata(),
+					typeid(Actor),
+					&actor,
+					completed))
 			{
 				return std::nullopt;
 			}
@@ -189,8 +215,16 @@ std::optional<DetachedActors> CreateDetachedActors(
 					return std::nullopt;
 				}
 
-				if (!CompleteProperties(componentRecord.id, *metadata, componentRecord.properties, completed) ||
-					!RestoreProperties(*metadata, *type, owned, completed))
+				if (!CompleteProperties(
+					componentRecord.id,
+					*metadata,
+					componentRecord.properties,
+					completed) ||
+					!RestoreProperties(
+						*metadata,
+						*type,
+						owned,
+						completed))
 				{
 					return std::nullopt;
 				}

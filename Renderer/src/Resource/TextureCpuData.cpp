@@ -27,10 +27,12 @@ Result ValidateTextureDesc(const TextureDesc& desc)
 		return { false, "Texture dimensions must be greater than zero." };
 	}
 
+	// Calculate the maximum number of mip levels based on the largest dimension.
+	// ex: For 8x8 texture, max mip levels = 4 (8, 4, 2, 1)
 	const auto largestDimension = std::max(desc.width, desc.height);
-	const auto maxMipCount = std::bit_width(largestDimension);
+	const auto maxMipLevels = std::bit_width(largestDimension);
 
-	if (desc.mips.empty() || desc.mips.size() > maxMipCount)
+	if (desc.mips.empty() || desc.mips.size() > maxMipLevels)
 	{
 		return { false, "Invalid number of mip levels." };
 	}
@@ -102,29 +104,35 @@ Result CopyTextureCpuData(const TextureDesc& desc, TextureCpuData& output)
 		std::size_t width = desc.width;
 		std::size_t height = desc.height;
 
+		const std::size_t rowBytes = width * BytesPerPixel;	// Do not consider padding in the row pitch.
+
 		// Copy each mip level's pixel data to the destination structure.
 		for (std::size_t level = 0; level < desc.mips.size(); ++level)
 		{
 			const auto& source = desc.mips[level];
 			auto& destination = copied.mips[level];
-			const std::size_t rowBytes = width * BytesPerPixel;
-
+			
 			destination.rowPitch = rowBytes;
-			destination.pixels.resize(rowBytes * height);
-
+			destination.pixels.resize(rowBytes * height);	// Allocate only the required bytes for the mip level.
+			
+			// Iterate over each row.
 			for (std::size_t row = 0; row < height; ++row)
 			{
+				// calculate first address of the row in source and destination
 				const std::byte* sourceRow = source.pixels.data() + row * source.rowPitch;
 				std::byte* destinationRow = destination.pixels.data() + row * destination.rowPitch;
+
+				// Copy the row data from source to destination.
 				std::memcpy(destinationRow, sourceRow, rowBytes);
 			}
 
+			// Halve the dimensions for the next mip level, ensuring they don't go below 1.
 			width = std::max<std::size_t>(1, width / 2);
 			height = std::max<std::size_t>(1, height / 2);
 		}
 
 		// Commit only after every mips has been copied successfully.
-		output.mips.swap(copied.mips);
+		output.mips.swap(copied.mips);	// Swap does not copy the data.
 		output.width = copied.width;
 		output.height = copied.height;
 		output.format = copied.format;

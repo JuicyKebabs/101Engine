@@ -5,12 +5,12 @@
 class Explosion : public Behavior
 {
 public:
-    void Start() override;
-    void PreUpdate() override;
-    void Update() override;
-    void LateUpdate() override;
-    void Destroy() override;
-    static std::optional<TypeMetadata> BuildMetadata();
+	void Start() override;
+	void PreUpdate() override;
+	void Update() override;
+	void LateUpdate() override;
+	void Destroy() override;
+	static std::optional<TypeMetadata> BuildMetadata();
 
 private:
 	float m_duration = 1.0f; // 爆発の表示時間（秒）

@@ -237,10 +237,10 @@ namespace
 				if (data.contains("meshAssetId")) data["meshAssetId"] = nullptr;
 				if (data.contains("textureAssetId")) data["textureAssetId"] = nullptr;
 				if (data.contains("actorImprint")) data["actorImprint"] = nullptr;
-                if (data.contains("nextScene"))
-                {
-                    data["nextScene"] = nullptr;
-                }
+				if (data.contains("nextScene"))
+				{
+					data["nextScene"] = nullptr;
+				}
 			}
 		}
 
@@ -1034,11 +1034,11 @@ namespace
 
 int main()
 {
-    // The current repository fixture includes real GameCode Component types.
-    // Keep their DLL loaded until every Scene and registry factory is gone.
-    const auto gameCodePath = GetExecutableDirectory() / L"GameCode.dll";
-    HMODULE gameCode = LoadLibraryW(gameCodePath.c_str());
-    Check(gameCode != nullptr, "Repository fixture GameCode DLL loads");
+	// The current repository fixture includes real GameCode Component types.
+	// Keep their DLL loaded until every Scene and registry factory is gone.
+	const auto gameCodePath = GetExecutableDirectory() / L"GameCode.dll";
+	HMODULE gameCode = LoadLibraryW(gameCodePath.c_str());
+	Check(gameCode != nullptr, "Repository fixture GameCode DLL loads");
 	RegisterVersion3TestBehavior();
 	TestVersion3ChildBeforeParent();
 	TestRepositorySceneCompatibility();
@@ -1056,10 +1056,10 @@ int main()
 	TestVersion3ComponentReferencesAndRendererRoundTrip();
 	TestVersion3ReferenceResolutionFailures();
 	ComponentRegistry::Get().UnregisterAllGameComponents();
-    if (gameCode)
-    {
-        FreeLibrary(gameCode);
-    }
+	if (gameCode)
+	{
+		FreeLibrary(gameCode);
+	}
 
 	if (g_failures != 0)
 	{

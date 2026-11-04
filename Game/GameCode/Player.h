@@ -8,12 +8,12 @@
 class Player : public Behavior
 {
 public:
-    void Start() override;
-    void PreUpdate() override;
-    void Update() override;
-    void LateUpdate() override;
-    void Destroy() override;
-    static std::optional<TypeMetadata> BuildMetadata();
+	void Start() override;
+	void PreUpdate() override;
+	void Update() override;
+	void LateUpdate() override;
+	void Destroy() override;
+	static std::optional<TypeMetadata> BuildMetadata();
 
 	void SetCanMove(bool canMove) { m_canMove = canMove; }	// プレイヤーの移動可否を設定
 	bool CanMove() const { return m_canMove; }				// プレイヤーが移動可能かどうかを取得

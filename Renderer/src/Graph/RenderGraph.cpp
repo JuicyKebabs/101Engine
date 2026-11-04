@@ -46,9 +46,9 @@ namespace
 		switch (use.usage)
 		{
 		case TextureUsage::ShaderRead:
-            // A Depth resource is readable only if an actual SRV was imported.
-            // DSV-only images still fail this capability check.
-            if (!HasCapability(desc.capabilities, TextureCapability::ShaderRead))
+			// A Depth resource is readable only if an actual SRV was imported.
+			// DSV-only images still fail this capability check.
+			if (!HasCapability(desc.capabilities, TextureCapability::ShaderRead))
 			{
 				return { false, "ShaderRead is unsupported by the texture format/capabilities." };
 			}
@@ -141,7 +141,7 @@ namespace
 		{
 		case GraphTextureFormat::RGBA8_UNorm:
 		case GraphTextureFormat::RGBA8_sRGB:
-        case GraphTextureFormat::RGBA16_Float:
+		case GraphTextureFormat::RGBA16_Float:
 		case GraphTextureFormat::D32_Float:
 			break;
 		default:
@@ -437,7 +437,8 @@ Result RenderGraph::Compile()
 
 				// Combine shader stage flags of duplicated texture uses in the same pass.
 				auto previous = std::find_if(
-					compiled.uses.begin(), compiled.uses.end(),
+					compiled.uses.begin(),
+					compiled.uses.end(),
 					[&](const PassTextureUse& item) { return item.texture == use.texture; });
 
 				if (previous == compiled.uses.end())

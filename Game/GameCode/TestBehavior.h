@@ -7,9 +7,9 @@
 class TestBehavior : public Behavior
 {
 public:
-    void Start() override;
+	void Start() override;
 
-    void Update() override;
+	void Update() override;
 
 	static std::optional<TypeMetadata> BuildMetadata();
 

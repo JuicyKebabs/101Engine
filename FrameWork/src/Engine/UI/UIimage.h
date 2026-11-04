@@ -33,14 +33,18 @@ public:
 
 		m_textureAssetId = {};
 		m_pendingTextureAssetId.reset();
+
 		SetOrder(desc.order);
 		SetColor(desc.color);
 		SetVisible(desc.isVisible);
+
 		SetUVScale(desc.uvScale);
 		SetUVOffset(desc.uvOffset);
 		SetFlipX(desc.flipX);
 		SetFlipY(desc.flipY);
+
 		SetName(desc.name);
+
 		m_isProxyDirty = true;
 	}
 

@@ -204,12 +204,20 @@ public:
 
 	Result AddGeometry(const GeometryGpuData& gpu, std::unique_ptr<GeometryUploadData>& upload)
 	{
-		return Add(gpu, upload, m_geometryUploads, RecordGeometryUpload);
+		return Add(
+			gpu,
+			upload,
+			m_geometryUploads,
+			RecordGeometryUpload);
 	}
 
 	Result AddTexture(const TextureGpuData& gpu, std::unique_ptr<TextureUploadData>& upload)
 	{
-		return Add(gpu, upload, m_textureUploads, RecordTextureUpload);
+		return Add(
+			gpu,
+			upload,
+			m_textureUploads,
+			RecordTextureUpload);
 	}
 
 	[[nodiscard]]

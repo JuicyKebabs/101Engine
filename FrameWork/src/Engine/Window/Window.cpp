@@ -58,7 +58,11 @@ bool Window::Initialize(const InitDesc& desc)
 		static_cast<LONG>(desc.clientHeight)
 	};
 
-	if (!AdjustWindowRectEx(&windowRect, style, FALSE, 0))
+	if (!AdjustWindowRectEx(
+		&windowRect,
+		style,
+		FALSE,
+		0))
 	{
 		DBG("Window::Initialize: Failed to calculate window size. Error: %lu", GetLastError());
 		Terminate();
@@ -109,14 +113,18 @@ void Window::Terminate()
 
 	m_instance = nullptr;
 	m_className.clear();
+
 	m_clientSize = {};
 	m_requestedSize = {};
 	m_hasResizeRequest = false;
+
 	m_isMinimized = false;
 	m_allowFullscreenToggle = false;
+
 	m_mode = Mode::Windowed;
 	m_requestedMode = Mode::Windowed;
 	m_hasModeChangeRequest = false;
+
 	m_windowedStyle = 0;
 	m_windowedPlacement = { sizeof(WINDOWPLACEMENT) };
 	m_hasWindowedPlacement = false;
@@ -240,7 +248,11 @@ LRESULT CALLBACK Window::StaticWindowProcedure(
 
 	if (!window)
 	{
-		return DefWindowProcW(hwnd, message, wParam, lParam);
+		return DefWindowProcW(
+			hwnd,
+			message,
+			wParam,
+			lParam);
 	}
 
 	const LRESULT result = window->HandleMessage(message, wParam, lParam);
@@ -309,7 +321,12 @@ LRESULT Window::HandleMessage(
 	{
 		LRESULT callbackResult = 0;
 
-		if (m_messageCallback(m_hwnd, message, wParam, lParam, callbackResult))
+		if (m_messageCallback(
+			m_hwnd,
+			message,
+			wParam,
+			lParam,
+			callbackResult))
 		{
 			return callbackResult;
 		}
@@ -320,7 +337,11 @@ LRESULT Window::HandleMessage(
 		return result;
 	}
 
-	return DefWindowProcW(m_hwnd, message, wParam, lParam);
+	return DefWindowProcW(
+		m_hwnd,
+		message,
+		wParam,
+		lParam);
 }
 
 void Window::RequestResize(uint32_t width, uint32_t height)
@@ -396,10 +417,14 @@ bool Window::EnterBorderlessFullscreen()
 		SWP_NOOWNERZORDER | SWP_FRAMECHANGED))
 	{
 		DBG("Window::EnterBorderlessFullscreen: Failed to resize window. Error: %lu", GetLastError());
+
 		SetWindowLongPtrW(m_hwnd, GWL_STYLE, m_windowedStyle);
 		SetWindowPlacement(m_hwnd, &m_windowedPlacement);
+
 		RefreshWindowFrame();
+
 		m_hasWindowedPlacement = false;
+
 		return false;
 	}
 

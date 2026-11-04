@@ -14,54 +14,30 @@
 namespace rendering::graph
 {
 
-FrameResourceBindings::FrameResourceBindings(
-	backend::Backend& backend,
-	RenderGraph& graph,
-	GraphExecutor& executor) noexcept
+FrameResourceBindings::FrameResourceBindings(backend::Backend& backend, RenderGraph& graph,
+                                             GraphExecutor& executor) noexcept
 	: m_backend(backend), m_graph(graph), m_executor(executor)
-{}
+{
+}
 
 // Reuse existing physical identity rather than creating independent aliases for read and write.
 // Otherwise Graph could miss the dependency between a Scene output and a later Material sample.
-Result FrameResourceBindings::ImportBinding(
-	const GraphTextureBinding& binding,
-	const std::string& name,
-	GraphTextureHandle& texture)
+Result FrameResourceBindings::ImportBinding(const GraphTextureBinding& binding, const std::string& name,
+											GraphTextureHandle& texture)
 {
-	// ponytail: linear lookup suits small Graphs; index by native Resource if profiling shows a bottleneck.
-	const auto existing = std::find_if(
-		m_importedBindings.begin(), m_importedBindings.end(),
-		[&binding](const GraphTextureBinding& imported)
-		{
-			return imported.Resource() == binding.Resource();
-		});
+	const auto* existing = m_executor.FindPhysicalBinding(binding.Resource());
 
-	if (existing != m_importedBindings.end())
+	if (existing)
 	{
 		texture = existing->handle;
 		return {};
 	}
 
-	// Allocate our entry before changing the Graph/Executor. Import failure rolls it back.
-	m_importedBindings.push_back(binding);
-	GraphTextureHandle importedTexture;
-	Result result = m_executor.ImportTexture(binding, name, importedTexture);
-
-	if (!result.IsSuccess())
-	{
-		m_importedBindings.pop_back();
-		return result;
-	}
-
-	m_importedBindings.back().handle = importedTexture;
-	texture = importedTexture;
-	return {};
+	return m_executor.ImportTexture(binding, name, texture);
 }
 
-Result FrameResourceBindings::ImportWindowOutput(
-	WindowOutputHandle output,
-	GraphTextureHandle& texture,
-	ViewTargets& targets)
+Result FrameResourceBindings::ImportWindowOutput(WindowOutputHandle output, GraphTextureHandle& texture,
+                                                 ViewTargets& targets)
 {
 	backend::BackBufferInfo backBuffer;
 	Result result = m_backend.GetCurrentWindowTexture(output, backBuffer);
@@ -89,36 +65,36 @@ Result FrameResourceBindings::ImportDepth(backend::DepthTexture& depth, GraphTex
 	GraphTextureBinding binding;
 	binding.resource = depth.Resource();
 	binding.dsv = depth.Dsv();
-    binding.srv = depth.Srv();
+	binding.srv = depth.Srv();
 	binding.viewFormat = DXGI_FORMAT_D32_FLOAT;
 	binding.initialState = depth.submittedState;
 	binding.contentsValid = depth.contentsValid;
 	binding.owner = &depth;
-    Result imported = ImportBinding(binding, "SceneDepth", texture);
-    if (!imported.IsSuccess())
-    {
-        return imported;
-    }
 
-    // Every import has an explicit final usage, including a depth-only Shadow
-    // writer and the resident disabled binding. Capability controls which final
-    // state is legal; a DSV-only Scene depth is never made shader-readable.
-    TextureUse finalUse;
-    finalUse.usage = TextureUsage::DepthAttachment;
-    if (depth.AllowsSampling())
-    {
-        finalUse.usage = TextureUsage::ShaderRead;
-        finalUse.stages = ShaderStage::Pixel;
-    }
+	Result imported = ImportBinding(binding, "SceneDepth", texture);
 
-    return m_graph.SetFinalUsage(texture, finalUse);
+	if (!imported.IsSuccess())
+	{
+		return imported;
+	}
+
+	// Every import has an explicit final usage, including a depth-only Shadow
+	// writer and the resident disabled binding. Capability controls which final
+	// state is legal; a DSV-only Scene depth is never made shader-readable.
+	TextureUse finalUse;
+	finalUse.usage = TextureUsage::DepthAttachment;
+
+	if (depth.AllowsSampling())
+	{
+		finalUse.usage = TextureUsage::ShaderRead;
+		finalUse.stages = ShaderStage::Pixel;
+	}
+
+	return m_graph.SetFinalUsage(texture, finalUse);
 }
 
-Result FrameResourceBindings::PrepareViewTargets(
-	WindowOutputHandle output,
-	backend::DepthTexture& depth,
-	ViewTargets& targets,
-	bool includeDepth)
+Result FrameResourceBindings::PrepareViewTargets(WindowOutputHandle output, backend::DepthTexture& depth,
+                                                 ViewTargets& targets, bool includeDepth)
 {
 	ViewTargets preparedTargets;
 	Result result = ImportWindowOutput(output, preparedTargets.color, preparedTargets);
@@ -131,17 +107,21 @@ Result FrameResourceBindings::PrepareViewTargets(
 	if (includeDepth)
 	{
 		result = depth.Ensure(m_backend.GetNativeDevice(), preparedTargets.width, preparedTargets.height);
+
 		if (!result.IsSuccess())
 		{
 			auto* device = m_backend.GetNativeDevice();
+
 			if (device && FAILED(device->GetDeviceRemovedReason()))
 			{
 				result.failureKind = FailureKind::DeviceLost;
 			}
+
 			return result;
 		}
 
 		result = ImportDepth(depth, preparedTargets.depth);
+
 		if (!result.IsSuccess())
 		{
 			return result;
@@ -150,6 +130,7 @@ Result FrameResourceBindings::PrepareViewTargets(
 		TextureUse finalDepthUse;
 		finalDepthUse.usage = TextureUsage::DepthAttachment;
 		result = m_graph.SetFinalUsage(preparedTargets.depth, finalDepthUse);
+
 		if (!result.IsSuccess())
 		{
 			return result;
@@ -171,10 +152,8 @@ Result FrameResourceBindings::PrepareViewTargets(
 
 // Import the color and, for Scene only, its already-matching private Depth.
 // Overlay does not import Depth. No allocation/replacement is performed after a resource is imported.
-Result FrameResourceBindings::PrepareRenderTargetTargets(
-	detail::RenderTargetTextureContent& content,
-	bool includeDepth,
-	ViewTargets& targets)
+Result FrameResourceBindings::PrepareRenderTargetTargets(detail::RenderTargetTextureContent& content, bool includeDepth,
+                                                         ViewTargets& targets)
 {
 	if (!content.gpuData)
 	{
@@ -185,6 +164,7 @@ Result FrameResourceBindings::PrepareRenderTargetTargets(
 	preparedTargets.width = content.gpuData->width;
 	preparedTargets.height = content.gpuData->height;
 	Result imported = ImportRenderTarget(content, "SceneOutput", preparedTargets.color);
+
 	if (!imported.IsSuccess())
 	{
 		return imported;
@@ -194,6 +174,7 @@ Result FrameResourceBindings::PrepareRenderTargetTargets(
 	{
 		// Matching Depth was created atomically with the color image, before Import.
 		imported = ImportDepth(content.gpuData->Depth(), preparedTargets.depth);
+
 		if (!imported.IsSuccess())
 		{
 			return imported;
@@ -202,6 +183,7 @@ Result FrameResourceBindings::PrepareRenderTargetTargets(
 		TextureUse finalDepthUse;
 		finalDepthUse.usage = TextureUsage::DepthAttachment;
 		imported = m_graph.SetFinalUsage(preparedTargets.depth, finalDepthUse);
+
 		if (!imported.IsSuccess())
 		{
 			return imported;
@@ -215,10 +197,8 @@ Result FrameResourceBindings::PrepareRenderTargetTargets(
 // Both an attachment writer and a Material reader reach this same import.
 // Keep the final color usage shader-readable in both Vertex and Pixel stages for later consumption.
 // State transition alone does not authorize reading uninitialized contents.
-Result FrameResourceBindings::ImportRenderTarget(
-	detail::RenderTargetTextureContent& content,
-	const std::string& name,
-	GraphTextureHandle& texture)
+Result FrameResourceBindings::ImportRenderTarget(detail::RenderTargetTextureContent& content, const std::string& name,
+                                                 GraphTextureHandle& texture)
 {
 	if (!content.gpuData || !content.gpuData->Resource())
 	{
@@ -226,6 +206,7 @@ Result FrameResourceBindings::ImportRenderTarget(
 	}
 
 	auto& gpu = *content.gpuData;
+
 	GraphTextureBinding binding;
 	binding.resource = gpu.Resource();
 	binding.rtv = gpu.Rtv();
@@ -234,7 +215,9 @@ Result FrameResourceBindings::ImportRenderTarget(
 	binding.initialState = gpu.submittedState;
 	binding.contentsValid = gpu.contentsValid;
 	binding.owner = &content;
+
 	Result imported = ImportBinding(binding, name, texture);
+
 	if (!imported.IsSuccess())
 	{
 		return imported;
@@ -248,34 +231,31 @@ Result FrameResourceBindings::ImportRenderTarget(
 
 // Recording may only look up resources already declared before Compile.
 // A missing entry is a contract error, not a reason to import a surprise dependency during execution.
-Result FrameResourceBindings::FindImportedRenderTarget(
-	const detail::RenderTargetTextureContent& content,
-	GraphTextureHandle& texture) const
+Result FrameResourceBindings::FindImportedRenderTarget(const detail::RenderTargetTextureContent& content,
+                                                       GraphTextureHandle& texture) const
 {
-	const auto existing = std::find_if(
-		m_importedBindings.begin(), m_importedBindings.end(),
-		[&content](const GraphTextureBinding& binding)
-		{
-			const auto owner = std::get_if<detail::RenderTargetTextureContent*>(&binding.owner);
-			return owner && *owner == &content;
-		});
-	if (existing == m_importedBindings.end())
+	if (!content.gpuData)
 	{
-		return detail::Fail("FrameResourceBindings: RenderTargetTexture was not declared before execution.");
+		return detail::Fail("FrameResourceBindings: resource is unavailable.");
+	}
+
+	const auto* existing = m_executor.FindPhysicalBinding(content.gpuData->Resource());
+
+	if (!existing)
+	{
+		return detail::Fail("FrameResourceBindings: resource was not declared before execution.");
 	}
 
 	texture = existing->handle;
 	return {};
 }
 
-Result FrameResourceBindings::ImportTexture(
-	detail::TextureContent& content,
-	const std::string& name,
-	GraphTextureHandle& texture)
+Result FrameResourceBindings::ImportTexture(detail::TextureContent& content, const std::string& name,
+											GraphTextureHandle& texture)
 {
 	if (content.state.preparationState != detail::ResourcePreparationState::Ready || !content.gpuData)
 	{
-		return { false, "FrameResourceBindings: Texture is not ready." };
+		return {false, "FrameResourceBindings: Texture is not ready."};
 	}
 
 	auto& gpu = *content.gpuData;
@@ -301,40 +281,34 @@ Result FrameResourceBindings::ImportTexture(
 
 Result FrameResourceBindings::FindImportedDepth(const backend::DepthTexture& depth, GraphTextureHandle& texture) const
 {
-    const auto existing = std::find_if(m_importedBindings.begin(), m_importedBindings.end(),
-        [&depth](const GraphTextureBinding& binding)
-        {
-            const auto owner = std::get_if<backend::DepthTexture*>(&binding.owner);
-            return owner && *owner == &depth;
-        });
-    if (existing == m_importedBindings.end())
-    {
-        return detail::Fail("Depth sample was not declared before execution.");
-    }
+	const auto* existing = m_executor.FindPhysicalBinding(depth.Resource());
 
-    texture = existing->handle;
-    return {};
-}
-
-Result FrameResourceBindings::FindImportedTexture(
-	const detail::TextureContent& content,
-	GraphTextureHandle& texture) const
-{
-	const auto existing = std::find_if(
-		m_importedBindings.begin(), m_importedBindings.end(),
-		[&content](const GraphTextureBinding& binding)
-		{
-			const auto owner = std::get_if<detail::TextureContent*>(&binding.owner);
-			return owner && *owner == &content;
-		});
-
-	if (existing == m_importedBindings.end())
+	if (!existing)
 	{
-		return { false, "FrameResourceBindings: Texture was not declared before execution." };
+		return detail::Fail("FrameResourceBindings: resource was not declared before execution.");
 	}
 
 	texture = existing->handle;
 	return {};
 }
 
+Result FrameResourceBindings::FindImportedTexture(const detail::TextureContent& content,
+                                                  GraphTextureHandle& texture) const
+{
+	if (!content.gpuData)
+	{
+		return detail::Fail("FrameResourceBindings: resource is unavailable.");
+	}
+
+	const auto* existing = m_executor.FindPhysicalBinding(content.gpuData->texture.Get());
+
+	if (!existing)
+	{
+		return detail::Fail("FrameResourceBindings: resource was not declared before execution.");
+	}
+
+	texture = existing->handle;
+	return {};
 }
+
+} // namespace rendering::graph

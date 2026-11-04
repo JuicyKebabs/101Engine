@@ -53,10 +53,10 @@ public:
 	CollisionSystem() = default;	// Constructor
 	~CollisionSystem() = default;	// Destructor
 
-    void PrepareRegistrationCapacity(std::size_t count)
-    {
-        m_pCollidersList.reserve(m_pCollidersList.size() + count);
-    }
+	void PrepareRegistrationCapacity(std::size_t count)
+	{
+		m_pCollidersList.reserve(m_pCollidersList.size() + count);
+	}
 
 	void Register(Collider* collider);		// Register a collider to the collision system
 	// The argument must still be alive. Remove all system-owned references before

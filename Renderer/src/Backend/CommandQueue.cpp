@@ -56,7 +56,11 @@ Result CommandQueue::Initialize(ID3D12Device* device, D3D12_COMMAND_LIST_TYPE ty
 	}
 
 	// Create an event for fence synchronization
-	const HANDLE fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+	const HANDLE fenceEvent = CreateEventW(
+		nullptr,
+		FALSE,
+		FALSE,
+		nullptr);
 
 	if (fenceEvent == nullptr)
 	{

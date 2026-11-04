@@ -78,7 +78,11 @@ bool ActorImprintInstanceDeserializer::Deserialize(
 		return false;
 	}
 
-	return Prepare(record, scene, system, outRestore);
+	return Prepare(
+		record,
+		scene,
+		system,
+		outRestore);
 }
 
 Actor* ActorImprintInstanceDeserializer::Restore(
@@ -88,7 +92,11 @@ Actor* ActorImprintInstanceDeserializer::Restore(
 {
 	ActorImprintPreparedRestore restore;
 
-	if (!Deserialize(json, scene, system, restore))
+	if (!Deserialize(
+		json,
+		scene,
+		system,
+		restore))
 	{
 		return nullptr;
 	}

@@ -80,11 +80,10 @@ public:
 	//-------------------------------
 	// Frame resource management
 	//-------------------------------
-	Result EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount, UINT retainedCount);
+	Result EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount);
 	Result BeginFrameResources();
 	Result EndFrameResources();
 
-	Result QueryCompletedGraphicsFence(std::uint64_t& outValue);
 	[[nodiscard]] bool HasPendingFrameResources() const noexcept
 	{
 		return m_frameActive;
@@ -92,7 +91,6 @@ public:
 
 	Result AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output);
 	Result CopyFrameDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output);
-	Result KeepFrameObjectAlive(IUnknown* object);
 
 	[[nodiscard]] ID3D12DescriptorHeap* GetFrameDescriptorHeap() const noexcept
 	{
@@ -106,7 +104,7 @@ public:
 	// Resource upload related functions. Only one upload batch is supported for now.
 	[[nodiscard]] Result CollectUploads();
 	[[nodiscard]] Result BeginUploads();
-	[[nodiscard]] QueueSubmissionResult SubmitUploads();
+	[[nodiscard]] QueueSubmissionResult SubmitUploadsAndWait();
 	[[nodiscard]] Result CancelUploads()
 	{
 		return m_uploadBatch.Cancel();
@@ -128,15 +126,11 @@ public:
 
 	// Generate GPU data for resources from CPU data.
 	// Generation is done before uploading.
-	[[nodiscard]] Result PrepareGeometry(
-		const detail::GeometryCpuData& cpu,
-		std::unique_ptr<GeometryGpuData>& gpu,
-		std::unique_ptr<GeometryUploadData>& upload);
+	[[nodiscard]] Result PrepareGeometry(const detail::GeometryCpuData& cpu, std::unique_ptr<GeometryGpuData>& gpu,
+                                         std::unique_ptr<GeometryUploadData>& upload);
 
-	[[nodiscard]] Result PrepareTexture(
-		const detail::TextureCpuData& cpu,
-		std::unique_ptr<TextureGpuData>& gpu,
-		std::unique_ptr<TextureUploadData>& upload);
+	[[nodiscard]] Result PrepareTexture(const detail::TextureCpuData& cpu, std::unique_ptr<TextureGpuData>& gpu,
+										std::unique_ptr<TextureUploadData>& upload);
 
 private:
 	Device m_device;
@@ -145,9 +139,10 @@ private:
 
 	// Frame resources are used for per-frame allocations and descriptor management.
 	FrameResources m_frameResources;
-	bool m_frameActive = false;					// If a frame is currently active and has not been finalized.
-	bool m_frameCommandsNeedDiscard = false;	// If the frame still has unsubmitted commands.
-	bool m_frameCompletionUnknown = false;		// If it's unable to confirm GPU completion for the frame (Don't allow refreshing).
+	bool m_frameActive = false;              // If a frame is currently active and has not been finalized.
+	bool m_frameCommandsNeedDiscard = false; // If the frame still has unsubmitted commands.
+	bool m_frameCompletionUnknown =
+		false; // If it's unable to confirm GPU completion for the frame (Don't allow refreshing).
 	std::uint64_t m_frameFence = 0;
 
 	// Only one window output is supported for now.
@@ -155,7 +150,7 @@ private:
 	SwapChain m_windowSwapChain;
 	WindowOutputHandle m_windowOutputHandle{};
 
-	UploadBatch m_uploadBatch;	// For resource uploads.
+	UploadBatch m_uploadBatch; // For resource uploads.
 
 private:
 	// Handles failures when GPU completion cannot be confirmed
@@ -163,4 +158,4 @@ private:
 	Result HandleSubmissionFailure(Result failure);
 };
 
-}
+} // namespace rendering::backend

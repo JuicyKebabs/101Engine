@@ -66,9 +66,12 @@ void ShowWin32Error(const wchar_t* message)
 std::wstring Utf8ToWide(const std::string& text)
 {
 	const int required = MultiByteToWideChar(
-		CP_UTF8, MB_ERR_INVALID_CHARS,
-		text.c_str(), -1,
-		nullptr, 0);
+		CP_UTF8,
+		MB_ERR_INVALID_CHARS,
+		text.c_str(),
+		-1,
+		nullptr,
+		0);
 
 	if (required == 0)
 	{
@@ -76,12 +79,16 @@ std::wstring Utf8ToWide(const std::string& text)
 	}
 
 	std::wstring converted(
-		static_cast<std::size_t>(required), L'\0');
+		static_cast<std::size_t>(required),
+		L'\0');
 
 	const int written = MultiByteToWideChar(
-		CP_UTF8, MB_ERR_INVALID_CHARS,
-		text.c_str(), -1,
-		converted.data(), required);
+		CP_UTF8,
+		MB_ERR_INVALID_CHARS,
+		text.c_str(),
+		-1,
+		converted.data(),
+		required);
 
 	if (written == 0)
 	{
@@ -142,7 +149,11 @@ LRESULT CALLBACK WindowProcedure(
 	}
 	}
 
-	return DefWindowProcW(window, message, wParam, lParam);
+	return DefWindowProcW(
+		window,
+		message,
+		wParam,
+		lParam);
 }
 
 }
@@ -197,6 +208,7 @@ int WINAPI wWinMain(
 
 	// Try to get the client rect of the window,
 	RECT clientRect{};
+
 	if (!GetClientRect(window, &clientRect))
 	{
 		ShowWin32Error(L"GetClientRect");
@@ -207,8 +219,8 @@ int WINAPI wWinMain(
 	}
 
 	// Calculate the client area size and check if it is valid.
-    LONG clientWidth = clientRect.right - clientRect.left;
-    LONG clientHeight = clientRect.bottom - clientRect.top;
+	LONG clientWidth = clientRect.right - clientRect.left;
+	LONG clientHeight = clientRect.bottom - clientRect.top;
 
 	// Client area must be bigger than zero,
 	if (clientWidth <= 0 || clientHeight <= 0)
@@ -293,12 +305,12 @@ int WINAPI wWinMain(
 
 			const rendering::Vector3 corners[][4] =
 			{
-			    {{-1, -1, -1}, {-1, 1, -1}, {1, 1, -1}, {1, -1, -1}},
-			    {{1, -1, 1}, {1, 1, 1}, {-1, 1, 1}, {-1, -1, 1}},
-			    {{-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}, {-1, -1, -1}},
-			    {{1, -1, -1}, {1, 1, -1}, {1, 1, 1}, {1, -1, 1}},
-			    {{-1, 1, -1}, {-1, 1, 1}, {1, 1, 1}, {1, 1, -1}},
-			    {{-1, -1, 1}, {-1, -1, -1}, {1, -1, -1}, {1, -1, 1}}
+				{{-1, -1, -1}, {-1, 1, -1}, {1, 1, -1}, {1, -1, -1}},
+				{{1, -1, 1}, {1, 1, 1}, {-1, 1, 1}, {-1, -1, 1}},
+				{{-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}, {-1, -1, -1}},
+				{{1, -1, -1}, {1, 1, -1}, {1, 1, 1}, {1, -1, 1}},
+				{{-1, 1, -1}, {-1, 1, 1}, {1, 1, 1}, {1, 1, -1}},
+				{{-1, -1, 1}, {-1, -1, -1}, {1, -1, -1}, {1, -1, 1}}
 			};
 
 			for (std::uint32_t face = 0; face < 6; ++face)
@@ -377,6 +389,7 @@ int WINAPI wWinMain(
 
 					pipelineDesc.pixelShader = extra.handle;
 					const auto overridePipeline = renderer.RegisterPipeline(pipelineDesc);
+
 					if (result.IsSuccess())
 					{
 						result = overridePipeline.result;
@@ -388,34 +401,42 @@ int WINAPI wWinMain(
 					{
 						rendering::MaterialDesc material;
 						material.pipeline = pipeline.handle;
+
 						rendering::Vector4 baseColor{};
-                    baseColor.x = 1;
-                    baseColor.y = 0.3f;
-                    baseColor.z = 0.15f;
-                    baseColor.w = 1;
-                    rendering::MaterialParameter colorParameter{};
-                    colorParameter.name = "BaseColor";
-                    colorParameter.value = baseColor;
-                    rendering::Vector4 identityTransform{};
-                    identityTransform.x = 1;
-                    identityTransform.y = 1;
-                    rendering::MaterialParameter uvParameter{};
-                    uvParameter.name = "UVTransform";
-                    uvParameter.value = identityTransform;
-                    rendering::MaterialParameter localParameter{};
-                    localParameter.name = "LocalQuadTransform";
-                    localParameter.value = identityTransform;
-                    rendering::MaterialParameter textureParameter{};
-                    textureParameter.name = "BaseTexture";
-                    textureParameter.value = textureHandle;
-                    rendering::MaterialParameter extraParameter{};
-                    extraParameter.name = "ExtraTexture";
-                    extraParameter.value = textureHandle;
-                    material.parameters.push_back(colorParameter);
-                    material.parameters.push_back(uvParameter);
-                    material.parameters.push_back(localParameter);
-                    material.parameters.push_back(textureParameter);
-                    material.parameters.push_back(extraParameter);
+					baseColor.x = 1;
+					baseColor.y = 0.3f;
+					baseColor.z = 0.15f;
+					baseColor.w = 1;
+
+					rendering::MaterialParameter colorParameter{};
+					colorParameter.name = "BaseColor";
+					colorParameter.value = baseColor;
+
+					rendering::Vector4 identityTransform{};
+					identityTransform.x = 1;
+					identityTransform.y = 1;
+
+					rendering::MaterialParameter uvParameter{};
+					uvParameter.name = "UVTransform";
+					uvParameter.value = identityTransform;
+
+					rendering::MaterialParameter localParameter{};
+					localParameter.name = "LocalQuadTransform";
+					localParameter.value = identityTransform;
+
+					rendering::MaterialParameter textureParameter{};
+					textureParameter.name = "BaseTexture";
+					textureParameter.value = textureHandle;
+
+					rendering::MaterialParameter extraParameter{};
+					extraParameter.name = "ExtraTexture";
+					extraParameter.value = textureHandle;
+
+					material.parameters.push_back(colorParameter);
+					material.parameters.push_back(uvParameter);
+					material.parameters.push_back(localParameter);
+					material.parameters.push_back(textureParameter);
+					material.parameters.push_back(extraParameter);
 
 						auto registered = renderer.RegisterMaterial(material);
 						result = registered.result;
@@ -424,6 +445,7 @@ int WINAPI wWinMain(
 						// Keep a second material for the per-view override.
 						material.parameters[0].value = rendering::Vector4{ 0.15f, 0.5f, 1, 1 };
 						auto other = renderer.RegisterMaterial(material);
+
 						if (result.IsSuccess())
 						{
 							result = other.result;
@@ -457,7 +479,12 @@ int WINAPI wWinMain(
 
 			for (;;)
 			{
-				if (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+				if (PeekMessageW(
+					&message,
+					nullptr,
+					0,
+					0,
+					PM_REMOVE))
 				{
 					if (message.message == WM_QUIT)
 					{
@@ -482,48 +509,52 @@ int WINAPI wWinMain(
 					continue;
 				}
 
-                // Window size belongs to this host. Resolve it outside Render,
-                // then replace the output before publishing the new projection.
-                RECT currentClientRect{};
-                if (!GetClientRect(window, &currentClientRect))
-                {
-                    ShowWin32Error(L"GetClientRect");
-                    exitCode = 1;
-                    break;
-                }
+				// Window size belongs to this host. Resolve it outside Render,
+				// then replace the output before publishing the new projection.
+				RECT currentClientRect{};
 
-                const LONG requestedWidth = currentClientRect.right - currentClientRect.left;
-                const LONG requestedHeight = currentClientRect.bottom - currentClientRect.top;
-                if (requestedWidth <= 0 || requestedHeight <= 0)
-                {
-                    // Do not submit a zero extent or overwrite the last valid
-                    // projection. Resume after a later positive-size message.
-                    if (!WaitMessage())
-                    {
-                        ShowWin32Error(L"WaitMessage");
-                        exitCode = 1;
-                        break;
-                    }
-                    continue;
-                }
+				if (!GetClientRect(window, &currentClientRect))
+				{
+					ShowWin32Error(L"GetClientRect");
+					exitCode = 1;
+					break;
+				}
 
-                if (requestedWidth != clientWidth || requestedHeight != clientHeight)
-                {
-                    result = renderer.ResizeWindowOutput(windowOutput,
-                        static_cast<std::uint32_t>(requestedWidth),
-                        static_cast<std::uint32_t>(requestedHeight));
-                    if (!result.IsSuccess())
-                    {
-                        // A partial native replacement may be unavailable.
-                        // Stop before Submit; do not render with mixed extents.
-                        ShowRendererFailure(window, result);
-                        exitCode = 1;
-                        break;
-                    }
+				const LONG requestedWidth = currentClientRect.right - currentClientRect.left;
+				const LONG requestedHeight = currentClientRect.bottom - currentClientRect.top;
 
-                    clientWidth = requestedWidth;
-                    clientHeight = requestedHeight;
-                }
+				if (requestedWidth <= 0 || requestedHeight <= 0)
+				{
+					// Do not submit a zero extent or overwrite the last valid
+					// projection. Resume after a later positive-size message.
+					if (!WaitMessage())
+					{
+						ShowWin32Error(L"WaitMessage");
+						exitCode = 1;
+						break;
+					}
+
+					continue;
+				}
+
+				if (requestedWidth != clientWidth || requestedHeight != clientHeight)
+				{
+					result = renderer.ResizeWindowOutput(windowOutput,
+						static_cast<std::uint32_t>(requestedWidth),
+						static_cast<std::uint32_t>(requestedHeight));
+
+					if (!result.IsSuccess())
+					{
+						// A partial native replacement may be unavailable.
+						// Stop before Submit; do not render with mixed extents.
+						ShowRendererFailure(window, result);
+						exitCode = 1;
+						break;
+					}
+
+					clientWidth = requestedWidth;
+					clientHeight = requestedHeight;
+				}
 
 				const float seconds =
 					std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
@@ -542,36 +573,45 @@ int WINAPI wWinMain(
 				{
 					rendering::MaterialDesc material;
 					material.pipeline = extraPipeline;
+
 					rendering::Vector4 baseColor{};
-                    baseColor.x = 0.4f;
-                    baseColor.y = 1;
-                    baseColor.z = 0.2f;
-                    baseColor.w = 1;
-                    rendering::MaterialParameter colorParameter{};
-                    colorParameter.name = "BaseColor";
-                    colorParameter.value = baseColor;
-                    rendering::Vector4 identityTransform{};
-                    identityTransform.x = 1;
-                    identityTransform.y = 1;
-                    rendering::MaterialParameter uvParameter{};
-                    uvParameter.name = "UVTransform";
-                    uvParameter.value = identityTransform;
-                    rendering::MaterialParameter localParameter{};
-                    localParameter.name = "LocalQuadTransform";
-                    localParameter.value = identityTransform;
-                    rendering::MaterialParameter textureParameter{};
-                    textureParameter.name = "BaseTexture";
-                    textureParameter.value = textureHandle;
-                    rendering::MaterialParameter extraParameter{};
-                    extraParameter.name = "ExtraTexture";
-                    extraParameter.value = textureHandle;
-                    material.parameters.push_back(colorParameter);
-                    material.parameters.push_back(uvParameter);
-                    material.parameters.push_back(localParameter);
-                    material.parameters.push_back(textureParameter);
-                    material.parameters.push_back(extraParameter);
+					baseColor.x = 0.4f;
+					baseColor.y = 1;
+					baseColor.z = 0.2f;
+					baseColor.w = 1;
+
+					rendering::MaterialParameter colorParameter{};
+					colorParameter.name = "BaseColor";
+					colorParameter.value = baseColor;
+
+					rendering::Vector4 identityTransform{};
+					identityTransform.x = 1;
+					identityTransform.y = 1;
+
+					rendering::MaterialParameter uvParameter{};
+					uvParameter.name = "UVTransform";
+					uvParameter.value = identityTransform;
+
+					rendering::MaterialParameter localParameter{};
+					localParameter.name = "LocalQuadTransform";
+					localParameter.value = identityTransform;
+
+					rendering::MaterialParameter textureParameter{};
+					textureParameter.name = "BaseTexture";
+					textureParameter.value = textureHandle;
+
+					rendering::MaterialParameter extraParameter{};
+					extraParameter.name = "ExtraTexture";
+					extraParameter.value = textureHandle;
+
+					material.parameters.push_back(colorParameter);
+					material.parameters.push_back(uvParameter);
+					material.parameters.push_back(localParameter);
+					material.parameters.push_back(textureParameter);
+					material.parameters.push_back(extraParameter);
 
 					result = renderer.UpdateMaterial(materialHandle, material);
+
 					if (!result.IsSuccess())
 					{
 						ShowRendererFailure(window, result);
@@ -602,7 +642,10 @@ int WINAPI wWinMain(
 				view.view =
 					rendering::Matrix4x4::CreateLookAt(view.cameraPosition, { 0, 0, 0 }, { 0, 1, 0 });
 				view.projection = rendering::Matrix4x4::CreatePerspectiveFov(
-					rendering::PI / 3, static_cast<float>(clientWidth) / clientHeight, 0.1f, 100);
+					rendering::PI / 3,
+					static_cast<float>(clientWidth) / clientHeight,
+					0.1f,
+					100);
 
 				if (useMaterialOverride)
 				{
@@ -619,6 +662,7 @@ int WINAPI wWinMain(
 				result = renderer.SubmitFrameRenderData(std::move(frame));
 
 				rendering::RenderResult rendered;
+
 				if (result.IsSuccess())
 				{
 					rendered = renderer.Render();

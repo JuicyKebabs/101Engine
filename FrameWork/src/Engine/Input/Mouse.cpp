@@ -31,8 +31,12 @@ void Mouse::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			RAWINPUT raw{};
 			UINT size = sizeof(raw);
 
-			if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT,
-				&raw, &size, sizeof(RAWINPUTHEADER)) == sizeof(raw) &&
+			if (GetRawInputData(
+				reinterpret_cast<HRAWINPUT>(lParam),
+				RID_INPUT,
+				&raw,
+				&size,
+				sizeof(RAWINPUTHEADER)) == sizeof(raw) &&
 				raw.header.dwType == RIM_TYPEMOUSE &&
 				!(raw.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE))
 			{
@@ -46,30 +50,37 @@ void Mouse::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		UpdateClientPosition(lParam);
 		m_current.left = true;
 		break;
+
 	case WM_LBUTTONUP:
 		UpdateClientPosition(lParam);
 		m_current.left = false;
 		break;
+
 	case WM_RBUTTONDOWN:
 		UpdateClientPosition(lParam);
 		m_current.right = true;
 		break;
+
 	case WM_RBUTTONUP:
 		UpdateClientPosition(lParam);
 		m_current.right = false;
 		break;
+
 	case WM_MBUTTONDOWN:
 		UpdateClientPosition(lParam);
 		m_current.middle = true;
 		break;
+
 	case WM_MBUTTONUP:
 		UpdateClientPosition(lParam);
 		m_current.middle = false;
 		break;
+
 	case WM_MOUSEWHEEL:
 		m_wheelAccumulator += static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) /
 			static_cast<float>(WHEEL_DELTA);
 		break;
+
 	case WM_ACTIVATEAPP:
 		if (!wParam)
 		{

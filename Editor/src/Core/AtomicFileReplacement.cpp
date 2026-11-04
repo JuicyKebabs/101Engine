@@ -54,7 +54,11 @@ namespace
 	{
 		if (destination.empty() || !destination.is_absolute())
 		{
-			return Fail(error, AtomicFileReplacementErrorCode::InvalidDestination, destination, ERROR_INVALID_NAME,
+			return Fail(
+				error,
+				AtomicFileReplacementErrorCode::InvalidDestination,
+				destination,
+				ERROR_INVALID_NAME,
 				"Destination must be an absolute path.");
 		}
 
@@ -62,38 +66,66 @@ namespace
 
 		if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY))
 		{
-			return Fail(error, AtomicFileReplacementErrorCode::InvalidDestination,
-				destination, attributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : ERROR_DIRECTORY,
+			return Fail(
+				error,
+				AtomicFileReplacementErrorCode::InvalidDestination,
+				destination,
+				attributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : ERROR_DIRECTORY,
 				"Destination must be an existing file.");
 		}
 
 		std::array<wchar_t, 32768> volumeRoot{};
 
-		if (!GetVolumePathNameW(destination.c_str(), volumeRoot.data(),
-				static_cast<DWORD>(volumeRoot.size())))
+		if (!GetVolumePathNameW(
+			destination.c_str(),
+			volumeRoot.data(),
+			static_cast<DWORD>(volumeRoot.size())))
 		{
-			return Fail(error, AtomicFileReplacementErrorCode::UnsupportedVolume, destination, GetLastError(),
+			return Fail(
+				error,
+				AtomicFileReplacementErrorCode::UnsupportedVolume,
+				destination,
+				GetLastError(),
 				"Could not resolve the destination volume.");
 		}
 
 		if (GetDriveTypeW(volumeRoot.data()) != DRIVE_FIXED)
 		{
-			return Fail(error, AtomicFileReplacementErrorCode::UnsupportedVolume,
-				destination, ERROR_NOT_SUPPORTED, "Atomic saves require a local fixed volume.");
+			return Fail(
+				error,
+				AtomicFileReplacementErrorCode::UnsupportedVolume,
+				destination,
+				ERROR_NOT_SUPPORTED,
+				"Atomic saves require a local fixed volume.");
 		}
 
 		std::array<wchar_t, 64> fileSystem{};
 
-		if (!GetVolumeInformationW(volumeRoot.data(), nullptr, 0, nullptr, nullptr, nullptr,
-				fileSystem.data(), static_cast<DWORD>(fileSystem.size())))
+		if (!GetVolumeInformationW(
+			volumeRoot.data(),
+			nullptr,
+			0,
+			nullptr,
+			nullptr,
+			nullptr,
+			fileSystem.data(),
+			static_cast<DWORD>(fileSystem.size())))
 		{
-			return Fail(error, AtomicFileReplacementErrorCode::UnsupportedVolume, destination, GetLastError(),
+			return Fail(
+				error,
+				AtomicFileReplacementErrorCode::UnsupportedVolume,
+				destination,
+				GetLastError(),
 				"Could not identify the destination filesystem.");
 		}
 
 		if (_wcsicmp(fileSystem.data(), L"NTFS") != 0 && _wcsicmp(fileSystem.data(), L"ReFS") != 0)
 		{
-			return Fail(error, AtomicFileReplacementErrorCode::UnsupportedVolume, destination, ERROR_NOT_SUPPORTED,
+			return Fail(
+				error,
+				AtomicFileReplacementErrorCode::UnsupportedVolume,
+				destination,
+				ERROR_NOT_SUPPORTED,
 				"Atomic saves support local NTFS or ReFS destinations.");
 		}
 
@@ -134,8 +166,14 @@ bool AtomicFileReplacement::WriteTemporary(
 	for (int attempt = 0; attempt < 16; ++attempt)
 	{
 		temporary = UniqueSibling(destination, L".tmp");
-		raw = CreateFileW(temporary.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_NEW,
-			FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_WRITE_THROUGH, nullptr);
+		raw = CreateFileW(
+			temporary.c_str(),
+			GENERIC_READ | GENERIC_WRITE,
+			0,
+			nullptr,
+			CREATE_NEW,
+			FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_WRITE_THROUGH,
+			nullptr);
 
 		if (raw != INVALID_HANDLE_VALUE)
 		{
@@ -144,15 +182,23 @@ bool AtomicFileReplacement::WriteTemporary(
 
 		if (GetLastError() != ERROR_FILE_EXISTS && GetLastError() != ERROR_ALREADY_EXISTS)
 		{
-			return Fail(outError, AtomicFileReplacementErrorCode::TemporaryCreateFailed,
-				temporary, GetLastError(), "Could not create the same-directory temporary file.");
+			return Fail(
+				outError,
+				AtomicFileReplacementErrorCode::TemporaryCreateFailed,
+				temporary,
+				GetLastError(),
+				"Could not create the same-directory temporary file.");
 		}
 	}
 
 	if (raw == INVALID_HANDLE_VALUE)
 	{
-		return Fail(outError, AtomicFileReplacementErrorCode::TemporaryCreateFailed,
-			temporary, ERROR_FILE_EXISTS, "Could not allocate a unique temporary filename.");
+		return Fail(
+			outError,
+			AtomicFileReplacementErrorCode::TemporaryCreateFailed,
+			temporary,
+			ERROR_FILE_EXISTS,
+			"Could not allocate a unique temporary filename.");
 	}
 
 	bool succeeded = true;
@@ -161,13 +207,19 @@ bool AtomicFileReplacement::WriteTemporary(
 	{
 		UniqueHandle file(raw);
 		std::size_t offset = 0;
+
 		while (offset < bytes.size())
 		{
 			const DWORD requested = static_cast<DWORD>(
 				(std::min)(bytes.size() - offset, static_cast<std::size_t>((std::numeric_limits<DWORD>::max)())));
 			DWORD written = 0;
 
-			if (!WriteFile(file.Get(), bytes.data() + offset, requested, &written, nullptr) || written != requested)
+			if (!WriteFile(
+				file.Get(),
+				bytes.data() + offset,
+				requested,
+				&written,
+				nullptr) || written != requested)
 			{
 				succeeded = false;
 				failure = GetLastError();
@@ -189,7 +241,12 @@ bool AtomicFileReplacement::WriteTemporary(
 	if (!succeeded)
 	{
 		DeleteFileW(temporary.c_str());
-		return Fail(outError, failureCode, temporary, failure, "Could not persist the complete temporary file.");
+		return Fail(
+			outError,
+			failureCode,
+			temporary,
+			failure,
+			"Could not persist the complete temporary file.");
 	}
 
 	outTemporary = std::move(temporary);
@@ -215,8 +272,12 @@ bool AtomicFileReplacement::Replace(
 		temporary.parent_path().lexically_normal() != destination.parent_path().lexically_normal() ||
 		!Exists(temporary))
 	{
-		return Fail(outError, AtomicFileReplacementErrorCode::InvalidDestination,
-			temporary, ERROR_INVALID_NAME, "Replacement input must be an existing sibling temporary file.");
+		return Fail(
+			outError,
+			AtomicFileReplacementErrorCode::InvalidDestination,
+			temporary,
+			ERROR_INVALID_NAME,
+			"Replacement input must be an existing sibling temporary file.");
 	}
 
 	std::filesystem::path backup;
@@ -235,11 +296,21 @@ bool AtomicFileReplacement::Replace(
 
 	if (backup.empty())
 	{
-		return Fail(outError, AtomicFileReplacementErrorCode::TemporaryCreateFailed,
-			destination, ERROR_FILE_EXISTS, "Could not allocate a unique backup filename.");
+		return Fail(
+			outError,
+			AtomicFileReplacementErrorCode::TemporaryCreateFailed,
+			destination,
+			ERROR_FILE_EXISTS,
+			"Could not allocate a unique backup filename.");
 	}
 
-	if (ReplaceFileW(destination.c_str(), temporary.c_str(), backup.c_str(), 0, nullptr, nullptr))
+	if (ReplaceFileW(
+		destination.c_str(),
+		temporary.c_str(),
+		backup.c_str(),
+		0,
+		nullptr,
+		nullptr))
 	{
 		// Replacement already committed. A cleanup failure leaves a recoverable
 		// backup but does not turn a successful save into a false failure.
@@ -255,7 +326,13 @@ bool AtomicFileReplacement::Replace(
 
 		if (Exists(destination))
 		{
-			recovered = ReplaceFileW(destination.c_str(), backup.c_str(), nullptr, 0, nullptr, nullptr) != FALSE;
+			recovered = ReplaceFileW(
+				destination.c_str(),
+				backup.c_str(),
+				nullptr,
+				0,
+				nullptr,
+				nullptr) != FALSE;
 		}
 		else
 		{
@@ -264,14 +341,22 @@ bool AtomicFileReplacement::Replace(
 
 		if (!recovered)
 		{
-			return Fail(outError, AtomicFileReplacementErrorCode::RecoveryFailed,
-				destination, GetLastError(), "Replacement failed and the original backup could not be restored.");
+			return Fail(
+				outError,
+				AtomicFileReplacementErrorCode::RecoveryFailed,
+				destination,
+				GetLastError(),
+				"Replacement failed and the original backup could not be restored.");
 		}
 	}
 
 	DeleteFileW(temporary.c_str());
-	return Fail(outError, AtomicFileReplacementErrorCode::ReplaceFailed,
-		destination, replaceError, "The destination rejected the atomic replacement; the original was retained.");
+	return Fail(
+		outError,
+		AtomicFileReplacementErrorCode::ReplaceFailed,
+		destination,
+		replaceError,
+		"The destination rejected the atomic replacement; the original was retained.");
 }
 
 void AtomicFileReplacement::RemoveTemporary(const std::filesystem::path& temporary) noexcept

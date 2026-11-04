@@ -213,6 +213,7 @@ bool ValidateObjectGraph(const nlohmann::json& asset)
 	{
 		std::size_t current = i;
 		trail.clear();
+
 		while (current != noParent && states[current] == VisitState::Unvisited)
 		{
 			states[current] = VisitState::Visiting;

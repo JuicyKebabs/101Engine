@@ -686,10 +686,13 @@ namespace
 		}
 
 		// Sort the properties by their serialized names to ensure consistent ordering in the JSON output.
-		std::sort(properties.begin(), properties.end(), [](const auto* lhs, const auto* rhs)
-		{
-			return lhs->GetPath().ToString() < rhs->GetPath().ToString();
-		});
+		std::sort(
+			properties.begin(),
+			properties.end(),
+			[](const auto* lhs, const auto* rhs)
+			{
+				return lhs->GetPath().ToString() < rhs->GetPath().ToString();
+			});
 
 		return properties;
 	}
@@ -724,7 +727,11 @@ bool ReflectionSerializer::Serialize(
 			return false;
 		}
 
-		if (!SerializePropertyValue(*property, value, serializedValue, context))
+		if (!SerializePropertyValue(
+			*property,
+			value,
+			serializedValue,
+			context))
 		{
 			DBG("Failed to encode a serializable property.");
 			return false;
@@ -803,7 +810,11 @@ bool ReflectionDeserializer::Deserialize(
 		PropertyValue value;
 
 		// Deserialize the JSON entry into a PropertyValue and validate it against the property's constraints.
-		if (!DeserializePropertyValue(*property, *entry, value, context))
+		if (!DeserializePropertyValue(
+			*property,
+			*entry,
+			value,
+			context))
 		{
 			DBG("Serialized property has an invalid representation.");
 			return false;
@@ -839,6 +850,7 @@ bool ReflectionDeserializer::Deserialize(
 	auto Rollback = [&]()
 	{
 		bool restored = true;
+
 		while (appliedCount > 0)
 		{
 			--appliedCount;
@@ -849,6 +861,7 @@ bool ReflectionDeserializer::Deserialize(
 				restored = false;
 			}
 		}
+
 		return restored;
 	};
 

@@ -11,23 +11,25 @@ REGISTER_GAME_COMPONENT(TitleManager)
 
 std::optional<TypeMetadata> TitleManager::BuildMetadata()
 {
-    TypeMetadataBuilder<TitleManager> builder("TitleManager");
+	TypeMetadataBuilder<TitleManager> builder("TitleManager");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in TitleManager.
-    // builder.Property("speed", &TitleManager::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in TitleManager.
+	// builder.Property("speed", &TitleManager::m_speed);
 
 	builder.Property("nextScene", &TitleManager::m_nextScene).Optional();
 	builder.Property("FadeImageActor", &TitleManager::m_fadeImageActor).Optional();
-    return builder.Build();
+	return builder.Build();
 }
 
 void TitleManager::Start()
 {
 	UIImage* fadeImage = nullptr;
+
 	if (auto fadeImageActorPtr = m_fadeImageActor.Resolve(*GetOwner()->GetOwner()))
 	{
 		fadeImage = fadeImageActorPtr->GetComponentByClass<UIImage>();
+
 		if (!fadeImage)
 		{
 			DBG("TitleManager: FadeImageActor has no UIImage component.");
@@ -37,6 +39,7 @@ void TitleManager::Start()
 	{
 		DBG("TitleManager: FadeImageActor is not found.");
 	}
+
 	m_fadeImage = fadeImage;
 
 	if (m_fadeImage)
@@ -77,11 +80,13 @@ void TitleManager::Update()
 		if (newAlpha >= 1.0f)
 		{
 			auto guid = m_nextScene.GetGuid();
+
 			if (!guid.IsValid())
 			{
 				DBG("TitleManager: nextScene AssetReference is invalid.");
 				return;
 			}
+
 			if (ChangeScene(guid)) m_isFadingOut = false;
 			else DBG("TitleManager: Failed to reserve the next Scene.");
 		}

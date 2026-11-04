@@ -11,16 +11,16 @@ REGISTER_GAME_COMPONENT(Bullet)
 
 std::optional<TypeMetadata> Bullet::BuildMetadata()
 {
-    TypeMetadataBuilder<Bullet> builder("Bullet");
+	TypeMetadataBuilder<Bullet> builder("Bullet");
 
-    /*---- Describe the property registration process ----*/
-    // Example: register a private member declared in Bullet.
-    // builder.Property("speed", &Bullet::m_speed);
+	/*---- Describe the property registration process ----*/
+	// Example: register a private member declared in Bullet.
+	// builder.Property("speed", &Bullet::m_speed);
 
 	builder.Property("damage", &Bullet::m_damage).Optional();
 	builder.Property("lifeTime", &Bullet::m_lifeTime).Optional();
 
-    return builder.Build();
+	return builder.Build();
 }
 
 void Bullet::Start() 
@@ -47,10 +47,12 @@ void Bullet::Update()
 	if (m_lifeTime <= 0.0f)
 	{
 		auto owner = GetOwner();
+
 		if (owner)
 		{
 			owner->Destroy();
 		}
+
 		DBG("Bullet destroyed due to lifetime expiration.");
 	}
 }
@@ -64,6 +66,7 @@ void Bullet::LateUpdate()
 		if (info.opponent)
 		{
 			auto opponentActor = info.opponent->GetOwner();
+
 			if (opponentActor)
 			{
 				DBG("Bullet collided with: %s", opponentActor->GetName().c_str());
@@ -75,6 +78,7 @@ void Bullet::LateUpdate()
 				if (tagName == "Enemy")
 				{
 					FixedTarget* target = opponentActor->GetComponentByClass<FixedTarget>();
+
 					if (target)
 					{
 						// ターゲットの破壊時処理を呼び出す
@@ -85,10 +89,12 @@ void Bullet::LateUpdate()
 				}
 
 				auto owner = GetOwner();
+
 				if (owner)
 				{
 					owner->Destroy();
 				}
+
 				DBG("Bullet destroyed due to collision.");
 			}
 		}
@@ -105,6 +111,7 @@ void Bullet::Launch(const Vector3& position, const Vector3& direction, float spe
 
 	auto owner = GetOwner();
 	Transform* transform = owner ? owner->GetComponentByClass<Transform>() : nullptr;
+
 	if (transform)
 	{
 		transform->SetLocalPosition(position);

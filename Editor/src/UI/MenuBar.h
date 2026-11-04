@@ -10,26 +10,26 @@
 class MenuBar
 {
 public:
-    struct Callbacks
-    {
+	struct Callbacks
+	{
 		std::function<void()> onSaveDocument;
 
-        std::function<void()> onUndo;
-        std::function<void()> onRedo;
-        std::function<void()> onResetLayout;
+		std::function<void()> onUndo;
+		std::function<void()> onRedo;
+		std::function<void()> onResetLayout;
 
-        std::function<void()> onBuildGame;
-        std::function<void(bool)> onReloadGameCode;
+		std::function<void()> onBuildGame;
+		std::function<void(bool)> onReloadGameCode;
 		std::function<void(const std::string&, bool isBehavior)> onCreateScript;
 		std::function<void()> onCreateActorImprint;
 
-        bool canUndo = false;
-        bool canRedo = false;
+		bool canUndo = false;
+		bool canRedo = false;
 		bool canSave = false;
-        bool canModifyScripts = true;
+		bool canModifyScripts = true;
 		bool canModifyActorImprints = true;
-        bool canBuild = true;
-    };
+		bool canBuild = true;
+	};
 
 	static bool DispatchCreateActorImprint(const Callbacks& callbacks)
 	{
@@ -57,10 +57,10 @@ public:
 		return true;
 	}
 
-    void Render(const Callbacks& callbacks);
+	void Render(const Callbacks& callbacks);
 
 private:
-    char m_newScriptNameBuffer[128] = "";
-    bool m_showCreateScriptPopup = false;
-    bool m_createAsBehavior = true;
+	char m_newScriptNameBuffer[128] = "";
+	bool m_showCreateScriptPopup = false;
+	bool m_createAsBehavior = true;
 };

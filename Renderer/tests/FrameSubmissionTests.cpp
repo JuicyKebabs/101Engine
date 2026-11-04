@@ -48,6 +48,53 @@ void CheckSkipped(rendering::Renderer& renderer)
 	Require(result.disposition == rendering::RenderDisposition::SkippedNoSubmission, "Submission was consumed twice.");
 }
 
+void VerifyOutputPlanning(rendering::Renderer& renderer)
+{
+	using namespace rendering;
+
+	RenderTargetTextureDesc description;
+	description.width = 64;
+	description.height = 48;
+	const auto first = renderer.CreateRenderTargetTexture(description);
+	const auto second = renderer.CreateRenderTargetTexture(description);
+	Check(first.result);
+	Check(second.result);
+
+	FrameRenderData frame;
+	RenderView scene;
+	scene.id = 10;
+	scene.output = first.handle;
+	frame.views.push_back(scene);
+
+	scene.id = 20;
+	scene.output = second.handle;
+	frame.views.push_back(scene);
+
+	RenderView overlay;
+	overlay.id = 11;
+	overlay.output = first.handle;
+	overlay.kind = ViewKind::Overlay;
+	frame.views.push_back(overlay);
+
+	Check(renderer.SubmitFrameRenderData(std::move(frame)));
+	const auto rendered = renderer.Render();
+	CheckProcessed(rendered);
+	Require(rendered.drawnObjects == 2, "Clear-only Scene display passes were lost.");
+
+	RenderTargetTextureInfo information;
+	Check(renderer.GetRenderTargetTextureInfo(first.handle, information));
+	Require(information.contentsValid, "Scene/Overlay output was not committed.");
+	Check(renderer.GetRenderTargetTextureInfo(second.handle, information));
+	Require(information.contentsValid, "Second Scene output was not committed.");
+
+	Check(renderer.ResizeRenderTargetTexture(first.handle, 32, 24));
+	Check(renderer.GetRenderTargetTextureInfo(first.handle, information));
+	Require(information.revision == 2 && !information.contentsValid, "Resize did not replace the output revision.");
+
+	Check(renderer.DestroyRenderTargetTexture(first.handle));
+	Check(renderer.DestroyRenderTargetTexture(second.handle));
+}
+
 struct TestWindow
 {
 	static constexpr wchar_t ClassName[] = L"101RendererFrameSubmissionTests";
@@ -62,7 +109,9 @@ struct TestWindow
 		Require(RegisterClassW(&windowClass) != 0, "Window class registration failed.");
 
 		// Keep the validation Window hidden; Render still exercises Clear and Present.
-		window = CreateWindowExW(0, ClassName, ClassName, WS_OVERLAPPEDWINDOW, 0, 0, 320, 200, nullptr, nullptr, windowClass.hInstance, nullptr);
+		window = CreateWindowExW(0, ClassName, ClassName, WS_OVERLAPPEDWINDOW, 0, 0, 320, 200, nullptr, nullptr,
+                                 windowClass.hInstance, nullptr);
+
 		if (!window)
 		{
 			UnregisterClassW(ClassName, windowClass.hInstance);
@@ -82,44 +131,53 @@ void VerifyFrameSubmission()
 	using namespace rendering;
 	TestWindow window;
 	Renderer renderer;
-    RendererConfiguration configuration{};
-    configuration.enableDebugLayer = true;
-    configuration.enableGpuValidation = true;
+	RendererConfiguration configuration{};
+	configuration.enableDebugLayer = true;
+	configuration.enableGpuValidation = true;
+
 	FrameRenderData uninitialized;
-	Require(!renderer.SubmitFrameRenderData(std::move(uninitialized)).IsSuccess(), "Uninitialized Submit was accepted.");
+	Require(!renderer.SubmitFrameRenderData(std::move(uninitialized)).IsSuccess(),
+			"Uninitialized Submit was accepted.");
+
 	const auto uninitializedRender = renderer.Render();
-	Require(!uninitializedRender.status.IsSuccess() && uninitializedRender.disposition == RenderDisposition::NotProcessed, "Uninitialized Render was accepted.");
+	Require(!uninitializedRender.status.IsSuccess() &&
+				uninitializedRender.disposition == RenderDisposition::NotProcessed,
+			"Uninitialized Render was accepted.");
 
 	Check(renderer.Initialize(configuration));
 	CheckSkipped(renderer);
 
 	Win32WindowOutputDesc outputDescription{};
-    outputDescription.window = window.window;
-    outputDescription.width = 320;
-    outputDescription.height = 200;
-    const auto output = renderer.CreateWindowOutput(outputDescription);
+	outputDescription.window = window.window;
+	outputDescription.width = 320;
+	outputDescription.height = 200;
+	const auto output = renderer.CreateWindowOutput(outputDescription);
 	Check(output.status);
 
 	FrameRenderData invalidView;
 	RenderObject unavailableObject{};
-    RenderView unavailableView{};
-    invalidView.objects.push_back(unavailableObject);
-    invalidView.views.push_back(unavailableView);
+	RenderView unavailableView{};
+	invalidView.objects.push_back(unavailableObject);
+	invalidView.views.push_back(unavailableView);
 	auto* invalidStorage = invalidView.objects.data();
 	Require(!renderer.SubmitFrameRenderData(std::move(invalidView)).IsSuccess(), "Invalid WindowOutput was accepted.");
-	Require(invalidView.objects.data() == invalidStorage && invalidView.objects.size() == 1, "Rejected input was moved.");
+	Require(invalidView.objects.data() == invalidStorage && invalidView.objects.size() == 1,
+			"Rejected input was moved.");
 	CheckSkipped(renderer);
 
-    FrameRenderData duplicateSceneOutput;
-    RenderView firstView;
-    firstView.output = output.handle;
-    firstView.id = 1;
-    duplicateSceneOutput.views.push_back(firstView);
-    RenderView secondView = firstView;
-    secondView.id = 2;
-    duplicateSceneOutput.views.push_back(secondView);
-    Require(!renderer.SubmitFrameRenderData(std::move(duplicateSceneOutput)).IsSuccess(), "Duplicate Scene output was accepted.");
-    Require(duplicateSceneOutput.views.size() == 2, "Rejected Views were moved.");
+	FrameRenderData duplicateSceneOutput;
+	RenderView firstView;
+	firstView.output = output.handle;
+	firstView.id = 1;
+	duplicateSceneOutput.views.push_back(firstView);
+
+	RenderView secondView = firstView;
+	secondView.id = 2;
+	duplicateSceneOutput.views.push_back(secondView);
+
+	Require(!renderer.SubmitFrameRenderData(std::move(duplicateSceneOutput)).IsSuccess(),
+			"Duplicate Scene output was accepted.");
+	Require(duplicateSceneOutput.views.size() == 2, "Rejected Views were moved.");
 
 	const std::array<MeshVertex, 3> vertices{};
 	GeometryDesc geometryDesc{};
@@ -127,40 +185,44 @@ void VerifyFrameSubmission()
 	const auto geometry = renderer.RegisterGeometry(geometryDesc);
 	Check(geometry.status);
 
-	const std::array<std::byte, 4> pixels{ std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255} };
+	const std::array<std::byte, 4> pixels{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255}};
+
 	std::array<TextureMipDesc, 1> mips{};
-    mips[0].pixels = pixels;
-    mips[0].rowPitch = 4;
-    TextureDesc textureDescription{};
-    textureDescription.width = 1;
-    textureDescription.height = 1;
-    textureDescription.format = TextureFormat::RGBA8_UNorm;
-    textureDescription.mips = mips;
-    const auto texture = renderer.RegisterTexture(textureDescription);
+	mips[0].pixels = pixels;
+	mips[0].rowPitch = 4;
+
+	TextureDesc textureDescription{};
+	textureDescription.width = 1;
+	textureDescription.height = 1;
+	textureDescription.format = TextureFormat::RGBA8_UNorm;
+	textureDescription.mips = mips;
+
+	const auto texture = renderer.RegisterTexture(textureDescription);
 	Check(texture.status);
 
 	FrameRenderData frame;
 	RenderObject registeredObject{};
-    registeredObject.geometry = geometry.handle;
-    RenderView outputView{};
-    outputView.output = output.handle;
-    frame.objects.push_back(registeredObject);
-    frame.objects.push_back(registeredObject);
-    frame.views.push_back(outputView);
-    Check(renderer.SubmitFrameRenderData(std::move(frame)));
+	registeredObject.geometry = geometry.handle;
+	RenderView outputView{};
+	outputView.output = output.handle;
+	frame.objects.push_back(registeredObject);
+	frame.objects.push_back(registeredObject);
+	frame.views.push_back(outputView);
+	Check(renderer.SubmitFrameRenderData(std::move(frame)));
 
 	FrameRenderData duplicate;
 	duplicate.objects.push_back(registeredObject);
 	auto* duplicateStorage = duplicate.objects.data();
 	Require(!renderer.SubmitFrameRenderData(std::move(duplicate)).IsSuccess(), "Duplicate Submit was accepted.");
-	Require(duplicate.objects.data() == duplicateStorage && duplicate.objects.size() == 1, "Duplicate Submit took its input.");
+	Require(duplicate.objects.data() == duplicateStorage && duplicate.objects.size() == 1,
+			"Duplicate Submit took its input.");
 
 	Check(renderer.DestroyGeometry(geometry.handle));
 	Check(renderer.DestroyTexture(texture.handle));
 	const auto destroyedDependencies = renderer.Render();
 	CheckProcessed(destroyedDependencies);
 	// R8 replaces both destroyed Geometry references with resident error cubes.
-    // The third actual draw is the private HDR display transform.
+	// The third actual draw is the private HDR display transform.
 	Require(destroyedDependencies.drawnObjects == 3, "R8 fallback/display draws were not recorded.");
 	Require(destroyedDependencies.diagnostics.size() == 2, "Destroyed Geometry was not diagnosed per Object.");
 	CheckSkipped(renderer);
@@ -174,22 +236,28 @@ void VerifyFrameSubmission()
 	CheckProcessed(renderer.Render());
 	CheckSkipped(renderer);
 
-	// A View-less frame prepares resources and can be finalized with uploads retained.
+	// A View-less frame also completes its uploads before returning.
 	const auto secondGeometry = renderer.RegisterGeometry(geometryDesc);
 	Check(secondGeometry.status);
+
 	FrameRenderData uploadOnly;
 	RenderObject uploadObject{};
-    uploadObject.geometry = secondGeometry.handle;
-    uploadOnly.objects.push_back(uploadObject);
+	uploadObject.geometry = secondGeometry.handle;
+	uploadOnly.objects.push_back(uploadObject);
+
 	Check(renderer.SubmitFrameRenderData(std::move(uploadOnly)));
 	CheckProcessed(renderer.Render());
+
+	VerifyOutputPlanning(renderer);
+
 	renderer.Finalize();
 	renderer.Finalize();
 
 	Check(renderer.Initialize(configuration));
 	FrameRenderData staleOutput;
 	staleOutput.views.push_back(outputView);
-	Require(!renderer.SubmitFrameRenderData(std::move(staleOutput)).IsSuccess(), "Old output survived reinitialization.");
+	Require(!renderer.SubmitFrameRenderData(std::move(staleOutput)).IsSuccess(),
+			"Old output survived reinitialization.");
 
 	// Finalize must also discard an accepted, unconsumed CPU submission.
 	FrameRenderData pending;
@@ -202,7 +270,7 @@ void VerifyFrameSubmission()
 	renderer.Finalize();
 }
 
-}
+} // namespace
 
 int main()
 {

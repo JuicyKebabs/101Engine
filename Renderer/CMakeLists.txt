@@ -1,7 +1,3 @@
-# R7 implementation guide: section 4.34.
-# Compile the guide's new GPU output owner and registry into the existing Renderer DLL.
-# Shader compilation and existing target/link boundaries remain unchanged.
-
 add_library(101Renderer SHARED
     src/Renderer.cpp
     src/Backend/ApiResult.cpp
@@ -26,8 +22,9 @@ add_library(101Renderer SHARED
     src/FrameDrawContext.cpp
     src/Resource/ShaderData.cpp
     src/DrawSystem.cpp
+    src/DrawCommandPreparation.cpp
     src/FallbackResources.cpp
-    src/SceneFrameResources.cpp
+    src/SceneOutputResources.cpp
     src/Graph/FrameTextureResolver.cpp
     src/Graph/FrameResourceBindings.cpp
     src/Backend/RenderTargetTextureGpuData.cpp
@@ -74,42 +71,42 @@ endif()
 
 
 # Shader compilation is an external build step, available with Engine disabled.
-file(GLOB R4_SDK_BIN_DIRS "C:/Program Files (x86)/Windows Kits/10/bin/*/x64")
-list(SORT R4_SDK_BIN_DIRS COMPARE NATURAL ORDER DESCENDING)
+file(GLOB RENDERER_SDK_BIN_DIRS "C:/Program Files (x86)/Windows Kits/10/bin/*/x64")
+list(SORT RENDERER_SDK_BIN_DIRS COMPARE NATURAL ORDER DESCENDING)
 
 find_program(
     RENDERER_FXC fxc.exe PATHS
-    ${R4_SDK_BIN_DIRS}
+    ${RENDERER_SDK_BIN_DIRS}
     "$ENV{WindowsSdkDir}/bin/$ENV{WindowsSDKVersion}/x64")
 
 if(NOT RENDERER_FXC)
-    message(FATAL_ERROR "FXC is required for the R4 sample Shader assets")
+    message(FATAL_ERROR "FXC is required to compile Renderer shader assets")
 endif()
 
-set(R4_SHADER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
-set(R4_SHADER_OUTPUTS "")
+set(RENDERER_SHADER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+set(RENDERER_SHADER_OUTPUTS "")
 
-foreach(R4_SHADER MeshVS FullscreenVS ColorPS TexturePS ExtraPS LitPS DisplayPS)
-    if(R4_SHADER STREQUAL "MeshVS" OR R4_SHADER STREQUAL "FullscreenVS")
-        set(R4_PROFILE vs_5_0)
+foreach(RENDERER_SHADER MeshVS FullscreenVS ColorPS TexturePS ExtraPS LitPS DisplayPS)
+    if(RENDERER_SHADER STREQUAL "MeshVS" OR RENDERER_SHADER STREQUAL "FullscreenVS")
+        set(RENDERER_SHADER_PROFILE vs_5_0)
     else()
-        set(R4_PROFILE ps_5_0)
+        set(RENDERER_SHADER_PROFILE ps_5_0)
     endif()
 
-    set(R4_OUTPUT "${R4_SHADER_DIRECTORY}/${R4_SHADER}.cso")
+    set(RENDERER_SHADER_OUTPUT "${RENDERER_SHADER_DIRECTORY}/${RENDERER_SHADER}.cso")
 
     add_custom_command(
-        OUTPUT "${R4_OUTPUT}"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${R4_SHADER_DIRECTORY}"
-        COMMAND "${RENDERER_FXC}" /nologo /T ${R4_PROFILE} /E main /Fo "${R4_OUTPUT}" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${R4_SHADER}.hlsl"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${R4_SHADER}.hlsl" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MaterialParams.hlsli"
+        OUTPUT "${RENDERER_SHADER_OUTPUT}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${RENDERER_SHADER_DIRECTORY}"
+        COMMAND "${RENDERER_FXC}" /nologo /T ${RENDERER_SHADER_PROFILE} /E main /Fo "${RENDERER_SHADER_OUTPUT}" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${RENDERER_SHADER}.hlsl"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${RENDERER_SHADER}.hlsl" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MaterialParams.hlsli"
         VERBATIM)
 
-    list(APPEND R4_SHADER_OUTPUTS "${R4_OUTPUT}")
+    list(APPEND RENDERER_SHADER_OUTPUTS "${RENDERER_SHADER_OUTPUT}")
     
 endforeach()
 
-add_custom_target(RendererShaderAssets DEPENDS ${R4_SHADER_OUTPUTS})
+add_custom_target(RendererShaderAssets DEPENDS ${RENDERER_SHADER_OUTPUTS})
 # R8 CPU contract check: use the exported API without relying on upload readiness.
 if(BUILD_TESTING)
     add_executable(RendererGeometryDataTests tests/GeometryDataTests.cpp)

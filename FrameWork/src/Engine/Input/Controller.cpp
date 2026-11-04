@@ -177,10 +177,13 @@ void Controller::UpdateUpState(ControllerState& contState, ControllerInputInfo& 
 	inputInfo.B.up = IsButtonUp(XINPUT_GAMEPAD_B, current, previous);
 	inputInfo.X.up = IsButtonUp(XINPUT_GAMEPAD_X, current, previous);
 	inputInfo.Y.up = IsButtonUp(XINPUT_GAMEPAD_Y, current, previous);
+
 	inputInfo.START.up = IsButtonUp(XINPUT_GAMEPAD_START, current, previous);
 	inputInfo.BACK.up = IsButtonUp(XINPUT_GAMEPAD_BACK, current, previous);
+
 	inputInfo.LSHOULDER.up = IsButtonUp(XINPUT_GAMEPAD_LEFT_SHOULDER, current, previous);
 	inputInfo.RSHOULDER.up = IsButtonUp(XINPUT_GAMEPAD_RIGHT_SHOULDER, current, previous);
+
 	inputInfo.LTHUMB.up = IsButtonUp(XINPUT_GAMEPAD_LEFT_THUMB, current, previous);
 	inputInfo.RTHUMB.up = IsButtonUp(XINPUT_GAMEPAD_RIGHT_THUMB, current, previous);
 

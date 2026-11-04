@@ -49,9 +49,15 @@ struct ReflectionInspectorCallbacks
 struct ReflectionInspectorServices
 {
 	std::function<bool(
-		const char*, const PropertyMetadata&, const ActorReference&, ActorReference&)> drawActorReference;
+		const char*,
+		const PropertyMetadata&,
+		const ActorReference&,
+		ActorReference&)> drawActorReference;
 	std::function<bool(
-		const char*, const PropertyMetadata&, const AssetReferenceValue&, AssetReferenceValue&)> drawAssetReference;
+		const char*,
+		const PropertyMetadata&,
+		const AssetReferenceValue&,
+		AssetReferenceValue&)> drawAssetReference;
 };
 
 class ReflectionInspector

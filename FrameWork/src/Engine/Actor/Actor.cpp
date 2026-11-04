@@ -297,7 +297,8 @@ bool Actor::RemoveComponentImmediate(Component* component)
 
 	// Get given component from the instances vector of the same type
 	auto instanceIt = std::find_if(
-		instances.begin(), instances.end(),
+		instances.begin(),
+		instances.end(),
 		[component](const std::unique_ptr<Component>& instance)
 		{
 			return instance.get() == component;
@@ -311,7 +312,8 @@ bool Actor::RemoveComponentImmediate(Component* component)
 
 	// Get given component from the iteration vector (m_componentPtrs)
 	auto pointerIt = std::find(
-		m_componentPtrs.begin(), m_componentPtrs.end(),
+		m_componentPtrs.begin(),
+		m_componentPtrs.end(),
 		component
 	);
 
@@ -618,10 +620,13 @@ void Actor::RemoveDestroyedComponents(Component* component)
 	{
 		auto& instances = mapIt->second.instances;
 		auto instance =
-			std::find_if(instances.begin(), instances.end(), [component](const std::unique_ptr<Component>& instance)
-		{
-			return instance.get() == component;
-		});
+			std::find_if(
+				instances.begin(),
+				instances.end(),
+				[component](const std::unique_ptr<Component>& instance)
+			{
+				return instance.get() == component;
+			});
 
 		if (instance != instances.end())
 		{

@@ -269,6 +269,7 @@ bool TypeMetadata::CopySerializableState(
 	auto rollback = [&]()
 	{
 		bool restored = true;
+
 		while (appliedCount > 0)
 		{
 			const StateEntry& entry = entries[--appliedCount];
