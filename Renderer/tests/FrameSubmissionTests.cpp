@@ -182,7 +182,7 @@ void VerifyFrameSubmission()
 	GeometryDesc geometryDesc{};
 	geometryDesc.vertices = vertices;
 	const auto geometry = renderer.RegisterGeometry(geometryDesc);
-	Check(geometry.status);
+	Check(geometry.result);
 
 	const std::array<std::byte, 4> pixels{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255}};
 
@@ -197,7 +197,7 @@ void VerifyFrameSubmission()
 	textureDescription.mips = mips;
 
 	const auto texture = renderer.RegisterTexture(textureDescription);
-	Check(texture.status);
+	Check(texture.result);
 
 	FrameRenderData frame;
 	RenderObject registeredObject{};
@@ -236,7 +236,7 @@ void VerifyFrameSubmission()
 
 	// A View-less frame also completes its uploads before returning.
 	const auto secondGeometry = renderer.RegisterGeometry(geometryDesc);
-	Check(secondGeometry.status);
+	Check(secondGeometry.result);
 
 	FrameRenderData uploadOnly;
 	RenderObject uploadObject{};
