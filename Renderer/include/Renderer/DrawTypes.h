@@ -121,6 +121,7 @@ struct ShaderMetadata
 	std::vector<ShaderResourceBinding> resources;
 	std::vector<ShaderVertexInput> vertexInputs;
 	std::uint32_t colorOutputs = 0;
+
 	// Reflection records the system-provided scalar separately from user vertex attributes.
 	// It must not create a VB InputElement for SV_VertexID.
 	bool usesVertexId = false;

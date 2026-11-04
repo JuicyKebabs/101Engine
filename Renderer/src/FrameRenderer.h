@@ -29,7 +29,7 @@ public:
                            detail::FrameDrawContext& context, std::vector<std::size_t>& indices) const;
 	Result BuildPassPlan(FrameRenderData& frame, detail::FrameDrawContext& context,
                          std::vector<PlannedPass>& lists) const;
-	Result BuildViews(const FrameRenderData& frame, detail::FrameDrawContext& context,
+	Result BuildRenderPasses(const FrameRenderData& frame, detail::FrameDrawContext& context,
                       const std::vector<PlannedPass>& lists, graph::RenderGraph& graph) const;
 
 private:

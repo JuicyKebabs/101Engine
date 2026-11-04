@@ -225,19 +225,6 @@ Result FrameRenderer::SelectViewDraws(const FrameRenderData& frame, const PassRe
 namespace
 {
 
-// Configure both selection and recording from the same plan entry. The Light
-// projection may differ from the Camera used to derive Billboard World.
-void AppendPlannedDraws(const detail::RenderList& indices, PlannedPass& pass)
-{
-	for (std::size_t objectIndex : indices)
-	{
-		PlannedDraw draw;
-		draw.objectIndex = objectIndex;
-		draw.settings = pass.renderView.drawSettings;
-		pass.draws.push_back(draw);
-	}
-}
-
 Result ReserveInternalId(const FrameRenderData& frame, const std::vector<PlannedPass>& lists, ViewId& output)
 {
 	ViewId candidate = (std::numeric_limits<ViewId>::max)();
@@ -306,49 +293,6 @@ RenderView MakeShadowView(const RenderView& source, const DirectionalLight& ligh
 	shadow.viewport.reset();
 
 	return shadow;
-}
-
-Result AppendShadowPass(
-	FrameRenderData& frame, detail::FrameDrawContext& context, detail::SceneOutputImages* images,
-	PlannedPass& scene, std::vector<PlannedPass>& lists)
-{
-	const RenderView& source = frame.views[scene.sourceViewIndex];
-	PlannedPass shadowList;
-	shadowList.sourceViewIndex = scene.sourceViewIndex;
-	shadowList.renderView = MakeShadowView(source, *frame.directionalLight, images->hdrColor);
-
-	shadowList.renderView.drawSettings.pipelineOverride = context.ShadowPipeline();
-	shadowList.renderView.drawSettings.materialOverride.reset();
-	shadowList.name = "Shadow[" + std::to_string(source.id) + "]";
-
-	shadowList.depthLoad = graph::AttachmentLoadOp::Clear;
-	shadowList.depth = images->shadowDepth.get();
-	shadowList.shadow.texture = &context.DisabledShadow();
-
-	Extent2D shadowExtent;
-	shadowExtent.width = static_cast<std::uint32_t>(images->shadowDepth->Resource()->GetDesc().Width);
-	shadowExtent.height = images->shadowDepth->Resource()->GetDesc().Height;
-	shadowList.extentOverride = shadowExtent;
-
-	const PassRecordingInputs shadowInputs = MakePassRecordingInputs(frame, shadowList);
-	detail::RenderList shadowIndices;
-
-	// This selection starts from all source members under Light
-	// projection. Camera visibility never determines casters.
-	Result selected = context.SelectAvailableDraws(shadowList.renderView.drawSettings, shadowIndices, shadowInputs);
-
-	if (!selected.IsSuccess())
-	{
-		return selected;
-	}
-
-	std::erase_if(shadowIndices, [&frame](std::size_t index) { return !frame.objects[index].castShadow; });
-	AppendPlannedDraws(shadowIndices, shadowList);
-	scene.shadow.texture = images->shadowDepth.get();
-	scene.shadow.viewProjection = shadowList.renderView.view * shadowList.renderView.projection;
-	scene.shadow.enabled = true;
-	lists.push_back(std::move(shadowList));
-	return {};
 }
 
 Result AppendAuxiliaryPasses(
@@ -452,169 +396,377 @@ Result AppendAuxiliaryPasses(
 	return {};
 }
 
-Result AppendDisplayPass(
-	FrameRenderData& frame, detail::FrameDrawContext& context, std::size_t viewIndex,
-	detail::SceneOutputImages& images, std::vector<PlannedPass>& lists)
-{
-	const RenderView& source = frame.views[viewIndex];
-	PlannedPass display;
-	display.sourceViewIndex = viewIndex;
-	display.renderView = source;
-	display.colorLoad = graph::AttachmentLoadOp::Clear;
-	display.renderView.kind = ViewKind::Overlay;
-
-	// HDR stores an entire output, including its clear outside a
-	// partial Scene viewport. Convert the complete image one-to-one.
-	display.renderView.viewport.reset();
-
-	DrawSettings displaySettings;
-	display.renderView.drawSettings = displaySettings;
-
-	Result reserved = ReserveInternalId(frame, lists, display.renderView.id);
-
-	if (!reserved.IsSuccess())
-	{
-		return reserved;
-	}
-
-	display.name = "DisplayTransform[" + std::to_string(source.id) + "]";
-	display.shadow.texture = &context.DisabledShadow();
-
-	ProceduralGeometry fullscreen;
-	fullscreen.vertexCount = 3;
-
-	RenderObject object;
-	object.material = images.displayMaterial;
-	object.procedural = fullscreen;
-	object.targetViews.push_back(display.renderView.id);
-
-	const std::size_t objectIndex = frame.objects.size();
-	frame.objects.push_back(std::move(object));
-	PlannedDraw displayDraw;
-	displayDraw.objectIndex = objectIndex;
-	displayDraw.settings = display.renderView.drawSettings;
-	display.draws.push_back(displayDraw);
-	lists.push_back(std::move(display));
-
-	return {};
-}
-
 } // namespace
 
 Result FrameRenderer::BuildPassPlan(
 	FrameRenderData& frame,
 	detail::FrameDrawContext& context,
-	std::vector<PlannedPass>& lists) const
+	std::vector<PlannedPass>& plannedPasses) const
 {
-	// Ordinary source Views remain stable. Internal full-screen Objects append
-	// to the same owning array and use private IDs, so they cannot enter Scene
-	// selection or the host's explicit auxiliary lists by accident.
-	for (ViewKind kind : {ViewKind::Scene, ViewKind::Overlay})
-	{
-		for (std::size_t viewIndex = 0; viewIndex < frame.views.size(); ++viewIndex)
-		{
-			const RenderView& source = frame.views[viewIndex];
+	// ========================================================================
+	// Plan each Scene View in this order:
+	// Shadow -> SceneHDR -> Auxiliary -> DisplayTransform.
+	// ========================================================================
 
-			if (source.kind != kind)
+	for (std::size_t viewIndex = 0; viewIndex < frame.views.size(); ++viewIndex)
+	{
+		const RenderView& sourceView = frame.views[viewIndex];
+		const bool isSceneView = sourceView.kind == ViewKind::Scene;
+
+		if (!isSceneView)
+		{
+			continue;
+		}
+
+		// --------------------------------------------------------------------
+		// 1. Prepare the images required to render the Scene.
+		// --------------------------------------------------------------------
+
+		detail::SceneOutputImages* sceneImages = nullptr;
+		Result shadowPreparationResult;
+
+		const Result scenePreparationResult = context.PrepareSceneImages(
+			sourceView,
+			sceneImages,
+			shadowPreparationResult);
+
+		if (!scenePreparationResult.IsSuccess())
+		{
+			return scenePreparationResult;
+		}
+
+		// Use disabled shadows unless a Shadow pass can be planned.
+		// Update the texture and matrix after planning a valid Shadow pass.
+		ShadowInputs sceneShadowInputs;
+		sceneShadowInputs.texture = &context.DisabledShadow();
+
+		const bool hasDirectionalLight = frame.directionalLight.has_value();
+		const bool isShadowPreparationSuccessful =
+			shadowPreparationResult.IsSuccess();
+		const bool hasShadowDepthTexture =
+			sceneImages->shadowDepth != nullptr;
+
+		const bool canPlanShadowPass =
+			hasDirectionalLight &&
+			isShadowPreparationSuccessful &&
+			hasShadowDepthTexture;
+
+		// --------------------------------------------------------------------
+		// 2. Plan the Shadow pass.
+		// --------------------------------------------------------------------
+
+		if (canPlanShadowPass)
+		{
+			PlannedPass shadowPass;
+			shadowPass.sourceViewIndex = viewIndex;
+			shadowPass.name =
+				"Shadow[" + std::to_string(sourceView.id) + "]";
+
+			// Derive a View from the light using the source Camera View.
+			shadowPass.renderView = MakeShadowView(
+				sourceView,
+				*frame.directionalLight,
+				sceneImages->hdrColor);
+
+			shadowPass.renderView.drawSettings.pipelineOverride =
+				context.ShadowPipeline();
+			shadowPass.renderView.drawSettings.materialOverride.reset();
+
+			// Clear and use only the Shadow Depth attachment, with no Color output.
+			shadowPass.depthLoad = graph::AttachmentLoadOp::Clear;
+			shadowPass.depth = sceneImages->shadowDepth.get();
+			shadowPass.shadow.texture = &context.DisabledShadow();
+
+			const auto shadowDepthDescription =
+				sceneImages->shadowDepth->Resource()->GetDesc();
+
+			Extent2D shadowExtent;
+			shadowExtent.width =
+				static_cast<std::uint32_t>(shadowDepthDescription.Width);
+			shadowExtent.height = shadowDepthDescription.Height;
+
+			shadowPass.extentOverride = shadowExtent;
+
+			// Select using the light View rather than reusing Camera visibility.
+			const PassRecordingInputs shadowRecordingInputs =
+				MakePassRecordingInputs(frame, shadowPass);
+
+			detail::RenderList shadowObjectIndices;
+
+			const Result shadowSelectionResult = context.SelectAvailableDraws(
+				shadowPass.renderView.drawSettings,
+				shadowObjectIndices,
+				shadowRecordingInputs);
+
+			if (!shadowSelectionResult.IsSuccess())
+			{
+				return shadowSelectionResult;
+			}
+
+			// Include only selected Objects that cast shadows.
+
+			for (std::size_t objectIndex : shadowObjectIndices)
+			{
+				const bool castsShadow = frame.objects[objectIndex].castShadow;
+
+				if (!castsShadow)
+				{
+					continue;
+				}
+
+				PlannedDraw shadowDraw;
+				shadowDraw.objectIndex = objectIndex;
+				shadowDraw.settings = shadowPass.renderView.drawSettings;
+
+				shadowPass.draws.push_back(shadowDraw);
+			}
+
+			// Finalize Shadow inputs for the following SceneHDR and Auxiliary passes.
+			sceneShadowInputs.texture = sceneImages->shadowDepth.get();
+			sceneShadowInputs.viewProjection =
+				shadowPass.renderView.view *
+				shadowPass.renderView.projection;
+			sceneShadowInputs.enabled = true;
+
+			plannedPasses.push_back(std::move(shadowPass));
+		}
+
+		// A Shadow preparation failure is diagnostic; Scene rendering continues.
+
+		if (!isShadowPreparationSuccessful)
+		{
+			context.ReportViewFailure(
+				sourceView.id,
+				"ShadowPrepare",
+				shadowPreparationResult.message);
+		}
+
+		// --------------------------------------------------------------------
+		// 3. Plan the SceneHDR pass.
+		// --------------------------------------------------------------------
+
+		PlannedPass scenePass;
+		scenePass.sourceViewIndex = viewIndex;
+		scenePass.name =
+			"SceneHDR[" + std::to_string(sourceView.id) + "]";
+
+		// Preserve the source Camera and draw settings, but render Color to HDR.
+		scenePass.renderView = sourceView;
+		scenePass.renderView.output = sceneImages->hdrColor;
+
+		scenePass.colorLoad = graph::AttachmentLoadOp::Clear;
+		scenePass.depthLoad = graph::AttachmentLoadOp::Clear;
+		scenePass.shadow = sceneShadowInputs;
+
+		const PassRecordingInputs sceneRecordingInputs =
+			MakePassRecordingInputs(frame, scenePass);
+
+		detail::RenderList sceneObjectIndices;
+
+		// Place opaque Objects first, followed by transparent Objects back to front.
+		const Result sceneSelectionResult = SelectViewDraws(
+			frame,
+			sceneRecordingInputs,
+			context,
+			sceneObjectIndices);
+
+		if (!sceneSelectionResult.IsSuccess())
+		{
+			return sceneSelectionResult;
+		}
+
+		for (std::size_t objectIndex : sceneObjectIndices)
+		{
+			PlannedDraw sceneDraw;
+			sceneDraw.objectIndex = objectIndex;
+			sceneDraw.settings = scenePass.renderView.drawSettings;
+
+			scenePass.draws.push_back(sceneDraw);
+		}
+
+		plannedPasses.push_back(std::move(scenePass));
+
+		// --------------------------------------------------------------------
+		// 4. Plan Auxiliary passes associated with this Scene View.
+		// --------------------------------------------------------------------
+
+		const Result sceneAuxiliaryResult = AppendAuxiliaryPasses(
+			frame,
+			context,
+			viewIndex,
+			sceneImages,
+			sceneShadowInputs,
+			plannedPasses);
+
+		if (!sceneAuxiliaryResult.IsSuccess())
+		{
+			return sceneAuxiliaryResult;
+		}
+
+		// --------------------------------------------------------------------
+		// 5. Plan the DisplayTransform pass.
+		// --------------------------------------------------------------------
+
+		PlannedPass displayPass;
+		displayPass.sourceViewIndex = viewIndex;
+		displayPass.name =
+			"DisplayTransform[" + std::to_string(sourceView.id) + "]";
+
+		// Render to the output specified by the source View.
+		displayPass.renderView = sourceView;
+		displayPass.renderView.kind = ViewKind::Overlay;
+		displayPass.colorLoad = graph::AttachmentLoadOp::Clear;
+		displayPass.shadow.texture = &context.DisabledShadow();
+
+		// Convert the entire HDR image without inheriting a partial Viewport.
+		displayPass.renderView.viewport.reset();
+
+		DrawSettings displayDrawSettings;
+		displayPass.renderView.drawSettings = displayDrawSettings;
+
+		// Use a private ID so the internal Object cannot enter normal Scene selection.
+		const Result displayIdReservationResult = ReserveInternalId(
+			frame,
+			plannedPasses,
+			displayPass.renderView.id);
+
+		if (!displayIdReservationResult.IsSuccess())
+		{
+			return displayIdReservationResult;
+		}
+
+		// Draw a fullscreen triangle using the Display Material.
+		ProceduralGeometry fullscreenTriangle;
+		fullscreenTriangle.vertexCount = 3;
+
+		RenderObject displayObject;
+		displayObject.material = sceneImages->displayMaterial;
+		displayObject.procedural = fullscreenTriangle;
+		displayObject.targetViews.push_back(displayPass.renderView.id);
+
+		const std::size_t displayObjectIndex = frame.objects.size();
+		frame.objects.push_back(std::move(displayObject));
+
+		PlannedDraw displayDraw;
+		displayDraw.objectIndex = displayObjectIndex;
+		displayDraw.settings = displayPass.renderView.drawSettings;
+
+		displayPass.draws.push_back(displayDraw);
+
+		plannedPasses.push_back(std::move(displayPass));
+	}
+
+	// ========================================================================
+	// After all Scene Views, plan each Overlay View in this order:
+	// Overlay -> Auxiliary.
+	// ========================================================================
+
+	for (std::size_t viewIndex = 0; viewIndex < frame.views.size(); ++viewIndex)
+	{
+		const RenderView& sourceView = frame.views[viewIndex];
+		const bool isOverlayView = sourceView.kind == ViewKind::Overlay;
+
+		if (!isOverlayView)
+		{
+			continue;
+		}
+
+		// --------------------------------------------------------------------
+		// 6. Plan the Overlay pass.
+		// --------------------------------------------------------------------
+
+		PlannedPass overlayPass;
+		overlayPass.sourceViewIndex = viewIndex;
+		overlayPass.name =
+			"Overlay[" + std::to_string(sourceView.id) + "]";
+
+		overlayPass.renderView = sourceView;
+		overlayPass.renderView.drawSettings.depthOverride =
+			DepthMode::Disabled;
+
+		overlayPass.shadow.texture = &context.DisabledShadow();
+
+		// Preserve existing contents if a previous pass writes to this output.
+		bool hasPreviousColorOutput = false;
+
+		for (const PlannedPass& previousPass : plannedPasses)
+		{
+			const bool hasColorAttachment =
+				previousPass.colorLoad.has_value();
+
+			if (!hasColorAttachment)
 			{
 				continue;
 			}
 
-			PlannedPass sceneList;
-			sceneList.sourceViewIndex = viewIndex;
-			sceneList.renderView = source;
-			sceneList.colorLoad = graph::AttachmentLoadOp::Clear;
+			const bool writesToSameOutput = SameViewOutput(
+				previousPass.renderView.output,
+				sourceView.output);
 
-			if (kind == ViewKind::Scene)
+			if (writesToSameOutput)
 			{
-				sceneList.depthLoad = graph::AttachmentLoadOp::Clear;
+				hasPreviousColorOutput = true;
+				break;
 			}
 
-			if (kind == ViewKind::Overlay)
-			{
-				// Overlay ordering is already determined by its submitter.
-				// There is no Depth attachment even for a Canvas preview of a
-				// normally world-space Material. Compile an explicit PSO variant.
-				sceneList.renderView.drawSettings.depthOverride = DepthMode::Disabled;
-			}
-
-			sceneList.name = (kind == ViewKind::Scene ? "SceneHDR[" : "Overlay[") + std::to_string(source.id) + "]";
-			sceneList.shadow.texture = &context.DisabledShadow();
-
-			detail::SceneOutputImages* images = nullptr;
-
-			if (kind == ViewKind::Scene)
-			{
-				Result shadowPreparation;
-				Result prepared = context.PrepareSceneImages(source, images, shadowPreparation);
-
-				if (!prepared.IsSuccess())
-				{
-					return prepared;
-				}
-
-				sceneList.renderView.output = images->hdrColor;
-
-				if (frame.directionalLight && shadowPreparation.IsSuccess() && images->shadowDepth)
-				{
-
-					Result shadow = AppendShadowPass(frame, context, images, sceneList, lists);
-
-					if (!shadow.IsSuccess())
-					{
-						return shadow;
-					}
-				}
-				else if (!shadowPreparation.IsSuccess())
-				{
-					// Preparation failed before any Shadow usage declaration.
-					// Keep a fresh disabled binding, never an old Frame's map.
-					context.ReportViewFailure(source.id, "ShadowPrepare", shadowPreparation.message);
-				}
-			}
-
-			const PassRecordingInputs sceneInputs = MakePassRecordingInputs(frame, sceneList);
-			detail::RenderList sceneIndices;
-			Result selected = SelectViewDraws(frame, sceneInputs, context, sceneIndices);
-
-			if (!selected.IsSuccess())
-			{
-				return selected;
-			}
-
-			// Overlay loads a previously produced output. A first Overlay still
-			// clears its output, including the no-Camera/background-only case.
-			const bool loadOverlay = kind == ViewKind::Overlay &&
-                                     std::any_of(lists.begin(), lists.end(),
-                                                 [&source](const PlannedPass& previous)
-                                                 {
-                                                     return previous.colorLoad.has_value() &&
-															SameViewOutput(previous.renderView.output, source.output);
-                                                 });
-
-			sceneList.colorLoad = loadOverlay ? graph::AttachmentLoadOp::Load : graph::AttachmentLoadOp::Clear;
-			AppendPlannedDraws(sceneIndices, sceneList);
-
-			const ShadowInputs sourceShadow = sceneList.shadow;
-			lists.push_back(std::move(sceneList));
-
-			Result auxiliary = AppendAuxiliaryPasses(frame, context, viewIndex, images, sourceShadow, lists);
-
-			if (!auxiliary.IsSuccess())
-			{
-				return auxiliary;
-			}
-
-			if (images)
-			{
-				Result display = AppendDisplayPass(frame, context, viewIndex, *images, lists);
-
-				if (!display.IsSuccess())
-				{
-					return display;
-				}
-			}
 		}
+
+		overlayPass.colorLoad = graph::AttachmentLoadOp::Clear;
+
+		if (hasPreviousColorOutput)
+		{
+			overlayPass.colorLoad = graph::AttachmentLoadOp::Load;
+		}
+
+		const PassRecordingInputs overlayRecordingInputs =
+			MakePassRecordingInputs(frame, overlayPass);
+
+		detail::RenderList overlayObjectIndices;
+
+		// SelectViewDraws preserves input order without sorting Overlay Objects.
+		const Result overlaySelectionResult = SelectViewDraws(
+			frame,
+			overlayRecordingInputs,
+			context,
+			overlayObjectIndices);
+
+		if (!overlaySelectionResult.IsSuccess())
+		{
+			return overlaySelectionResult;
+		}
+
+		for (std::size_t objectIndex : overlayObjectIndices)
+		{
+			PlannedDraw overlayDraw;
+			overlayDraw.objectIndex = objectIndex;
+			overlayDraw.settings = overlayPass.renderView.drawSettings;
+
+			overlayPass.draws.push_back(overlayDraw);
+		}
+
+		const ShadowInputs overlayShadowInputs = overlayPass.shadow;
+
+		plannedPasses.push_back(std::move(overlayPass));
+
+		// --------------------------------------------------------------------
+		// 7. Plan Auxiliary passes associated with this Overlay View.
+		// --------------------------------------------------------------------
+
+		detail::SceneOutputImages* overlaySceneImages = nullptr;
+
+		const Result overlayAuxiliaryResult = AppendAuxiliaryPasses(
+			frame,
+			context,
+			viewIndex,
+			overlaySceneImages,
+			overlayShadowInputs,
+			plannedPasses);
+
+		if (!overlayAuxiliaryResult.IsSuccess())
+		{
+			return overlayAuxiliaryResult;
+		}
+
 	}
 
 	return {};
@@ -719,7 +871,7 @@ Result FrameRenderer::AddStepPass(
 	return graph.AddPass(std::move(*pass));
 }
 
-Result FrameRenderer::BuildViews(
+Result FrameRenderer::BuildRenderPasses(
 	const FrameRenderData& frame,
 	detail::FrameDrawContext& context,
 	const std::vector<PlannedPass>& lists,

@@ -19,13 +19,16 @@
 namespace rendering::detail
 {
 
-static_assert(sizeof(Vector2) == 8 && sizeof(Vector3) == 12 && sizeof(Vector4) == 16 && sizeof(Matrix4x4) == 64,
-              "ShaderData: unexpected size of math types.");
+static_assert(sizeof(Vector2) == 8 && sizeof(Vector3) == 12 && sizeof(Vector4) == 16 && sizeof(Matrix4x4) == 64, "ShaderData: unexpected size of math types.");
 
 const MaterialParameter* FindMaterialParameter(const MaterialDesc& material, std::string_view name) noexcept
 {
-	const auto found = std::find_if(material.parameters.begin(), material.parameters.end(),
-									[name](const MaterialParameter& parameter) { return parameter.name == name; });
+	const auto found = std::find_if(
+		material.parameters.begin(), material.parameters.end(),
+		[name](const MaterialParameter& parameter)
+		{
+			return parameter.name == name;
+		});
 
 	return found == material.parameters.end() ? nullptr : &*found;
 }
@@ -201,8 +204,10 @@ bool SameLayout(const ShaderConstantBuffer& a, const ShaderConstantBuffer& b) no
 	return true;
 }
 
-Result ReflectConstantBuffer(ID3D12ShaderReflection& reflection, const D3D12_SHADER_INPUT_BIND_DESC& bindDesc,
-                             ShaderConstantBuffer& output)
+Result ReflectConstantBuffer(
+	ID3D12ShaderReflection& reflection,
+	const D3D12_SHADER_INPUT_BIND_DESC& bindDesc,
+	ShaderConstantBuffer& output)
 {
 	// Get datail by its name.
 	auto* nativeBuffer = reflection.GetConstantBufferByName(bindDesc.Name);
@@ -293,8 +298,11 @@ Result ReflectConstantBuffer(ID3D12ShaderReflection& reflection, const D3D12_SHA
 	return {};
 }
 
-Result ReflectBindings(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DESC& shader, ShaderStages stages,
-                       ShaderMetadata& metadata)
+Result ReflectBindings(
+	ID3D12ShaderReflection& reflection,
+	const D3D12_SHADER_DESC& shader,
+	ShaderStages stages,
+	 ShaderMetadata& metadata)
 {
 	std::set<std::pair<D3D_SHADER_INPUT_TYPE, UINT>> resourceBindings;
 
@@ -338,8 +346,9 @@ Result ReflectBindings(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DE
 		//----------------------------
 		// Texture reflection
 		//----------------------------
-		else if (bindDesc.Type == D3D_SIT_TEXTURE && bindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE2D &&
-                 bindDesc.ReturnType == D3D_RETURN_TYPE_FLOAT)
+		else if (bindDesc.Type == D3D_SIT_TEXTURE &&
+				 bindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE2D &&
+				 bindDesc.ReturnType == D3D_RETURN_TYPE_FLOAT)
 		{
 			ShaderResourceBinding resource;
 			resource.name = bindDesc.Name;
@@ -389,8 +398,7 @@ Result ReflectBindings(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DE
 	return {};
 }
 
-Result ReflectVertexInputs(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DESC& shader,
-                           ShaderMetadata& metadata)
+Result ReflectVertexInputs(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DESC& shader, ShaderMetadata& metadata)
 {
 	// Iterate all input parameters for vertex shader to reflect the vertex input layout.
 	for (UINT i = 0; i < shader.InputParameters; ++i)
@@ -451,8 +459,7 @@ Result ReflectVertexInputs(ID3D12ShaderReflection& reflection, const D3D12_SHADE
 	return {};
 }
 
-Result ReflectColorOutputs(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DESC& shader,
-                           ShaderMetadata& metadata)
+Result ReflectColorOutputs(ID3D12ShaderReflection& reflection, const D3D12_SHADER_DESC& shader, ShaderMetadata& metadata)
 {
 	for (UINT i = 0; i < shader.OutputParameters; ++i)
 	{
@@ -531,8 +538,9 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 		return reflected;
 	}
 
-	reflected = desc.stage == ShaderStage::Vertex ? ReflectVertexInputs(*reflection.Get(), shader, candidate.metadata)
-                                                  : ReflectColorOutputs(*reflection.Get(), shader, candidate.metadata);
+	reflected = desc.stage == 
+		ShaderStage::Vertex ? ReflectVertexInputs(*reflection.Get(), shader, candidate.metadata)
+		: ReflectColorOutputs(*reflection.Get(), shader, candidate.metadata);
 
 	if (!reflected.IsSuccess())
 	{
@@ -556,8 +564,12 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 		for (const auto& cb : pixel->constants)
 		{
 			// Collect duplicated bindings for being merged.
-			auto found = std::find_if(candidate.constants.begin(), candidate.constants.end(),
-                                      [&](const auto& x) { return x.binding == cb.binding; });
+			auto found = std::find_if(
+				candidate.constants.begin(), candidate.constants.end(),
+				[&](const auto& x)
+				{
+					return x.binding == cb.binding;
+				});
 
 			if (found == candidate.constants.end())
 			{
@@ -594,20 +606,20 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 
 					if (sameBinding != sameName)
 					{
-						return {false, "MergeMetadata: VS/PS resource name/register collision: " + vertexBind.name +
-                                           " & " + pixelBind.name};
+						return {false, "MergeMetadata: VS/PS resource name/register collision: " + vertexBind.name + " & " + pixelBind.name};
 					}
 				}
 			}
 
 			// Find same binding reaources
-			auto found = std::find_if(candidate.resources.begin(), candidate.resources.end(),
-                                      [&](const auto& vertexBind)
-                                      {
-                                          const bool sameResourceKind = vertexBind.sampler == pixelBind.sampler;
-                                          const bool sameRegister = vertexBind.binding == pixelBind.binding;
-                                          return sameResourceKind && sameRegister;
-                                      });
+			auto found = std::find_if(
+				candidate.resources.begin(), candidate.resources.end(),
+				[&](const auto& vertexBind)
+				{
+					const bool sameResourceKind = vertexBind.sampler == pixelBind.sampler;
+					const bool sameRegister = vertexBind.binding == pixelBind.binding;
+					return sameResourceKind && sameRegister;
+				});
 
 			if (found == candidate.resources.end())
 			{
@@ -645,8 +657,7 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 	// Detect duplicate resource names in the common schema (binding 5) and resource names.
 	for (const auto& bind : candidate.resources)
 	{
-		if (!bind.sampler && ((bind.name.starts_with("Renderer") && bind.name != "RendererShadowMap") ||
-                              !names.insert(bind.name).second))
+		if (!bind.sampler && ((bind.name.starts_with("Renderer") && bind.name != "RendererShadowMap") ||  !names.insert(bind.name).second))
 		{
 			return {false, "MergeMetadata: duplicate resource name '" + bind.name + "' in common schema."};
 		}
