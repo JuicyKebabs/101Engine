@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.35.
 // Follow the new submission contract without weakening value-ownership checks.
 // Multiple Views are supported; two Scene Views writing the same color output are still rejected.
 
@@ -183,7 +182,7 @@ void VerifyFrameSubmission()
 	GeometryDesc geometryDesc{};
 	geometryDesc.vertices = vertices;
 	const auto geometry = renderer.RegisterGeometry(geometryDesc);
-	Check(geometry.status);
+	Check(geometry.result);
 
 	const std::array<std::byte, 4> pixels{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255}};
 
@@ -198,7 +197,7 @@ void VerifyFrameSubmission()
 	textureDescription.mips = mips;
 
 	const auto texture = renderer.RegisterTexture(textureDescription);
-	Check(texture.status);
+	Check(texture.result);
 
 	FrameRenderData frame;
 	RenderObject registeredObject{};
@@ -221,9 +220,8 @@ void VerifyFrameSubmission()
 	Check(renderer.DestroyTexture(texture.handle));
 	const auto destroyedDependencies = renderer.Render();
 	CheckProcessed(destroyedDependencies);
-	// R8 replaces both destroyed Geometry references with resident error cubes.
 	// The third actual draw is the private HDR display transform.
-	Require(destroyedDependencies.drawnObjects == 3, "R8 fallback/display draws were not recorded.");
+	Require(destroyedDependencies.drawnObjects == 3, "fallback/display draws were not recorded.");
 	Require(destroyedDependencies.diagnostics.size() == 2, "Destroyed Geometry was not diagnosed per Object.");
 	CheckSkipped(renderer);
 
@@ -238,7 +236,7 @@ void VerifyFrameSubmission()
 
 	// A View-less frame also completes its uploads before returning.
 	const auto secondGeometry = renderer.RegisterGeometry(geometryDesc);
-	Check(secondGeometry.status);
+	Check(secondGeometry.result);
 
 	FrameRenderData uploadOnly;
 	RenderObject uploadObject{};

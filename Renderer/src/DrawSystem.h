@@ -114,6 +114,7 @@ public:
 	ResourceRegistrationResult<ShaderHandle> Register(const ShaderDesc& desc);
 	ResourceRegistrationResult<PipelineHandle> Register(const PipelineDesc& desc);
 	ResourceRegistrationResult<MaterialHandle> Register(const MaterialDesc& desc);
+
 	Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
 
 	Result ResolveDrawInputs(

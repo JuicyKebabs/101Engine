@@ -130,8 +130,7 @@ Result DrawResources::PrepareConstantBindings(
 	viewConstants.shadowInformation.w = 0;
 
 	ObjectConstants objectConstants;
-	Result worldPrepared =
-		DeriveObjectWorld(object, pass.billboardSource ? *pass.billboardSource : *pass.view, objectConstants.world);
+	Result worldPrepared = DeriveObjectWorld(object, pass.billboardSource ? *pass.billboardSource : *pass.view, objectConstants.world);
 
 	if (!worldPrepared.IsSuccess())
 	{
@@ -255,8 +254,11 @@ Result DrawResources::PrepareConstantBindings(
 // Resolve the same owner that declaration imported, copy its CPU SRV to the frame-visible heap,
 // while its registry/cache owner stays stable through synchronous execution.
 // Descriptor copying creates a view description; the owner protects the underlying storage.
-Result DrawResources::PrepareTextureBindings(const DrawInputs& inputs, FrameDrawContext& drawContext,
-                                             const PassRecordingInputs& pass, DrawCommand& command)
+Result DrawResources::PrepareTextureBindings(
+	const DrawInputs& inputs,
+	FrameDrawContext& drawContext,
+	const PassRecordingInputs& pass,
+	DrawCommand& command)
 {
 	UINT rootIndex = static_cast<UINT>(command.m_packet.constants.size());
 
@@ -328,9 +330,10 @@ Result DrawResources::PrepareTextureBindings(const DrawInputs& inputs, FrameDraw
 // Prepare commands for one View's original Object indices and current output layout.
 // Resolve effective viewport/scissor and remove empty clips before native recording.
 // Allocation/preparation failure aborts the unsent Graph rather than submitting a partial frame.
-Result DrawResources::PrepareCommands(FrameDrawContext& drawContext, const PassRecordingInputs& pass,
-                                      std::span<const PlannedDraw> draws, const graph::OutputLayout& output,
-                                      std::vector<DrawCommand>& commands)
+Result DrawResources::PrepareCommands(
+	FrameDrawContext& drawContext, const PassRecordingInputs& pass,
+	std::span<const PlannedDraw> draws, const graph::OutputLayout& output,
+	std::vector<DrawCommand>& commands)
 {
 	// This cache is deliberately local to one PrepareCommands call for one View.
 	// Moving it to frame-global state would reuse Camera A addresses when preparing Camera B.
@@ -340,6 +343,7 @@ Result DrawResources::PrepareCommands(FrameDrawContext& drawContext, const PassR
 	{
 		const std::size_t objectIndex = draw.objectIndex;
 		const DrawSettings& settings = draw.settings;
+
 		if (objectIndex >= drawContext.Frame().objects.size())
 		{
 			return {false, "PrepareCommands: Object index is out of range."};
@@ -361,11 +365,9 @@ Result DrawResources::PrepareCommands(FrameDrawContext& drawContext, const PassR
 			continue;
 		}
 
-		const bool colorCountMismatch =
-			inputs.pixelShader && inputs.pixelShader->metadata.colorOutputs != output.colorFormats.size();
+		const bool colorCountMismatch = inputs.pixelShader && inputs.pixelShader->metadata.colorOutputs != output.colorFormats.size();
 		const bool missingPixelShader = !inputs.pixelShader && !output.colorFormats.empty();
-		const bool missingDepth =
-			inputs.depthOverride.value_or(inputs.pipeline->desc.depth) != DepthMode::Disabled && !output.depthFormat;
+		const bool missingDepth = inputs.depthOverride.value_or(inputs.pipeline->desc.depth) != DepthMode::Disabled && !output.depthFormat;
 
 		if (colorCountMismatch || missingPixelShader || missingDepth)
 		{
@@ -400,8 +402,8 @@ Result DrawResources::PrepareCommands(FrameDrawContext& drawContext, const PassR
 
 			const bool indexed = inputs.geometry->gpuData->indexCount != 0;
 			command.m_packet.kind = indexed ? backend::DrawKind::Indexed : backend::DrawKind::Vertices;
-			const UINT availableCount =
-				indexed ? inputs.geometry->gpuData->indexCount : inputs.geometry->gpuData->vertexCount;
+
+			const UINT availableCount = indexed ? inputs.geometry->gpuData->indexCount : inputs.geometry->gpuData->vertexCount;
 
 			// The original range may describe a completely different mesh.
 			// Applying it to the resident cube would hide it or access past VB.
@@ -415,8 +417,9 @@ Result DrawResources::PrepareCommands(FrameDrawContext& drawContext, const PassR
 			{
 				command.m_packet.first = object.drawRange.first;
 				command.m_packet.baseVertex = object.drawRange.baseVertex;
-				command.m_packet.count =
-					object.drawRange.count == 0 ? availableCount - object.drawRange.first : object.drawRange.count;
+				command.m_packet.count = 
+					object.drawRange.count == 0 ?
+					availableCount - object.drawRange.first : object.drawRange.count;
 			}
 		}
 
@@ -430,8 +433,7 @@ Result DrawResources::PrepareCommands(FrameDrawContext& drawContext, const PassR
 			continue;
 		}
 
-		result =
-			PrepareConstantBindings(drawContext.Frame(), pass, object, inputs, drawContext, commonAllocations, command);
+		result = PrepareConstantBindings(drawContext.Frame(), pass, object, inputs, drawContext, commonAllocations, command);
 
 		if (!result.IsSuccess())
 		{

@@ -107,7 +107,6 @@ foreach(RENDERER_SHADER MeshVS FullscreenVS ColorPS TexturePS ExtraPS LitPS Disp
 endforeach()
 
 add_custom_target(RendererShaderAssets DEPENDS ${RENDERER_SHADER_OUTPUTS})
-# R8 CPU contract check: use the exported API without relying on upload readiness.
 if(BUILD_TESTING)
     add_executable(RendererGeometryDataTests tests/GeometryDataTests.cpp)
     target_compile_definitions(RendererGeometryDataTests PRIVATE NOMINMAX)
@@ -116,15 +115,15 @@ if(BUILD_TESTING)
 endif()
 
 # Embed the private GPU programs so Renderer initialization has no asset path.
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli" R8_COMMON)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MaterialParams.hlsli" R8_MATERIAL_PARAMS)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MeshVS.hlsl" R8_BUILTIN_MESH)
-string(REPLACE "#include \"Common.hlsli\"" "${R8_COMMON}" R8_BUILTIN_MESH "${R8_BUILTIN_MESH}")
-string(REPLACE "#include \"MaterialParams.hlsli\"" "${R8_MATERIAL_PARAMS}" R8_BUILTIN_MESH "${R8_BUILTIN_MESH}")
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/FullscreenVS.hlsl" R8_BUILTIN_FULLSCREEN)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" R8_DISPLAY_FUNCTIONS)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayPS.hlsl" R8_BUILTIN_DISPLAY)
-string(REPLACE "#include \"DisplayTransform.hlsli\"" "${R8_DISPLAY_FUNCTIONS}" R8_BUILTIN_DISPLAY "${R8_BUILTIN_DISPLAY}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Common.hlsli" COMMON)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MaterialParams.hlsli" MATERIAL_PARAMS)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/MeshVS.hlsl" BUILTIN_MESH)
+string(REPLACE "#include \"Common.hlsli\"" "${COMMON}" BUILTIN_MESH "${BUILTIN_MESH}")
+string(REPLACE "#include \"MaterialParams.hlsli\"" "${MATERIAL_PARAMS}" BUILTIN_MESH "${BUILTIN_MESH}")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/FullscreenVS.hlsl" BUILTIN_FULLSCREEN)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" DISPLAY_FUNCTIONS)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayPS.hlsl" BUILTIN_DISPLAY)
+string(REPLACE "#include \"DisplayTransform.hlsli\"" "${DISPLAY_FUNCTIONS}" BUILTIN_DISPLAY "${BUILTIN_DISPLAY}")
 configure_file(src/BuiltinShaderSources.h.in generated/BuiltinShaderSources.h @ONLY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     shaders/Common.hlsli shaders/MaterialParams.hlsli shaders/MeshVS.hlsl shaders/FullscreenVS.hlsl

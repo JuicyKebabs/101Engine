@@ -554,7 +554,7 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 	//----------------------------------------------------------------------------------------------
 	// 7. Register resource bindings for each planned pass.
 	//----------------------------------------------------------------------------------------------
-	Result built = frameRenderer.BuildViews(frame, context, lists, graph);
+	Result built = frameRenderer.BuildRenderPasses(frame, context, lists, graph);
 
 	if (!built.IsSuccess())
 	{

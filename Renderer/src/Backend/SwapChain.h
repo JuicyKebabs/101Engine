@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.11.
 // Window identity survives a partially failed resize, but usable BackBuffers may not.
 // IsInitialized answers identity; buffer-ready state answers whether drawing/Present is possible.
 // Borrowed BackBuffer information must not outlive Resize or Finalize.

@@ -1,6 +1,4 @@
-// R7 implementation guide: section 4.14.
 // Bridge to the existing Queue, Upload and FrameResources implementation.
-// R7 adds idle output replacement and pre-record growth, not a ring or concurrent frames.
 // Signal success, GPU completion and safe CPU reuse remain distinct checkpoints.
 
 #include "Backend.h"

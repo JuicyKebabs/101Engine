@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.12.
 // DXGI requires old BackBuffer references to be released before ResizeBuffers.
 // Unlike an ordinary output image, Window replacement cannot retain the old complete set.
 // A failed replacement pauses this Window until an explicit positive-size retry succeeds.

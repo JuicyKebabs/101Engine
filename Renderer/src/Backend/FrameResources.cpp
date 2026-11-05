@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.26.
 // Grow complete replacement allocations before recording, then allocate monotonically.
 // Constants and descriptor slots have separate capacities and hard limits.
 // GPU completion is required before resetting offsets.

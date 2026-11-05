@@ -8,9 +8,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
-#include <limits>
-#include <set>
 #include <d3dcompiler.h>
 #include <d3d12shader.h>
 #include <cctype>
@@ -344,9 +341,12 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 
 	for (const auto& input : vs->metadata.vertexInputs)
 	{
-		bool mismatchVertex =
-			std::none_of(fields.begin(), fields.end(), [&](const backend::VertexField& field)
-                         { return input.semantic == field.semantic && input.components == field.count; });
+		bool mismatchVertex = std::none_of(
+				fields.begin(), fields.end(),
+				[&](const backend::VertexField& field)
+				{
+					return input.semantic == field.semantic && input.components == field.count;
+				});
 
 		if (input.index != 0 || mismatchVertex)
 		{
@@ -354,8 +354,12 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 		}
 	}
 
-	const auto tables = std::count_if(candidate->layout.resources.begin(), candidate->layout.resources.end(),
-                                      [](const auto& binding) { return !binding.sampler; });
+	const auto tables = std::count_if(
+		candidate->layout.resources.begin(), candidate->layout.resources.end(),
+		[](const auto& binding)
+		{
+			return !binding.sampler;
+		});
 
 	if (candidate->layout.constants.size() * 2 + tables > 64)
 	{

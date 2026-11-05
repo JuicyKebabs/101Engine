@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.25.
 // Owns a linear constant Upload Buffer and shader-visible descriptors.
 // Growth happens before any addresses/handles are handed to this frame's commands.
 // Reset is completion-gated; capacity grows to a high-water mark rather than rotating through frames.

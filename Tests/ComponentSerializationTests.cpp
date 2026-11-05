@@ -223,7 +223,7 @@ namespace
 		Check(mesh.Serialize(meshRecord) && sprite.Serialize(spriteRecord) && image.Serialize(imageRecord),
 			"Renderer schemas serialize");
 		Check(!meshRecord.contains("blendMode") && !spriteRecord.contains("blendMode") && !imageRecord.contains("blendMode"),
-			"R8 Components no longer persist Pipeline BlendMode");
+			"Components no longer persist Pipeline BlendMode");
 		Check(meshRecord["castShadow"] == true && spriteRecord["castShadow"] == false,
 			"Mesh and Sprite persist their distinct Shadow defaults");
 		Check(!meshRecord.contains("textureOverrideAssetId"), "Mesh TextureOverride was removed");

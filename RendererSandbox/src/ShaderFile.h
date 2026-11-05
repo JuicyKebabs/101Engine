@@ -10,7 +10,7 @@ namespace sandbox
 {
 	inline std::vector<std::byte> ReadShader(const char* name)
 	{
-		std::ifstream file(std::filesystem::path(R4_SHADER_DIRECTORY) / name, std::ios::binary | std::ios::ate);
+		std::ifstream file(std::filesystem::path(SHADER_DIRECTORY) / name, std::ios::binary | std::ios::ate);
 
 		if (!file)
 		{

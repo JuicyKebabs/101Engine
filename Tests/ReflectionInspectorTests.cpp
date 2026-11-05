@@ -230,7 +230,7 @@ struct InteractionFixture
 	InteractionFixture()
 	{
 		object.first.x = 1;
-		TypeMetadataBuilder<EditableObject> builder("R10InspectorInteraction");
+		TypeMetadataBuilder<EditableObject> builder("InspectorInteraction");
 		builder.Property("earlier", &EditableObject::earlier);
 		builder.Property("first", &EditableObject::first);
 		builder.Property("second", &EditableObject::second);
@@ -282,7 +282,7 @@ struct InteractionFixture
 		size.y = 300;
 		ImGui::SetNextWindowPos(position);
 		ImGui::SetNextWindowSize(size);
-		ImGui::Begin("R10 interaction fixture", nullptr, ImGuiWindowFlags_NoSavedSettings);
+		ImGui::Begin("interaction fixture", nullptr, ImGuiWindowFlags_NoSavedSettings);
 		const ImVec2 firstMinimum = ImGui::GetCursorScreenPos();
 		earlierPoint.x = firstMinimum.x + 8;
 		earlierPoint.y = firstMinimum.y + 8;

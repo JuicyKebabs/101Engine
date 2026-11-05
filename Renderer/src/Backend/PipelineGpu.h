@@ -46,10 +46,14 @@ struct PipelineBuildInputs
 
 Result BuildPipeline(ID3D12Device* device, const PipelineBuildInputs& inputs, PipelineGpuData& output);
 
-Result CreateRootSignature(ID3D12Device* device, const D3D12_ROOT_SIGNATURE_DESC& desc,
-                           Microsoft::WRL::ComPtr<ID3D12RootSignature>& output);
+Result CreateRootSignature(
+	ID3D12Device* device,
+	const D3D12_ROOT_SIGNATURE_DESC& desc,
+	Microsoft::WRL::ComPtr<ID3D12RootSignature>& output);
 
-Result CreateGraphicsPipeline(ID3D12Device* device, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc,
-                              Microsoft::WRL::ComPtr<ID3D12PipelineState>& output);
+Result CreateGraphicsPipeline(
+	ID3D12Device* device,
+	const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc,
+	Microsoft::WRL::ComPtr<ID3D12PipelineState>& output);
 
 } // namespace rendering::backend

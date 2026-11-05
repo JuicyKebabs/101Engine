@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.30.
 // Select, prepare, declare and record from the same original Object indices.
 // Resolve current registry revisions under single-threaded, non-reentrant Render sequencing.
 // Keep Graph ownership connections here and delegate packing/PSO/draw preparation to DrawResources.
@@ -813,7 +812,7 @@ Result FrameDrawContext::EstimateRequirements(
 
 		if (constantsExceeded || descriptorsExceeded)
 		{
-			return Fail("Frame requirements exceed the configured R7 hard limits.");
+			return Fail("Frame requirements exceed the configured hard limits.");
 		}
 	}
 

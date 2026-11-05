@@ -1,4 +1,3 @@
-// R7 implementation guide: section 4.19.
 // Execute the compiled declaration as one graphics submission, after validating live bindings.
 // A failure before submission discards partial graphics recording; independent Uploads may exist.
 // Only a successful Execute/Signal permits state/Fence publication; unknown completion retains storage.
