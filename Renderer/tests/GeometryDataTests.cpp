@@ -38,9 +38,9 @@ int main()
 
 	rendering::GeometryDesc description;
 	description.vertices = vertices;
-	rendering::GeometryRegistrationResult registration = renderer.RegisterGeometry(description);
+	const auto registration = renderer.RegisterGeometry(description);
 
-	if (!Check(registration.status.IsSuccess(), "Accept CPU Geometry before upload"))
+	if (!Check(registration.result.IsSuccess(), "Accept CPU Geometry before upload"))
 	{
 		return 1;
 	}
