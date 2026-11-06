@@ -411,7 +411,7 @@ Result DrawResources::UpdateMaterial(MaterialHandle handle, const MaterialDesc& 
 
 Result DrawResources::ResolveTextureInput(
 	const MaterialDesc& material, const ShaderResourceBinding& requirement,
-    TextureHandle& handle, TextureContent*& content)
+	TextureHandle& handle, TextureContent*& content)
 {
 	const MaterialParameter* parameter = FindMaterialParameter(material, requirement.name);
 
@@ -665,9 +665,10 @@ Result DrawResources::ResolveDrawInputs(
 	return {};
 }
 
-Result DrawResources::GetOrCreatePipelineVariant(const DrawInputs& inputs, const DrawDiagnostic& diagnostic,
-                                                 const graph::OutputLayout& output, backend::Backend& backend,
-                                                 PipelineVariant*& result)
+Result DrawResources::GetOrCreatePipelineVariant(
+	const DrawInputs& inputs, const DrawDiagnostic& diagnostic,
+	const graph::OutputLayout& output, backend::Backend& backend,
+	PipelineVariant*& result)
 {
 	auto& pipeline = *inputs.pipeline;
 	const DepthMode effectiveDepth = inputs.depthOverride.value_or(pipeline.desc.depth);

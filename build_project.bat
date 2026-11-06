@@ -1,1 +1,0 @@
-"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build "C:\Users\kamka\デスクトップ\101Engine-developing\101Engine/build" --target 101Game --config Debug > "C:\Users\kamka\デスクトップ\101Engine-developing\101Engine/cmake_build.log" 2>&1

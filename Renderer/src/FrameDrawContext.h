@@ -85,8 +85,8 @@ public:
 	// Use identical settings for declaration and recording in this mutation-free Render scope.
 	Result DeclareDrawResources(
 		graph::RenderPassBuilder& builder,
-		std::span<const PlannedDraw> draws
-		, const PassRecordingInputs& pass);
+		std::span<const PlannedDraw> draws,
+		const PassRecordingInputs& pass);
 
 	Result RecordPass(
 		graph::RenderPassContext& context,

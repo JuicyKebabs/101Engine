@@ -52,8 +52,10 @@ public:
 	Result RecordDrawCommands(std::span<const rendering::DrawCommand> commands);
 
 private:
-	RenderPassContext(const RenderGraph& graph, const CompiledPass& pass,
-                      backend::CommandContext* commands = nullptr) noexcept
+	RenderPassContext(
+		const RenderGraph& graph,
+		const CompiledPass& pass,
+		backend::CommandContext* commands = nullptr) noexcept
 		: m_graph(graph), m_pass(pass), m_commands(commands)
 	{
 	}

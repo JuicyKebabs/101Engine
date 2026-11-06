@@ -125,11 +125,15 @@ public:
 
 	// Generate GPU data for resources from CPU data.
 	// Generation is done before uploading.
-	[[nodiscard]] Result PrepareGeometry(const detail::GeometryCpuData& cpu, std::unique_ptr<GeometryGpuData>& gpu,
-                                         std::unique_ptr<GeometryUploadData>& upload);
+	[[nodiscard]] Result PrepareGeometry(
+		const detail::GeometryCpuData& cpu,
+		std::unique_ptr<GeometryGpuData>& gpu,
+		std::unique_ptr<GeometryUploadData>& upload);
 
-	[[nodiscard]] Result PrepareTexture(const detail::TextureCpuData& cpu, std::unique_ptr<TextureGpuData>& gpu,
-										std::unique_ptr<TextureUploadData>& upload);
+	[[nodiscard]] Result PrepareTexture(
+		const detail::TextureCpuData& cpu,
+		std::unique_ptr<TextureGpuData>& gpu,
+		std::unique_ptr<TextureUploadData>& upload);
 
 private:
 	Device m_device;

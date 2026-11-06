@@ -572,7 +572,7 @@ public:
 	class PropertyConfiguration
 	{
 	public:
-	  PropertyConfiguration(TypeMetadataBuilder& owner, std::size_t index)
+		PropertyConfiguration(TypeMetadataBuilder& owner, std::size_t index)
 		  : m_owner(owner), m_index(index < owner.m_properties.size() ? index : std::numeric_limits<std::size_t>::max())
 	  {
 	  }

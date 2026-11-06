@@ -252,7 +252,8 @@ private:
 
 private:
 	template<class Gpu, class Upload, class Recorder>
-	Result Add(const Gpu& gpu,
+	Result Add(
+		const Gpu& gpu,
 		std::unique_ptr<Upload>& upload,
 		std::vector<std::unique_ptr<Upload>>& retained,
 		Recorder record)

@@ -24,16 +24,21 @@ Result ValidateViewStructure(const FrameRenderData& frame);
 class FrameRenderer
 {
 public:
-	Result SelectViewDraws(const FrameRenderData& frame, const PassRecordingInputs& pass,
-                           detail::FrameDrawContext& context, std::vector<std::size_t>& indices) const;
-	Result BuildPassPlan(FrameRenderData& frame, detail::FrameDrawContext& context,
-                         std::vector<PlannedPass>& lists) const;
-	Result BuildRenderPasses(const FrameRenderData& frame, detail::FrameDrawContext& context,
-                      const std::vector<PlannedPass>& lists, graph::RenderGraph& graph) const;
+	Result SelectViewDraws(
+		const FrameRenderData& frame, const PassRecordingInputs& pass,
+		detail::FrameDrawContext& context, std::vector<std::size_t>& indices) const;
+	Result BuildPassPlan(
+		FrameRenderData& frame,
+		detail::FrameDrawContext& context,
+		std::vector<PlannedPass>& lists) const;
+	Result BuildRenderPasses(
+		const FrameRenderData& frame, detail::FrameDrawContext& context,
+		const std::vector<PlannedPass>& lists, graph::RenderGraph& graph) const;
 
 private:
-	Result AddStepPass(const FrameRenderData& frame, const PlannedPass& list, detail::FrameDrawContext& context,
-                       graph::RenderGraph& graph) const;
+	Result AddStepPass(
+		const FrameRenderData& frame, const PlannedPass& list, detail::FrameDrawContext& context,
+		graph::RenderGraph& graph) const;
 };
 
 } // namespace rendering

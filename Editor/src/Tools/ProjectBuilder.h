@@ -20,7 +20,7 @@ public:
 		const std::string& target = "101Game", 
 		const std::string& config = "Debug",
 		bool buildDependencies = true
-		);
+	);
 
 	// Build GameCode for hot reload using the Editor's matching configuration.
 	// This method does't use MSBuild system.

@@ -10,6 +10,7 @@
 #include <chrono>
 
 #include "ShaderFile.h"
+#include "Diagnostics.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Math.h"
@@ -45,7 +46,7 @@ bool VerifyRendererMath()
 		", point=(" + std::to_string(transformed.x) +
 		", " + std::to_string(transformed.y) +
 		", " + std::to_string(transformed.z) + ")\n";
-	OutputDebugStringA(message.c_str());
+	sandbox::WriteDiagnostic(message);
 	return succeeded;
 }
 
@@ -63,48 +64,11 @@ void ShowWin32Error(const wchar_t* message)
 		MB_OK | MB_ICONERROR);
 }
 
-std::wstring Utf8ToWide(const std::string& text)
-{
-	const int required = MultiByteToWideChar(
-		CP_UTF8,
-		MB_ERR_INVALID_CHARS,
-		text.c_str(),
-		-1,
-		nullptr,
-		0);
-
-	if (required == 0)
-	{
-		return L"Failed to convert the renderer diagnostic.";
-	}
-
-	std::wstring converted(
-		static_cast<std::size_t>(required),
-		L'\0');
-
-	const int written = MultiByteToWideChar(
-		CP_UTF8,
-		MB_ERR_INVALID_CHARS,
-		text.c_str(),
-		-1,
-		converted.data(),
-		required);
-
-	if (written == 0)
-	{
-		return L"Failed to convert the renderer diagnostic.";
-	}
-
-	// The conversion includes the terminating null character.
-	converted.pop_back();
-	return converted;
-}
-
 void ShowRendererFailure(HWND window, const rendering::Result& result)
 {
 	if (result.failureKind == rendering::FailureKind::GpuCompletionUnknown)
 	{
-		OutputDebugStringA(result.message.c_str());
+		sandbox::WriteDiagnostic(result.message);
 		OutputDebugStringW(
 			L"\n[RendererSandbox] Fatal GPU synchronization failure.\n");
 
@@ -112,7 +76,7 @@ void ShowRendererFailure(HWND window, const rendering::Result& result)
 		__fastfail(FAST_FAIL_FATAL_APP_EXIT);
 	}
 
-	const std::wstring message = Utf8ToWide(result.message);
+	const std::wstring message = sandbox::Utf8ToWide(result.message);
 
 	OutputDebugStringW(message.c_str());
 	OutputDebugStringW(L"\n");
@@ -277,7 +241,7 @@ int WINAPI wWinMain(
 					+ std::to_string(windowOutput.value)
 					+ "\n";
 
-				OutputDebugStringA(message.c_str());
+				sandbox::WriteDiagnostic(message);
 			}
 		}
 
@@ -358,9 +322,9 @@ int WINAPI wWinMain(
 		{
 			try
 			{
-				const auto vsBytes = sandbox::ReadShader("MeshVS.cso");
-				const auto psBytes = sandbox::ReadShader("LitPS.cso");
-				const auto extraBytes = sandbox::ReadShader("ExtraPS.cso");
+				const auto vsBytes = sandbox::ReadShader(L"MeshVS.cso");
+				const auto psBytes = sandbox::ReadShader(L"LitPS.cso");
+				const auto extraBytes = sandbox::ReadShader(L"ExtraPS.cso");
 
 				auto vs = renderer.RegisterShader({rendering::ShaderStage::Vertex, vsBytes});
 				auto ps = renderer.RegisterShader({rendering::ShaderStage::Pixel, psBytes});
@@ -455,9 +419,14 @@ int WINAPI wWinMain(
 					}
 				}
 			}
-			catch (const std::exception& e)
+			catch (const sandbox::ShaderFileError& e)
 			{
 				result = {false, e.what()};
+			}
+			catch (const std::exception&)
+			{
+				// 任意の例外メッセージの文字コードは規定されていない。
+				result = {false, "Unexpected exception while preparing shader resources."};
 			}
 		}
 
@@ -678,7 +647,7 @@ int WINAPI wWinMain(
 
 				if (!firstFramePresented && rendered.disposition == rendering::RenderDisposition::Processed)
 				{
-					OutputDebugStringA("[RendererSandbox] First frame presented.\n");
+					OutputDebugStringW(L"[RendererSandbox] First frame presented.\n");
 					firstFramePresented = true;
 				}
 			}

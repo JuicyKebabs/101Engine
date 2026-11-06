@@ -44,19 +44,19 @@ struct TextureUploadData
 // No GPU commands are recorded or submitted by this function.
 [[nodiscard]]
 Result PrepareTextureUpload(
-ID3D12Device* device,
-const detail::TextureCpuData& cpu,
-std::unique_ptr<TextureGpuData>& gpuOutput,
-std::unique_ptr<TextureUploadData>& uploadOutput);
+	ID3D12Device* device,
+	const detail::TextureCpuData& cpu,
+	std::unique_ptr<TextureGpuData>& gpuOutput,
+	std::unique_ptr<TextureUploadData>& uploadOutput);
 
 // One initial upload on the Graphics (DIRECT) queue only. 
 // Caller retains the texture, upload and command allocator until submission completion. 
 // On any recording failure, discard the entire list; never execute a partial upload.
 [[nodiscard]]
 Result RecordTextureUpload(
-CommandContext& context,
-const TextureGpuData& gpu,
-const TextureUploadData& upload);
+	CommandContext& context,
+	const TextureGpuData& gpu,
+	const TextureUploadData& upload);
 
 }
 

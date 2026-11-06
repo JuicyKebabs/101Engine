@@ -301,7 +301,7 @@ Result ReflectBindings(
 	ID3D12ShaderReflection& reflection,
 	const D3D12_SHADER_DESC& shader,
 	ShaderStages stages,
-	 ShaderMetadata& metadata)
+	ShaderMetadata& metadata)
 {
 	std::set<std::pair<D3D_SHADER_INPUT_TYPE, UINT>> resourceBindings;
 
