@@ -10,7 +10,8 @@ RenderAssetResources::~RenderAssetResources()
 	Finalize();
 }
 
-bool RenderAssetResources::Initialize(rendering::Renderer& renderer,
+bool RenderAssetResources::Initialize(
+	rendering::Renderer& renderer,
 	const std::filesystem::path& absoluteShaderDirectory)
 {
 	if (m_renderer || !absoluteShaderDirectory.is_absolute())

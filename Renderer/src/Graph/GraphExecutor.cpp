@@ -221,8 +221,10 @@ const GraphTextureBinding* GraphExecutor::FindPhysicalBinding(ID3D12Resource* re
 	return &*found;
 }
 
-Result GraphExecutor::ImportTexture(const GraphTextureBinding& texture, const std::string& name,
-									GraphTextureHandle& output)
+Result GraphExecutor::ImportTexture(
+	const GraphTextureBinding& texture,
+	const std::string& name,
+	GraphTextureHandle& output)
 {
 	output = {};
 

@@ -7,8 +7,10 @@
 namespace rendering::backend
 {
 
-Result CreateRootSignature(ID3D12Device* device, const D3D12_ROOT_SIGNATURE_DESC& desc,
-                           Microsoft::WRL::ComPtr<ID3D12RootSignature>& output)
+Result CreateRootSignature(
+	ID3D12Device* device,
+	const D3D12_ROOT_SIGNATURE_DESC& desc,
+	Microsoft::WRL::ComPtr<ID3D12RootSignature>& output)
 {
 	if (!device)
 	{
@@ -49,8 +51,10 @@ Result CreateRootSignature(ID3D12Device* device, const D3D12_ROOT_SIGNATURE_DESC
 	return {};
 }
 
-Result CreateGraphicsPipeline(ID3D12Device* device, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc,
-                              Microsoft::WRL::ComPtr<ID3D12PipelineState>& output)
+Result CreateGraphicsPipeline(
+	ID3D12Device* device,
+	const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc,
+	Microsoft::WRL::ComPtr<ID3D12PipelineState>& output)
 {
 	if (!device)
 	{
@@ -113,8 +117,10 @@ DXGI_FORMAT NativeFormat(graph::GraphTextureFormat format)
 	}
 }
 
-Result BuildRootSignature(ID3D12Device* device, const PipelineBuildInputs& inputs,
-                          Microsoft::WRL::ComPtr<ID3D12RootSignature>& output)
+Result BuildRootSignature(
+	ID3D12Device* device,
+	const PipelineBuildInputs& inputs,
+	Microsoft::WRL::ComPtr<ID3D12RootSignature>& output)
 {
 	std::vector<D3D12_ROOT_PARAMETER> rootParameters;
 	std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
@@ -212,8 +218,9 @@ Result BuildRootSignature(ID3D12Device* device, const PipelineBuildInputs& input
 	return CreateRootSignature(device, rootSigDesc, output);
 }
 
-Result BuildInputLayout(std::span<const ShaderVertexInput> vertexInputs,
-						std::vector<D3D12_INPUT_ELEMENT_DESC>& inputElements)
+Result BuildInputLayout(
+	std::span<const ShaderVertexInput> vertexInputs,
+	std::vector<D3D12_INPUT_ELEMENT_DESC>& inputElements)
 {
 	auto fields = VertexFields();
 

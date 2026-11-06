@@ -15,5 +15,12 @@ target_link_libraries(RendererSandbox
         user32
 )
 
-add_dependencies(RendererSandbox RendererShaderAssets)
-target_compile_definitions(RendererSandbox PRIVATE SHADER_DIRECTORY="${CMAKE_BINARY_DIR}/Renderer/shaders")
+# シェーダーのソースだけを変更し、実行ファイルの再リンクが不要な場合も実行する。
+add_custom_target(RendererSandboxShaderAssets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_BINARY_DIR}/Renderer/shaders"
+        "$<TARGET_FILE_DIR:RendererSandbox>/shaders"
+    VERBATIM
+)
+add_dependencies(RendererSandboxShaderAssets RendererShaderAssets)
+add_dependencies(RendererSandbox RendererSandboxShaderAssets)

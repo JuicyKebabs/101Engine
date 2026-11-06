@@ -104,7 +104,8 @@ Result QueryBinding(
 // Called only after Execute/Signal succeeds, using identities validated in Preflight.
 // Publish submitted State and content validity back to the same physical owner.
 // The use Fence is stamped by the executor; this function itself does not wait for completion.
-void CommitBinding(backend::Backend& backend,
+void CommitBinding(
+	backend::Backend& backend,
 	const GraphTextureBinding& binding,
 	D3D12_RESOURCE_STATES state,
 	bool contentsValid) noexcept

@@ -350,8 +350,9 @@ WindowOutputCreationResult Backend::CreateWindowOutput(const Win32WindowOutputDe
 	}
 
 	// Initialize the swap chain for the given window output description.
-	Result result = m_windowSwapChain.Initialize(m_device.GetNativeDevice(), m_device.GetNativeFactory(),
-                                                 m_graphicsQueue.GetNativeCommandQueue(), outputDesc);
+	Result result = m_windowSwapChain.Initialize(
+		m_device.GetNativeDevice(), m_device.GetNativeFactory(),
+		m_graphicsQueue.GetNativeCommandQueue(), outputDesc);
 
 	if (!result.IsSuccess())
 	{
@@ -614,8 +615,10 @@ QueueSubmissionResult Backend::SubmitUploadsAndWait()
 	return submission;
 }
 
-Result Backend::PrepareGeometry(const detail::GeometryCpuData& cpu, std::unique_ptr<GeometryGpuData>& gpu,
-								std::unique_ptr<GeometryUploadData>& upload)
+Result Backend::PrepareGeometry(
+	const detail::GeometryCpuData& cpu,
+	std::unique_ptr<GeometryGpuData>& gpu,
+	std::unique_ptr<GeometryUploadData>& upload)
 {
 	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
 	{
@@ -635,8 +638,10 @@ Result Backend::PrepareGeometry(const detail::GeometryCpuData& cpu, std::unique_
 	return result;
 }
 
-Result Backend::PrepareTexture(const detail::TextureCpuData& cpu, std::unique_ptr<TextureGpuData>& gpu,
-                               std::unique_ptr<TextureUploadData>& upload)
+Result Backend::PrepareTexture(
+	const detail::TextureCpuData& cpu,
+	std::unique_ptr<TextureGpuData>& gpu,
+	std::unique_ptr<TextureUploadData>& upload)
 {
 	if (!m_device.IsInitialized() || !m_graphicsQueue.IsInitialized())
 	{

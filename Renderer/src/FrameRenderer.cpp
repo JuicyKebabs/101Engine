@@ -174,8 +174,9 @@ Result ValidateViewStructure(const FrameRenderData& frame)
 // Classify using the final Pipeline's blend mode after View overrides.
 // Opaque draws preserve source order; transparent draws sort by Camera-space z back-to-front.
 // Stable sort keeps submission order for equal depth. Overlay deliberately bypasses this Scene ordering.
-Result FrameRenderer::SelectViewDraws(const FrameRenderData& frame, const PassRecordingInputs& pass,
-                                      detail::FrameDrawContext& context, detail::RenderList& indices) const
+Result FrameRenderer::SelectViewDraws(
+	const FrameRenderData& frame, const PassRecordingInputs& pass,
+	detail::FrameDrawContext& context, detail::RenderList& indices) const
 {
 	const RenderView& view = *pass.view;
 	detail::RenderList available;

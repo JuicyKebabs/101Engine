@@ -5,25 +5,43 @@
 #include <fstream>
 #include <cstdlib>
 #include <filesystem>
+#include <vector>
 
-// NOTE: cmake is invoked via a generated .bat file rather than passing the
-// command directly to system(). Passing a command containing multiple
-// double-quoted paths (e.g. `"...cmake.exe" -S "..." -B "..." > "...log" 2>&1`)
-// directly to system() causes cmd.exe to mis-parse the quoting (it wraps the
-// whole string in an extra layer of quotes), which made cmake fail with
-// exit code 1 even though the exact same command worked when typed manually
-// into a command prompt. Writing the command to a .bat file and calling
-// system() with just the file path avoids the double-parsing problem,
-// because system() only sees a simple unquoted path, and cmd.exe parses the
-// .bat file's contents only once.
+// 生成スクリプトはbuild/の直下に置く。内部のプロジェクトパスはすべて
+// プロジェクトのルートからの相対パスとし、呼び出し側の作業ディレクトリに依存させない。
+static std::filesystem::path GetBatchPath(const char* name)
+{
+	const auto build = std::filesystem::path(PathManager::GetProjectRoot()) / "build";
+	std::filesystem::create_directories(build);
+	return build / name;
+}
 
-// Helper function to get the Visual Studio installation path using vswhere.exe.
-// This function is used to resolve the path to cmake.exe and vcvars64.bat.
+static void WriteBatchPrologue(std::ofstream& bat)
+{
+	bat << "@echo off\nsetlocal EnableExtensions DisableDelayedExpansion\n";
+	bat << "pushd \"%~dp0..\" >nul 2>&1 || exit /b 1\n";
+}
+
+static int RunBatch(std::ofstream& bat, const std::filesystem::path& path)
+{
+	bat.close();
+	if (!bat)
+	{
+		DBG("ProjectBuilder: Could not write build script.");
+		return 1;
+	}
+	// CALLを使い、空白を含むバッチパスの引用符を維持する。ワイド文字APIを使い、
+	// cmd.exeの起動に用いるパスを狭い文字列へ変換しない。
+	return _wsystem((L"call \"" + path.wstring() + L"\"").c_str());
+}
+
+// vswhere.exeでVisual Studioのインストール先を取得する補助関数。
+// cmake.exeとvcvars64.batのパス解決に使用する。
 static std::string GetVSInstallPath()
 {
 	FILE* pipe = _popen(
-		"\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\""
-		" -latest -version \"[18.0,19.0)\" -property installationPath 2>NUL",
+		"\"\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\""
+		" -latest -version \"[18.0,19.0)\" -property installationPath 2>NUL\"",
 		"r");
 
 	if (!pipe)
@@ -47,7 +65,7 @@ static std::string GetVSInstallPath()
 	return path;
 }
 
-// Helper function to resolve the path to cmake.exe using the "where" command.
+// whereコマンドを使ってcmake.exeのパスを解決する補助関数。
 static std::string ResolveCMakePath()
 {
 	std::string installPath = GetVSInstallPath();
@@ -64,22 +82,20 @@ static std::string ResolveCMakePath()
 	return "cmake";
 }
 
-// Resolve the path to cmake.exe at static initialization time.
+// 静的初期化時にcmake.exeのパスを解決する。
 static const std::string kCMakePath = ResolveCMakePath();
 
 bool ProjectBuilder::Reconfigure()
 {
-	std::string projectRoot = PathManager::GetProjectRoot();
-	std::string buildDir = projectRoot + "/build";
-
-	std::string batPath = projectRoot + "/reconfigure.bat";
+	const auto batPath = GetBatchPath("reconfigure_editor.bat");
 	std::ofstream bat(batPath);
-	bat << "\"" << kCMakePath << "\" -S \"" << projectRoot << "\" -B \"" << buildDir
-		<< "\" -G \"Visual Studio 18 2026\" -A x64 > \"" << projectRoot << "/cmake_reconfigure.log\" 2>&1\n";
-	bat.close();
+	WriteBatchPrologue(bat);
+	bat << "\"" << kCMakePath << "\" -S . -B build"
+		<< " -G \"Visual Studio 18 2026\" -A x64 > cmake_reconfigure.log 2>&1\n";
+	bat << "exit /b %errorlevel%\n";
 
 	DBG("ProjectBuilder: Running reconfigure via batch file...");
-	int result = system(batPath.c_str());
+	int result = RunBatch(bat, batPath);
 
 	if (result != 0)
 	{
@@ -93,34 +109,30 @@ bool ProjectBuilder::Reconfigure()
 
 bool ProjectBuilder::Build(const std::string& target, const std::string& config, bool buildDependencies)
 {
-	// Construct paths
-	std::string projectRoot = PathManager::GetProjectRoot();
-	std::string buildDir = projectRoot + "/build";
-
-	// Generate batch file to invoke cmake --build with proper quoting and output redirection
-	std::string batPath = projectRoot + "/build_project.bat";
+	// 適切な引用符と出力リダイレクトでcmake --buildを呼ぶバッチファイルを生成する。
+	const auto batPath = GetBatchPath("build_project.bat");
 	std::ofstream bat(batPath);
+	WriteBatchPrologue(bat);
+	bat << "\"" << kCMakePath << "\" --build build"
+		<< " --target \"" << target << "\" --config \"" << config << "\"";
 
-	bat << "\"" << kCMakePath << "\" --build \"" << buildDir
-		<< "\" --target " << target << " --config " << config;
-
-	// Skip building dependencies if requested 
-	// (e.g. to avoid disconnecting static singletons from target)
+	// 要求された場合は、依存先のビルドを省く。
+	// （例：静的シングルトンと対象の接続が切れることを避けるため）
 	if (!buildDependencies)
 	{
 		bat << " -- /p:BuildProjectReferences=false";
 	}
 
-	bat << " > \"" << projectRoot << "/cmake_build.log\" 2>&1\n";
-	bat.close();
+	bat << " > cmake_build.log 2>&1\n";
+	bat << "exit /b %errorlevel%\n";
 
-	// Run the batch file and check the result
+	// バッチファイルを実行し、結果を確認する。
 	DBG(
 		"ProjectBuilder: Building target '%s' (%s)%s via batch file...",
 		target.c_str(),
 		config.c_str(),
 		buildDependencies ? "" : " (skip deps)");
-	int result = system(batPath.c_str());
+	int result = RunBatch(bat, batPath);
 
 	if (result != 0)
 	{
@@ -146,7 +158,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 {
 	namespace fs = std::filesystem;
 
-	// Construct paths for the project root and Visual Studio installation
+	// プロジェクトルートとVisual Studioのインストール先のパスを構築する。
 	std::string projectRoot = PathManager::GetProjectRoot();
 	const auto hotReloadConfig = ResolveGameCodeHotReloadConfig(projectRoot, config);
 
@@ -164,31 +176,33 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		return false;
 	}
 
-	// Construct paths for vcvars64.bat and the include directories exposed by 101Framework.
-	// The hot-reload compiler is invoked directly, so it does not inherit CMake's
-	// target_include_directories settings automatically.
+	// vcvars64.batと、101Frameworkが公開するインクルードディレクトリのパスを構築する。
+	// ホットリロードではコンパイラを直接呼び出すため、CMakeの
+	// target_include_directories設定は自動継承されない。
 	std::string vcvars = vsPath + "\\VC\\Auxiliary\\Build\\vcvars64.bat";
-	std::string gameCodeDir = projectRoot + "\\Game\\GameCode";
-	std::string frameworkInc = projectRoot + "\\Framework\\src";
-	std::string thirdPartyInc = projectRoot + "\\third_party";
+	const auto gameCodeRoot = fs::path(projectRoot) / "Game" / "GameCode";
+	std::string gameCodeDir = "Game\\GameCode";
+	std::string frameworkInc = "Framework\\src";
+	std::string thirdPartyInc = "third_party";
 	std::string directXInc = thirdPartyInc + "\\DirectX\\d3dx12";
 	std::string directXTexInc = thirdPartyInc + "\\DirectX\\DirectXTex\\include";
 	std::string assimpInc = thirdPartyInc + "\\Assimp\\include";
 	std::string imguiInc = thirdPartyInc + "\\ImGui";
 	std::string imguiBackendInc = imguiInc + "\\backends";
 
-	// Construct paths for location of outputting build artifacts
-	const std::string& objDir = hotReloadConfig->objectDirectory;
-	const std::string& frameworkLib = hotReloadConfig->frameworkLibrary;
-	const std::string& outputDll = hotReloadConfig->stagedDll;
-	const std::string& outputLib = hotReloadConfig->stagedLibrary;
-	std::string logPath = projectRoot + "\\hotreload_compile.log";
-	std::string batPath = projectRoot + "\\build_hotreload.bat";
+	// ビルド生成物の出力先のパスを構築する。
+	const auto scriptConfig = ResolveGameCodeHotReloadConfig(".", config);
+	const std::string& objDir = scriptConfig->objectDirectory;
+	const std::string& frameworkLib = scriptConfig->frameworkLibrary;
+	const std::string& outputDll = scriptConfig->stagedDll;
+	const std::string& outputLib = scriptConfig->stagedLibrary;
+	std::string logPath = "hotreload_compile.log";
+	const auto batPath = GetBatchPath("build_hotreload.bat");
 
-	// Remove staged GameCode.dll and GameCode.lib if they exist, to ensure a clean build
+	// クリーンなビルドのため、一時GameCode.dllとGameCode.libがあれば削除する。
 	std::error_code error;
 
-	fs::remove(outputDll, error);
+	fs::remove(hotReloadConfig->stagedDll, error);
 
 	if (error)
 	{
@@ -198,7 +212,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 
 	error.clear();
 
-	fs::remove(outputLib, error);
+	fs::remove(hotReloadConfig->stagedLibrary, error);
 
 	if (error)
 	{
@@ -206,46 +220,48 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		return false;
 	}
 
-	// Collect all source files for hot reload
+	// ホットリロード用の全ソースファイルを収集する。
 	std::vector<std::string> sources;
 
-	for (const auto& entry : fs::recursive_directory_iterator(gameCodeDir))
+	for (const auto& entry : fs::recursive_directory_iterator(gameCodeRoot))
 	{
 		if (entry.path().extension() == ".cpp")
 		{
-			sources.push_back(entry.path().string());
+			sources.push_back(entry.path().lexically_relative(fs::path(projectRoot)).string());
 		}
 	}
 
-	// Check if hot reload is needed
+	// ホットリロードが必要か確認する。
 	if (sources.empty())
 	{
 		DBG("ProjectBuilder: No .cpp files found in Game/GameCode/");
 		return false;
 	}
 
-	// Create the directory for saving .obj files if it doesn't exist
-	fs::create_directories(objDir);
+	// .objファイルの保存先ディレクトリがなければ作成する。
+	fs::create_directories(hotReloadConfig->objectDirectory);
 
-	// Generate batch file to compile and link GameCode for hot reload
+	// ホットリロード用にGameCodeをコンパイル・リンクするバッチファイルを生成する。
+	std::ofstream bat(batPath);
 	{
-		std::ofstream bat(batPath);
-		bat << "@echo off\n\n";
+		WriteBatchPrologue(bat);
+		bat << "if not exist \"" << objDir << "\" mkdir \"" << objDir << "\"\n";
+		bat << "if errorlevel 1 exit /b 1\n";
 
-		// Call vcvars64.bat to set up the Visual Studio environment
-		// In order to enable cl.exe, link.exe and other included tools to be used in the batch file
+		// vcvars64.batを呼び、Visual Studioの環境を設定する。
+		// バッチファイル内でcl.exe、link.exeなどの付属ツールを使えるようにする。
 		bat << "call \"" << vcvars << "\" >nul 2>&1\n";
 		bat << "if errorlevel 1 (\n";
 		bat << "    echo [HotReload] vcvars64.bat failed\n";
 		bat << "    exit /b 1\n";
 		bat << ")\n\n";
 
-		// Compile all .cpp files into .obj files
-		// Genarate obj files by giving all .cpp files to cl.exe.
+		// すべての.cppファイルを.objファイルへコンパイルする。
+		// 全.cppファイルをcl.exeへ渡し、objファイルを生成する。
 		bat << "echo [HotReload] Compiling " << (int)sources.size() << " files...\n";
 
 		bat << "cl.exe /nologo " << hotReloadConfig->compilerFlags
-			<< " /Z7 /EHsc /std:c++latest /DNOMINMAX /c";
+			<< " /utf-8 /Z7 /EHsc /std:c++latest /DNOMINMAX /c";
 
 		bat << " /I\"" << gameCodeDir << "\"";
 		bat << " /I\"" << frameworkInc << "\"";
@@ -269,7 +285,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		bat << "    exit /b 1\n";
 		bat << ")\n\n";
 
-		// Link all .obj files into GameCode.dll and GameCode.lib
+		// 全.objファイルをGameCode.dllとGameCode.libへリンクする。
 		bat << "echo [HotReload] Linking...\n";
 		bat << "link.exe /nologo /DLL /OPT:NOREF /DEBUG:NONE";
 		bat << " /OUT:\"" << outputDll << "\"";
@@ -289,16 +305,17 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		bat << ")\n\n";
 
 		bat << "echo [HotReload] Build succeeded.\n";
+		bat << "exit /b 0\n";
 	}
 
-	// Run the batch file to compile and link GameCode for hot reload
+	// バッチファイルを実行し、ホットリロード用のGameCodeをコンパイル・リンクする。
 	DBG(
 		"ProjectBuilder: Hot reload build (%s, %d files) via cl.exe...",
 		hotReloadConfig->configuration.c_str(),
 		(int)sources.size());
-	int result = system(batPath.c_str());
+	int result = RunBatch(bat, batPath);
 
-	// Check if hot reload is succeeded or failed
+	// ホットリロードが成功したか失敗したか確認する。
 	if (result != 0)
 	{
 		DBG("ProjectBuilder: Hot reload build FAILED (code %d)", result);
@@ -306,7 +323,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		return false;
 	}
 
-	// Succeded
+	// 成功
 	DBG("ProjectBuilder: Hot reload build succeeded.");
 	return true;
 }

@@ -31,7 +31,8 @@ Result ClassifyDeviceFailure(ID3D12Device* device, Result failure)
 // Prepare the complete GPU allocation before registering a usable slot.
 // CPU allocation failures release only private candidates; no incomplete handle is returned.
 ResourceRegistrationResult<RenderTargetTextureHandle> RenderTargetTextureRegistry::Create(
-	ID3D12Device* device, const RenderTargetTextureDesc& description)
+	ID3D12Device* device,
+	const RenderTargetTextureDesc& description)
 {
 	ResourceRegistrationResult<RenderTargetTextureHandle> registration;
 
@@ -89,8 +90,9 @@ ResourceRegistrationResult<RenderTargetTextureHandle> RenderTargetTextureRegistr
 // Precondition: the public Renderer already established an inactive, confirmed-idle boundary.
 // Build a new complete revision first. The old dimensions, revision and GPU set survive any preparation failure.
 // Same-size requests are no-ops so valid existing contents are not unnecessarily discarded.
-Result RenderTargetTextureRegistry::Resize(ID3D12Device* device, RenderTargetTextureHandle handle, std::uint32_t width,
-                                           std::uint32_t height)
+Result RenderTargetTextureRegistry::Resize(
+	ID3D12Device* device, RenderTargetTextureHandle handle, std::uint32_t width,
+	std::uint32_t height)
 {
 	auto* current = FindForNewUse(handle);
 
