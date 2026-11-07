@@ -1,0 +1,42 @@
+{
+  "actors": [
+    {
+      "components": [
+        {
+          "localObjectId": 2,
+          "properties": {
+            "name": "",
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "type": "Transform"
+        }
+      ],
+      "localObjectId": 1,
+      "parentLocalObjectId": null,
+      "properties": {
+        "is_active": true,
+        "name": "Root",
+        "tag": "None"
+      }
+    }
+  ],
+  "definitionRevision": "{B9FD9E2A-DFF0-488F-9261-65BBFD8E6594}",
+  "nextLocalObjectId": 3,
+  "rootActorLocalObjectId": 1,
+  "version": 1
+}

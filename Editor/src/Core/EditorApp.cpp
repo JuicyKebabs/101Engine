@@ -5,6 +5,8 @@
 #include <shellapi.h>
 
 #include "Core/EditorApp.h"
+#include "Core/AssetCreationPath.h"
+#include "ActorImprint/ActorImprintAssetWorkflow.h"
 #include "Renderer/Win32WindowOutputDesc.h"
 #include "Engine/Core/Path/ExecutablePath.h"
 #include <stdexcept>
@@ -45,7 +47,6 @@
 #include "Command/ComponentPropertyEditCommand.h"
 #include "Command/TransformEditCommand.h"
 #include "Command/InstantiateActorImprintCommand.h"
-#include "ActorImprint/ActorImprintAssetWorkflow.h"
 #include "ActorImprint/ActorImprintEditingContext.h"
 #include "UI/EditorTheme.h"
 #include "Scene/ScenePicker.h"
@@ -471,12 +472,28 @@ bool EditorApp::LoadScene(const Guid& sceneAssetGuid)
 			sceneAssetGuid));
 	}
 
-	m_sceneAssetPanel.Select(sceneAssetGuid);
+	m_assetBrowserPanel.SelectAsset(sceneAssetGuid);
 	return true;
 }
 
-bool EditorApp::RequestCreateScene(std::string_view name)
+bool EditorApp::RequestCreateScene(
+	const std::filesystem::path& relativeDirectory,
+	std::string_view name)
 {
+	if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
+	{
+		m_operationDiagnostic = "Scene creation is unavailable.";
+		return false;
+	}
+
+	std::filesystem::path directory;
+
+	if (!AssetCreationPath::ResolveDirectory(*m_pAssetManager, relativeDirectory, directory, m_operationDiagnostic))
+	{
+		return false;
+	}
+
+	m_pendingSceneDirectory = relativeDirectory;
 	m_pendingSceneAction = PendingSceneAction::Create;
 	m_pendingSceneName.assign(name);
 	m_pendingSceneGuid = {};
@@ -513,6 +530,7 @@ bool EditorApp::RequestOpenScene(const Guid& sceneAssetGuid)
 
 	m_pendingSceneAction = PendingSceneAction::Open;
 	m_pendingSceneName.clear();
+	m_pendingSceneDirectory.clear();
 	m_pendingSceneGuid = sceneAssetGuid;
 
 	if (!current)
@@ -534,9 +552,11 @@ bool EditorApp::ExecutePendingSceneAction()
 {
 	const PendingSceneAction action = m_pendingSceneAction;
 	const std::string name = std::move(m_pendingSceneName);
+	const std::filesystem::path relativeDirectory = std::move(m_pendingSceneDirectory);
 	const Guid guid = m_pendingSceneGuid;
 	m_pendingSceneAction = PendingSceneAction::None;
 	m_pendingSceneName.clear();
+	m_pendingSceneDirectory.clear();
 	m_pendingSceneGuid = {};
 
 	if (action == PendingSceneAction::Open)
@@ -555,6 +575,7 @@ bool EditorApp::ExecutePendingSceneAction()
 	SceneAssetWorkflowError error;
 
 	if (!SceneAssetWorkflow::Create(
+		relativeDirectory,
 		name,
 		*scene,
 		*m_pAssetManager,
@@ -562,7 +583,8 @@ bool EditorApp::ExecutePendingSceneAction()
 		path,
 		&error))
 	{
-		m_sceneAssetPanel.SetDiagnostic(error.message);
+		m_operationDiagnostic = error.message;
+		m_openOperationDiagnosticPopup = true;
 		return false;
 	}
 
@@ -588,8 +610,8 @@ bool EditorApp::ExecutePendingSceneAction()
 				createdGuid));
 	}
 
-	m_sceneAssetPanel.Select(createdGuid);
-	m_sceneAssetPanel.SetDiagnostic("Scene asset created.");
+	RebuildAssetBrowserView();
+	m_assetBrowserPanel.SelectAsset(createdGuid);
 	return true;
 }
 
@@ -1271,10 +1293,16 @@ bool EditorApp::InitInstance()
 		return false;
 	}
 
-	if (!m_pAssetManager->Initialize(PathManager::Resolve("asset"), m_pRenderer.get(), m_renderAssets.get()))
+	if (!m_pAssetManager->Initialize(
+		PathManager::Resolve("asset"),
+		m_pRenderer.get(),
+		m_renderAssets.get()))
 	{
 		return false;
 	}
+
+	// Rebuild the asset browser view to reflect the current state of the asset manager
+	RebuildAssetBrowserView();
 
 	m_inputManager.Initialize();
 	return true;
@@ -1393,9 +1421,8 @@ void EditorApp::Update(float deltaTime)
 		}
 	}
 
-	// ActorImprint state remains fixed for the whole Play session. The elapsed
-	// time is retained so Edit mode observes filesystem changes promptly on exit.
-	RefreshAssetCatalog(deltaTime);
+	// Reflesh the asset catalog if it is requested.
+	RefreshAssetCatalog();
 
 	if (m_editorMode == EditorMode::Edit)
 	{
@@ -1407,16 +1434,11 @@ void EditorApp::Update(float deltaTime)
 
 }
 
-void EditorApp::RefreshAssetCatalog(float deltaTime)
+void EditorApp::RefreshAssetCatalog()
 {
 	if (!m_pAssetManager)
 	{
 		return;
-	}
-
-	if (std::isfinite(deltaTime) && deltaTime > 0.0f)
-	{
-		m_assetRefreshElapsedSeconds += deltaTime;
 	}
 
 	if (m_editorMode != EditorMode::Edit)
@@ -1424,24 +1446,25 @@ void EditorApp::RefreshAssetCatalog(float deltaTime)
 		return;
 	}
 
-	if (m_assetRefreshElapsedSeconds < kAssetRefreshIntervalSeconds)
-	{
-		return;
-	}
-
-	m_assetRefreshElapsedSeconds = 0.0f;
+	m_assetRefreshRequested = false;
 
 	AssetCatalogError error;
 
+	// Refresh the asset catalog and handle any errors that occur during the process.
 	if (!m_pAssetManager->Refresh(&error))
 	{
-		DBG(
-			"EditorApp: Asset catalog refresh failed at '%s': %s",
-			error.path.c_str(),
-			error.message.c_str());
-	}
-}
+		const std::string diagnostic =
+			"Asset catalog refresh failed at '" +
+			error.path + "': " + error.message;
 
+		m_assetBrowserPanel.SetDiagnostic(diagnostic);
+		DBG("EditorApp: %s", diagnostic.c_str());
+		return;
+	}
+
+	// Rebuild the asset browser view to reflect the updated asset catalog.
+	RebuildAssetBrowserView();
+}
 bool EditorApp::HasActiveEditTransaction() const
 {
 	return m_inspectorPanel.HasActiveEdit() ||
@@ -1755,8 +1778,7 @@ void EditorApp::RenderImGui()
 	RenderSceneViewPanel();
 	RenderToolbar();
 	RenderScriptsPanel();
-	RenderActorImprintsPanel();
-	RenderSceneAssetPanel();
+	RenderAssetBrowserPanel();
 	RenderTagManagerPanel();
 	RenderDocumentDecisionModal();
 	RenderOperationDiagnosticModal();
@@ -1823,8 +1845,7 @@ void EditorApp::BuildDefaultDockLayout(unsigned int dockSpaceId)
 	ImGui::DockBuilderDockWindow("Inspector", rightNode);
 	ImGui::DockBuilderDockWindow("Toolbar", toolbarNode);
 	ImGui::DockBuilderDockWindow("Scripts", scriptsNode);
-	ImGui::DockBuilderDockWindow("Actor Imprints", scriptsNode);
-	ImGui::DockBuilderDockWindow("Scenes", scriptsNode);
+	ImGui::DockBuilderDockWindow("Assets", scriptsNode);
 	ImGui::DockBuilderDockWindow("Scene", centerNode);
 	ImGui::DockBuilderFinish(dockSpaceId);
 }
@@ -2503,15 +2524,6 @@ void EditorApp::RenderMenuBar()
 			ReloadGameCode(true);
 		}
 	};
-	callbacks.onCreateActorImprint = [this]()
-	{
-		if (m_editorMode != EditorMode::Edit || !m_pActorImprintSystem)
-		{
-			return;
-		}
-
-		m_actorImprintsPanel.RequestCreateDialog();
-	};
 
 	callbacks.canUndo = m_editorMode == EditorMode::Edit && document &&
 		document->GetCommandHistory().CanUndo();
@@ -2519,8 +2531,7 @@ void EditorApp::RenderMenuBar()
 		document->GetCommandHistory().CanRedo();
 	callbacks.canSave = m_editorMode == EditorMode::Edit && document != nullptr;
 	callbacks.canModifyScripts = m_editorMode == EditorMode::Edit && editScene != nullptr;
-	callbacks.canModifyActorImprints = m_editorMode == EditorMode::Edit &&
-		m_pActorImprintSystem != nullptr;
+	callbacks.canModifyActorImprints = false; // TODO: Implement this when ActorImprint editing is supported in the editor.
 	callbacks.canBuild = m_editorMode == EditorMode::Edit && editScene != nullptr;
 
 	m_menuBar.Render(callbacks);
@@ -2615,206 +2626,6 @@ void EditorApp::RenderScriptsPanel()
 	m_scriptsPanel.Render(callbacks, editScene);
 }
 
-void EditorApp::RenderActorImprintsPanel()
-{
-	if (!m_pAssetManager)
-	{
-		return;
-	}
-
-	ActorImprintsPanel::Callbacks callbacks;
-	callbacks.canModify = m_editorMode == EditorMode::Edit && m_pActorImprintSystem != nullptr;
-	callbacks.onCreate = [this](std::string_view name)
-	{
-		if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
-		{
-			return false;
-		}
-
-		Guid assetGuid;
-
-		if (!ActorImprintAssetWorkflow::Create(
-			name,
-			*m_pAssetManager,
-			m_engineContext,
-			assetGuid))
-		{
-			return false;
-		}
-
-		m_actorImprintsPanel.Select(assetGuid);
-
-		ProcessActorImprintAssetChanges();
-		return true;
-	};
-	callbacks.onEdit = [this](const Guid& assetGuid)
-	{
-		if (m_editorMode != EditorMode::Edit || !m_pAssetManager ||
-			!m_pActorImprintSystem)
-		{
-			return false;
-		}
-
-		StopAllEditTransactions();
-		EditorDocumentId documentId;
-
-		if (!ActorImprintAssetWorkflow::OpenDocument(
-			assetGuid,
-			*m_pAssetManager,
-			*m_pActorImprintSystem,
-			m_engineContext,
-			m_documentManager,
-			m_window.GetWidth(),
-			m_window.GetHeight(),
-			documentId))
-		{
-			return false;
-		}
-
-
-		return true;
-	};
-	callbacks.onDelete = [this](const Guid& assetGuid)
-	{
-		if (m_editorMode != EditorMode::Edit || !m_pAssetManager ||
-			!m_pActorImprintSystem)
-		{
-			return false;
-		}
-
-		if (!ActorImprintAssetWorkflow::Delete(
-			assetGuid,
-			*m_pAssetManager,
-			*m_pActorImprintSystem,
-			m_documentManager))
-		{
-			return false;
-		}
-
-		ProcessActorImprintAssetChanges();
-		return true;
-	};
-	m_actorImprintsPanel.Render(*m_pAssetManager, callbacks);
-}
-
-void EditorApp::RenderSceneAssetPanel()
-{
-	if (!m_pAssetManager)
-	{
-		return;
-	}
-
-	SceneAssetPanel::Callbacks callbacks;
-	callbacks.canModify = m_editorMode == EditorMode::Edit;
-	callbacks.onCreate = [this](std::string_view name)
-	{
-		return RequestCreateScene(name);
-	};
-	callbacks.onOpen = [this](const Guid& guid)
-	{
-		if (!RequestOpenScene(guid))
-		{
-			m_sceneAssetPanel.SetDiagnostic("Scene could not be loaded. The current Scene was preserved.");
-			return false;
-		}
-
-		m_sceneAssetPanel.SetDiagnostic("Scene opened.");
-		return true;
-	};
-	callbacks.onRename = [this](const Guid& guid, std::string_view name)
-	{
-		std::string path;
-		SceneAssetWorkflowError error;
-
-		if (!SceneAssetWorkflow::Rename(
-			guid,
-			name,
-			*m_pAssetManager,
-			path,
-			&error))
-		{
-			m_sceneAssetPanel.SetDiagnostic(error.message);
-			return false;
-		}
-
-		for (const EditorDocumentInfo& info : m_documentManager.GetDocuments())
-		{
-			if (info.type != EditorDocumentType::Scene || info.sourceAssetGuid != guid)
-			{
-				continue;
-			}
-
-			auto* document = static_cast<SceneEditorDocument*>(m_documentManager.FindDocument(info.id));
-
-			if (document)
-			{
-				document->UpdateAssetPath(guid, path);
-			}
-		}
-
-		m_sceneAssetPanel.SetDiagnostic("Scene asset renamed.");
-		return true;
-	};
-	callbacks.onSetEditorStartup = [this](const Guid& guid)
-	{
-		const AssetEntry* entry = m_pAssetManager->GetAssetEntry(guid);
-
-		if (!entry || entry->type != AssetType::Scene)
-		{
-			m_sceneAssetPanel.SetDiagnostic("Editor Startup Scene must reference a Scene asset.");
-			return false;
-		}
-
-		ProjectSettings candidate = m_projectSettings;
-		candidate.SetEditorStartupSceneGuid(guid);
-
-		std::string error;
-
-		if (!candidate.Save(PathManager::Resolve("project.101"), &error))
-		{
-			m_sceneAssetPanel.SetDiagnostic(error);
-			return false;
-		}
-
-		m_projectSettings = candidate;
-		m_sceneAssetPanel.SetDiagnostic("Editor Startup Scene updated.");
-
-		return true;
-	};
-
-	callbacks.onSetGameStartup = [this](const Guid& guid)
-	{
-		const AssetEntry* entry = m_pAssetManager->GetAssetEntry(guid);
-
-		if (!entry || entry->type != AssetType::Scene)
-		{
-			m_sceneAssetPanel.SetDiagnostic("Game Startup Scene must reference a Scene asset.");
-			return false;
-		}
-
-		ProjectSettings candidate = m_projectSettings;
-		candidate.SetGameStartupSceneGuid(guid);
-
-		std::string error;
-
-		if (!candidate.Save(PathManager::Resolve("project.101"), &error))
-		{
-			m_sceneAssetPanel.SetDiagnostic(error);
-			return false;
-		}
-
-		m_projectSettings = candidate;
-		m_sceneAssetPanel.SetDiagnostic("Game Startup Scene updated.");
-		return true;
-	};
-
-	m_sceneAssetPanel.Render(
-		*m_pAssetManager,
-		m_projectSettings.GetEditorStartupSceneGuid(),
-		m_projectSettings.GetGameStartupSceneGuid(),
-		callbacks);
-}
-
 void EditorApp::RenderTagManagerPanel()
 {
 	TagManagerPanel::Callbacks callbacks;
@@ -2903,6 +2714,7 @@ void EditorApp::RenderDocumentDecisionModal()
 		{
 			m_pendingSceneAction = PendingSceneAction::None;
 			m_pendingSceneName.clear();
+			m_pendingSceneDirectory.clear();
 			m_pendingSceneGuid = {};
 		};
 
@@ -3053,6 +2865,87 @@ void EditorApp::RenderOperationDiagnosticModal()
 	}
 
 	ImGui::EndPopup();
+}
+
+void EditorApp::RenderAssetBrowserPanel()
+{
+	AssetBrowserPanel::Callbacks callbacks;
+
+	callbacks.canRefresh = m_editorMode == EditorMode::Edit && m_pAssetManager != nullptr;
+
+	callbacks.canCreate =
+		callbacks.canRefresh &&
+		!HasActiveEditTransaction() &&
+		m_pendingSceneAction == PendingSceneAction::None;
+
+	callbacks.onRefresh = [this]()
+		{
+			m_assetRefreshRequested = true;
+		};
+
+	callbacks.onCreateScene = [this](
+		const std::filesystem::path & relativeDirectory,
+		std::string_view name)
+		{
+		const bool accepted = RequestCreateScene(relativeDirectory, name);
+		
+			if (!accepted)
+			{
+				m_assetBrowserPanel.SetDiagnostic(m_operationDiagnostic);
+			}
+
+			return accepted;
+		};
+
+		if (m_pActorImprintSystem)
+		{
+		callbacks.onCreateActorImprint = [this](
+			const std::filesystem::path & relativeDirectory,
+			std::string_view name)
+			{
+				if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
+				{
+					m_assetBrowserPanel.SetDiagnostic("ActorImprint creation is unavailable.");
+					return false;
+				}
+			
+				Guid createdGuid;
+				std::string error;
+			
+				if (!ActorImprintAssetWorkflow::Create(
+					relativeDirectory,
+					name,
+					*m_pAssetManager,
+					m_engineContext,
+					createdGuid,
+					&error))
+				{
+					m_assetBrowserPanel.SetDiagnostic(error);
+					return false;
+				}
+			
+				RebuildAssetBrowserView();
+				m_assetBrowserPanel.SelectAsset(createdGuid);
+				return true;
+			};
+		}
+
+	m_assetBrowserPanel.Render(callbacks);
+}
+
+void EditorApp::RebuildAssetBrowserView()
+{
+	if (!m_pAssetManager)
+	{
+		return;
+	}
+
+	if (!m_assetBrowserPanel.RebuildView(*m_pAssetManager))
+	{
+		DBG(
+			"EditorApp: Asset Browser rebuild failed: %s",
+			m_assetBrowserPanel.GetDiagnostic().c_str());
+	}
 }
 
 bool EditorApp::HandleWindowCloseRequest()

@@ -1,6 +1,6 @@
 #include "ActorImprintAssetWorkflow.h"
+#include "Core/AssetCreationPath.h"
 #include "Engine/Core/Debug/Debug.h"
-
 #include "ActorImprint/ActorImprintEditingContext.h"
 #include "ActorImprint/ActorImprintEditingSnapshot.h"
 #include "Document/ActorImprintEditorDocument.h"
@@ -120,25 +120,6 @@ namespace
 			fs::path(GuidGenerator::Generate().ToString()).wstring() + suffix);
 	}
 
-	bool HasCaseInsensitiveCollision(const fs::path& root, const fs::path& fileName)
-	{
-		std::error_code error;
-		const std::wstring wanted = Lower(fileName.filename().wstring());
-		const std::wstring wantedMeta = wanted + L".meta";
-
-		for (fs::directory_iterator it(root, error), end; !error && it != end; it.increment(error))
-		{
-			const std::wstring existing = Lower(it->path().filename().wstring());
-
-			if (existing == wanted || existing == wantedMeta)
-			{
-				return true;
-			}
-		}
-
-		return error || fs::exists(root / fileName, error) || fs::exists((root / fileName).wstring() + L".meta", error);
-	}
-
 	bool RestorePair(
 		const fs::path& stagedData,
 		const fs::path& data,
@@ -186,7 +167,7 @@ bool ActorImprintAssetWorkflow::NormalizeFileName(
 		return false;
 	}
 
-	const fs::path supplied{std::string(input)};
+	const fs::path supplied = fs::u8path(input.begin(), input.end());
 
 	if (supplied.has_parent_path() || supplied.filename() != supplied)
 	{
@@ -241,77 +222,69 @@ bool ActorImprintAssetWorkflow::NormalizeFileName(
 		return false;
 	}
 
-	outFileName = normalized.filename().string();
+	const std::u8string encoded = normalized.filename().u8string();
+	outFileName.assign(reinterpret_cast<const char*>(encoded.data()), encoded.size());
+	
 	return true;
 }
 
-bool ActorImprintAssetWorkflow::IsManagedAssetPath(std::string_view relativePath)
-{
-	const fs::path normalized = fs::path(relativePath).lexically_normal();
-
-	if (normalized.empty() || normalized.is_absolute())
-	{
-		return false;
-	}
-
-	auto component = normalized.begin();
-
-	if (component == normalized.end() ||
-		Lower(component->wstring()) !=
-		Lower(fs::path(ManagedDirectory()).wstring()))
-	{
-		return false;
-	}
-
-	return ++component != normalized.end();
-
-}
-
 bool ActorImprintAssetWorkflow::Create(
+	const std::filesystem::path& relativeDirectory,
 	std::string_view name,
-	AssetManager& assets,
+	AssetManager& assetManager,
 	EngineContext& engineContext,
-	Guid& outAssetGuid)
+	Guid& outAssetGuid,
+	std::string* outError)
 {
+	if (outError)
+	{
+		outError->clear();
+	}
+
+	auto fail = [outError](const std::string& message)
+	{
+		if (outError)
+		{
+			*outError = message;
+		}
+
+		DBG("%s", message.c_str());
+		return false;
+	};
+
 	outAssetGuid = {};
 	std::string fileName;
 
 	if (!NormalizeFileName(name, fileName))
 	{
-		return false;
+		return fail("Invalid ActorImprint filename.");
 	}
 
-	const fs::path root = fs::path(assets.GetAssetRoot());
-
-	if (root.empty() || !fs::is_directory(root) || engineContext.pAssetManager != &assets)
+	if (engineContext.pAssetManager != &assetManager)
 	{
-		DBG("Asset catalog root or EngineContext is unavailable.");
-		return false;
+		return fail("EngineContext does not own this AssetManager.");
 	}
 
-	const fs::path managedDirectory = root / fs::path(ManagedDirectory());
-	std::error_code directoryError;
-	fs::create_directories(managedDirectory, directoryError);
+	fs::path directory;
+	std::string pathError;
 
-	if (directoryError || !fs::is_directory(managedDirectory, directoryError))
+	if (!AssetCreationPath::ResolveDirectory(assetManager, relativeDirectory, directory, pathError))
 	{
-		DBG("Could not prepare the ActorImprints asset directory.");
-		return false;
+		return fail(pathError);
 	}
 
-	const fs::path destination = fs::absolute(managedDirectory / fileName).lexically_normal();
+	const fs::path destination = directory / fs::u8path(fileName);
 
-	if (HasCaseInsensitiveCollision(managedDirectory, destination.filename()))
+	if (!AssetCreationPath::CheckAvailable(directory, destination.filename(), pathError))
 	{
-		DBG("An asset or metadata sidecar already uses this name, ignoring case.");
-		return false;
+		return fail(pathError);
 	}
 
 	nlohmann::json serialized;
 
-	if (!ActorImprintEditingSnapshot::CreateDefault(assets, engineContext, serialized))
+	if (!ActorImprintEditingSnapshot::CreateDefault(assetManager, engineContext, serialized))
 	{
-		return false;
+		return fail("Could not create the initial ActorImprint snapshot.");
 	}
 
 	const std::string bytes = serialized.dump(2) + '\n';
@@ -319,8 +292,7 @@ bool ActorImprintAssetWorkflow::Create(
 
 	if (!assetGuid.IsValid())
 	{
-		DBG("Could not allocate an AssetGUID.");
-		return false;
+		return fail("Could not allocate an AssetGUID.");
 	}
 
 	const fs::path temporaryData = UniqueSibling(destination, L".tmp");
@@ -334,17 +306,16 @@ bool ActorImprintAssetWorkflow::Create(
 		DeleteFileW(temporaryData.c_str());
 		DeleteFileW(temporaryMeta.c_str());
 		DBG("Could not stage the ActorImprint and metadata files.");
-		return false;
-
+		return fail("Could not stage the ActorImprint and metadata files.");
 	}
 
-	AssetManagerAssetReferenceContext assetContext(assets);
+	AssetManagerAssetReferenceContext assetContext(assetManager);
 
 	if (!ActorImprintAssetDeserializer::Load(temporaryData.string(), &assetContext))
 	{
 		DeleteFileW(temporaryData.c_str());
 		DeleteFileW(temporaryMeta.c_str());
-		return false;
+		return fail("The staged ActorImprint could not be validated.");
 	}
 
 	if (!MoveNew(temporaryMeta, destinationMeta))
@@ -352,7 +323,7 @@ bool ActorImprintAssetWorkflow::Create(
 		DeleteFileW(temporaryData.c_str());
 		DeleteFileW(temporaryMeta.c_str());
 		DBG("Could not publish ActorImprint metadata.");
-		return false;
+		return fail("Could not publish ActorImprint metadata.");
 	}
 
 	if (!MoveNew(temporaryData, destination))
@@ -363,13 +334,12 @@ bool ActorImprintAssetWorkflow::Create(
 		const char* failureMessage = recovered
 			? "Could not publish the ActorImprint file; staged metadata was removed."
 			: "Could not publish the ActorImprint file or recover its metadata sidecar.";
-		DBG("%s", failureMessage);
-		return false;
+		return fail(failureMessage);
 	}
 
-	const std::string relativePath = (fs::path(ManagedDirectory()) / fileName).generic_string();
+	const std::string relativePath = destination.lexically_relative(assetManager.GetAssetRoot()).generic_string();
 
-	if (!assets.NotifyAssetChanged(relativePath))
+	if (!assetManager.NotifyAssetChanged(relativePath))
 	{
 		bool recovered = MoveNew(destination, temporaryData);
 		recovered = MoveNew(destinationMeta, temporaryMeta) && recovered;
@@ -381,8 +351,7 @@ bool ActorImprintAssetWorkflow::Create(
 			? "Asset catalog update failed."
 			: "Catalog rejected creation and the published pair could not be fully recovered.";
 
-		DBG("%s", failureMessage);
-		return false;
+		return fail(failureMessage);
 	}
 
 	outAssetGuid = assetGuid;
@@ -391,7 +360,7 @@ bool ActorImprintAssetWorkflow::Create(
 
 bool ActorImprintAssetWorkflow::OpenDocument(
 	const Guid& assetGuid,
-	AssetManager& assets,
+	AssetManager& assetManager,
 	ActorImprintSystem& system,
 	EngineContext& engineContext,
 	EditorDocumentManager& documents,
@@ -402,7 +371,7 @@ bool ActorImprintAssetWorkflow::OpenDocument(
 	outDocumentId = {};
 	auto context = ActorImprintEditingContext::Open(
 		assetGuid,
-		assets,
+		assetManager,
 		system,
 		engineContext);
 
@@ -420,11 +389,11 @@ bool ActorImprintAssetWorkflow::OpenDocument(
 
 bool ActorImprintAssetWorkflow::Delete(
 	const Guid& assetGuid,
-	AssetManager& assets,
+	AssetManager& assetManager,
 	const ActorImprintSystem& system,
 	const EditorDocumentManager& documents)
 {
-	const AssetEntry* entry = assets.GetAssetEntry(assetGuid);
+	const AssetEntry* entry = assetManager.GetAssetEntry(assetGuid);
 
 	if (!entry || entry->type != AssetType::ActorImprint)
 	{
@@ -445,7 +414,7 @@ bool ActorImprintAssetWorkflow::Delete(
 	}
 
 	const std::string relativePath = entry->relativePath;
-	const fs::path destination = fs::absolute(assets.GetAssetPath(assetGuid)).lexically_normal();
+	const fs::path destination = fs::absolute(assetManager.GetAssetPath(assetGuid)).lexically_normal();
 	const fs::path destinationMeta = destination.wstring() + L".meta";
 	const auto metadataGuid = MetaFile::TryLoad(destination.string());
 
@@ -474,13 +443,14 @@ bool ActorImprintAssetWorkflow::Delete(
 		return false;
 	}
 
-	if (!assets.NotifyAssetChanged(relativePath))
+	if (!assetManager.NotifyAssetChanged(relativePath))
 	{
 		const bool recovered = RestorePair(
 			stagedData,
 			destination,
 			stagedMeta,
 			destinationMeta);
+
 		const char* failureMessage = recovered
 			? "Asset catalog update failed."
 			: "Catalog rejected deletion and the asset pair could not be restored.";
