@@ -11,8 +11,8 @@ add_executable(101Game WIN32
 
 add_custom_command(TARGET 101Game POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc143-mtd.dll>
-        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc143-mt.dll>
+        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc145-mtd.dll>
+        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc145-mt.dll>
         $<TARGET_FILE_DIR:101Game>
 )
 
