@@ -3,13 +3,16 @@
 #include <cmath>
 #include <filesystem>
 #include <shellapi.h>
+#include <stdexcept>
+#include <utility>
 
 #include "Core/EditorApp.h"
 #include "Core/AssetCreationPath.h"
+#include "Core/AssetFileWorkflow.h"
+#include "Engine/Resource/BuiltinMeshAssets.h"
 #include "ActorImprint/ActorImprintAssetWorkflow.h"
 #include "Renderer/Win32WindowOutputDesc.h"
 #include "Engine/Core/Path/ExecutablePath.h"
-#include <stdexcept>
 #include "Engine/Input/InputManager.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -136,6 +139,26 @@ bool EditorApp::Initialize()
 				return true;
 			}
 
+			// Handle file drop events
+			if (message == WM_DROPFILES)
+			{
+				const auto handle = reinterpret_cast<HDROP>(wParam);
+				try
+				{
+					// Store the drop point and dropped files for processing the asset import
+					// in the rendering AssetBrowserPanel through callbacks.
+					QueueExplorerDrop(handle);
+				}
+				catch (const std::exception& error)
+				{
+					DBG("EditorApp: Could not read dropped files: %s", error.what());
+				}
+
+				DragFinish(handle);
+				outResult = 0;
+				return true;
+			}
+
 			if (ImGui::GetCurrentContext() &&ImGui_ImplWin32_WndProcHandler(hwnd,message,wParam,lParam))
 			{
 				outResult = TRUE;
@@ -216,6 +239,7 @@ bool EditorApp::Initialize()
 		}
 	}
 
+	DragAcceptFiles(m_window.GetHandle(), TRUE);
 	return true;
 }
 
@@ -308,6 +332,12 @@ int EditorApp::Run()
 
 void EditorApp::Terminate()
 {
+	if (const HWND hwnd = m_window.GetHandle())
+	{
+		DragAcceptFiles(hwnd, FALSE);
+	}
+	m_pendingExplorerDrops.clear();
+
 	// Destroy the scene while the game code DLL is still loaded
 	if (m_pPlaySceneManager)
 	{
@@ -356,6 +386,44 @@ bool EditorApp::ApplyWindowResizeRequest()
 
 	m_window.CommitResize();
 	return true;
+}
+
+void EditorApp::QueueExplorerDrop(HDROP handle)
+{
+	// Store the drop point and dropped files for processing
+	// the asset import in the rendering AssetBrowserPanel through callbacks.
+
+	POINT dropPoint{};
+
+	if (!DragQueryPoint(handle, &dropPoint))
+	{
+		return;
+	}
+
+	AssetBrowserPanel::FileDrop drop;
+	drop.x = static_cast<int>(dropPoint.x);
+	drop.y = static_cast<int>(dropPoint.y);
+
+	const UINT fileCount = DragQueryFileW(handle, 0xFFFFFFFF, nullptr, 0);
+	drop.filePaths.reserve(fileCount);
+
+	for (UINT i = 0; i < fileCount; ++i)
+	{
+		const UINT length = DragQueryFileW(handle, i, nullptr, 0);
+		std::wstring filePath(length + 1, L'\0');
+
+		if (length > 0 && DragQueryFileW(handle, i, filePath.data(), length + 1) == length)
+		{
+			filePath.resize(length);
+			drop.filePaths.emplace_back(filePath);
+		}
+	}
+
+	if (!drop.filePaths.empty())
+	{
+		// Store the drop for later importing in the AssetBrowserPanel.
+		m_pendingExplorerDrops.push_back(std::move(drop));
+	}
 }
 
 // Create a new scene with default settings
@@ -2887,7 +2955,7 @@ void EditorApp::RenderAssetBrowserPanel()
 		const std::filesystem::path & relativeDirectory,
 		std::string_view name)
 		{
-		const bool accepted = RequestCreateScene(relativeDirectory, name);
+			const bool accepted = RequestCreateScene(relativeDirectory, name);
 		
 			if (!accepted)
 			{
@@ -2897,40 +2965,375 @@ void EditorApp::RenderAssetBrowserPanel()
 			return accepted;
 		};
 
-		if (m_pActorImprintSystem)
+	if (m_pActorImprintSystem)
+	{
+	callbacks.onCreateActorImprint = [this](
+		const std::filesystem::path & relativeDirectory,
+		std::string_view name)
 		{
-		callbacks.onCreateActorImprint = [this](
-			const std::filesystem::path & relativeDirectory,
-			std::string_view name)
+			if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
 			{
-				if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
-				{
-					m_assetBrowserPanel.SetDiagnostic("ActorImprint creation is unavailable.");
-					return false;
-				}
+				m_assetBrowserPanel.SetDiagnostic("ActorImprint creation is unavailable.");
+				return false;
+			}
 			
-				Guid createdGuid;
-				std::string error;
+			Guid createdGuid;
+			std::string error;
 			
-				if (!ActorImprintAssetWorkflow::Create(
-					relativeDirectory,
-					name,
-					*m_pAssetManager,
-					m_engineContext,
-					createdGuid,
-					&error))
-				{
-					m_assetBrowserPanel.SetDiagnostic(error);
-					return false;
-				}
+			if (!ActorImprintAssetWorkflow::Create(
+				relativeDirectory,
+				name,
+				*m_pAssetManager,
+				m_engineContext,
+				createdGuid,
+				&error))
+			{
+				m_assetBrowserPanel.SetDiagnostic(error);
+				return false;
+			}
 			
-				RebuildAssetBrowserView();
-				m_assetBrowserPanel.SelectAsset(createdGuid);
-				return true;
-			};
+			RebuildAssetBrowserView();
+			m_assetBrowserPanel.SelectAsset(createdGuid);
+			return true;
+		};
+	}
+
+	callbacks.queryActions = [this](const Guid& guid)
+		{
+			return QueryAssetActions(guid);
+		};
+
+	callbacks.onAction = [this](
+		AssetBrowserPanel::AssetAction action,
+		const Guid& guid,
+		std::string_view name
+		)
+		{
+			return PerformAssetAction(action, guid, name);
+		};
+
+	callbacks.onMoveAsset = [this](const Guid& guid, const std::filesystem::path& directory)
+	{
+		PerformAssetMove(guid, directory);
+	};
+
+	callbacks.onImportFiles = [this](
+		const std::filesystem::path& directory, std::span<const std::filesystem::path> sources)
+	{
+		std::string diagnostic;
+		if (AssetFileWorkflow::Import(*m_pAssetManager, directory, sources, diagnostic))
+		{
+			RebuildAssetBrowserView();
 		}
 
-	m_assetBrowserPanel.Render(callbacks);
+		if (!diagnostic.empty())
+		{
+			m_operationDiagnostic = std::move(diagnostic);
+			m_openOperationDiagnosticPopup = true;
+		}
+	};
+
+	const auto drops = std::exchange(m_pendingExplorerDrops, {});
+	m_assetBrowserPanel.Render(callbacks, drops);
+}
+
+AssetBrowserPanel::AssetActions EditorApp::QueryAssetActions(const Guid& guid) const
+{
+	AssetBrowserPanel::AssetActions result;
+
+	if (!m_pAssetManager)
+	{
+		return result;
+	}
+
+	const AssetEntry* entry = m_pAssetManager->GetAssetEntry(guid);
+
+	if (!entry)
+	{
+		result.renameReason = result.deleteReason = "The asset is missing.";
+		return result;
+	}
+
+	const bool busy = m_editorMode != EditorMode::Edit ||
+		HasActiveEditTransaction() ||
+		m_pendingSceneAction != PendingSceneAction::None;
+
+	if (busy)
+	{
+		result.renameReason = result.deleteReason = "The Editor is busy or in Play mode.";
+		return result;
+	}
+
+	if (FindBuiltinMeshAsset(guid))
+	{
+		result.renameReason = result.deleteReason = "BuiltIn assets are read-only.";
+		return result;
+	}
+
+	const bool scene = entry->type == AssetType::Scene;
+	const bool imprint = entry->type == AssetType::ActorImprint;
+	const bool open = m_documentManager.HasOpenSourceAsset(guid);
+
+	result.canOpen = scene || (imprint && m_pActorImprintSystem != nullptr);
+	result.canSetStartup = scene;
+	result.editorStartup = scene && m_projectSettings.GetEditorStartupSceneGuid() == guid;
+	result.gameStartup = scene && m_projectSettings.GetGameStartupSceneGuid() == guid;
+	result.canRename = entry->type != AssetType::Texture;
+	result.canDelete = !open && !result.editorStartup && !result.gameStartup;
+	
+	 if (!result.canRename)
+	{
+		result.renameReason = "Texture rename is disabled because model files may reference its path.";
+	}
+
+	if (imprint && open)
+	{
+		result.canRename = false;
+		result.renameReason = "Close the ActorImprint Document before renaming.";
+	}
+
+	if (open)
+	{
+		result.deleteReason = "Close the asset Document before deleting.";
+	}
+	else if (result.editorStartup || result.gameStartup)
+	{
+		result.deleteReason = "Change the Startup Scene setting before deleting.";
+	}
+
+	if (imprint)
+	{
+		if (!m_pActorImprintSystem)
+		{
+			result.canRename = result.canDelete = false;
+			result.renameReason = result.deleteReason = "ActorImprint system is unavailable.";
+		}
+		else if (m_pActorImprintSystem->GetLiveInstanceCount(guid) != 0)
+		{
+			result.canDelete = false;
+			result.deleteReason = "Remove all loaded Scene Instances before deleting.";
+		}
+	}
+
+	result.canMove = result.canRename && AssetFileWorkflow::SupportsMove(entry->type);
+	return result;
+}
+
+void EditorApp::PerformAssetMove(const Guid& guid, const std::filesystem::path& directory)
+{
+	std::string error;
+	try
+	{
+		const auto policy = QueryAssetActions(guid);
+		if (!policy.canMove)
+		{
+			error = "This asset cannot be moved now.";
+		}
+		else
+		{
+			std::string path;
+			if (AssetFileWorkflow::Move(*m_pAssetManager, guid, directory, path, error))
+			{
+				CompleteAssetPathChange(guid, path);
+				return;
+			}
+		}
+	}
+	catch (const std::exception& exception)
+	{
+		error = exception.what();
+	}
+
+	m_operationDiagnostic = std::move(error);
+	m_openOperationDiagnosticPopup = true;
+}
+
+void EditorApp::CompleteAssetPathChange(const Guid& guid, const std::string& path)
+{
+	for (const auto& document : m_documentManager.GetDocuments())
+	{
+		if (document.type == EditorDocumentType::Scene && document.sourceAssetGuid == guid)
+		{
+			auto* sceneDocument = static_cast<SceneEditorDocument*>(m_documentManager.FindDocument(document.id));
+			if (sceneDocument)
+			{
+				sceneDocument->UpdateAssetPath(guid, path);
+			}
+		}
+	}
+
+	RebuildAssetBrowserView();
+	m_assetBrowserPanel.SelectAsset(guid);
+}
+
+bool EditorApp::PerformAssetAction(
+	AssetBrowserPanel::AssetAction action,
+	const Guid& guid,
+	std::string_view name)
+{
+	using Action = AssetBrowserPanel::AssetAction;
+	
+	auto fail = [this](const std::string& message)
+	{
+		m_assetBrowserPanel.SetDiagnostic(message);
+		return false;
+	};
+
+	try
+	{
+		const auto policy = QueryAssetActions(guid);
+
+		if (!m_pAssetManager)
+		{
+			return fail("AssetManager is unavailable.");
+		}
+
+		const AssetEntry* found = m_pAssetManager->GetAssetEntry(guid);
+
+		if (!found)
+		{
+			return fail("The asset no longer exists.");
+		}
+
+		const AssetEntry entry = *found;
+
+		switch (action)
+		{
+		case Action::Open:
+			if (!policy.canOpen)
+			{
+				return fail("This asset cannot be opened now.");
+			}
+
+			if (entry.type == AssetType::Scene)
+			{
+				if (!RequestOpenScene(guid))
+				{
+					return fail("The Scene could not be opened.");
+				}
+				return true;
+			}
+
+			{
+				StopAllEditTransactions();
+ 
+				EditorDocumentId document;
+
+				const bool opened =
+					ActorImprintAssetWorkflow::OpenDocument(
+						guid,
+						*m_pAssetManager,
+						*m_pActorImprintSystem,
+						m_engineContext,
+						m_documentManager,
+						m_window.GetWidth(),
+						m_window.GetHeight(),
+						document);
+				
+				if (!opened)
+				{
+					return fail("The ActorImprint could not be opened.");
+				}
+				
+				return true;
+			}
+
+		case Action::SetEditorStartup:
+		case Action::SetGameStartup:
+			if (!policy.canSetStartup)
+			{
+				return fail("Startup settings require an available Scene asset.");
+			}
+
+			{
+				ProjectSettings candidate = m_projectSettings;
+				
+				if (action == Action::SetEditorStartup)
+				{
+					candidate.SetEditorStartupSceneGuid(guid);
+				}
+				else
+				{
+					candidate.SetGameStartupSceneGuid(guid);
+				}
+				
+				std::string error;
+				
+				if (!candidate.Save(PathManager::Resolve("project.101"), &error))
+				{
+					return fail(error);
+				}
+				
+				m_projectSettings = candidate;
+				return true;
+            }
+
+        case Action::Rename:
+			if (!policy.canRename)
+			{
+				return fail(policy.renameReason);
+			}
+			
+			{
+				std::string path;
+				std::string error;
+				
+				if (entry.type == AssetType::Scene)
+				{
+					SceneAssetWorkflowError sceneError;
+					
+					if (!SceneAssetWorkflow::Rename(guid, name, *m_pAssetManager, path, &sceneError))
+					{
+						return fail(sceneError.message);
+					}
+				}
+				else if (!AssetFileWorkflow::Rename(*m_pAssetManager, guid, name, path, error))
+				{
+					return fail(error);
+				}
+				
+				CompleteAssetPathChange(guid, path);
+				return true;
+			}
+
+		case Action::Delete:
+			if (!policy.canDelete)
+			{
+				return fail(policy.deleteReason);
+			}
+
+			{
+				std::string error;
+				if (entry.type == AssetType::ActorImprint)
+				{
+					if (!ActorImprintAssetWorkflow::Delete(guid, *m_pAssetManager, *m_pActorImprintSystem, m_documentManager))
+					{
+						return fail("ActorImprint deletion failed. Check references and metadata.");
+					}
+				}
+				else if (!AssetFileWorkflow::Delete(*m_pAssetManager, guid, error))
+				{
+					return fail(error);
+				}
+
+				RebuildAssetBrowserView();
+				
+				if (!error.empty())
+				{
+					m_assetBrowserPanel.SetDiagnostic(error);
+				}
+
+				return true;
+			}
+
+		default:
+			return fail("Unsupported asset action.");
+		}
+	}
+	catch (const std::exception& error)
+	{
+		return fail(error.what());
+	}
 }
 
 void EditorApp::RebuildAssetBrowserView()

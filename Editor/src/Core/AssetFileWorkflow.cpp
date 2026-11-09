@@ -4,17 +4,108 @@
 #include "Engine/Resource/BuiltinMeshAssets.h"
 #include "Engine/Resource/MetaFile.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
+#include "Engine/Core/String/StringEncoding.h"
 
 #include <Windows.h>
 #include <array>
 #include <algorithm>
 #include <filesystem>
 #include <cwchar>
+#include <utility>
 
 namespace
 {
 
 namespace fs = std::filesystem;
+
+bool PublishImportedFile(
+	const fs::path& source,
+	const fs::path& destination,
+	std::string& diagnostic)
+{
+	// Generate a new GUID for the imported asset.
+	const Guid guid = GuidGenerator::Generate();
+
+	if (!guid.IsValid())
+	{
+		diagnostic = "Could not generate an asset GUID.";
+		return false;
+	}
+
+	const fs::path staging = destination.parent_path() / (guid.ToString() + ".import-tmp");
+	const fs::path stagedData = staging / L"data.import-tmp";
+	const fs::path stagedMeta = stagedData.wstring() + L".meta";
+	const fs::path finalMeta = destination.wstring() + L".meta";
+	const std::string metadataBase = stagedData.string();
+
+	if (fs::path(destination.string()) != destination || fs::path(metadataBase) != stagedData)
+	{
+		diagnostic = "The destination path cannot be represented in the asset catalog.";
+		return false;
+	}
+
+	std::error_code error;
+
+	if (!fs::create_directory(staging, error))
+	{
+		diagnostic = "Could not create an import staging directory.";
+		return false;
+	}
+
+	bool metaPublished = false;
+	bool dataPublished = false;
+
+	try
+	{
+		if (!CopyFileW(source.c_str(), stagedData.c_str(), TRUE))
+		{
+			diagnostic = "Could not copy the file (Win32 error " + std::to_string(GetLastError()) + ").";
+		}
+		else if (!MetaFile::Save(metadataBase, guid, MetaFile::WriteMode::CreateNew))
+		{
+			diagnostic = "Could not write asset metadata.";
+		}
+		else
+		{
+			metaPublished = MoveFileExW(stagedMeta.c_str(), finalMeta.c_str(), MOVEFILE_WRITE_THROUGH) != FALSE;
+			dataPublished = metaPublished &&
+							MoveFileExW(stagedData.c_str(), destination.c_str(), MOVEFILE_WRITE_THROUGH) != FALSE;
+			
+			if (!dataPublished)
+			{
+				diagnostic =
+					"Could not publish the asset and its metadata (Win32 error " +
+					std::to_string(GetLastError()) + ").";
+			}
+		}
+	}
+	catch (const std::exception& exception)
+	{
+		diagnostic = exception.what();
+	}
+
+	const auto remove = [&diagnostic](const fs::path& path)
+	{
+		std::error_code cleanupError;
+		fs::remove(path, cleanupError);
+
+		if (cleanupError)
+		{
+			diagnostic += "\nCould not clean up " + StringEncoding::WideToUtf8(path.native()) + ".";
+		}
+	};
+
+	if (metaPublished && !dataPublished)
+	{
+		remove(finalMeta);
+	}
+
+	remove(stagedData);
+	remove(stagedMeta);
+	remove(staging);
+
+	return dataPublished;
+}
 
 // Holds pair of asset data and meta file paths for single asset.
 struct FilePair
@@ -91,13 +182,13 @@ bool Reject(FilePair& pair, std::string& error, const char* message)
 
 // Prepares the asset data and meta file paths for a transaction.
 bool Prepare(
-	AssetManager& assets,
+	AssetManager& assetManager,
 	const Guid& guid,
 	FilePair& pair,
 	AssetType& type,
 	std::string& error)
 {
-	const AssetEntry* entry = assets.GetAssetEntry(guid);
+	const AssetEntry* entry = assetManager.GetAssetEntry(guid);
 
 	// Reject if the asset is missing or read-only (built-in).
 	if (!entry || FindBuiltinMeshAsset(guid))
@@ -120,7 +211,7 @@ bool Prepare(
 	// Resolve the directory for the asset's parent folder.
 	fs::path directory;
 
-	if (!AssetCreationPath::ResolveDirectory(assets, parent, directory, error))
+	if (!AssetCreationPath::ResolveDirectory(assetManager, parent, directory, error))
 	{
 		return false;
 	}
@@ -219,8 +310,82 @@ bool MakeName(
 
 }
 
+bool AssetFileWorkflow::Import(
+	AssetManager& assetManager,
+	const fs::path& relativeDirectory,
+	std::span<const fs::path> sources,
+	std::string& diagnostic)
+{
+	fs::path directory;
+
+	if (!AssetCreationPath::ResolveDirectory(assetManager, relativeDirectory, directory, diagnostic))
+	{
+		return false;
+	}
+
+	std::size_t copied = 0;
+
+	for (const fs::path& source : sources)
+	{
+		std::string error;
+		try
+		{
+			const fs::path filename = source.filename();
+
+			if (!source.is_absolute() || !fs::is_regular_file(source))
+			{
+				error = "Expected a regular file.";
+			}
+			else if (filename.native().find_first_of(L"<>:\"/\\|?*") != std::wstring::npos ||
+					 filename.native().ends_with(L'.') || filename.native().ends_with(L' '))
+			{
+				error = "The file name is not valid in the destination.";
+			}
+			// Reject files with unsupported extensions based on the AssetManager's supported asset types.
+			else if (AssetManager::DetermineAssetType(filename.extension().string()) == AssetType::Unknown)
+			{
+				error = "Unsupported asset file extension.";
+			}
+			// Check if the destination path is available and publish the imported file with a new GUID.
+			else if (AssetCreationPath::CheckAvailable(directory, filename, error) &&
+					 PublishImportedFile(source, directory / filename, error))
+			{
+				++copied;
+			}
+		}
+		catch (const std::exception& exception)
+		{
+			error = exception.what();
+		}
+
+		if (!error.empty())
+		{
+			diagnostic += StringEncoding::WideToUtf8(source.filename().native()) + ": " + error + "\n";
+		}
+	}
+
+	if (copied == 0)
+	{
+		return false;
+	}
+
+	AssetCatalogError catalogError;
+
+	// Refresh the AssetManager's catalog to recognize the newly imported assets.
+	if (!assetManager.Refresh(&catalogError))
+	{
+		diagnostic += 
+			std::to_string(copied) + " file(s) copied, but the asset catalog could not be updated.\n" +
+			StringEncoding::WideToUtf8(fs::path(catalogError.path).native()) + ": " + catalogError.message;
+		
+		return false;
+	}
+
+	return true;
+}
+
 bool AssetFileWorkflow::Rename(
-	AssetManager& assets,
+	AssetManager& assetManager,
 	const Guid& guid,
 	std::string_view newName,
 	std::string& outPath,
@@ -233,7 +398,7 @@ bool AssetFileWorkflow::Rename(
 	AssetType type = AssetType::Unknown;
 
 	// Prepare transaction files for the asset to be renamed.
-	if (!Prepare(assets, guid, pair, type, error))
+	if (!Prepare(assetManager, guid, pair, type, error))
 	{
 		return false;
 	}
@@ -293,10 +458,10 @@ bool AssetFileWorkflow::Rename(
 	}
 
 	// Notify the AssetManager of the asset change to update the catalog.
-	const std::string relative = pair.data[2].lexically_relative(assets.GetAssetRoot()).generic_string();
+	const std::string relative = pair.data[2].lexically_relative(assetManager.GetAssetRoot()).generic_string();
 	AssetCatalogError catalogError;
 
-	if (!assets.NotifyAssetChanged(relative, &catalogError))
+	if (!assetManager.NotifyAssetChanged(relative, &catalogError))
 	{
 		return Reject(pair, error, "Catalog rejected the rename.");
 	}
@@ -304,7 +469,90 @@ bool AssetFileWorkflow::Rename(
 	return true;
 }
 
-bool AssetFileWorkflow::Delete(AssetManager& assets, const Guid& guid, std::string& error)
+bool AssetFileWorkflow::SupportsMove(AssetType type)
+{
+	return type == AssetType::Scene ||
+		type == AssetType::ActorImprint ||
+		type == AssetType::Audio;
+}
+
+bool AssetFileWorkflow::Move(
+	AssetManager& assetManager,
+	const Guid& guid,
+	const fs::path& relativeDirectory,
+	std::string& outPath,
+	std::string& error)
+{
+	outPath.clear();
+	error.clear();
+
+	FilePair pair;
+	AssetType type = AssetType::Unknown;
+	if (!Prepare(assetManager, guid, pair, type, error))
+	{
+		return false;
+	}
+
+	if (!SupportsMove(type))
+	{
+		error = "Moving this asset type is disabled.";
+		return false;
+	}
+
+	fs::path directory;
+	if (!AssetCreationPath::ResolveDirectory(assetManager, relativeDirectory, directory, error))
+	{
+		return false;
+	}
+
+	if (fs::equivalent(directory, pair.data[0].parent_path()))
+	{
+		error = "The asset is already in that folder.";
+		return false;
+	}
+
+	const fs::path filename = pair.data[0].filename();
+	if (!AssetCreationPath::CheckAvailable(directory, filename, error))
+	{
+		return false;
+	}
+
+	pair.data[2] = directory / filename;
+	pair.meta[2] = pair.data[2].wstring() + L".meta";
+
+	std::string absolutePath = pair.data[2].string();
+	if (fs::path(absolutePath) != pair.data[2])
+	{
+		error = "The destination path cannot be represented in the asset catalog.";
+		return false;
+	}
+
+	const std::string relativePath =
+		pair.data[2].lexically_relative(assetManager.GetAssetRoot()).generic_string();
+
+	if (!pair.MoveTo(2))
+	{
+		return Reject(pair, error, "Could not move the asset and its metadata.");
+	}
+
+	AssetCatalogError catalogError;
+	try
+	{
+		if (assetManager.NotifyAssetChanged(relativePath, &catalogError))
+		{
+			outPath = std::move(absolutePath);
+			return true;
+		}
+	}
+	catch (const std::exception& exception)
+	{
+		return Reject(pair, error, exception.what());
+	}
+
+	return Reject(pair, error, catalogError.message.c_str());
+}
+
+bool AssetFileWorkflow::Delete(AssetManager& assetManager, const Guid& guid, std::string& error)
 {
 	error.clear();
 
@@ -312,12 +560,12 @@ bool AssetFileWorkflow::Delete(AssetManager& assets, const Guid& guid, std::stri
 	AssetType type = AssetType::Unknown;
 
 	// Prepare transaction files for the asset to be deleted.
-	if (!Prepare(assets, guid, pair, type, error))
+	if (!Prepare(assetManager, guid, pair, type, error))
 	{
 		return false;
 	}
 
-	// Reject deletion of ActorImprint assets, which require a reference-aware workflow.
+	// Reject deletion of ActorImprint assetManager, which require a reference-aware workflow.
 	if (type == AssetType::ActorImprint)
 	{
 		error = "ActorImprint deletion requires its reference-aware workflow.";
@@ -325,7 +573,7 @@ bool AssetFileWorkflow::Delete(AssetManager& assets, const Guid& guid, std::stri
 	}
 
 	// Move the asset data and meta file to temporary paths for deletion.
-	const std::string relative = pair.data[0].lexically_relative(assets.GetAssetRoot()).generic_string();
+	const std::string relative = pair.data[0].lexically_relative(assetManager.GetAssetRoot()).generic_string();
 
 	if (!pair.MoveTo(1))
 	{
@@ -335,7 +583,7 @@ bool AssetFileWorkflow::Delete(AssetManager& assets, const Guid& guid, std::stri
 	// Notify the AssetManager of the asset change to update the catalog.
 	AssetCatalogError catalogError;
 
-	if (!assets.NotifyAssetChanged(relative, &catalogError))
+	if (!assetManager.NotifyAssetChanged(relative, &catalogError))
 	{
 		return Reject(pair, error, "Catalog rejected the deletion.");
 	}

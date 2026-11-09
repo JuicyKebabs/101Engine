@@ -1,5 +1,6 @@
 #pragma once
 #include <windows.h>
+#include <shellapi.h>
 #include <memory>
 #include <filesystem>
 #include <optional>
@@ -138,6 +139,8 @@ private:
 	bool m_openOperationDiagnosticPopup = false;
 	std::string m_operationDiagnostic;
 
+	std::vector<AssetBrowserPanel::FileDrop> m_pendingExplorerDrops;
+
 private:
 	// Struct to track transform edits for undo/redo
 	struct TransformEditTransaction
@@ -173,6 +176,8 @@ private:
 	EditorApp() = default;
 
 	bool ApplyWindowResizeRequest();
+
+	void QueueExplorerDrop(HDROP handle);
 
 	void NewScene();									// Create a new scene with default settings
 	void LoadScene(const std::string& filePath);		// Load a scene from a file
@@ -227,6 +232,14 @@ private:
 	void RenderAssetBrowserPanel();
 
 	void RebuildAssetBrowserView();
+
+	AssetBrowserPanel::AssetActions QueryAssetActions(const Guid& guid) const;
+	bool PerformAssetAction(
+		AssetBrowserPanel::AssetAction action,
+		const Guid & guid,
+		std::string_view name);
+	void PerformAssetMove(const Guid& guid, const std::filesystem::path& directory);
+	void CompleteAssetPathChange(const Guid& guid, const std::string& path);
 	
 	void ShutdownImGui();
 

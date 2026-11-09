@@ -1,4 +1,5 @@
 #include "SceneAssetWorkflow.h"
+#include "Core/AssetFileWorkflow.h"
 #include "Core/AssetCreationPath.h"
 #include "Engine/Core/GUID/GuidGenerator.h"
 #include "Engine/Resource/AssetManager.h"
@@ -22,38 +23,6 @@ bool Fail(SceneAssetWorkflowError* error, const fs::path& path, std::string mess
 	}
 
 	return false;
-}
-
-bool ExistsCaseInsensitive(
-	const fs::path& directory,
-	const fs::path& filename,
-	const fs::path& ignored = {})
-{
-	std::error_code error;
-
-	for (const auto& item : fs::directory_iterator(directory, error))
-	{
-		if (error)
-		{
-			return true;
-		}
-
-		if (!ignored.empty() && fs::equivalent(item.path(), ignored, error))
-		{
-			error.clear();
-			continue;
-		}
-
-		auto left = item.path().filename().wstring();
-		auto right = filename.wstring();
-
-		if (_wcsicmp(left.c_str(), right.c_str()) == 0)
-		{
-			return true;
-		}
-	}
-
-	return error.value() != 0;
 }
 
 bool Move(const fs::path& from, const fs::path& to)
@@ -202,130 +171,33 @@ bool SceneAssetWorkflow::Create(
 bool SceneAssetWorkflow::Rename(
 	const Guid& guid,
 	std::string_view newName,
-	AssetManager& assetManager,
-	std::string& outPath,
-	SceneAssetWorkflowError* outError)
+	AssetManager & assets,
+	std::string & outPath,
+	SceneAssetWorkflowError * outError)
 {
+	outPath.clear();
+
 	if (outError)
 	{
-		*outError = {};
+		outError->path.clear();
+		outError->message.clear();
 	}
 
-	outPath.clear();
-	const AssetEntry* entry = assetManager.GetAssetEntry(guid);
-
+	const AssetEntry* entry = assets.GetAssetEntry(guid);
+	std::filesystem::path errorPath;
+	
 	if (!entry || entry->type != AssetType::Scene)
 	{
-		return Fail(outError, {}, "Scene asset is unavailable.");
+		return Fail(outError, errorPath, "Scene asset is unavailable.");
 	}
-
-	std::string normalizedName;
-
-	if (!NormalizeName(newName, normalizedName, outError))
-	{
-		return false;
-	}
-
-	const fs::path relativeAsset(entry->relativePath);
-	fs::path relativeDirectory = relativeAsset.parent_path();
-
-	if (relativeDirectory.empty())
-	{
-		relativeDirectory = ".";
-	}
-
-	fs::path directory;
-	std::string pathError;
-
-	if (!AssetCreationPath::ResolveDirectory(assetManager, relativeDirectory, directory, pathError))
-	{
-		return Fail(outError, relativeDirectory, pathError);
-	}
-
-	const fs::path source = directory / relativeAsset.filename();
-
-	const fs::path sourceMeta = source.string() + ".meta";
-	const fs::path destination = source.parent_path() / (normalizedName + ".scene");
-	const fs::path destinationMeta = destination.string() + ".meta";
-
-	if (source.filename() == destination.filename())
-	{
-		outPath = source.string();
-		return true;
-	}
-
-	if (ExistsCaseInsensitive(source.parent_path(), destination.filename(), source))
-	{
-		return Fail(outError, destination, "A Scene with this name already exists.");
-	}
-
-	if (!fs::exists(sourceMeta))
-	{
-		return Fail(outError, sourceMeta, "Scene metadata is missing.");
-	}
-
-	const fs::path staging =
-		source.parent_path() /
-		(source.filename().wstring() + L"." + fs::path(GuidGenerator::Generate().ToString()).wstring() + L".rename");
 	
-	const fs::path stagingMeta = staging.string() + ".meta";
-
-	if (!Move(source, staging))
+	errorPath = std::filesystem::path(entry->relativePath);
+	std::string error;
+	
+	if (!AssetFileWorkflow::Rename(assets, guid, newName, outPath, error))
 	{
-		return Fail(outError, source, "Could not stage the Scene for rename.");
+		return Fail(outError, errorPath, error);
 	}
 
-	if (!Move(sourceMeta, stagingMeta))
-	{
-		Move(staging, source);
-		return Fail(outError, sourceMeta, "Could not stage Scene metadata for rename.");
-	}
-
-	if (!Move(staging, destination) || !Move(stagingMeta, destinationMeta))
-	{
-		if (fs::exists(destination))
-		{
-			Move(destination, staging);
-		}
-
-		if (fs::exists(destinationMeta))
-		{
-			Move(destinationMeta, stagingMeta);
-		}
-
-		Move(staging, source);
-		Move(stagingMeta, sourceMeta);
-		return Fail(outError, destination, "Could not publish the renamed Scene; the original was restored.");
-	}
-
-	AssetCatalogError catalogError;
-
-	if (!assetManager.Refresh(&catalogError))
-	{
-		Move(destination, staging);
-		Move(destinationMeta, stagingMeta);
-		Move(staging, source);
-		Move(stagingMeta, sourceMeta);
-
-		assetManager.Refresh();
-
-		return Fail(outError, catalogError.path, catalogError.message);
-	}
-
-	const AssetEntry* renamed = assetManager.GetAssetEntry(guid);
-
-	if (!renamed || renamed->type != AssetType::Scene)
-	{
-		Move(destination, staging);
-		Move(destinationMeta, stagingMeta);
-		Move(staging, source);
-		Move(stagingMeta, sourceMeta);
-
-		assetManager.Refresh();
-
-		return Fail(outError, destination, "The Asset Catalog lost the Scene identity after rename.");
-	}
-
-	outPath = assetManager.GetAssetPath(guid);
 	return true;
 }

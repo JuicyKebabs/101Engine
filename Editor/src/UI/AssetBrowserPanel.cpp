@@ -1,7 +1,8 @@
 #include "AssetBrowserPanel.h"
-
+#include "AssetDragDropPayload.h"
 #include "Engine/Resource/BuiltinMeshAssets.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -31,6 +32,22 @@ std::string FolderKey(const fs::path& relativePath)
 
 	// Match AssetManager's catalog path convention.
 	return "Assets/" + relativePath.generic_string();
+}
+
+fs::path ProjectDirectoryForKey(std::string_view key)
+{
+	if (key == "Assets")
+	{
+		return ".";
+	}
+
+	constexpr std::string_view prefix = "Assets/";
+	if (key.starts_with(prefix))
+	{
+		return fs::path(key.substr(prefix.size()));
+	}
+
+	return {};
 }
 
 const char* AssetTypeName(AssetType type)
@@ -350,7 +367,7 @@ const std::vector<AssetEntry>& AssetBrowserPanel::GetVisibleEntries() const
 	return empty;
 }
 
-void AssetBrowserPanel::DrawFolderTree(std::size_t folderIndex)
+void AssetBrowserPanel::DrawFolderTree(std::size_t folderIndex, const Callbacks& callbacks)
 {
 	const FolderEntry& folder = m_folders[folderIndex];
 
@@ -382,11 +399,34 @@ void AssetBrowserPanel::DrawFolderTree(std::size_t folderIndex)
 		SelectFolder(folder.key);
 	}
 
+	if (callbacks.onMoveAsset && callbacks.queryActions && ImGui::BeginDragDropTarget())
+	{
+		const ImGuiPayload* raw = ImGui::GetDragDropPayload();
+		if (raw && raw->IsDataType(EditorAssetDragDropPayloadType) &&
+			raw->DataSize == sizeof(EditorAssetDragDropPayload))
+		{
+			const auto& asset = *static_cast<const EditorAssetDragDropPayload*>(raw->Data);
+			fs::path directory = ProjectDirectoryForKey(folder.key);
+			const bool sameFolder = std::any_of(
+				folder.assets.begin(), folder.assets.end(),
+				[&asset](const AssetEntry& entry) { return entry.guid == asset.assetGuid; });
+
+			if (!directory.empty() && !sameFolder &&
+				callbacks.queryActions(asset.assetGuid).canMove &&
+				ImGui::AcceptDragDropPayload(EditorAssetDragDropPayloadType))
+			{
+				m_pendingMove = MoveRequest{asset.assetGuid, std::move(directory)};
+			}
+		}
+
+		ImGui::EndDragDropTarget();
+	}
+
 	if (open)
 	{
 		for (const std::size_t childIndex : folder.children)
 		{
-			DrawFolderTree(childIndex);
+			DrawFolderTree(childIndex, callbacks);
 		}
 
 		ImGui::TreePop();
@@ -395,7 +435,7 @@ void AssetBrowserPanel::DrawFolderTree(std::size_t folderIndex)
 	ImGui::PopID();
 }
 
-void AssetBrowserPanel::DrawAssetList()
+void AssetBrowserPanel::DrawAssetList(const Callbacks& callbacks)
 {
 	const auto& entries = GetVisibleEntries();
 
@@ -441,7 +481,29 @@ void AssetBrowserPanel::DrawAssetList()
 			m_selectedAssetGuid = entry.guid;
 		}
 
-		const bool hovered = ImGui::IsItemHovered();
+		const std::string name = DisplayPath(fs::path(entry.relativePath).filename());
+		const bool dragging = ImGui::BeginDragDropSource();
+
+		// Drag the asset to another panel to perform an action.
+		if (dragging)
+		{
+			const EditorAssetDragDropPayload payload(entry.guid, entry.type);
+
+			ImGui::SetDragDropPayload(
+				EditorAssetDragDropPayloadType,
+				&payload,
+				sizeof(payload),
+				ImGuiCond_Once);
+
+			ImGui::TextUnformatted(name.c_str());
+			ImGui::EndDragDropSource();
+		}
+
+		const bool hovered = !dragging && ImGui::IsItemHovered();
+
+		// Draw the right-click context menu for the asset icon.
+		DrawAssetMenu(entry, callbacks);
+
 		const bool selected = entry.guid == m_selectedAssetGuid;
 
 		const ImVec2 tileMax(tileMin.x + tileSize.x, tileMin.y + tileSize.y);
@@ -461,7 +523,6 @@ void AssetBrowserPanel::DrawAssetList()
 		const ImVec2 iconPosition(tileMin.x + (tileWidth - iconSize) * 0.5f, tileMin.y + 6.0f);
 		DrawAssetIcon(iconPosition, iconSize, entry.type);
 
-		const std::string name = DisplayPath(fs::path(entry.relativePath).filename());
 		const ImVec2 namePosition(tileMin.x + 6.0f, iconPosition.y + iconSize + 6.0f);
 		const ImVec4 nameClip(
 			namePosition.x,
@@ -493,6 +554,172 @@ void AssetBrowserPanel::DrawAssetList()
 	}
 }
 
+void AssetBrowserPanel::DrawAssetMenu(const AssetEntry& entry, const Callbacks& callbacks)
+{
+	if (!ImGui::BeginPopupContextItem("AssetContext"))
+	{
+		return;
+	}
+
+	m_selectedAssetGuid = entry.guid;
+	AssetActions policy;
+
+	if (callbacks.queryActions)
+	{
+		policy = callbacks.queryActions(entry.guid);
+	}
+
+	auto request = [this, &entry](AssetAction action)
+	{
+		m_actionAsset = entry;
+		m_pendingAssetAction = action;
+		m_actionDiagnostic.clear();
+
+		if (action == AssetAction::Rename)
+		{
+			const std::string stem = DisplayPath(fs::path(entry.relativePath).stem());
+			strncpy_s(m_renameName, stem.c_str(), _TRUNCATE);
+		}
+	};
+
+	const bool available = static_cast<bool>(callbacks.onAction);
+	
+	if (entry.type == AssetType::Scene || entry.type == AssetType::ActorImprint)
+	{
+		const char* label = entry.type == AssetType::Scene ? "Open" : "Edit";
+		
+		if (ImGui::MenuItem(label, nullptr, false, available && policy.canOpen))
+		{
+			request(AssetAction::Open);
+		}
+	}
+
+	if (ImGui::MenuItem("Rename...", nullptr, false, available && policy.canRename))
+	{
+		request(AssetAction::Rename);
+	}
+
+	if (!policy.canRename && !policy.renameReason.empty())
+	{
+		ImGui::TextDisabled("%s", policy.renameReason.c_str());
+	}
+
+	if (ImGui::MenuItem("Delete...", nullptr, false, available && policy.canDelete))
+	{
+		request(AssetAction::Delete);
+	}
+
+	if (!policy.canDelete && !policy.deleteReason.empty())
+	{
+		ImGui::TextDisabled("%s", policy.deleteReason.c_str());
+	}
+
+	if (entry.type == AssetType::Scene)
+	{
+		ImGui::Separator();
+
+		if (ImGui::MenuItem("Set as Editor Startup Scene", nullptr,
+			policy.editorStartup, available && policy.canSetStartup && !policy.editorStartup))
+		{
+			request(AssetAction::SetEditorStartup);
+		}
+
+		if (ImGui::MenuItem("Set as Game Startup Scene", nullptr,
+			policy.gameStartup, available && policy.canSetStartup && !policy.gameStartup))
+		{
+			request(AssetAction::SetGameStartup);
+		}
+	}
+
+	ImGui::EndPopup();
+}
+
+void AssetBrowserPanel::DrawAssetActionDialog(const Callbacks& callbacks)
+{
+	if (m_pendingAssetAction != AssetAction::None)
+	{
+	const AssetAction requested = m_pendingAssetAction;
+	m_pendingAssetAction = AssetAction::None;
+	if (requested == AssetAction::Rename || requested == AssetAction::Delete)
+	{
+	m_dialogAssetAction = requested;
+	ImGui::OpenPopup("Asset Operation");
+	}
+	else if (callbacks.onAction)
+	{
+	callbacks.onAction(requested, m_actionAsset.guid, "");
+	}
+	}
+
+	if (!ImGui::BeginPopupModal("Asset Operation", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		return;
+	}
+
+	AssetActions policy;
+
+	if (callbacks.queryActions)
+	{
+		policy = callbacks.queryActions(m_actionAsset.guid);
+	}
+
+	const bool rename = m_dialogAssetAction == AssetAction::Rename;
+	const bool permitted = rename ? policy.canRename : policy.canDelete;
+	const std::string path = DisplayPath(fs::path(m_actionAsset.relativePath));
+	
+	ImGui::TextWrapped("%s: %s", rename ? "Rename" : "Delete", path.c_str());
+	
+	if (rename)
+	{
+		ImGui::InputText("Name", m_renameName, sizeof(m_renameName));
+		ImGui::TextDisabled("The file extension is preserved.");
+	}
+	else
+	{
+		ImGui::TextUnformatted("Delete this asset and its .meta file? This cannot be undone.");
+	}
+
+	const std::string& reason = rename ? policy.renameReason : policy.deleteReason;
+	
+	if (!permitted)
+	{
+		ImGui::TextWrapped("%s", reason.c_str());
+	}
+
+	if (!m_actionDiagnostic.empty())
+	{
+		ImGui::TextWrapped("%s", m_actionDiagnostic.c_str());
+	}
+
+	const bool enabled = permitted && static_cast<bool>(callbacks.onAction);
+	ImGui::BeginDisabled(!enabled);
+	const bool execute = ImGui::Button(rename ? "Rename" : "Delete");
+	ImGui::EndDisabled();
+
+	if (execute && enabled)
+	{
+		m_diagnostic.clear();
+
+		if (callbacks.onAction(m_dialogAssetAction, m_actionAsset.guid, m_renameName))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		else
+		{
+			m_actionDiagnostic = m_diagnostic.empty() ? "The operation failed." : m_diagnostic;
+		}
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Cancel"))
+	{
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
+}
+
 void AssetBrowserPanel::DrawSelection() const
 {
 	for (const AssetEntry& entry : GetVisibleEntries())
@@ -512,8 +739,8 @@ void AssetBrowserPanel::DrawSelection() const
 
 void AssetBrowserPanel::DrawCreateMenu(const Callbacks& callbacks)
 {
-	const bool projectFolder = m_selectedFolderKey == "Assets" || m_selectedFolderKey.starts_with("Assets/");
-	const bool canCreate = callbacks.canCreate && projectFolder;
+	const fs::path directory = ProjectDirectoryForKey(m_selectedFolderKey);
+	const bool canCreate = callbacks.canCreate && !directory.empty();
 
 	const ImGuiPopupFlags flags =
 	ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems;
@@ -540,12 +767,7 @@ void AssetBrowserPanel::DrawCreateMenu(const Callbacks& callbacks)
 		if (requestedType != AssetType::Unknown)
 		{
 			m_createType = requestedType;
-			m_createDirectory = ".";
-
-			if (m_selectedFolderKey != "Assets")
-			{
-				m_createDirectory = std::filesystem::path(m_selectedFolderKey.substr(7));
-			}
+			m_createDirectory = directory;
 
 			m_createName[0] = '\0';
 			m_createDiagnostic.clear();
@@ -622,8 +844,10 @@ void AssetBrowserPanel::DrawCreateDialog(const Callbacks& callbacks)
 	ImGui::EndPopup();
 }
 
-void AssetBrowserPanel::Render(const Callbacks& callbacks)
+void AssetBrowserPanel::Render(const Callbacks& callbacks, std::span<const FileDrop> drops)
 {
+	fs::path importDirectory;
+	std::vector<fs::path> importSources;
 	const bool visible = ImGui::Begin("Assets");
 
 	if (visible)
@@ -661,8 +885,8 @@ void AssetBrowserPanel::Render(const Callbacks& callbacks)
 			{
 				if (m_folders.size() >= 2)
 				{
-					DrawFolderTree(0);
-					DrawFolderTree(1);
+					DrawFolderTree(0, callbacks);
+					DrawFolderTree(1, callbacks);
 				}
 			}
 
@@ -679,8 +903,44 @@ void AssetBrowserPanel::Render(const Callbacks& callbacks)
 
 				if (ImGui::BeginChild("##Entries", listSize))
 				{
-					DrawAssetList();
+					DrawAssetList(callbacks);
 					DrawCreateMenu(callbacks);
+
+					if (callbacks.canCreate &&
+						callbacks.onImportFiles &&
+						!drops.empty() &&
+						!ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))
+					{
+						// Current displayed directory.
+						importDirectory = ProjectDirectoryForKey(m_selectedFolderKey);
+
+						if (!importDirectory.empty())
+						{
+							const ImGuiWindow* entries = ImGui::GetCurrentWindowRead();
+
+							for (const FileDrop& drop : drops)
+							{
+								// Checking the dropped place is inside the asset browser panel area.
+								const ImVec2 point(static_cast<float>(drop.x), static_cast<float>(drop.y));
+
+								if (!entries->InnerClipRect.Contains(point))
+								{
+									continue;
+								}
+
+								ImGuiWindow* hovered = nullptr;
+								ImGui::FindHoveredWindowEx(point, true, &hovered, nullptr);
+
+								if (hovered == entries)
+								{
+									importSources.insert(
+										importSources.end(),
+										drop.filePaths.begin(),
+										drop.filePaths.end());
+								}
+							}
+						}
+					}
 				}
 
 				ImGui::EndChild();
@@ -693,7 +953,24 @@ void AssetBrowserPanel::Render(const Callbacks& callbacks)
 		}
 
 		DrawCreateDialog(callbacks);
+		DrawAssetActionDialog(callbacks);
 	}
 
 	ImGui::End();
+
+	const auto move = std::exchange(m_pendingMove, std::nullopt);
+	if (ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))
+	{
+		return;
+	}
+
+	if (move)
+	{
+		callbacks.onMoveAsset(move->guid, move->directory);
+	}
+
+	if (!importSources.empty())
+	{
+		callbacks.onImportFiles(importDirectory, importSources);
+	}
 }
