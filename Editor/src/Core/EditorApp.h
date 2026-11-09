@@ -1,6 +1,8 @@
 #pragma once
 #include <windows.h>
+#include <shellapi.h>
 #include <memory>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -15,7 +17,6 @@
 #include "Engine/Core/Context/Context.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Scene/SceneManager.h"
-#include "Engine/Actor/Actor.h"
 #include "Engine/Window/Window.h"
 #include "Command/RectTransformEditCommand.h"
 #include "Document/EditorDocumentManager.h"
@@ -26,9 +27,8 @@
 #include "UI/MenuBar.h"
 #include "UI/Toolbar.h"
 #include "UI/ScriptsPanel.h"
-#include "UI/ActorImprintsPanel.h"
-#include "UI/SceneAssetPanel.h"
 #include "UI/TagManagerPanel.h"
+#include "UI/AssetBrowserPanel.h"
 #include "Engine/Project/ProjectSettings.h"
 
 //--------------------------------------------
@@ -99,7 +99,7 @@ private:
 
 	EditorMode m_editorMode = EditorMode::Edit; // The current mode of the editor (Edit or Play)
 	EditorModeTransition m_pendingModeTransition = EditorModeTransition::None;
-	float m_assetRefreshElapsedSeconds = 0.0f;
+	bool m_assetRefreshRequested = false;
 	std::unique_ptr<SceneManager> m_pPlaySceneManager;
 	SceneBase* m_pPlayScene = nullptr; // Non-owning current Scene of m_pPlaySceneManager.
 	EditorDocumentManager m_documentManager;
@@ -107,9 +107,12 @@ private:
 	bool m_openDocumentDecisionPopup = false;
 	bool m_allowWindowClose = false;
 	std::string m_documentDecisionDiagnostic;
+
+	// Scene management for the editor.
 	enum class PendingSceneAction { None, Create, Open };
 	PendingSceneAction m_pendingSceneAction = PendingSceneAction::None;
 	std::string m_pendingSceneName;
+	std::filesystem::path m_pendingSceneDirectory;
 	Guid m_pendingSceneGuid;
 
 	// Panels
@@ -119,10 +122,9 @@ private:
 	MenuBar m_menuBar;
 	Toolbar m_toolbar;
 	ScriptsPanel m_scriptsPanel;
-	ActorImprintsPanel m_actorImprintsPanel;
-	SceneAssetPanel m_sceneAssetPanel;
 	TagManagerPanel m_tagManagerPanel;
 	ProjectSettings m_projectSettings;
+	AssetBrowserPanel m_assetBrowserPanel;
 
 	// ImGui keeps IniFilename as a raw pointer, so the backing string must
 	// remain alive for the entire ImGui context lifetime.
@@ -133,6 +135,11 @@ private:
 
 	// Render data for rendering the outline of a selected object in the scene view
 	bool m_showColliders = false;
+
+	bool m_openOperationDiagnosticPopup = false;
+	std::string m_operationDiagnostic;
+
+	std::vector<AssetBrowserPanel::FileDrop> m_pendingExplorerDrops;
 
 private:
 	// Struct to track transform edits for undo/redo
@@ -170,19 +177,23 @@ private:
 
 	bool ApplyWindowResizeRequest();
 
-	void NewScene();                                // Create a new scene with default settings
-	void LoadScene(const std::string& filePath);    // Load a scene from a file
-	bool LoadScene(const Guid& sceneAssetGuid);
-	std::unique_ptr<SceneBase> CreateDefaultScene();
-	bool RequestCreateScene(std::string_view name);
+	void QueueExplorerDrop(HDROP handle);
+
+	void NewScene();									// Create a new scene with default settings
+	void LoadScene(const std::string& filePath);		// Load a scene from a file
+	bool LoadScene(const Guid& sceneAssetGuid);			// Load a scene from an asset GUID
+	std::unique_ptr<SceneBase> CreateDefaultScene();	// Create a default scene with a camera and light
+	bool RequestCreateScene(
+		const std::filesystem::path & relativeDirectory,
+		std::string_view name);
 	bool RequestOpenScene(const Guid& sceneAssetGuid);
 	bool ExecutePendingSceneAction();
-	void ReloadGameCode(bool reconfigure);          // For hot-reloading game code DLL
-	void DeleteScript(const std::string& name);     // Delete a script file from the project
-	void EnterPlayMode();                           // Switch to Play mode
-	void ExitPlayMode();                            // Switch back to Edit mode
-	void ApplyPendingModeTransition();              // Apply a deferred Play/Edit mode transition
-	void RefreshAssetCatalog(float deltaTime);
+	void ReloadGameCode(bool reconfigure);				// For hot-reloading game code DLL
+	void DeleteScript(const std::string& name);			// Delete a script file from the project
+	void EnterPlayMode();								// Switch to Play mode
+	void ExitPlayMode();								// Switch back to Edit mode
+	void ApplyPendingModeTransition();					// Apply a deferred Play/Edit mode transition
+	void RefreshAssetCatalog();
 	bool ProcessActorImprintAssetChanges(const Guid* requiredAsset = nullptr);
 	bool SaveEditorDocument(EditorDocumentId id);
 	bool HasActiveEditTransaction() const;
@@ -215,11 +226,21 @@ private:
 	void RenderMenuBar();
 	void RenderToolbar();
 	void RenderScriptsPanel();
-	void RenderActorImprintsPanel();
-	void RenderSceneAssetPanel();
 	void RenderTagManagerPanel();
 	void RenderDocumentDecisionModal();
 	void RenderOperationDiagnosticModal();
+	void RenderAssetBrowserPanel();
+
+	void RebuildAssetBrowserView();
+
+	AssetBrowserPanel::AssetActions QueryAssetActions(const Guid& guid) const;
+	bool PerformAssetAction(
+		AssetBrowserPanel::AssetAction action,
+		const Guid & guid,
+		std::string_view name);
+	void PerformAssetMove(const Guid& guid, const std::filesystem::path& directory);
+	void CompleteAssetPathChange(const Guid& guid, const std::string& path);
+	
 	void ShutdownImGui();
 
 	SceneBase* GetActiveScene() const;
@@ -259,6 +280,4 @@ private:
 
 	bool HandleWindowCloseRequest();
 	void CompleteExitRequest();
-	bool m_openOperationDiagnosticPopup = false;
-	std::string m_operationDiagnostic;
 };

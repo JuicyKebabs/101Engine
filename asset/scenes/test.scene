@@ -1,0 +1,203 @@
+{
+    "actorImprintInstances": [],
+    "actors": [
+        {
+            "actorId": "{044AE860-03D4-4644-A23E-53D3DE5B03E1}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            -3.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "billboardType": 0,
+                        "castShadow": false,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "flipX": false,
+                        "flipY": false,
+                        "name": "",
+                        "pivot": [
+                            0.5,
+                            0.5
+                        ],
+                        "sortOrderInCanvas": 0,
+                        "textureAssetId": "{8A5A6333-6CEA-4394-AD9C-13E13FB44526}",
+                        "uvOffset": [
+                            0.0,
+                            0.0
+                        ],
+                        "uvScale": [
+                            1.0,
+                            1.0
+                        ],
+                        "visible": true
+                    },
+                    "type": "SpriteRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "TestTexture",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{12747E3B-1005-4190-AD14-6CE3DE877325}",
+            "components": [
+                {
+                    "data": {
+                        "name": "Transform",
+                        "position": [
+                            0.0,
+                            0.0,
+                            -5.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "followActorId": null,
+                        "followMode": 1,
+                        "lens": {
+                            "farZ": 1000.0,
+                            "fov": 1.72787606716156,
+                            "height": 1080.0,
+                            "nearZ": 0.10000000149011612,
+                            "projectionType": 0,
+                            "width": 1920.0
+                        },
+                        "name": "Camera",
+                        "pose": {
+                            "position": [
+                                0.0,
+                                0.0,
+                                -5.0
+                            ],
+                            "rotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rig": {
+                            "offsetPosition": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "offsetRotation": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                            ]
+                        },
+                        "rotationMode": 1,
+                        "targetActorId": null
+                    },
+                    "type": "Camera"
+                }
+            ],
+            "is_active": true,
+            "name": "DefaultCamera",
+            "parentId": null,
+            "tag": "MainCamera"
+        },
+        {
+            "actorId": "{FBFA99A3-E21E-41EB-B498-D81DB851E0A6}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            0.0,
+                            0.550000011920929,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "castShadow": true,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "meshAssetId": "{B0A4AC1C-322D-4D44-91C4-A6773BFBC157}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "TestMesh",
+            "parentId": null,
+            "tag": "None"
+        }
+    ],
+    "directional_light": {
+        "color": [
+            1.0,
+            1.0,
+            1.0
+        ],
+        "direction": [
+            -1.0,
+            -1.0,
+            0.0
+        ],
+        "intensity": 1.0
+    },
+    "version": 4
+}

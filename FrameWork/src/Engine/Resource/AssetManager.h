@@ -90,6 +90,8 @@ public:
 	bool NotifyAssetContentReplaced(const Guid& guid);
 	std::vector<AssetChange> TakePendingChanges();
 
+	static AssetType DetermineAssetType(const std::string& extension);
+
 	// Lookup functions to retrieve asset entries by path or GUID
 	const AssetEntry* GetAssetEntryByPath(const std::string& relativePath) const;
 	const AssetEntry* GetAssetEntry(const Guid& guid) const;
@@ -155,6 +157,4 @@ private:
 	// No asset is loaded at this time, only the catalog is built.
 	bool ScanAssetDirectory(const std::string& rootDir, const std::string& notifiedPath, AssetCatalogError* outError);
 
-	// Deteremine asset type based on the file extension.
-	AssetType DetermineAssetType(const std::string& extension);
 };

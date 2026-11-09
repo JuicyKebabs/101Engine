@@ -697,7 +697,6 @@ add_test(NAME ActorImprintEditingTests COMMAND ActorImprintEditingTests)
 set_tests_properties(ActorImprintEditingTests PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(ActorImprintWorkflowTests
-	ActorImprintWorkflowTests.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintAssetWorkflow.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingCommand.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/ActorImprint/ActorImprintEditingContext.cpp
@@ -716,7 +715,6 @@ add_executable(ActorImprintWorkflowTests
 	${CMAKE_SOURCE_DIR}/Editor/src/Document/EditorDocumentManager.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/Document/IEditorDocument.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/UI/Inspector/AssetPicker.cpp
-	${CMAKE_SOURCE_DIR}/Editor/src/UI/ActorImprintsPanel.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/UI/EditorUI.cpp
 	${CMAKE_SOURCE_DIR}/Editor/src/UI/HierarchyPanel.cpp
 	${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui.cpp

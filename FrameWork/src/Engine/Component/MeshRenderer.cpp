@@ -83,6 +83,7 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
 				pivot,
 				false,
 				false);
+
 			renderTemplate.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene,
 				renderTemplate.materialDesc.description);
 		}
