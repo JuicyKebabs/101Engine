@@ -378,6 +378,11 @@ AssetType AssetManager::DetermineAssetType(const std::string& extension)
 		return AssetType::Scene;
 	}
 
+	if (ext == ".animclip")
+	{
+		return AssetType::AnimationClip;
+	}
+
 	return AssetType::Unknown;
 }
 

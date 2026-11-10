@@ -12,6 +12,15 @@ class AssetManager;
 
 namespace AssetFileWorkflow
 {
+	bool CreateGenerated(
+		AssetManager& assetManager,
+		const std::filesystem::path& relativeDirectory,
+		std::string_view name,
+		const std::filesystem::path& extension,
+		std::string_view bytes,
+		Guid& outGuid,
+		std::string& diagnostic);
+
 	// Copy supported files with fresh GUIDs and refresh the catalog once.
 	bool Import(
 		AssetManager& assetManager,

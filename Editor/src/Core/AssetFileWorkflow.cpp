@@ -10,6 +10,7 @@
 #include <array>
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <cwchar>
 #include <utility>
 
@@ -18,22 +19,15 @@ namespace
 
 namespace fs = std::filesystem;
 
-bool PublishImportedFile(
-	const fs::path& source,
+template<class WriteStagedData>
+bool PublishAssetFile(
 	const fs::path& destination,
+	const Guid& guid,
+	WriteStagedData writeStagedData,
 	std::string& diagnostic)
 {
-	// Generate a new GUID for the imported asset.
-	const Guid guid = GuidGenerator::Generate();
-
-	if (!guid.IsValid())
-	{
-		diagnostic = "Could not generate an asset GUID.";
-		return false;
-	}
-
-	const fs::path staging = destination.parent_path() / (guid.ToString() + ".import-tmp");
-	const fs::path stagedData = staging / L"data.import-tmp";
+	const fs::path staging = destination.parent_path() / (guid.ToString() + ".asset-tmp");
+	const fs::path stagedData = staging / L"data.asset-tmp";
 	const fs::path stagedMeta = stagedData.wstring() + L".meta";
 	const fs::path finalMeta = destination.wstring() + L".meta";
 	const std::string metadataBase = stagedData.string();
@@ -48,7 +42,7 @@ bool PublishImportedFile(
 
 	if (!fs::create_directory(staging, error))
 	{
-		diagnostic = "Could not create an import staging directory.";
+		diagnostic = "Could not create an asset staging directory.";
 		return false;
 	}
 
@@ -57,9 +51,9 @@ bool PublishImportedFile(
 
 	try
 	{
-		if (!CopyFileW(source.c_str(), stagedData.c_str(), TRUE))
+		if (!writeStagedData(stagedData, diagnostic))
 		{
-			diagnostic = "Could not copy the file (Win32 error " + std::to_string(GetLastError()) + ").";
+			// The writer has supplied the diagnostic.
 		}
 		else if (!MetaFile::Save(metadataBase, guid, MetaFile::WriteMode::CreateNew))
 		{
@@ -105,6 +99,32 @@ bool PublishImportedFile(
 	remove(staging);
 
 	return dataPublished;
+}
+
+bool PublishImportedFile(
+	const fs::path& source,
+	const fs::path& destination,
+	std::string& diagnostic)
+{
+	const Guid guid = GuidGenerator::Generate();
+
+	if (!guid.IsValid())
+	{
+		diagnostic = "Could not generate an asset GUID.";
+		return false;
+	}
+
+	return PublishAssetFile(destination, guid,
+		[&source](const fs::path& stagedData, std::string& error)
+		{
+			if (!CopyFileW(source.c_str(), stagedData.c_str(), TRUE))
+			{
+				error = "Could not copy the file (Win32 error " + std::to_string(GetLastError()) + ").";
+				return false;
+			}
+
+			return true;
+		}, diagnostic);
 }
 
 // Holds pair of asset data and meta file paths for single asset.
@@ -308,6 +328,107 @@ bool MakeName(
 	return true;
 }
 
+}
+
+bool AssetFileWorkflow::CreateGenerated(
+	AssetManager& assetManager,
+	const fs::path& relativeDirectory,
+	std::string_view name,
+	const fs::path& extension,
+	std::string_view bytes,
+	Guid& outGuid,
+	std::string& diagnostic)
+{
+	outGuid = {};
+	diagnostic.clear();
+
+	try
+	{
+		if (AssetManager::DetermineAssetType(extension.string()) == AssetType::Unknown)
+		{
+			diagnostic = "The asset extension is not registered.";
+			return false;
+		}
+
+		fs::path directory;
+		fs::path filename;
+
+		if (!AssetCreationPath::ResolveDirectory(assetManager, relativeDirectory, directory, diagnostic) ||
+			!MakeName(name, extension, filename, diagnostic) ||
+			!AssetCreationPath::CheckAvailable(directory, filename, diagnostic))
+		{
+			return false;
+		}
+
+		const fs::path destination = directory / filename;
+		const fs::path metadata = destination.wstring() + L".meta";
+		const std::string relativePath =
+			destination.lexically_relative(assetManager.GetAssetRoot()).generic_string();
+		const Guid guid = GuidGenerator::Generate();
+
+		if (!guid.IsValid())
+		{
+			diagnostic = "Could not generate an asset GUID.";
+			return false;
+		}
+
+		if (!PublishAssetFile(destination, guid,
+			[bytes](const fs::path& stagedData, std::string& error)
+			{
+				std::ofstream output(stagedData, std::ios::binary);
+				output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+				output.close();
+
+				if (!output)
+				{
+					error = "Could not write the staged asset.";
+					return false;
+				}
+
+				return true;
+			}, diagnostic))
+		{
+			return false;
+		}
+
+		try
+		{
+			AssetCatalogError catalogError;
+
+			if (assetManager.NotifyAssetChanged(relativePath, &catalogError))
+			{
+				outGuid = guid;
+				return true;
+			}
+
+			diagnostic = "Asset catalog update failed: " + catalogError.message;
+		}
+		catch (const std::exception& exception)
+		{
+			diagnostic = exception.what();
+		}
+
+		// Remove the asset before its metadata to preserve identity if removal fails.
+		std::error_code cleanupError;
+		fs::remove(destination, cleanupError);
+
+		if (!cleanupError)
+		{
+			fs::remove(metadata, cleanupError);
+		}
+
+		if (cleanupError)
+		{
+			diagnostic += " Could not fully remove the published asset and metadata.";
+		}
+
+		return false;
+	}
+	catch (const std::exception& exception)
+	{
+		diagnostic = exception.what();
+		return false;
+	}
 }
 
 bool AssetFileWorkflow::Import(

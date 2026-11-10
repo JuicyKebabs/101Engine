@@ -30,8 +30,8 @@ target_include_directories(101Editor PRIVATE
 
 add_custom_command(TARGET 101Editor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc143-mtd.dll>
-        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc143-mt.dll>
+        $<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Debug/assimp-vc145-mtd.dll>
+        $<$<CONFIG:Release>:${CMAKE_SOURCE_DIR}/third_party/Assimp/bin/Release/assimp-vc145-mt.dll>
         $<TARGET_FILE_DIR:101Editor>
 )
 
@@ -41,7 +41,7 @@ add_custom_command(TARGET 101Editor POST_BUILD
         $<TARGET_FILE_DIR:101Editor>
 )
 
-target_link_libraries(101Editor PRIVATE 101Framework d3dcompiler shell32)
+target_link_libraries(101Editor PRIVATE 101Framework d3dcompiler shell32 ole32)
 add_dependencies(101Editor GameCode)
 
 add_custom_command(TARGET 101Editor POST_BUILD

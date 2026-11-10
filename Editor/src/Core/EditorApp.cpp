@@ -3,6 +3,9 @@
 #include <cmath>
 #include <filesystem>
 #include <shellapi.h>
+#include <shobjidl.h>
+#include <memory>
+#include <cwchar>
 #include <stdexcept>
 #include <utility>
 
@@ -11,6 +14,8 @@
 #include "Core/AssetFileWorkflow.h"
 #include "Engine/Resource/BuiltinMeshAssets.h"
 #include "ActorImprint/ActorImprintAssetWorkflow.h"
+#include "Animation/AnimationClipAssetWorkflow.h"
+#include "Engine/Core/ComPtr/ComPtr.h"
 #include "Renderer/Win32WindowOutputDesc.h"
 #include "Engine/Core/Path/ExecutablePath.h"
 #include "Engine/Input/InputManager.h"
@@ -78,6 +83,114 @@ namespace
 
 	constexpr const char* kBuildConfiguration = ENGINE_BUILD_CONFIGURATION;
 	constexpr const char* kHotReloadScenePath = "build/_hotreload_temp.scene";
+
+	bool BrowseAnimationClipDirectory(
+		HWND owner,
+		const AssetManager& assets,
+		std::filesystem::path& directory,
+		std::string& diagnostic)
+	{
+		namespace fs = std::filesystem;
+		diagnostic.clear();
+
+		try
+		{
+			const fs::path root = fs::path(assets.GetAssetRoot()).lexically_normal();
+			fs::path initialDirectory;
+			std::string ignored;
+
+			if (!AssetCreationPath::ResolveDirectory(assets, directory, initialDirectory, ignored))
+			{
+				initialDirectory = root;
+			}
+
+			ComPtr<IFileOpenDialog> dialog;
+			FILEOPENDIALOGOPTIONS options{};
+
+			if (FAILED(CoCreateInstance(__uuidof(FileOpenDialog), nullptr,
+					CLSCTX_INPROC_SERVER, IID_PPV_ARGS(dialog.GetAddressOf()))) ||
+				FAILED(dialog->GetOptions(&options)) ||
+				FAILED(dialog->SetOptions(options | FOS_PICKFOLDERS |
+					FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR)))
+			{
+				diagnostic = "Could not open the folder picker.";
+				return false;
+			}
+
+			ComPtr<IShellItem> initialFolder;
+
+			if (SUCCEEDED(SHCreateItemFromParsingName(initialDirectory.c_str(), nullptr,
+				IID_PPV_ARGS(initialFolder.GetAddressOf()))))
+			{
+				dialog->SetFolder(initialFolder.Get());
+			}
+
+			const HRESULT shown = dialog->Show(owner);
+
+			if (shown == HRESULT_FROM_WIN32(ERROR_CANCELLED))
+			{
+				return false;
+			}
+
+			ComPtr<IShellItem> item;
+			PWSTR selectedPath = nullptr;
+
+			if (FAILED(shown) || FAILED(dialog->GetResult(item.GetAddressOf())) ||
+				FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &selectedPath)))
+			{
+				diagnostic = "Could not get the selected folder.";
+				return false;
+			}
+
+			const std::unique_ptr<wchar_t, decltype(&CoTaskMemFree)> path(selectedPath, CoTaskMemFree);
+			const fs::path selected = fs::path(path.get()).lexically_normal();
+			auto part = selected.begin();
+
+			for (const fs::path& rootPart : root)
+			{
+				if (rootPart.empty())
+				{
+					continue;
+				}
+
+				if (part == selected.end() || _wcsicmp(part->c_str(), rootPart.c_str()) != 0)
+				{
+					diagnostic = "Choose a folder below the asset root.";
+					return false;
+				}
+
+				++part;
+			}
+
+			fs::path relative;
+
+			for (; part != selected.end(); ++part)
+			{
+				relative /= *part;
+			}
+
+			if (relative.empty() || relative.lexically_normal() == ".")
+			{
+				diagnostic = "Choose a folder below the asset root.";
+				return false;
+			}
+
+			fs::path resolved;
+
+			if (!AssetCreationPath::ResolveDirectory(assets, relative, resolved, diagnostic))
+			{
+				return false;
+			}
+
+			directory = std::move(relative);
+			return true;
+		}
+		catch (const std::exception& exception)
+		{
+			diagnostic = exception.what();
+			return false;
+		}
+	}
 
 	std::string GetGameCodeBuildPath(const char* fileName)
 	{
@@ -2967,35 +3080,35 @@ void EditorApp::RenderAssetBrowserPanel()
 
 	if (m_pActorImprintSystem)
 	{
-	callbacks.onCreateActorImprint = [this](
-		const std::filesystem::path & relativeDirectory,
-		std::string_view name)
-		{
-			if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
+		callbacks.onCreateActorImprint = [this](
+			const std::filesystem::path & relativeDirectory,
+			std::string_view name)
 			{
-				m_assetBrowserPanel.SetDiagnostic("ActorImprint creation is unavailable.");
-				return false;
-			}
+				if (m_editorMode != EditorMode::Edit || !m_pAssetManager)
+				{
+					m_assetBrowserPanel.SetDiagnostic("ActorImprint creation is unavailable.");
+					return false;
+				}
 			
-			Guid createdGuid;
-			std::string error;
+				Guid createdGuid;
+				std::string error;
 			
-			if (!ActorImprintAssetWorkflow::Create(
-				relativeDirectory,
-				name,
-				*m_pAssetManager,
-				m_engineContext,
-				createdGuid,
-				&error))
-			{
-				m_assetBrowserPanel.SetDiagnostic(error);
-				return false;
-			}
+				if (!ActorImprintAssetWorkflow::Create(
+					relativeDirectory,
+					name,
+					*m_pAssetManager,
+					m_engineContext,
+					createdGuid,
+					&error))
+				{
+					m_assetBrowserPanel.SetDiagnostic(error);
+					return false;
+				}
 			
-			RebuildAssetBrowserView();
-			m_assetBrowserPanel.SelectAsset(createdGuid);
-			return true;
-		};
+				RebuildAssetBrowserView();
+				m_assetBrowserPanel.SelectAsset(createdGuid);
+				return true;
+			};
 	}
 
 	callbacks.queryActions = [this](const Guid& guid)
@@ -3003,6 +3116,7 @@ void EditorApp::RenderAssetBrowserPanel()
 			return QueryAssetActions(guid);
 		};
 
+	// Perform common action dor assets.
 	callbacks.onAction = [this](
 		AssetBrowserPanel::AssetAction action,
 		const Guid& guid,
@@ -3012,13 +3126,16 @@ void EditorApp::RenderAssetBrowserPanel()
 			return PerformAssetAction(action, guid, name);
 		};
 
+	// Move an asset file and its meta file to diffrent directly.
 	callbacks.onMoveAsset = [this](const Guid& guid, const std::filesystem::path& directory)
 	{
 		PerformAssetMove(guid, directory);
 	};
 
+	// Import new asset files and reflesh asset catalog to be displayed on asset browser.
 	callbacks.onImportFiles = [this](
-		const std::filesystem::path& directory, std::span<const std::filesystem::path> sources)
+		const std::filesystem::path& directory,
+		 std::span<const std::filesystem::path> sources)
 	{
 		std::string diagnostic;
 		if (AssetFileWorkflow::Import(*m_pAssetManager, directory, sources, diagnostic))
@@ -3034,6 +3151,80 @@ void EditorApp::RenderAssetBrowserPanel()
 	};
 
 	const auto drops = std::exchange(m_pendingExplorerDrops, {});
+
+	// Load model clips fpr displaying modal dialog of animation clips
+	if (m_pAssetManager)
+	{
+		callbacks.onLoadModelClips = [this](
+			const Guid& guid,
+			AssetBrowserPanel::ModelClips& outClips,
+			std::string& diagnostic)
+			{
+				const AssetEntry* entry = m_pAssetManager->GetAssetEntry(guid);
+
+				if (!entry || entry->type != AssetType::Mesh)
+				{
+					diagnostic = "The model asset is unavailable.";
+					return false;
+				}
+
+				const std::string path = m_pAssetManager->GetAssetPath(guid);
+
+				if (path.empty())
+				{
+					diagnostic = "The model has no source file.";
+					return false;
+				}
+
+				rendering::assets::ModelData model;
+				const auto loaded = rendering::assets::LoadModel(
+					std::filesystem::path(m_pAssetManager->GetAssetRoot()),
+					std::filesystem::path(path),
+					model);
+
+				if (!loaded.IsSuccess())
+				{
+					diagnostic = loaded.message;
+					return false;
+				}
+
+				outClips.modelGuid = guid;
+				outClips.modelName = StringEncoding::WideToUtf8(std::filesystem::path(path).filename().native());
+				outClips.nodes = std::move(model.nodes);
+				outClips.clips = std::move(model.animationClips);
+				return true;
+			};
+
+		callbacks.onBrowseClipDirectory = [this](
+			std::filesystem::path& directory,
+			std::string& diagnostic)
+			{
+				return BrowseAnimationClipDirectory(
+					m_window.GetHandle(), *m_pAssetManager, directory, diagnostic);
+			};
+
+		callbacks.onCreateAnimationClip = [this](
+			const AssetBrowserPanel::ModelClips& model,
+			std::size_t index,
+			const std::filesystem::path& directory,
+			std::string_view name,
+			std::string& diagnostic)
+			{
+				Guid createdGuid;
+
+				if (!AnimationClipAssetWorkflow::Create(
+					*m_pAssetManager, directory, name, model.modelGuid,
+					model.nodes, model.clips[index], createdGuid, diagnostic))
+				{
+					return false;
+				}
+
+				RebuildAssetBrowserView();
+				m_assetBrowserPanel.SelectAsset(createdGuid);
+				return true;
+			};
+	}
+
 	m_assetBrowserPanel.Render(callbacks, drops);
 }
 
@@ -3055,8 +3246,8 @@ AssetBrowserPanel::AssetActions EditorApp::QueryAssetActions(const Guid& guid) c
 	}
 
 	const bool busy = m_editorMode != EditorMode::Edit ||
-		HasActiveEditTransaction() ||
-		m_pendingSceneAction != PendingSceneAction::None;
+					  HasActiveEditTransaction() ||
+					  m_pendingSceneAction != PendingSceneAction::None;
 
 	if (busy)
 	{
