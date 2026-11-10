@@ -37,29 +37,6 @@ struct Mesh
 	float boundsRadius = 0.0f;			// Bounding sphere radius (for sorting)
 };
 
-// Bone data structure
-struct Bone
-{
-	std::wstring name;			// Bone name
-	int parentIndex = -1;		// Parent bone index (-1 if root)
-	DirectX::XMMATRIX offset;	// Offset matrix
-	int nodeIndex = -1;			// Node index in the model's node hierarchy
-};
-
-// Skeleton data structure
-struct Skeleton
-{
-	std::vector<Bone> bones;						// Bone array
-	std::unordered_map<std::wstring, int> boneMap;	// Map from bone name to index
-};
-
-struct AnimationClip
-{
-	std::wstring name;	// Animation clip name
-	float duration;		// Duration in seconds
-	float ticksPerSecond; // Ticks per second
-};
-
 using Model = std::vector<Mesh>;	// Model is a collection of meshes
 
 //mesh type enumeration

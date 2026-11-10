@@ -21,7 +21,7 @@ int WINAPI WinMain(
 		return EXIT_FAILURE;
 	}
 
-	const HRESULT comStatus = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	const HRESULT comStatus = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
 	if (FAILED(comStatus))
 	{

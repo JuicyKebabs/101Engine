@@ -1,13 +1,15 @@
 #pragma once
+
 #include "Engine/Core/GUID/Guid.h"
 #include "Engine/Resource/AssetType.h"
 #include "Engine/Resource/AssetChange.h"
 #include "Engine/Resource/SceneAssetUsage.h"
 #include "RendererAssets/AssetFiles.h"
 #include "Engine/Core/Math/Math.h"
-#include <memory>
 #include "Engine/Resource/Texture.h"
 #include "Engine/Audio/AudioHandle.h"
+
+#include <memory>
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -54,7 +56,7 @@ struct GeometryInfo
 
 struct ModelAnimationMetadata
 {
-	std::vector<rendering::assets::ModelNode> nodes;
+	std::string name;
 	std::vector<rendering::assets::AnimationChannel> channels;
 	double duration = 0;
 	double ticksPerSecond = 30;
@@ -102,7 +104,6 @@ public:
 	// Get the handle for each asset type by GUID
 	const std::vector<GeometryInfo>& GetGeometryInfos(SceneBase& scene, const Guid& guid);
 	rendering::TextureHandle GetTextureHandle(SceneBase& scene, const Guid& guid);
-	const ModelAnimationMetadata* GetModelAnimationMetadata(const Guid& guid) const;
 	rendering::MaterialHandle RegisterSceneMaterial(SceneBase& scene, const rendering::MaterialDesc& description);
 	void ReleaseScene(const SceneBase* scene) noexcept;
 	std::unique_ptr<PreparedSceneAssetTransfer> PrepareSceneTransfer(const SceneBase& source, const SceneBase& destination);
@@ -133,11 +134,14 @@ private:
 		// Retention also covers imported meshes with no visible node placement.
 		// This is identity bookkeeping only; Bounds/Revision stay in Components.
 		std::vector<rendering::GeometryHandle> registeredGeometries;
-		ModelAnimationMetadata animation;
+		std::vector<rendering::assets::ModelNode> nodes;
+		std::vector<ModelAnimationMetadata> animation;
 		std::vector<std::string> textureDependencies;
 		std::vector<Guid> textureAssetDependencies;
 	};
+
 	class AcquisitionBatch;
+
 	std::unordered_map<Guid, CachedModel> m_loadedModels;
 	std::unordered_map<Guid, rendering::TextureHandle> m_loadedTextures;
 	std::unordered_map<std::string, rendering::TextureHandle> m_dependencyTextures;

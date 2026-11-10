@@ -1,7 +1,7 @@
 #pragma once
 
-
 #include "Engine/Resource/AssetManager.h"
+#include "RendererAssets/AssetFiles.h"
 
 #include <string>
 #include <optional>
@@ -49,6 +49,14 @@ public:
 		std::string deleteReason;
 	};
 
+	struct ModelClips
+	{
+		Guid modelGuid;
+		std::string modelName;
+		std::vector<rendering::assets::ModelNode> nodes;
+		std::vector<rendering::assets::ImportedAnimationClip> clips;
+	};
+
 	struct Callbacks
 	{
 		// For refresh button
@@ -65,8 +73,20 @@ public:
 		std::function<bool(const std::filesystem::path&, std::string_view)> onCreateScene;
 		std::function<bool(const std::filesystem::path&, std::string_view)> onCreateActorImprint;
 
+		// For drag-and-drop of files into the asset browser panel.
 		std::function<void(
-			const std::filesystem::path&, std::span<const std::filesystem::path>)> onImportFiles;
+			const std::filesystem::path&,
+			std::span<const std::filesystem::path>)> onImportFiles;
+
+		// For loading animation clips from a model file to display in the modal dialog.
+		std::function<bool(const Guid&, ModelClips&, std::string&)> onLoadModelClips;
+		std::function<bool(std::filesystem::path&, std::string&)> onBrowseClipDirectory;
+		std::function<bool(
+			const ModelClips&,
+			std::size_t,
+			const std::filesystem::path&,
+			std::string_view,
+			std::string&)> onCreateAnimationClip;
 	};
 
 public:
@@ -124,11 +144,19 @@ private:
 	char m_createName[256]{};						// Store the name of the new asset being created (without extension).
 	std::string m_createDiagnostic;					// Diagnostic message for the asset creation process.
 
+	// State for the animation clip modal dialog, used when the user clicks the "Clips" button.
+	std::optional<Guid> m_pendingClipsSource;
+	ModelClips m_modelClips;
+	std::optional<std::size_t> m_selectedClip;
+	std::filesystem::path m_clipDirectory;
+	std::string m_clipName;
+	std::string m_clipsDiagnostic;
+
 private:
 	// Build a folder tree from the AssetManager's asset catalog and filesystem.
 	static std::vector<FolderEntry> BuildFolderTree(const AssetManager& assets);
 
-	// get folder entry by key, return nullptr if not found
+	// Get folder entry by key, return nullptr if not found
 	static const FolderEntry* FindFolder(
 		const std::vector<FolderEntry>& folders,
 		const std::string& key);
@@ -142,4 +170,5 @@ private:
 	void DrawSelection() const;
 	void DrawCreateMenu(const Callbacks& callbacks);
 	void DrawCreateDialog(const Callbacks& callbacks);
+	void DrawClipsDialog(const Callbacks& callbacks);
 };

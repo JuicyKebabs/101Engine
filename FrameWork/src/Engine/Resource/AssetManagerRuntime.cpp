@@ -273,10 +273,20 @@ public:
 			result.placements.push_back(geometry);
 		}
 
-		result.animation.nodes = std::move(imported.nodes);
-		result.animation.channels = std::move(imported.animationChannels);
-		result.animation.duration = imported.animationDuration;
-		result.animation.ticksPerSecond = imported.ticksPerSecond;
+		result.nodes = std::move(imported.nodes);
+
+		result.animation.reserve(imported.animationClips.size());
+
+		for (auto& clip : imported.animationClips)
+		{
+			auto& metadata = result.animation.emplace_back();
+
+			metadata.name = std::move(clip.name);
+			metadata.channels = clip.channels;
+			metadata.duration = clip.durationTicks;
+			metadata.ticksPerSecond = std::move(clip.ticksPerSecond);
+		}
+
 		RetainModel(result);
 		return result;
 	}
@@ -551,12 +561,6 @@ rendering::MaterialHandle AssetManager::RegisterSceneMaterial(SceneBase& scene, 
 	const rendering::MaterialHandle handle = batch.Material(description);
 	batch.Commit();
 	return handle;
-}
-
-const ModelAnimationMetadata* AssetManager::GetModelAnimationMetadata(const Guid& guid) const
-{
-	const auto cached = m_loadedModels.find(guid);
-	return cached == m_loadedModels.end() ? nullptr : &cached->second.animation;
 }
 
 void AssetManager::ReleaseScene(const SceneBase* scene) noexcept

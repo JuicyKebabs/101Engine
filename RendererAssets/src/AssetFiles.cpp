@@ -64,6 +64,59 @@ Vector3 CopyVector(const aiVector3D& source)
 	return value;
 }
 
+ImportedAnimationClip CopyanimationClip(const aiAnimation& animation)
+{
+	ImportedAnimationClip candidate;
+
+	candidate.name = animation.mName.C_Str();
+	OutputDebugStringA(("Copying animation clip: " + candidate.name + "\n").c_str());
+
+	candidate.durationTicks = animation.mDuration;
+
+	const double defaultTicksPerSecond = 30.0;
+	candidate.ticksPerSecond =
+		animation.mTicksPerSecond == 0 ?
+		defaultTicksPerSecond : animation.mTicksPerSecond;
+
+	for (unsigned channelIndex = 0; channelIndex < animation.mNumChannels; ++channelIndex)
+	{
+		const aiNodeAnim& source = *animation.mChannels[channelIndex];
+		AnimationChannel channel;
+		channel.nodeName = source.mNodeName.C_Str();
+
+		const auto copyVectors = [](const aiVectorKey* keys, unsigned count, std::vector<AnimationVectorKey>& destination)
+			{
+				destination.reserve(count);
+				for (unsigned index = 0; index < count; ++index)
+				{
+					AnimationVectorKey key;
+					key.time = keys[index].mTime;
+					key.value = CopyVector(keys[index].mValue);
+					destination.push_back(key);
+				}
+			};
+
+		copyVectors(source.mPositionKeys, source.mNumPositionKeys, channel.positions);
+		copyVectors(source.mScalingKeys, source.mNumScalingKeys, channel.scales);
+
+		for (unsigned keyIndex = 0; keyIndex < source.mNumRotationKeys; ++keyIndex)
+		{
+			const aiQuatKey& sourceKey = source.mRotationKeys[keyIndex];
+			AnimationRotationKey key;
+			key.time = sourceKey.mTime;
+			key.value.x = sourceKey.mValue.x;
+			key.value.y = sourceKey.mValue.y;
+			key.value.z = sourceKey.mValue.z;
+			key.value.w = sourceKey.mValue.w;
+			channel.rotations.push_back(key);
+		}
+
+		candidate.channels.push_back(std::move(channel));
+	}
+
+	return candidate;
+}
+
 }
 
 GeometryDesc MeshData::Description() const
@@ -112,9 +165,15 @@ Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::
 	const std::string utf8Path(reinterpret_cast<const char*>(encodedPath.data()), encodedPath.size());
 
 	Assimp::Importer importer;
-	const unsigned flags = aiProcess_Triangulate | aiProcess_CalcTangentSpace |
-		aiProcess_GenSmoothNormals | aiProcess_GenUVCoords | aiProcess_RemoveRedundantMaterials |
-		aiProcess_OptimizeMeshes | aiProcess_LimitBoneWeights | aiProcess_ConvertToLeftHanded;
+	const unsigned flags =
+		aiProcess_Triangulate |
+		aiProcess_CalcTangentSpace |
+		aiProcess_GenSmoothNormals |
+		aiProcess_GenUVCoords |
+		aiProcess_RemoveRedundantMaterials |
+		aiProcess_OptimizeMeshes |
+		aiProcess_LimitBoneWeights |
+		aiProcess_ConvertToLeftHanded;	// Convert to left-handed coordinates for DirectX
 
 	const aiScene* scene = importer.ReadFile(utf8Path, flags);
 
@@ -122,6 +181,10 @@ Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::
 	{
 		return Failure("Model parsing failed: " + std::string(importer.GetErrorString()));
 	}
+
+	//------------------------------------------------------
+	// Copying the meshes and their vertex/index data.
+	//------------------------------------------------------
 
 	ModelData candidate;
 	candidate.meshes.resize(scene->mNumMeshes);
@@ -216,8 +279,10 @@ Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::
 		}
 	}
 
+	//------------------------------------------------------
+	// Copying the node hierarchy and mesh placements.
+	//------------------------------------------------------
 	std::function<void(const aiNode*, std::int32_t, const Matrix4x4&)> visit;
-
 	visit = [&](const aiNode* node, std::int32_t parent, const Matrix4x4& parentToModel)
 	{
 		ModelNode copiedNode;
@@ -251,47 +316,20 @@ Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::
 	Matrix4x4 modelRoot = Matrix4x4::Identity();
 	visit(scene->mRootNode, -1, modelRoot);
 
+	//------------------------------------------------------
+	// Copying animation clips.
+	//------------------------------------------------------
 	if (scene->mNumAnimations != 0)
 	{
-		const aiAnimation& animation = *scene->mAnimations[0];
-		candidate.animationDuration = animation.mDuration;
-		candidate.ticksPerSecond = animation.mTicksPerSecond == 0 ? 30 : animation.mTicksPerSecond;
+		std::vector<ImportedAnimationClip> clips;
+		clips.reserve(scene->mNumAnimations);
 
-		for (unsigned channelIndex = 0; channelIndex < animation.mNumChannels; ++channelIndex)
+		for (unsigned animationIndex = 0; animationIndex < scene->mNumAnimations; ++animationIndex)
 		{
-			const aiNodeAnim& source = *animation.mChannels[channelIndex];
-			AnimationChannel channel;
-			channel.nodeName = source.mNodeName.C_Str();
-
-			const auto copyVectors = [](const aiVectorKey* keys, unsigned count, std::vector<AnimationVectorKey>& destination)
-			{
-				destination.reserve(count);
-				for (unsigned index = 0; index < count; ++index)
-				{
-					AnimationVectorKey key;
-					key.time = keys[index].mTime;
-					key.value = CopyVector(keys[index].mValue);
-					destination.push_back(key);
-				}
-			};
-
-			copyVectors(source.mPositionKeys, source.mNumPositionKeys, channel.positions);
-			copyVectors(source.mScalingKeys, source.mNumScalingKeys, channel.scales);
-
-			for (unsigned keyIndex = 0; keyIndex < source.mNumRotationKeys; ++keyIndex)
-			{
-				const aiQuatKey& sourceKey = source.mRotationKeys[keyIndex];
-				AnimationRotationKey key;
-				key.time = sourceKey.mTime;
-				key.value.x = sourceKey.mValue.x;
-				key.value.y = sourceKey.mValue.y;
-				key.value.z = sourceKey.mValue.z;
-				key.value.w = sourceKey.mValue.w;
-				channel.rotations.push_back(key);
-			}
-
-			candidate.animationChannels.push_back(std::move(channel));
+			clips.push_back(CopyanimationClip(*scene->mAnimations[animationIndex]));
 		}
+
+		candidate.animationClips = std::move(clips);
 	}
 
 	output = std::move(candidate);

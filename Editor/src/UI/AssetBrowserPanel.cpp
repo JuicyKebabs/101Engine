@@ -3,6 +3,7 @@
 #include "Engine/Resource/BuiltinMeshAssets.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "misc/cpp/imgui_stdlib.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -60,6 +61,7 @@ const char* AssetTypeName(AssetType type)
 	case AssetType::Audio: return "Audio";
 	case AssetType::ActorImprint: return "ActorImprint";
 	case AssetType::Scene: return "Scene";
+	case AssetType::AnimationClip: return "AnimationClip";
 	default: return "Unknown";
 	}
 }
@@ -90,6 +92,10 @@ void DrawAssetIcon(const ImVec2& position, float size, AssetType type)
 	case AssetType::ActorImprint:
 		color = IM_COL32(210, 115, 90, 255);
 		label = "IMPRINT";
+		break;
+	case AssetType::AnimationClip:
+		color = IM_COL32(75, 165, 170, 255);
+		label = "CLIP";
 		break;
 	default:
 		break;
@@ -582,8 +588,20 @@ void AssetBrowserPanel::DrawAssetMenu(const AssetEntry& entry, const Callbacks& 
 		}
 	};
 
+	// Draw the "Clips" menu item for mesh assets if the callback is available and the asset is not a built-in mesh.
+	if (entry.type == AssetType::Mesh && !FindBuiltinMeshAsset(entry.guid))
+	{
+		const bool canLoadClips = static_cast<bool>(callbacks.onLoadModelClips);
+
+		if (ImGui::MenuItem("Clips", nullptr, false, canLoadClips))
+		{
+			m_pendingClipsSource = entry.guid;
+		}
+	}
+
 	const bool available = static_cast<bool>(callbacks.onAction);
 	
+	// Draw the "Open" or "Edit" menu item for scene and actor imprint assets.
 	if (entry.type == AssetType::Scene || entry.type == AssetType::ActorImprint)
 	{
 		const char* label = entry.type == AssetType::Scene ? "Open" : "Edit";
@@ -844,6 +862,144 @@ void AssetBrowserPanel::DrawCreateDialog(const Callbacks& callbacks)
 	ImGui::EndPopup();
 }
 
+void AssetBrowserPanel::DrawClipsDialog(const Callbacks& callbacks)
+{
+	const auto selectClip = [this](std::size_t index)
+	{
+		m_selectedClip = index;
+		const auto& clip = m_modelClips.clips[index];
+		m_clipName = clip.name.empty() ? "Clip " + std::to_string(index + 1) : clip.name;
+	};
+
+	const auto source = std::exchange(m_pendingClipsSource, std::nullopt);
+
+	if (source)
+	{
+		m_modelClips = {};
+		m_selectedClip.reset();
+		m_clipName.clear();
+		m_clipsDiagnostic.clear();
+		m_clipDirectory = ProjectDirectoryForKey(m_selectedFolderKey);
+
+		if (m_clipDirectory == ".")
+		{
+			m_clipDirectory.clear();
+		}
+
+		if (!callbacks.onLoadModelClips ||
+			!callbacks.onLoadModelClips(*source, m_modelClips, m_clipsDiagnostic))
+		{
+			if (m_clipsDiagnostic.empty())
+			{
+				m_clipsDiagnostic = "Could not load the model clips.";
+			}
+		}
+		else if (m_modelClips.clips.size() == 1)
+		{
+			selectClip(0);
+		}
+
+		ImGui::OpenPopup("Model Clips");
+	}
+
+	if (!ImGui::BeginPopupModal("Model Clips", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		return;
+	}
+
+	if (!m_modelClips.modelName.empty())
+	{
+		ImGui::TextUnformatted(m_modelClips.modelName.c_str());
+	}
+
+	if (!m_modelClips.clips.empty())
+	{
+		if (ImGui::BeginChild("##ModelClipList", ImVec2(360.0f, 160.0f)))
+		{
+			for (std::size_t index = 0; index < m_modelClips.clips.size(); ++index)
+			{
+				const auto& clip = m_modelClips.clips[index];
+				const std::string label = clip.name.empty()
+					? "Clip " + std::to_string(index + 1)
+					: clip.name;
+
+				ImGui::PushID(static_cast<int>(index));
+
+				if (ImGui::Selectable(label.c_str(), m_selectedClip == index, 0, ImVec2(270.0f, 0.0f)))
+				{
+					if (m_selectedClip != index)
+					{
+						selectClip(index);
+						m_clipsDiagnostic.clear();
+					}
+				}
+
+				ImGui::SameLine();
+
+				if (clip.ticksPerSecond > 0.0)
+				{
+					ImGui::TextDisabled("%.2f s", clip.durationTicks / clip.ticksPerSecond);
+				}
+
+				ImGui::PopID();
+			}
+		}
+
+		ImGui::EndChild();
+		ImGui::InputText("Name", &m_clipName);
+		const std::string folder = m_clipDirectory.empty()
+			? "Choose a folder below Assets"
+			: "Assets / " + DisplayPath(m_clipDirectory);
+		ImGui::TextWrapped("%s", folder.c_str());
+		ImGui::SameLine();
+
+		ImGui::BeginDisabled(!callbacks.canCreate || !callbacks.onBrowseClipDirectory);
+		const bool browse = ImGui::Button("Browse...");
+		ImGui::EndDisabled();
+
+		if (browse && callbacks.onBrowseClipDirectory)
+		{
+			std::string diagnostic;
+
+			if (callbacks.onBrowseClipDirectory(m_clipDirectory, diagnostic) || !diagnostic.empty())
+			{
+				m_clipsDiagnostic = std::move(diagnostic);
+			}
+		}
+	}
+	else if (m_clipsDiagnostic.empty())
+	{
+		ImGui::TextUnformatted("This model has no animation clips.");
+	}
+
+	if (!m_clipsDiagnostic.empty())
+	{
+		ImGui::TextWrapped("%s", m_clipsDiagnostic.c_str());
+	}
+
+	const bool canCreate =
+		callbacks.canCreate && callbacks.onCreateAnimationClip &&
+		m_selectedClip && *m_selectedClip < m_modelClips.clips.size() &&
+		!m_clipName.empty() && !m_clipDirectory.empty();
+
+	ImGui::BeginDisabled(!canCreate);
+	const bool create = ImGui::Button("Create");
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+
+	const bool cancel = ImGui::Button("Cancel");
+
+	if (cancel || (create && canCreate &&
+		callbacks.onCreateAnimationClip(
+			m_modelClips, *m_selectedClip, m_clipDirectory, m_clipName, m_clipsDiagnostic)))
+	{
+		m_modelClips = {};
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
+}
+
 void AssetBrowserPanel::Render(const Callbacks& callbacks, std::span<const FileDrop> drops)
 {
 	fs::path importDirectory;
@@ -954,6 +1110,7 @@ void AssetBrowserPanel::Render(const Callbacks& callbacks, std::span<const FileD
 
 		DrawCreateDialog(callbacks);
 		DrawAssetActionDialog(callbacks);
+		DrawClipsDialog(callbacks);
 	}
 
 	ImGui::End();

@@ -10,7 +10,7 @@ enum class AssetType
 	//Material,
 	//Shader,
 	//Font,
-	//Animation,
+	AnimationClip,
 	//Scene,
 	//Script,
 	Unknown
@@ -22,3 +22,4 @@ struct MeshAsset {};
 struct TextureAsset {};
 struct AudioAsset {};
 struct SceneAsset {};
+struct AnimationClipAsset {};
