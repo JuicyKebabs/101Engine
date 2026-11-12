@@ -92,6 +92,13 @@ struct DrawRange
 	std::int32_t baseVertex = 0;
 };
 
+// Half-open range of matrices in FrameRenderData::skinningPalettes.
+struct SkinningPaletteRange
+{
+	std::uint32_t begin = 0;
+	std::uint32_t end = 0;
+};
+
 // A unit of the drawing an object in a specific View.
 // Describe what is drawn, how it looks, where it is, and which Views it appears in.
 // One immutable submitted value may appear in multiple View index lists.
@@ -120,6 +127,7 @@ struct RenderObject
 	std::optional<ProceduralGeometry> procedural;
 	DrawRange drawRange;
 	std::optional<ScissorRect> scissor;
+	std::optional<SkinningPaletteRange> skinningPalette;
 };
 
 // Camera/projection/settings are owned frame values.
@@ -194,6 +202,7 @@ struct FrameRenderData
 	std::vector<RenderView> views;
 	std::vector<AuxiliaryPass> auxiliaryPasses;
 	std::optional<DirectionalLight> directionalLight;
+	std::vector<Matrix4x4> skinningPalettes;
 	float time = 0;
 
 private:

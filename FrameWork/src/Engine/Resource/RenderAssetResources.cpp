@@ -232,7 +232,7 @@ rendering::MaterialDesc RenderAssetResources::MakeMaterial(
 	bool flipX,
 	bool flipY) const
 {
-	rendering::Vector4 white;
+	Vector4 white;
 	white.x = 1;
 	white.y = 1;
 	white.z = 1;
@@ -241,7 +241,7 @@ rendering::MaterialDesc RenderAssetResources::MakeMaterial(
 	baseColor.name = "BaseColor";
 	baseColor.value = white;
 
-	rendering::Vector4 uv;
+	Vector4 uv;
 	uv.x = uvScale.x;
 	uv.y = uvScale.y;
 	uv.z = uvOffset.x;
@@ -250,7 +250,7 @@ rendering::MaterialDesc RenderAssetResources::MakeMaterial(
 	uvParameter.name = "UVTransform";
 	uvParameter.value = uv;
 
-	rendering::Vector4 localQuad;
+	Vector4 localQuad;
 	localQuad.x = flipX ? -1.0f : 1.0f;
 	localQuad.y = flipY ? -1.0f : 1.0f;
 	localQuad.z = (0.5f - pivot.x) * localQuad.x;

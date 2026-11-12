@@ -6,10 +6,14 @@
 #include <assimp/scene.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <optional>
+#include <string_view>
+#include <unordered_map>
 
 namespace rendering::assets
 {
@@ -64,6 +68,98 @@ Vector3 CopyVector(const aiVector3D& source)
 	return value;
 }
 
+using NodeIndices = std::unordered_map<std::string_view, std::optional<std::size_t>>;
+
+Result CopySkin(const aiMesh& source, const NodeIndices& nodeIndices, MeshSkinData& output)
+{
+	MeshSkinData skin;
+	skin.bones.reserve(source.mNumBones);
+	skin.vertexWeights.resize(source.mNumVertices);
+
+	std::vector<std::size_t> influenceCounts(source.mNumVertices);
+
+	// Copy the bone data and accumulate the vertex influence counts.
+	for (unsigned boneIndex = 0; boneIndex < source.mNumBones; ++boneIndex)
+	{
+		const aiBone* sourceBone = source.mBones[boneIndex];
+
+		if (!sourceBone)
+		{
+			return Failure("CopySkin : Mesh has no bones.");
+		}
+
+		const auto node = nodeIndices.find(sourceBone->mName.C_Str());
+
+		if (node == nodeIndices.end() || !node->second)
+		{
+			return Failure("CopySkin : Skin bone has no unique model node: " + std::string(sourceBone->mName.C_Str()));
+		}
+
+		// Copy the bone data and accumulate the vertex influence counts.
+		SkinBone bone;
+		bone.nodeIndex = *node->second;
+		bone.meshToBoneBind = CopyMatrix(sourceBone->mOffsetMatrix);
+
+		skin.bones.push_back(bone);
+
+		// Accumulate the vertex influences for this bone.
+		for (unsigned index = 0; index < sourceBone->mNumWeights; ++index)
+		{
+			const aiVertexWeight& influence = sourceBone->mWeights[index];
+
+			if (influence.mVertexId >= source.mNumVertices ||
+				!std::isfinite(influence.mWeight) ||
+				influence.mWeight < 0.0f)
+			{
+				return Failure("CopySkin : Skin contains an invalid vertex influence.");
+			}
+
+			if (influence.mWeight == 0.0f)
+			{
+				continue;
+			}
+
+			// Count how many bones influence this vertex so we can check against the limit.
+			auto& count = influenceCounts[influence.mVertexId];
+
+			if (count >= kMaxVertexBoneInfluences)
+			{
+				return Failure("CopySkin : Vertex has too many bone influences.");
+			}
+
+			auto& vertex = skin.vertexWeights[influence.mVertexId];
+			vertex.boneIndices[count] = boneIndex;
+			vertex.boneWeights[count] = influence.mWeight;
+			++count;
+		}
+	}
+
+	for (auto& vertex : skin.vertexWeights)
+	{
+		double total = 0.0;
+
+		for (float weight : vertex.boneWeights)
+		{
+			total += weight;
+		}
+
+		if (total == 0.0)
+		{
+			// A zero-weight vertex keeps its original position when skinned.
+			continue;
+		}
+
+		// Normalize the weights so they sum to 1.0.
+		for (float& weight : vertex.boneWeights)
+		{
+			weight = static_cast<float>(weight / total);
+		}
+	}
+
+	output = std::move(skin);
+	return {};
+}
+
 ImportedAnimationClip CopyanimationClip(const aiAnimation& animation)
 {
 	ImportedAnimationClip candidate;
@@ -102,12 +198,14 @@ ImportedAnimationClip CopyanimationClip(const aiAnimation& animation)
 		for (unsigned keyIndex = 0; keyIndex < source.mNumRotationKeys; ++keyIndex)
 		{
 			const aiQuatKey& sourceKey = source.mRotationKeys[keyIndex];
+
 			AnimationRotationKey key;
 			key.time = sourceKey.mTime;
 			key.value.x = sourceKey.mValue.x;
 			key.value.y = sourceKey.mValue.y;
 			key.value.z = sourceKey.mValue.z;
 			key.value.w = sourceKey.mValue.w;
+
 			channel.rotations.push_back(key);
 		}
 
@@ -165,6 +263,10 @@ Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::
 	const std::string utf8Path(reinterpret_cast<const char*>(encodedPath.data()), encodedPath.size());
 
 	Assimp::Importer importer;
+
+	// Limit the number of bone influences per vertex to the maximum supported by the engine.
+	importer.SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS, static_cast<int>(kMaxVertexBoneInfluences));
+
 	const unsigned flags =
 		aiProcess_Triangulate |
 		aiProcess_CalcTangentSpace |
@@ -315,6 +417,42 @@ Result LoadModel(const std::filesystem::path& absoluteBaseDirectory, const std::
 
 	Matrix4x4 modelRoot = Matrix4x4::Identity();
 	visit(scene->mRootNode, -1, modelRoot);
+
+	//------------------------------------------------------
+	// Copying the skinning data.
+	//------------------------------------------------------
+	NodeIndices nodeIndices;
+	nodeIndices.reserve(candidate.nodes.size());
+
+	// Build a map of node names to their indices in the model's node hierarchy.
+	for (std::size_t nodeIndex = 0; nodeIndex < candidate.nodes.size(); ++nodeIndex)
+	{
+		const auto inserted = nodeIndices.try_emplace(candidate.nodes[nodeIndex].name, nodeIndex);
+
+		if (!inserted.second)
+		{
+			inserted.first->second.reset();	// Mark as non-unique.
+		}
+	}
+
+	// Copy the skinning data for each mesh that has bones.
+	for (std::size_t meshIndex = 0; meshIndex < candidate.meshes.size(); ++meshIndex)
+	{
+		MeshData& mesh = candidate.meshes[meshIndex];
+
+		if (!mesh.valid || !scene->mMeshes[meshIndex]->HasBones())
+		{
+			continue;
+		}
+
+		const Result copied = CopySkin(*scene->mMeshes[meshIndex], nodeIndices, mesh.skin);
+
+		if (!copied.IsSuccess())
+		{
+			mesh.skin.valid = false;
+			mesh.diagnostic += " " + copied.message;
+		}
+	}
 
 	//------------------------------------------------------
 	// Copying animation clips.

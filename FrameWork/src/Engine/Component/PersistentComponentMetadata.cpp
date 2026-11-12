@@ -2,19 +2,22 @@
 #include "PersistentEnumMetadata.h"
 #include "PersistentMetadataHelpers.h"
 #include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/SkinnedMeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/UI/UIImage.h"
+#include "Engine/Component/AnimationPlayer.h"
 #include <cmath>
 
 template<class T>
 void PersistentComponentMetadata::AddRendererProperties(TypeMetadataBuilder<T>& builder, bool writeLegacySortOrder)
 {
 	PersistentMetadata::AddComponentName(builder);
-	builder.Property("color", &T::GetColor, &T::SetColor)
-		.Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
+
+	builder.Property("color", &T::GetColor, &T::SetColor).Inspector(InspectorMetadata{.presentation = InspectorPresentation::Color});
 	builder.Property("visible", &T::GetVisible, &T::SetVisible);
+
 	// UI order is authoritative; retain the legacy JSON field without applying it twice.
 	builder.Property(
 		"sortOrderInCanvas",
@@ -43,9 +46,9 @@ void PersistentComponentMetadata::AddUIRendererProperties(TypeMetadataBuilder<T>
 	builder.template Accessor<ActorReference>(
 		"canvasActorId",
 		[](const T& c, ActorReference& v)
-	{
+		{
 		return c.GetCanvasActorReference(v);
-	},
+		},
 		[](T& c, const ActorReference& v)
 		{
 			c.SetCanvasActorReference(v);
@@ -62,6 +65,15 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::MeshRenderer(std::str
 	return PersistentMetadata::Finish(builder);
 }
 
+std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SkinnedMeshRenderer(std::string stableTypeName)
+{
+	TypeMetadataBuilder<::SkinnedMeshRenderer> builder(std::move(stableTypeName));
+	AddRendererProperties(builder);
+	builder.Property("meshAssetId", &::SkinnedMeshRenderer::GetMeshAssetReference, &::SkinnedMeshRenderer::TrySetMeshAssetReference);
+	builder.Property("castShadow", &::SkinnedMeshRenderer::GetCastShadow, &::SkinnedMeshRenderer::SetCastShadow).Optional();
+	return PersistentMetadata::Finish(builder);
+}
+
 std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::string stableTypeName)
 {
 	using T = ::SpriteRenderer;
@@ -74,8 +86,7 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::SpriteRenderer(std::s
 	builder.Property("uvOffset", &T::GetUVOffset, &T::SetUVOffset).Validate(ValueValidation::Finite2);
 	builder.Property("pivot", &T::GetPivot, &T::SetPivot).Validate(ValueValidation::UnitCoordinate2);
 
-	builder.Property("billboardType", &T::GetBillboardType, &T::SetBillboardType)
-		.SerializedAs(EnumSerializationFormat::Integer);
+	builder.Property("billboardType", &T::GetBillboardType, &T::SetBillboardType).SerializedAs(EnumSerializationFormat::Integer);
 
 	builder.Property("flipX", &T::IsFlipX, &T::SetFlipX);
 	builder.Property("flipY", &T::IsFlipY, &T::SetFlipY);
@@ -107,18 +118,48 @@ std::unique_ptr<TypeMetadata> PersistentComponentMetadata::Canvas(std::string st
 
 	PersistentMetadata::AddComponentName(builder);
 
-	builder.Property("renderMode", &T::GetAuthoredRenderMode, &T::SetAuthoredRenderMode)
-		.SerializedAs(EnumSerializationFormat::Integer);
-	builder.Property("scaleMode", &T::GetScaleMode, &T::SetScaleMode)
-		.SerializedAs(EnumSerializationFormat::Integer)
-		.Optional();
+	builder.Property("renderMode", &T::GetAuthoredRenderMode, &T::SetAuthoredRenderMode).SerializedAs(EnumSerializationFormat::Integer);
+	builder.Property("scaleMode", &T::GetScaleMode, &T::SetScaleMode).SerializedAs(EnumSerializationFormat::Integer).Optional();
 	builder.Property("sortOrder", &T::GetSortOrder, &T::SetSortOrder);
 	builder.Property("visible", &T::IsVisible, &T::SetVisible);
 
 	builder.Property("referenceSize", &T::GetReferenceSize, &T::SetReferenceSize)
-		.Validate([](const Vector2& v) { return ValueValidation::Finite2(v) && v.x > 0 && v.y > 0; });
-	builder.Property("matchWidthOrHeight", &T::GetMatchWidthOrHeight, &T::SetMatchWidthOrHeight)
-		.Optional().Validate([](float v) { return std::isfinite(v) && v >= 0 && v <= 1; });
+		.Validate([](const Vector2& v)
+			{
+				return ValueValidation::Finite2(v) && v.x > 0 && v.y > 0;
+			});
+	
+	
+	builder.Property("matchWidthOrHeight", &T::GetMatchWidthOrHeight, &T::SetMatchWidthOrHeight).Optional()
+		.Validate([](float v)
+			{
+				return std::isfinite(v) && v >= 0 && v <= 1;
+			});
+
+	return PersistentMetadata::Finish(builder);
+}
+
+
+std::unique_ptr<TypeMetadata> PersistentComponentMetadata::AnimationPlayer(std::string stableTypeName)
+{
+	using T = ::AnimationPlayer;
+	TypeMetadataBuilder<T> builder(std::move(stableTypeName));
+
+	InspectorMetadata clipInspector;
+	clipInspector.label = "Clips";
+	builder.Property("clips", &T::GetClipSlots, &T::TrySetClipSlots).Inspector(clipInspector).Optional();
+
+	InspectorMetadata startInspector;
+	startInspector.label = "Play On Start";
+	builder.Property("playOnStart", &T::GetPlayOnStart, &T::SetPlayOnStart).Inspector(startInspector).Optional();
+
+	InspectorMetadata loopInspector;
+	loopInspector.label = "Loop";
+	builder.Property("loop", &T::GetLoop, &T::SetLoop).Inspector(loopInspector).Optional();
+
+	InspectorMetadata speedInspector;
+	speedInspector.label = "Playback Speed";
+	builder.Property("playbackSpeed", &T::GetPlaybackSpeed, &T::SetPlaybackSpeed).Inspector(speedInspector).Optional();
 
 	return PersistentMetadata::Finish(builder);
 }

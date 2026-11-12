@@ -1,8 +1,6 @@
 #pragma once
-#include <unordered_map>
+
 #include "Engine/Component/Camera.h"
-#include "Engine/Core/ComPtr/ComPtr.h"
-#include "Engine/Graphics/RenderData.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Actor/ActorPool.h"
 #include "Engine/Core/GUID/Guid.h"
@@ -11,8 +9,10 @@
 #include "Engine/Graphics/RenderSystem.h"
 #include "Engine/Graphics/CameraSystem.h"
 #include "Engine/Graphics/LightTypes.h"
+#include "ENgine/Animation/AnimationSystem.h"
 #include "Engine/Physics/CollisionSystem.h"
 #include "Engine/ActorImprint/ActorImprintInstanceRegistry.h"
+#include <unordered_map>
 
 // Forward declarations
 class SceneManager;
@@ -48,6 +48,7 @@ public:
 	void PreUpdate(float deltaTime);			// Pre-update
 	void Update(float deltaTime);				// Update
 	void LateUpdate(float deltaTime);			// Late update
+
 	bool AppendRenderData(
 		rendering::FrameRenderData& frame,
 		const rendering::ViewOutput& output,
@@ -55,7 +56,9 @@ public:
 		RenderViewPolicy viewPolicy = {},
 		rendering::ViewId sceneViewId = 1,
 		rendering::ViewId overlayViewId = 2);
+
 	void Finalize();							// Finalize
+
 	void EditorUpdate(float deltaTime);		// Update limited elements for editor
 
 	// Add an actor to the scene
@@ -186,11 +189,13 @@ public:
 	RenderSystem* GetRenderSystem() const { return m_pRenderSystem.get(); }				// Get render system
 	CameraSystem* GetCameraSystem() const { return m_pCameraSystem.get(); }				// Get camera system
 	CollisionSystem* GetCollisionSystem() const { return m_pCollisionSystem.get(); }	// Get collision system
+	AnimationSystem* GetAnimationSystem() const { return m_pAnimationSystem.get(); }	// Get animation system
 	DirectionalLight GetDirectionalLight() const { return m_directionalLight; }			// Get directional light
 	Vector2 GetViewportSize() const { return m_viewportSize; }							// Get viewport size
 	SceneManager* GetSceneManager() const { return m_pSceneManager; }					// Get scene manager
 	EngineContext* GetEngineContext() const { return m_pEngineContext; }				// Get engine context
-	SceneStructurePolicy GetStructurePolicy() const { return m_structurePolicy; }
+	SceneStructurePolicy GetStructurePolicy() const { return m_structurePolicy; }		// Get scene structure policy
+
 	// Enables the authoring-only invariant after an initial closed subtree has
 	// been populated. Once enabled, every public structural mutation query and
 	// execution path preserves exactly one root.
@@ -203,6 +208,7 @@ private:
 	ActorPool m_actorPool;	// Actor pool (used for allocating actors)
 	ActorImprintInstanceRegistry m_imprintInstances{ *this };
 	bool m_actorBatchActive = false;
+
 	// Reuses the transaction gate while lifecycle callbacks run. Nested scopes
 	// preserve an already-active construction transaction.
 	class StructuralMutationScope
@@ -216,6 +222,7 @@ private:
 				m_scene->m_actorBatchActive = true;
 			}
 		}
+
 		~StructuralMutationScope()
 		{
 			if (m_scene)
@@ -223,23 +230,28 @@ private:
 				m_scene->m_actorBatchActive = m_previous;
 			}
 		}
+
 		StructuralMutationScope(const StructuralMutationScope&) = delete;
 		StructuralMutationScope& operator=(const StructuralMutationScope&) = delete;
+
 	private:
 		SceneBase* m_scene;
 		bool m_previous;
 	};
+
 	// SceneManager can defer the logical release until the old Scene instance
 	// is completely gone. Ordinary Editor/candidate destruction releases here.
 	bool m_deferAssetRelease = false;
 	bool m_unpublishedCandidate = false;
 	std::vector<Actor*> m_unpublishedCommitActors;
+
 	// SceneActorBatch alone may install a read-only destination fallback while
 	// this Scene is an unpublished candidate. It never outlives that batch.
 	const SceneBase* m_actorLookupFallback = nullptr;
 
 	std::unique_ptr<RenderSystem> m_pRenderSystem = nullptr;		// Render system
 	std::unique_ptr<CameraSystem> m_pCameraSystem = nullptr;		// Camera system
+	std::unique_ptr<AnimationSystem> m_pAnimationSystem = nullptr;	// Animation system
 	std::unique_ptr<CollisionSystem> m_pCollisionSystem = nullptr;	// Collision system
 
 	std::unordered_map<Guid, ActorHandle> m_actorGuidMap;		// Map of actor GUIDs to actor handles (used for resolving actors by GUID)
@@ -261,6 +273,7 @@ private:
 	friend class ActorImprintSystem;
 	friend class ActorImprintInstanceSerializer;
 	friend class SceneActorBatch;
+
 	bool ValidateMutationActor(const Actor* actor) const;
 	bool ValidateInstanceDestruction(ActorHandle root) const;
 	void CommitInstanceDestruction(ActorHandle root);
@@ -269,6 +282,7 @@ private:
 		const Canvas* governingCanvas,
 		const Actor* canvasOverrideOwner = nullptr,
 		std::optional<CanvasRenderMode> canvasOverride = std::nullopt) const;
+
 	static TransformKind RequiredUITransformKind(bool underCanvas, std::optional<CanvasRenderMode> canvasMode);
 
 	// Helper function for Actor registration
@@ -323,10 +337,18 @@ private:
 	// Discard a SceneLoader candidate before publication. Candidate Actors have
 	// never received OnAttach, so they are released without lifecycle callbacks.
 	void DiscardUnpublishedCandidate() noexcept;
+
 	// Finish every allocation that Actor::AttachComponents would otherwise perform
 	// before the first lifecycle callback is allowed to run.
 	const std::vector<Actor*>& PrepareUnpublishedCandidateForCommit();
+
 	void PrepareComponentPublication(const std::vector<Actor*>& actors);
+
+	void PrepareRendererAttachment(
+		const Actor& actor,
+		const Component& component,
+		std::size_t upperBound);
+
 	// Publish a fully prepared candidate. All recoverable work and allocation must
 	// finish before this non-failing lifecycle commit begins.
 	void PublishUnpublishedCandidate() noexcept;

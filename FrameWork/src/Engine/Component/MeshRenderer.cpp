@@ -60,48 +60,12 @@ AssetPrepareResult MeshRenderer::PrepareMeshAssetState(const Guid& assetId, Prep
 
 	for (const GeometryInfo& geometry : geometries)
 	{
-		SubmeshRenderTemplate renderTemplate;
-		renderTemplate.meshDesc.meshHandle = geometry.geometry;
-		renderTemplate.localToModel = geometry.localToModel;
-		renderTemplate.materialDesc.textureHandle = geometry.texture;
-		renderTemplate.materialDesc.screen = GetRenderSpace() == RenderSpace::Screen;
-
-		if (context->pRenderAssets)
-		{
-			Vector2 uvScale = Vector2::One();
-			Vector2 uvOffset;
-			Vector2 pivot;
-			pivot.x = 0.5f;
-			pivot.y = 0.5f;
-
-			renderTemplate.materialDesc.description = context->pRenderAssets->MakeMaterial(
-				true,
-				renderTemplate.materialDesc.screen,
-				geometry.texture,
-				uvScale,
-				uvOffset,
-				pivot,
-				false,
-				false);
-
-			renderTemplate.materialDesc.handle = context->pAssetManager->RegisterSceneMaterial(*scene,
-				renderTemplate.materialDesc.description);
-		}
-
-		if (context->pRenderer)
-		{
-			rendering::GeometryData snapshot;
-			const auto queried = context->pRenderer->GetGeometryData(geometry.geometry, snapshot);
-
-			if (queried.IsSuccess())
-			{
-				renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
-				renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
-				renderTemplate.meshDesc.boundsRevision = snapshot.revision;
-			}
-		}
-
-		prepared.templates.push_back(std::move(renderTemplate));
+		prepared.templates.push_back(
+			PrepareSubmeshRenderTemplate(
+				*context,
+				*scene,
+				geometry,
+				GetRenderSpace() == RenderSpace::Screen));
 	}
 
 	acquisition.Commit();
@@ -392,7 +356,7 @@ bool MeshRenderer::SynchronizeRenderResources()
 
 		if (queried.IsSuccess() && snapshot.revision != renderTemplate.meshDesc.boundsRevision)
 		{// Update the bounds in the render template if the revision has changed
-			renderTemplate.meshDesc.boundsCenter = EngineRendering::FromRenderer(snapshot.boundsCenter);
+			renderTemplate.meshDesc.boundsCenter = snapshot.boundsCenter;
 			renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
 			renderTemplate.meshDesc.boundsRevision = snapshot.revision;
 			m_isProxyDirty = true;

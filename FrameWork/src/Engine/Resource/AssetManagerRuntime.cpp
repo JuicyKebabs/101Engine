@@ -2,7 +2,7 @@
 #include "RenderAssetResources.h"
 #include "BuiltinMeshAssets.h"
 #include "Engine/Graphics/RenderData.h"
-#include "Engine/Graphics/RenderingConversions.h"
+#include "Engine/Core/Math/Math.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Renderer/Renderer.h"
 
@@ -186,12 +186,12 @@ public:
 					for (const Vertex& source : generated.front().vertices)
 					{
 						rendering::MeshVertex vertex;
-						vertex.position = EngineRendering::ToRenderer(source.position);
-						vertex.normal = EngineRendering::ToRenderer(source.normal);
-						vertex.tangent = EngineRendering::ToRenderer(source.tangent);
+						vertex.position = source.position;
+						vertex.normal = source.normal;
+						vertex.tangent = source.tangent;
 						vertex.uv.x = source.uv.x;
 						vertex.uv.y = source.uv.y;
-						vertex.color = EngineRendering::ToRenderer(source.color);
+						vertex.color = source.color;
 						vertices.push_back(vertex);
 					}
 
@@ -238,7 +238,9 @@ public:
 		uniqueMeshes.reserve(imported.meshes.size());
 		result.registeredGeometries.reserve(imported.meshes.size());
 
-		for (const rendering::assets::MeshData& mesh : imported.meshes)
+		result.meshSkins.reserve(imported.meshes.size());
+
+		for (rendering::assets::MeshData& mesh : imported.meshes)
 		{
 			GeometryInfo geometry;
 			geometry.texture = mesh.texturePath.empty() ? White() : DependencyTexture(mesh.texturePath, result);
@@ -254,6 +256,7 @@ public:
 				DBG("SubMesh import: %s", mesh.diagnostic.c_str());
 			}
 
+			result.meshSkins.push_back(std::move(mesh.skin));
 			uniqueMeshes.push_back(geometry);
 			result.registeredGeometries.push_back(geometry.geometry);
 		}
@@ -267,13 +270,15 @@ public:
 			if (placement.meshIndex < uniqueMeshes.size())
 			{
 				geometry = uniqueMeshes[placement.meshIndex];
+				geometry.meshIndex = placement.meshIndex;
 			}
 
-			geometry.localToModel = EngineRendering::FromRenderer(placement.localToModel);
+			geometry.localToModel = placement.localToModel;
 			result.placements.push_back(geometry);
 		}
 
 		result.nodes = std::move(imported.nodes);
+		result.revision = m_owner.m_nextModelRevision++;
 
 		result.animation.reserve(imported.animationClips.size());
 
@@ -317,6 +322,18 @@ public:
 		m_usage.newMaterials.push_back(registration.handle);
 		return registration.handle;
 	}
+
+private:
+	AssetManager& m_owner;
+	SceneAssetUsage& m_destination;
+	SceneAssetUsage m_usage;
+	std::unordered_map<Guid, CachedModel> m_models;
+	std::unordered_map<Guid, rendering::TextureHandle> m_textures;
+	std::unordered_map<std::string, rendering::TextureHandle> m_dependencyTextures;
+	std::vector<rendering::GeometryHandle> m_newGeometries;
+	std::vector<rendering::TextureHandle> m_newTextures;
+	std::vector<rendering::MaterialHandle> m_newMaterials;
+	bool m_committed = false;
 
 private:
 	void ReportCleanup(const rendering::Result& result) const noexcept
@@ -518,17 +535,6 @@ private:
 		inserted.first->second = LoadTexture(file);
 		return inserted.first->second;
 	}
-
-	AssetManager& m_owner;
-	SceneAssetUsage& m_destination;
-	SceneAssetUsage m_usage;
-	std::unordered_map<Guid, CachedModel> m_models;
-	std::unordered_map<Guid, rendering::TextureHandle> m_textures;
-	std::unordered_map<std::string, rendering::TextureHandle> m_dependencyTextures;
-	std::vector<rendering::GeometryHandle> m_newGeometries;
-	std::vector<rendering::TextureHandle> m_newTextures;
-	std::vector<rendering::MaterialHandle> m_newMaterials;
-	bool m_committed = false;
 };
 
 AssetManager::~AssetManager()
@@ -545,6 +551,32 @@ const std::vector<GeometryInfo>& AssetManager::GetGeometryInfos(SceneBase& scene
 	batch.Model(guid);
 	batch.Commit();
 	return m_loadedModels.at(guid).placements;
+}
+
+SkinnedModelView AssetManager::GetSkinnedModel(SceneBase& scene, const Guid& guid)
+{
+	GetGeometryInfos(scene, guid);
+	return *FindLoadedSkinnedModel(guid);
+}
+
+std::optional<SkinnedModelView> AssetManager::FindLoadedSkinnedModel(const Guid& guid) const 
+{
+	const auto found = m_loadedModels.find(guid);
+
+	if (found == m_loadedModels.end())
+	{
+		return std::nullopt;
+	}
+
+	const CachedModel& model = found->second;
+
+	SkinnedModelView view;
+	view.placements = model.placements;
+	view.nodes = model.nodes;
+	view.revision = model.revision;
+	view.meshSkins = model.meshSkins;
+
+	return view;
 }
 
 rendering::TextureHandle AssetManager::GetTextureHandle(SceneBase& scene, const Guid& guid)
@@ -695,6 +727,7 @@ SceneAssetAcquisition::~SceneAssetAcquisition()
 	SceneAssetUsage acquired;
 	std::swap(acquired, current->second);
 	std::swap(current->second, m_previous);
+
 	// Required sets now describe the previous live state. Only newly unneeded
 	// registrations/cache keys are released; other Scenes retain their union.
 	m_owner.ReleaseUnusedUsage(acquired);

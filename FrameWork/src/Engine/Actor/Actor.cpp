@@ -1,12 +1,9 @@
 #include "Actor.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "ActorPool.h"
-#include "Engine/Graphics/RenderData.h"
 #include "Engine/Component/Transform.h"
+#include "Engine/Component/SkinnedMeshRenderer.h"
 #include "Engine/Component/RectTransform.h"
-#include "Engine/Component/Behavior.h"
 #include "Engine/Scene/SceneBase.h"
-#include "Engine/Core/Math/Math.h"
 #include "Engine/Scene/ComponentRegistry.h"
 
 // Destructor
@@ -22,6 +19,7 @@ void Actor::PreUpdate(float deltaTime)
 		return;
 	}
 
+	// Attach any pending components before updating
 	AttachPendingComponents();
 
 	// Post-update all components
@@ -208,6 +206,12 @@ Component* Actor::AddComponentImmediate(std::unique_ptr<Component> component, st
 
 	// Normalize storage of pending components before adding the new component
 	AttachPendingComponents();
+
+	// Prepare the capacity in the RenderSystem for the new component if it is a RendererComponent
+	if (m_pOwner)
+	{
+		m_pOwner->PrepareRendererAttachment(*this, *component, 1);
+	}
 
 	// Get components of the same type
 	auto& instances = m_components[typeId].instances;
@@ -597,8 +601,15 @@ void Actor::AttachPendingComponents()
 		return;
 	}
 
+	// Prepare the capacity in the RenderSystem for the new components if they are RendererComponents
+	for (const auto& pending : m_pendingComponents)
+	{
+		m_pOwner->PrepareRendererAttachment(*this, *pending.instance, m_pendingComponents.size());
+	}
+
 	const std::size_t firstAttached = m_componentPtrs.size();
 	PrepareComponentsForAttach();
+
 	SceneBase::StructuralMutationScope mutationScope(m_pOwner);
 
 	for (std::size_t i = firstAttached; i < m_componentPtrs.size(); ++i)

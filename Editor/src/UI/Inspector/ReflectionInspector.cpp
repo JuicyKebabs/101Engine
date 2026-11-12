@@ -1,5 +1,5 @@
-#include "Engine/Graphics/RenderingConversions.h"
 #include "ReflectionInspector.h"
+#include "Engine/Graphics/RenderingConversions.h"
 #include "Engine/Core/Debug/Debug.h"
 
 #include "imgui.h"
@@ -46,6 +46,7 @@ namespace
 		case PropertyEditorKind::Enum:
 		case PropertyEditorKind::ActorReference:
 		case PropertyEditorKind::AssetReference:
+		case PropertyEditorKind::AnimationClipSlots:
 			return false;
 		default:
 			return true;
@@ -239,6 +240,7 @@ namespace
 					return changed;
 				});
 			break;
+
 		case PropertyEditorKind::Quaternion:
 			if (Quaternion* value = std::get_if<Quaternion>(&result.value))
 			{
@@ -252,6 +254,7 @@ namespace
 			}
 
 			break;
+
 		case PropertyEditorKind::Enum:
 			if (EnumPropertyValue* value = std::get_if<EnumPropertyValue>(&result.value))
 			{
@@ -286,6 +289,7 @@ namespace
 			}
 
 			break;
+
 		case PropertyEditorKind::ActorReference:
 			if (services.drawActorReference)
 			{
@@ -310,6 +314,7 @@ namespace
 			}
 
 			break;
+
 		case PropertyEditorKind::AssetReference:
 			if (services.drawAssetReference)
 			{
@@ -334,6 +339,22 @@ namespace
 			}
 
 			break;
+
+		case PropertyEditorKind::AnimationClipSlots:
+			if (services.drawAnimationClipSlots)
+			{
+				if (auto* slots = std::get_if<AnimationClipSlots>(&result.value))
+				{
+					result.changed = services.drawAnimationClipSlots(label, *slots);
+				}
+			}
+			else
+			{
+				ImGui::TextDisabled("%s: unavailable", label);
+			}
+
+			break;
+
 		default:
 			ImGui::TextDisabled("%s: unsupported property type", label);
 			break;
@@ -378,6 +399,7 @@ PropertyEditorKind ReflectionInspector::GetEditorKind(PropertyLogicalType type)
 	case PropertyLogicalType::Enum: return PropertyEditorKind::Enum;
 	case PropertyLogicalType::ActorReference: return PropertyEditorKind::ActorReference;
 	case PropertyLogicalType::AssetReference: return PropertyEditorKind::AssetReference;
+	case PropertyLogicalType::AnimationClipSlots: return PropertyEditorKind::AnimationClipSlots;
 	default: return PropertyEditorKind::Unsupported;
 	}
 }

@@ -73,6 +73,13 @@ bool AssetManager::Initialize(
 	m_sceneUsage.clear();
 	m_loadedTextures.clear();
 	m_loadedAudio.clear();
+	m_loadedAnimationClips.clear();
+
+	for (auto& cached : m_animationClipCache)
+	{
+		cached.clip.reset();
+	}
+
 	return true;
 }
 

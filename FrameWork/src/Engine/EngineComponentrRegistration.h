@@ -2,6 +2,7 @@
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/SkinnedMeshRenderer.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/UI/UIRenderer.h"
 #include "Engine/UI/UIImage.h"
@@ -9,3 +10,4 @@
 #include "Engine/Component/Camera.h"
 #include "Engine/Component/RectTransform.h"
 #include "Engine/Component/Collider.h"
+#include "Engine/Component/AnimationPlayer.h"

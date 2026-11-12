@@ -1,14 +1,14 @@
 #include "RenderSystem.h"
 #include "Engine/Actor/ActorHierarchyActivity.h"
-#include "RenderingConversions.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Component/MeshRenderer.h"
+#include "Engine/Component/SkinnedMeshRenderer.h"
+#include "Engine/Component/Transform.h"
 #include "Engine/Component/SpriteRenderer.h"
 #include "Engine/UI/UIRenderer.h"
 #include "Engine/UI/Canvas.h"
 #include "Engine/Resource/RenderAssetResources.h"
-#include "Engine/Core/Debug/Debug.h"
 
 #include <algorithm>
 #include <cmath>
@@ -32,31 +32,31 @@ void UnregisterValue(std::vector<ComponentType*>& values, ComponentType* compone
 	std::erase(values, component);
 }
 
-enum class SourceKind { Mesh, Sprite, UI };
+enum class SourceKind { Mesh, SkinnedMesh, Sprite, UI };
 
 // Temporal structure to track the source of a submitted object for rendering.
 struct SubmissionSource
 {
 	RendererComponent* component = nullptr;	// Pointer to thre source component that submitted the object.
-	SourceKind kind = SourceKind::Mesh;		// The kind of the source component (Mesh, Sprite, or UI).
+	SourceKind kind = SourceKind::Mesh;		// The kind of the source component (Mesh, SkinnedMesh, Sprite, or UI).
 	bool screen = false;					// Whether the submission is for screen space rendering.
 	std::vector<std::uint32_t> orderPath;	// The order path for rendering.
 };
 
-rendering::Vector4 LocalQuadTransform(const ComponentMaterialState& material)
+Vector4 LocalQuadTransform(const ComponentMaterialState& material)
 {
 	for (const auto& parameter : material.description.parameters)
 	{
 		if (parameter.name == "LocalQuadTransform")
 		{
-			if (const auto* value = std::get_if<rendering::Vector4>(&parameter.value))
+			if (const auto* value = std::get_if<Vector4>(&parameter.value))
 			{
 				return *value;
 			}
 		}
 	}
 
-	rendering::Vector4 identity;
+	Vector4 identity;
 	identity.x = 1;
 	identity.y = 1;
 	return identity;
@@ -106,7 +106,7 @@ void SetWorldBounds(
 	}
 
 	rendering::BoundingSphere bounds;
-	bounds.center = EngineRendering::ToRenderer(center);
+	bounds.center = center;
 	bounds.radius = std::nextafter(static_cast<float>(radius), (std::numeric_limits<float>::infinity)());
 
 	if (!std::isfinite(bounds.radius))
@@ -121,9 +121,11 @@ void SetWorldBounds(
 }
 
 void RenderSystem::Register(MeshRenderer* value) { RegisterOnce(m_meshRenderers, value); }
+void RenderSystem::Register(SkinnedMeshRenderer* value) { RegisterOnce(m_skinnedMeshRenderers, value); }
 void RenderSystem::Register(SpriteRenderer* value) { RegisterOnce(m_spriteRenderers, value); }
 void RenderSystem::Register(UIRenderer* value) { RegisterOnce(m_uiRenderers, value); }
 void RenderSystem::Unregister(MeshRenderer* value) { UnregisterValue(m_meshRenderers, value); }
+void RenderSystem::Unregister(SkinnedMeshRenderer* value) { UnregisterValue(m_skinnedMeshRenderers, value); }
 void RenderSystem::Unregister(SpriteRenderer* value) { UnregisterValue(m_spriteRenderers, value); }
 void RenderSystem::Unregister(UIRenderer* value) { UnregisterValue(m_uiRenderers, value); }
 
@@ -136,12 +138,42 @@ void RenderSystem::PrepareRegistrationCapacity(std::size_t additionalComponents)
 	m_uiRenderers.reserve(m_uiRenderers.size() + additionalComponents);
 }
 
+void RenderSystem::PrepareRegistrationCapacity(const RendererComponent& renderer, std::size_t additionalRenderers)
+{
+	const auto reserve = [additionalRenderers](auto& registered)
+		{
+			registered.reserve(registered.size() + additionalRenderers);
+		};
+
+	if (dynamic_cast<const MeshRenderer*>(&renderer))
+	{
+		reserve(m_meshRenderers);
+	}
+	else if (dynamic_cast<const SkinnedMeshRenderer*>(&renderer))
+	{
+		reserve(m_skinnedMeshRenderers);
+	}
+	else if (dynamic_cast<const SpriteRenderer*>(&renderer))
+	{
+		reserve(m_spriteRenderers);
+	}
+	else if (dynamic_cast<const UIRenderer*>(&renderer))
+	{
+		reserve(m_uiRenderers);
+	}
+}
+
 void RenderSystem::FlushRegisters()
 {
 	const auto flush = [](const auto& renderers)
 	{
 		for (auto* renderer : renderers)
 		{
+			if (!renderer)
+			{
+				continue;
+			}
+
 			Actor* actor = renderer ? renderer->GetOwner() : nullptr;
 			const bool live = IsActorHierarchyActive(actor);
 
@@ -221,6 +253,12 @@ bool RenderSystem::AppendFrame(
 
 			const RenderSpace space = renderer->GetRenderSpace();
 
+			// Do not submit SkinnedMeshRenderer for Canvas preview or non-world space rendering.
+			if (kind == SourceKind::SkinnedMesh && (canvasPreview || space != RenderSpace::World))
+			{
+				continue;
+			}
+
 			if (policy.canvasViewRoot)
 			{
 				if (!policy.canvasViewRoot->ContainsRenderer(renderer))
@@ -264,6 +302,7 @@ bool RenderSystem::AppendFrame(
 	// 1. Gather all the renderers and their submission sources for the current frame.
 	//------------------------------------------------------------------------------------------------
 	if (!gather(m_meshRenderers, SourceKind::Mesh) ||
+		!gather(m_skinnedMeshRenderers, SourceKind::SkinnedMesh) ||
 		!gather(m_spriteRenderers, SourceKind::Sprite) ||
 		!gather(m_uiRenderers, SourceKind::UI))
 	{
@@ -271,7 +310,46 @@ bool RenderSystem::AppendFrame(
 	}
 
 	//------------------------------------------------------------------------------------------------
-	// 2. Sort the submission sources for rendering order.
+	// 2. Collect the skinning palette of all SkinnedMeshRenderer submissions.
+	//------------------------------------------------------------------------------------------------
+	// Check the total size of the skinning palettes to ensure it does not exceed the maximum allowed size.
+	const std::size_t paletteLimit = (std::min)(
+		frame.skinningPalettes.max_size(),
+		static_cast<std::size_t>((std::numeric_limits<std::uint32_t>::max)()));
+
+	std::size_t paletteEnd = frame.skinningPalettes.size();
+
+	if (paletteEnd > paletteLimit)
+	{
+		return false;
+	}
+
+	// Collect the skinning palettes from all SkinnedMeshRenderer submissions
+	// and append them to the frame's skinningPalettes vector.
+	for (const auto& source : sources)
+	{
+		if (source.kind != SourceKind::SkinnedMesh)
+		{
+			continue;
+		}
+
+		const auto* renderer = static_cast<const SkinnedMeshRenderer*>(source.component);
+
+		for (const auto& submesh : renderer->GetSubmeshes())
+		{
+			if (submesh.palette.size() > paletteLimit - paletteEnd)
+			{
+				return false;
+			}
+
+			paletteEnd += submesh.palette.size();
+		}
+	}
+
+	frame.skinningPalettes.reserve(paletteEnd);
+
+	//------------------------------------------------------------------------------------------------
+	// 3. Sort the submission sources for rendering order.
 	//	  World-Space submissions always precede Screen-Space submissions.
 	//	  Screen-Space submissions are sorted by the order path to preserve Canvas hierarchy.
 	//------------------------------------------------------------------------------------------------
@@ -290,7 +368,7 @@ bool RenderSystem::AppendFrame(
 		});
 
 	//------------------------------------------------------------------------------------------------
-	// 3. Construct the RenderViews for the current frame.
+	// 4. Construct the RenderViews for the current frame.
 	//------------------------------------------------------------------------------------------------
 	if (camera && !canvasPreview && policy.renderSpaceFilter != RenderSpaceFilter::ScreenOnly)
 	{
@@ -298,9 +376,9 @@ bool RenderSystem::AppendFrame(
 		rendering::RenderView sceneView;
 		sceneView.id = sceneViewId;
 		sceneView.output = output;
-		sceneView.view = EngineRendering::ToRenderer(camera->viewMatrix);
-		sceneView.projection = EngineRendering::ToRenderer(camera->projMatrix);
-		sceneView.cameraPosition = EngineRendering::ToRenderer(camera->position);
+		sceneView.view = camera->viewMatrix;
+		sceneView.projection = camera->projMatrix;
+		sceneView.cameraPosition = camera->position;
 		sceneView.exposure = 1.0f; // Default exposure; make it editable in the future.
 		frame.views.push_back(sceneView);
 
@@ -332,13 +410,13 @@ bool RenderSystem::AppendFrame(
 	if (canvasPreview && camera)
 	{// For Canvas preview, use the camera's view and projection matrices for the overlay view.
 	 // (Common framework systemn should not familiar with the editor only concept honestly.....)
-		overlay.view = EngineRendering::ToRenderer(camera->viewMatrix);
-		overlay.projection = EngineRendering::ToRenderer(camera->projMatrix);
-		overlay.cameraPosition = EngineRendering::ToRenderer(camera->position);
+		overlay.view = camera->viewMatrix;
+		overlay.projection = camera->projMatrix;
+		overlay.cameraPosition = camera->position;
 	}
 	else
 	{// For normal overlay view, use an orthographic projection that matches the viewport size.
-		overlay.projection = rendering::Matrix4x4::CreateOrthographic(
+		overlay.projection = Matrix4x4::CreateOrthographic(
 			static_cast<float>(width),
 			static_cast<float>(height),
 			-1,
@@ -346,7 +424,7 @@ bool RenderSystem::AppendFrame(
 
 		if (camera)
 		{
-			overlay.cameraPosition = EngineRendering::ToRenderer(camera->position);
+			overlay.cameraPosition = camera->position;
 		}
 	}
 
@@ -354,8 +432,9 @@ bool RenderSystem::AppendFrame(
 	frame.views.push_back(overlay);
 
 	//------------------------------------------------------------------------------------------------
-	// 4. Append every submitted object to the RenderObject which Renderer requires for rendering.
+	// 5. Append every submitted object to the RenderObject which Renderer requires for rendering.
 	//------------------------------------------------------------------------------------------------
+	// Lambda function to append a RenderObject to the frame and record its submission source.
 	const auto append = [&](
 		rendering::RenderObject object,
 		const SubmissionSource& source,
@@ -376,44 +455,86 @@ bool RenderSystem::AppendFrame(
 		m_records.push_back(record);
 	};
 
-	CameraInfo emptyCamera;
-	const CameraInfo& proxyCamera = camera ? *camera : emptyCamera;
-
-	for (const SubmissionSource& source : sources)
-	{
-		// MeshRenderer submission.
-		if (source.kind == SourceKind::Mesh)
+	// Lambda function to append a MeshRenderer submission to the frame.
+	const auto appendMesh = [&](
+		const SubmissionSource& source,
+		const SubmeshRenderTemplate& renderTemplate,
+		const Matrix4x4& actorWorld,
+		std::optional<rendering::SkinningPaletteRange> paletteRange)
 		{
-			auto* renderer = static_cast<MeshRenderer*>(source.component);
-			const auto& proxy = renderer->GetRenderProxy();
+			rendering::RenderObject object;
+			object.geometry = renderTemplate.meshDesc.meshHandle;
+			object.material = renderTemplate.materialDesc.handle;
+			object.world = renderTemplate.localToModel * actorWorld * worldToCanvas;
+			object.tint = source.component->GetColor();
+			object.castShadow = source.component->GetCastShadow() && !source.screen;
+			object.drawRange.first = renderTemplate.meshDesc.startIndex;
+			object.drawRange.baseVertex = renderTemplate.meshDesc.baseVertex;
+			object.skinningPalette = paletteRange;
 
-			// Create a RenderObject for each SubmeshRenderTemplate in the MeshRenderer's render templates.
-			for (const SubmeshRenderTemplate& renderTemplate : renderer->GetRenderTemplates())
+			// Bounds calculation for dynamic vertex data is not supported,
+			// so only set the world bounds if there is no skinning palette.
+			if (!paletteRange)
 			{
-				Matrix4x4 world = renderTemplate.localToModel * proxy.common.worldMatrix * worldToCanvas;
-				rendering::RenderObject object;
-				object.geometry = renderTemplate.meshDesc.meshHandle;
-				object.material = renderTemplate.materialDesc.handle;
-				object.world = EngineRendering::ToRenderer(world);
-				object.tint = EngineRendering::ToRenderer(proxy.common.color);
-				object.castShadow = renderer->GetCastShadow() && !source.screen;
-				object.drawRange.first = renderTemplate.meshDesc.startIndex;
-				object.drawRange.baseVertex = renderTemplate.meshDesc.baseVertex;
-
-				// Set the world bounds for the RenderObject based on the mesh's bounds and the world transform.
 				SetWorldBounds(
 					object,
 					renderTemplate.meshDesc.boundsCenter,
 					renderTemplate.meshDesc.boundsRadius,
 					renderTemplate.meshDesc.boundsRevision,
-					world);
-				
-				// Append the configured RenderObject to the frame.
-				append(
-					std::move(object),
-					source,
-					renderTemplate.materialDesc,
-					false);
+					object.world);
+			}
+
+			append(std::move(object), source, renderTemplate.materialDesc, false);
+		};
+
+	CameraInfo emptyCamera;
+	const CameraInfo& proxyCamera = camera ? *camera : emptyCamera;
+
+	for (const SubmissionSource& source : sources)
+	{
+		// MeshRenderer submissions.
+		if (source.kind == SourceKind::Mesh)
+		{
+			auto* renderer = static_cast<MeshRenderer*>(source.component);
+			const auto& proxy = renderer->GetRenderProxy();
+
+			for (const auto& renderTemplate : renderer->GetRenderTemplates())
+			{
+				appendMesh(source, renderTemplate, proxy.common.worldMatrix, std::nullopt);
+			}
+
+			continue;
+		}
+
+		// SkinnedMeshRenderer submissions.
+		if (source.kind == SourceKind::SkinnedMesh)
+		{
+			const auto* renderer = static_cast<const SkinnedMeshRenderer*>(source.component);
+			const auto* transform = renderer->GetOwner()->GetComponentByClass<Transform>();
+			const Matrix4x4 actorWorld = transform ? transform->GetWorldMatrix() : Matrix4x4::Identity();
+
+			for (const auto& submesh : renderer->GetSubmeshes())
+			{
+				std::optional<rendering::SkinningPaletteRange> paletteRange;
+
+				if (!submesh.palette.empty())
+				{
+					// Set the skinning palette range for the submesh in the frame's skinningPalettes vector.
+					rendering::SkinningPaletteRange range;
+
+					range.begin = static_cast<std::uint32_t>(frame.skinningPalettes.size());
+
+					frame.skinningPalettes.insert(
+						frame.skinningPalettes.end(),
+						submesh.palette.begin()
+						, submesh.palette.end());
+
+					range.end = static_cast<std::uint32_t>(frame.skinningPalettes.size());
+
+					paletteRange = range;
+				}
+
+				appendMesh(source, submesh.renderTemplate, actorWorld, paletteRange);
 			}
 
 			continue;
@@ -437,8 +558,8 @@ bool RenderSystem::AppendFrame(
 			rendering::RenderObject object;
 			object.geometry = context->pRenderAssets->Quad();	// Use built-in quad geometry for SpriteRenderer and UIRenderer.
 			object.material = material.handle;
-			object.world = EngineRendering::ToRenderer(world);
-			object.tint = EngineRendering::ToRenderer(common.color);
+			object.world = world;
+			object.tint = common.color;
 			object.billboard = billboard;
 			object.castShadow = castShadow && !source.screen;
 			
@@ -450,8 +571,8 @@ bool RenderSystem::AppendFrame(
 
 				if (queried.IsSuccess())
 				{
-					const rendering::Vector4 local = LocalQuadTransform(material);
-					Vector3 center = EngineRendering::FromRenderer(snapshot.boundsCenter);
+					const Vector4 local = LocalQuadTransform(material);
+					Vector3 center = snapshot.boundsCenter;
 					center.x = center.x * local.x + local.z;
 					center.y = center.y * local.y + local.w;
 					const float localStretch = (std::max)({ std::abs(local.x), std::abs(local.y), 1.0f });

@@ -243,7 +243,26 @@ Result ValidateFrameInputs(const FrameRenderData& data)
 {
 	if (!std::isfinite(data.time))
 	{
-		return {false, "ValidateFrameInputs: invalid Frame time input"};
+		return Fail("Time must be a finite value.");
+	}
+
+	for (const Matrix4x4 & matrix : data.skinningPalettes)
+	{
+		if (!Finite(matrix))
+		{
+			return Fail("Skinning palettes must contain finite matrices.");
+		}
+	}
+
+	for (const RenderObject& object : data.objects)
+	{
+		if (const auto& range = object.skinningPalette)
+		{
+			if (range->begin >= range->end || range->end > data.skinningPalettes.size())
+			{
+				return Fail("RenderObject has an invalid skinning palette range.");
+			}
+		}
 	}
 
 	if (data.directionalLight.has_value())

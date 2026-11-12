@@ -1,9 +1,15 @@
 #pragma once
+
 #include "Engine/Graphics/RenderData.h"
 #include "Engine/Resource/MeshHandle.h"
 #include "Engine/Resource/Texture.h"
 #include "Renderer/DrawTypes.h"
+
 #include <vector>
+
+class SceneBase;
+struct EngineContext;
+struct GeometryInfo;
 
 // Each Component owns its CPU draw template and Bounds snapshot. These values
 // neither retain GPU objects nor duplicate the AssetManager's GUID cache.
@@ -33,7 +39,14 @@ struct SubmeshRenderTemplate
 	ComponentMaterialState materialDesc;
 	Matrix4x4 localToModel = Matrix4x4::Identity();
 };
+
 using MeshRenderTemplate = std::vector<SubmeshRenderTemplate>;
+
+SubmeshRenderTemplate PrepareSubmeshRenderTemplate(
+	const EngineContext& engineContext,
+	SceneBase& scene,
+	const GeometryInfo& geometryInfo,
+	bool screen);
 
 struct SpriteRenderTemplate
 {
@@ -45,4 +58,5 @@ struct UIRenderElement
 {
 	ComponentMaterialState materialDesc;
 };
+
 using UIRenderTemplate = std::vector<UIRenderElement>;

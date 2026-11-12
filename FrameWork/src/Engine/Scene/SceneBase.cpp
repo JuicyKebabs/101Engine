@@ -1,13 +1,10 @@
 #include "SceneBase.h"
-#include "SceneLoader.h"
 #include "Engine/ActorImprint/ActorImprintSystem.h"
-#include "Engine/Input/InputManager.h"
 #include "Engine/Resource/AssetManager.h"
-#include "Engine/Scene/SceneManager.h"
 #include "Engine/Core/Debug/Debug.h"
-#include "Engine/Actor/ActorFactory.h"
 #include "Engine/Component/TransformConversion.h"
 #include "Engine/UI/UIRenderer.h"
+
 #include <unordered_set>
 #include <cmath>
 
@@ -16,6 +13,7 @@ SceneBase::SceneBase()
 {
 	m_pCameraSystem = std::make_unique<CameraSystem>(this);
 	m_pRenderSystem = std::make_unique<RenderSystem>(this);
+	m_pAnimationSystem = std::make_unique<AnimationSystem>();
 	m_pCollisionSystem = std::make_unique<CollisionSystem>();
 }
 
@@ -143,8 +141,15 @@ void SceneBase::LateUpdate(float deltaTime)
 	m_pCollisionSystem->CheckCollisions();
 
 	//Flush camera parameters to update camera information
-	if (m_pCameraSystem) {
+	if (m_pCameraSystem)
+	{
 		m_pCameraSystem->Flush(deltaTime);
+	}
+
+	// Update animation system
+	if (m_pAnimationSystem)
+	{
+		m_pAnimationSystem->ProcessAnimation(deltaTime);
 	}
 
 	// Clean up destroyed actors at the end of the frame
@@ -1277,5 +1282,40 @@ void SceneBase::PrepareComponentPublication(const std::vector<Actor*>& actors)
 				canvas->PrepareRegistrationCapacity(componentCount);
 			}
 		}
+	}
+}
+
+void SceneBase::PrepareRendererAttachment(
+	const Actor& actor,
+	const Component& component,
+	std::size_t upperBound)
+{
+	const auto* renderer = dynamic_cast<const RendererComponent*>(&component);
+
+	if (!renderer)
+	{
+		return;
+	}
+
+	// Prepare the capacity for the renderer in the render system
+	m_pRenderSystem->PrepareRegistrationCapacity(*renderer, upperBound);
+
+	if (!dynamic_cast<const UIRenderer*>(renderer))
+	{
+		return;
+	}
+
+	// Prepare the capacity of ui list in the governing canvas and the current canvas
+	Canvas* current = renderer->GetGoverningCanvas();
+	Canvas* governing = FindClosestCanvas(actor.GetParent());
+
+	if (current)
+	{
+		current->PrepareRegistrationCapacity(upperBound);
+	}
+
+	if (governing && governing != current)
+	{
+		governing->PrepareRegistrationCapacity(upperBound);
 	}
 }

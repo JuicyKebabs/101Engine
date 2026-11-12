@@ -9,6 +9,7 @@ class Actor;
 class Canvas;
 class SceneBase;
 class MeshRenderer;
+class SkinnedMeshRenderer;
 class SpriteRenderer;
 class UIRenderer;
 class RendererComponent;
@@ -46,12 +47,17 @@ class RenderSystem
 public:
 	explicit RenderSystem(SceneBase* scene = nullptr) : m_scene(scene) {}
 	void Register(MeshRenderer* renderer);
+	void Register(SkinnedMeshRenderer* renderer);
 	void Register(SpriteRenderer* renderer);
 	void Register(UIRenderer* renderer);
 	void Unregister(MeshRenderer* renderer);
+	void Unregister(SkinnedMeshRenderer* renderer);
 	void Unregister(SpriteRenderer* renderer);
 	void Unregister(UIRenderer* renderer);
+
 	void PrepareRegistrationCapacity(std::size_t additionalComponents);
+	void PrepareRegistrationCapacity(const RendererComponent& renderer, std::size_t additionalRenderers);
+	
 	void FlushRegisters();
 
 	// Render extraction: append all registered Components to the given FrameRenderData.
@@ -70,6 +76,7 @@ public:
 private:
 	SceneBase* m_scene = nullptr;
 	std::vector<MeshRenderer*> m_meshRenderers;
+	std::vector<SkinnedMeshRenderer*> m_skinnedMeshRenderers;
 	std::vector<SpriteRenderer*> m_spriteRenderers;
 	std::vector<UIRenderer*> m_uiRenderers;
 	std::vector<ExtractedObjectRecord> m_records;

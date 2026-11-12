@@ -29,6 +29,7 @@ enum class PropertyEditorKind
 	Enum,
 	ActorReference,
 	AssetReference,
+	AnimationClipSlots,
 };
 
 struct PropertyInspectorRow
@@ -53,11 +54,14 @@ struct ReflectionInspectorServices
 		const PropertyMetadata&,
 		const ActorReference&,
 		ActorReference&)> drawActorReference;
+
 	std::function<bool(
 		const char*,
 		const PropertyMetadata&,
 		const AssetReferenceValue&,
 		AssetReferenceValue&)> drawAssetReference;
+
+	std::function<bool(const char*, AnimationClipSlots&)> drawAnimationClipSlots;
 };
 
 class ReflectionInspector

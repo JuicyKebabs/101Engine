@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Engine/Core/Math/Math.h"
-#include "Renderer/Math.h"
 
 #include <cmath>
 #include <algorithm>
@@ -33,66 +32,6 @@ inline float ConservativeLinearScale(const Matrix4x4& matrix)
 	}
 
 	return static_cast<float>(std::sqrt(maximumRowSum * maximumColumnSum));
-}
-
-// Engine and Renderer keep independent value types. Copy values at this boundary
-// rather than aliasing unrelated structs or exporting either side's GPU objects.
-inline rendering::Vector3 ToRenderer(const Vector3& source)
-{
-	rendering::Vector3 value;
-	value.x = source.x;
-	value.y = source.y;
-	value.z = source.z;
-	return value;
-}
-
-inline rendering::Vector4 ToRenderer(const Vector4& source)
-{
-	rendering::Vector4 value;
-	value.x = source.x;
-	value.y = source.y;
-	value.z = source.z;
-	value.w = source.w;
-	return value;
-}
-
-inline Vector3 FromRenderer(const rendering::Vector3& source)
-{
-	Vector3 value;
-	value.x = source.x;
-	value.y = source.y;
-	value.z = source.z;
-	return value;
-}
-
-inline Matrix4x4 FromRenderer(const rendering::Matrix4x4& source)
-{
-	Matrix4x4 value;
-
-	for (std::size_t row = 0; row < 4; ++row)
-	{
-		for (std::size_t column = 0; column < 4; ++column)
-		{
-			value.m[row][column] = source.m[row][column];
-		}
-	}
-
-	return value;
-}
-
-inline rendering::Matrix4x4 ToRenderer(const Matrix4x4& source)
-{
-	rendering::Matrix4x4 value;
-
-	for (std::size_t row = 0; row < 4; ++row)
-	{
-		for (std::size_t column = 0; column < 4; ++column)
-		{
-			value.m[row][column] = source.m[row][column];
-		}
-	}
-
-	return value;
 }
 
 // These transfer functions describe the Editor/storage boundary. Lighting and

@@ -1,15 +1,17 @@
 #include "InspectorPanel.h"
 #include "Engine/Scene/ComponentRegistry.h"
 #include "Engine/Actor/ActorTag.h"
-#include "Engine/Core/Debug/Debug.h"
 #include "Engine/Scene/SceneBase.h"
 #include "UI/Inspector/AssetPicker.h"
 #include "UI/EditorUI.h"
 #include "imgui.h"
+#include "misc/cpp/imgui_stdlib.h"
+
 #include <algorithm>
-#include <typeindex>
-#include <unordered_map>
-#include <vector>
+#include <cstddef>
+#include <optional>
+#include <string_view>
+#include <utility>
 
 void InspectorPanel::Render(Actor* selectedActor, const InspectorContext& context, const Callbacks& callbacks)
 {
@@ -298,23 +300,25 @@ bool InspectorPanel::DrawComponent(
 				const Guid editActorGuid = actorGuid;
 				const std::size_t editOccurrenceIndex = occurrenceIndex;
 
-				reflectionCallbacks.restoreValue = [
-					editScene, editActorGuid, typeId, editOccurrenceIndex](
-					const PropertyMetadata& property,
-					const PropertyValue& value)
-				{
-					ComponentPropertyIdentity identity{
-						editActorGuid,
-						typeId,
-						editOccurrenceIndex,
-						property.GetPath() };
-					return ApplyComponentPropertyValue(editScene, identity, value);
-				};
+				reflectionCallbacks.restoreValue =
+					[editScene, editActorGuid, typeId, editOccurrenceIndex](
+						const PropertyMetadata& property,
+						const PropertyValue& value)
+						{
+							ComponentPropertyIdentity identity{
+								editActorGuid,
+								typeId,
+								editOccurrenceIndex,
+								property.GetPath() };
 
-				reflectionCallbacks.onEditCommit = [&, typeId](
-													   const PropertyMetadata& property,
-													   const PropertyValue& before,
-													   const PropertyValue& after)
+							return ApplyComponentPropertyValue(editScene, identity, value);
+						};
+
+				reflectionCallbacks.onEditCommit =
+					[&, typeId](
+						const PropertyMetadata& property,
+						const PropertyValue& before,
+						const PropertyValue& after)
 				{
 					if (!callbacks.onEditProperty)
 					{
@@ -328,104 +332,225 @@ bool InspectorPanel::DrawComponent(
 				};
 
 				ReflectionInspectorServices services;
-				services.drawActorReference = [&context](
-					const char* label,
-					const PropertyMetadata&,
-					const ActorReference& current,
-					ActorReference& selected)
-				{
-					if (!context.scene)
-					{
-						return false;
-					}
-
-					Actor* currentActor = current.Resolve(*context.scene);
-					const char* preview = "<None>";
-
-					if (current.HasValue())
-					{
-						preview = "<Missing Actor>";
-
-						if (currentActor)
+				services.drawActorReference =
+					[&context](
+						const char* label,
+						const PropertyMetadata&,
+						const ActorReference& current,
+						ActorReference& selected)
 						{
-							preview = currentActor->GetName().c_str();
+							if (!context.scene)
+							{
+								return false;
+							}
+
+							Actor* currentActor = current.Resolve(*context.scene);
+							const char* preview = "<None>";
+
+							if (current.HasValue())
+							{
+								preview = "<Missing Actor>";
+
+								if (currentActor)
+								{
+									preview = currentActor->GetName().c_str();
+								}
+							}
+
+							if (!ImGui::BeginCombo(label, preview))
+							{
+								return false;
+							}
+
+							bool changed = false;
+
+							if (ImGui::Selectable("<None>", !current.HasValue()) && current.HasValue())
+							{
+								selected.Clear();
+								changed = true;
+							}
+
+							for (Actor* actor : context.scene->GetAllActors())
+							{
+								if (!actor)
+								{
+									continue;
+								}
+
+								if (actor->IsDestroyed())
+								{
+									continue;
+								}
+
+								if (actor->GetOwner() != context.scene)
+								{
+									continue;
+								}
+
+								const bool isSelected = current.GetGuid() == actor->GetGuid();
+								ImGui::PushID(actor);
+
+								if (ImGui::Selectable(actor->GetName().c_str(), isSelected) && !isSelected)
+								{
+									selected.Set(actor);
+									changed = true;
+								}
+
+								ImGui::PopID();
+							}
+
+							ImGui::EndCombo();
+							return changed;
+						};
+
+				services.drawAssetReference =
+					[&context](
+						const char* label,
+						const PropertyMetadata& property,
+						const AssetReferenceValue& current,
+						AssetReferenceValue& selected)
+						{
+							if (!context.assetManager)
+							{
+								return false;
+							}
+
+							Guid selectedGuid;
+							const bool selectionChanged = AssetPicker::Draw(
+								label,
+								*context.assetManager,
+								property.GetAssetType(),
+								current.guid,
+								selectedGuid);
+
+							if (!selectionChanged)
+							{
+								return false;
+							}
+
+							// AssetPicker only exposes catalog entries of the requested type, so
+							// this is a validated live edit rather than a deferred load value.
+							selected = { selectedGuid, property.GetAssetType(), true };
+							return true;
+						};
+
+				// Preparres the specialized draw function for AnimationClipSlots, which is a custom property type.
+				services.drawAnimationClipSlots =
+					[this, &context, &actorGuid](const char* label, AnimationClipSlots& value)
+					{
+						if (!context.assetManager)
+						{
+							ImGui::TextDisabled("%s: Asset Manager unavailable", label);
+							return false;
 						}
-					}
 
-					if (!ImGui::BeginCombo(label, preview))
-					{
-						return false;
-					}
+						ImGui::TextUnformatted(label);
+						ImGui::TextDisabled("Press Enter to apply an Alias.");
 
-					bool changed = false;
+						const auto aliasExists = [&value](std::string_view alias)
+							{
+								return std::any_of(
+									value.slots.begin(), value.slots.end(),
+									[alias](const AnimationClipSlot& slot)
+									{
+										return slot.alias == alias;
+									});
+							};
 
-					if (ImGui::Selectable("<None>", !current.HasValue()) && current.HasValue())
-					{
-						selected.Clear();
-						changed = true;
-					}
+						bool changed = false;
+						std::optional<std::size_t> removeIndex;
 
-					for (Actor* actor : context.scene->GetAllActors())
-					{
-						if (!actor)
+						for (std::size_t index = 0; index < value.slots.size(); ++index)
 						{
-							continue;
+							AnimationClipSlot& slot = value.slots[index];
+							ImGui::PushID(static_cast<int>(index));
+
+							std::string alias = slot.alias;
+
+							if (ImGui::InputText("Alias", &alias, ImGuiInputTextFlags_EnterReturnsTrue) && alias != slot.alias)
+							{
+								if (alias.empty() || aliasExists(alias))
+								{
+									m_propertyEditDiagnostic = "Clip aliases must be nonempty and unique.";
+									m_propertyEditDiagnosticActorGuid = actorGuid;
+								}
+								else
+								{
+									if (value.defaultSlotAlias == slot.alias)
+									{
+										value.defaultSlotAlias = alias;
+									}
+
+									slot.alias = std::move(alias);
+									changed = true;
+								}
+							}
+
+							Guid selected;
+
+							if (AssetPicker::Draw("Clip", *context.assetManager, AssetType::AnimationClip, slot.clipAssetId, selected))
+							{
+								slot.clipAssetId = selected;
+								changed = true;
+							}
+
+							bool initial = value.defaultSlotAlias == slot.alias;
+
+							if (ImGui::Checkbox("Initial Clip", &initial))
+							{
+								if (initial)
+								{
+									value.defaultSlotAlias = slot.alias;
+								}
+								else
+								{
+									value.defaultSlotAlias.clear();
+								}
+
+								changed = true;
+							}
+
+							ImGui::SameLine();
+
+							if (ImGui::SmallButton("Remove Slot"))
+							{
+								removeIndex = index;
+							}
+
+							ImGui::PopID();
 						}
 
-						if (actor->IsDestroyed())
+						if (removeIndex)
 						{
-							continue;
-						}
+							auto removed = value.slots.begin() + static_cast<std::ptrdiff_t>(*removeIndex);
 
-						if (actor->GetOwner() != context.scene)
-						{
-							continue;
-						}
+							if (value.defaultSlotAlias == removed->alias)
+							{
+								value.defaultSlotAlias.clear();
+							}
 
-						const bool isSelected = current.GetGuid() == actor->GetGuid();
-						ImGui::PushID(actor);
-
-						if (ImGui::Selectable(actor->GetName().c_str(), isSelected) && !isSelected)
-						{
-							selected.Set(actor);
+							value.slots.erase(removed);
 							changed = true;
 						}
 
-						ImGui::PopID();
-					}
+						if (ImGui::SmallButton("Add Slot"))
+						{
+							std::size_t number = 1;
+							AnimationClipSlot slot;
+							slot.alias = "Clip " + std::to_string(number);
 
-					ImGui::EndCombo();
-					return changed;
-				};
-				services.drawAssetReference = [&context](
-					const char* label,
-					const PropertyMetadata& property,
-					const AssetReferenceValue& current,
-					AssetReferenceValue& selected)
-				{
-					if (!context.assetManager)
-					{
-						return false;
-					}
+							while (aliasExists(slot.alias))
+							{
+								++number;
+								slot.alias = "Clip " + std::to_string(number);
+							}
 
-					Guid selectedGuid;
-					const bool selectionChanged = AssetPicker::Draw(
-						label,
-						*context.assetManager,
-						property.GetAssetType(),
-						current.guid,
-						selectedGuid);
+							value.slots.push_back(std::move(slot));
+							changed = true;
+						}
 
-					if (!selectionChanged)
-					{
-						return false;
-					}
-
-					// AssetPicker only exposes catalog entries of the requested type, so
-					// this is a validated live edit rather than a deferred load value.
-					selected = { selectedGuid, property.GetAssetType(), true };
-					return true;
-				};
+						return changed;
+					};
 
 				m_reflectionInspector.Draw(
 					*metadata,

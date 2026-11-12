@@ -31,11 +31,15 @@ bool AssetManagerAssetReferenceContext::Check(
 
 	if (!entry)
 	{
-		const bool renderAsset = expectedType == AssetType::Mesh || expectedType == AssetType::Texture;
+		const bool canKeepMissingReference = 
+			expectedType ==
+				AssetType::Mesh ||
+				expectedType == AssetType::Texture ||
+				expectedType == AssetType::AnimationClip;
 
-		if (m_preserveMissingRenderAssets && renderAsset)
+		if (m_preserveMissingAssets && canKeepMissingReference)
 		{
-			DBG("Asset reference: missing render Asset GUID preserved for Invalid runtime resolution.");
+			DBG("Asset reference: missing Asset GUID preserved for deferred resolution.");
 			return true;
 		}
 

@@ -4,6 +4,7 @@
 #include "AssetReferenceCodec.h"
 #include "PropertyMetadata.h"
 #include "nlohmann/json.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -236,6 +237,101 @@ namespace
 		return true;
 	}
 
+	bool SerializeAnimationClipSlots(
+		const AnimationClipSlots& value,
+		const ReflectionSaveContext& context,
+		json& outJson)
+	{
+		if (!context.assetReferenceCodec || !context.assetReferenceContext)
+		{
+			return false;
+		}
+
+		json slots = json::array();
+
+		for (const AnimationClipSlot& slot : value.slots)
+		{
+			AssetReferenceValue reference;
+			reference.guid = slot.clipAssetId;
+			reference.expectedType = AssetType::AnimationClip;
+
+			json clipAssetId;
+
+			if (!context.assetReferenceCodec->Serialize(reference, *context.assetReferenceContext, clipAssetId))
+			{
+				return false;
+			}
+
+			json row = json::object();
+			row["alias"] = slot.alias;
+			row["clipAssetId"] = std::move(clipAssetId);
+			slots.push_back(std::move(row));
+		}
+
+		json result = json::object();
+		result["slots"] = std::move(slots);
+		result["defaultSlotAlias"] = value.defaultSlotAlias;
+
+		outJson = std::move(result);
+		return true;
+	}
+
+	bool DeserializeAnimationClipSlots(
+		const json& source,
+		const ReflectionRestoreContext& context,
+		AnimationClipSlots& outValue)
+	{
+		if (!context.assetReferenceCodec || !source.is_object() || source.size() != 2)
+		{
+			return false;
+		}
+
+		const auto slots = source.find("slots");
+		const auto defaultAlias = source.find("defaultSlotAlias");
+		const bool hasSlots = slots != source.end() && slots->is_array();
+		const bool hasDefaultAlias = defaultAlias != source.end() && defaultAlias->is_string();
+
+		if (!hasSlots || !hasDefaultAlias)
+		{
+			return false;
+		}
+
+		AnimationClipSlots value;
+		value.defaultSlotAlias = defaultAlias->get<std::string>();
+		value.slots.reserve(slots->size());
+
+		for (const json& row : *slots)
+		{
+			if (!row.is_object() || row.size() != 2)
+			{
+				return false;
+			}
+
+			const auto alias = row.find("alias");
+			const auto clipAssetId = row.find("clipAssetId");
+
+			if (alias == row.end() || !alias->is_string() || clipAssetId == row.end())
+			{
+				return false;
+			}
+
+			AssetReferenceValue reference;
+
+			if (!context.assetReferenceCodec->Deserialize(*clipAssetId, AssetType::AnimationClip, reference))
+			{
+				return false;
+			}
+
+			AnimationClipSlot slot;
+			slot.alias = alias->get<std::string>();
+			slot.clipAssetId = reference.guid;
+			value.slots.push_back(std::move(slot));
+		}
+
+		outValue = std::move(value);
+		return true;
+	}
+
 	bool SerializePropertyValue(
 		const PropertyMetadata& property,
 		const PropertyValue& value,
@@ -405,6 +501,12 @@ namespace
 			}
 
 			return true;
+		}
+
+		case PropertyLogicalType::AnimationClipSlots:
+		{
+			const auto* slots = std::get_if<AnimationClipSlots>(&value);
+			return slots && SerializeAnimationClipSlots(*slots, context, outJson);
 		}
 
 		default:
@@ -664,6 +766,19 @@ namespace
 			}
 
 			outValue = reference;
+			return true;
+		}
+
+		case PropertyLogicalType::AnimationClipSlots:
+		{
+			AnimationClipSlots slots;
+
+			if (!DeserializeAnimationClipSlots(source, context, slots))
+			{
+				return false;
+			}
+
+			outValue = std::move(slots);
 			return true;
 		}
 

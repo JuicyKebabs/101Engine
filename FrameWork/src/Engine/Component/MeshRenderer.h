@@ -1,8 +1,10 @@
 #pragma once
-#include <optional>
+
 #include "Engine/Resource/AssetReference.h"
 #include "Engine/Component/RendererComponent.h"
 #include "Engine/Graphics/RenderTemplateFactory.h"
+
+#include <optional>
 
 class Transform;
 
@@ -58,9 +60,12 @@ private:
 	MeshRendererProxy m_proxy;
 	Guid m_meshAssetId;
 	std::optional<Guid> m_pendingMeshAssetId;
+
+private:
 	AssetPrepareResult PrepareMeshAssetState(const Guid& assetId, PreparedMeshAssetState& output) const;
 	void CommitMeshAssetState(PreparedMeshAssetState&& state);
 	bool SetPendingMeshAssetReference(const AssetReference<MeshAsset>& value);
+
 	void OnAttachOverride() override;
 	void OnStartOverride() override;
 	void PreUpdateOverride(float deltaTime) override;
@@ -68,6 +73,8 @@ private:
 	void LateUpdateOverride(float deltaTime) override;
 	void OnDetachOverride() override;
 	void OnDestroyOverride() override;
+
 	void RebuildRenderProxy();
+
 	Matrix4x4 BuildWorldMatrix(Transform* transform) const;
 };

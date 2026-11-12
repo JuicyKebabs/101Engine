@@ -284,8 +284,8 @@ private:
 		}
 	}
 
-	GeometrySlotTable m_slots;                                // State management for geometry resources.
-	std::vector<std::unique_ptr<GeometryContent>> m_contents; // Actual geometry data (CPU data and GPU resources).
+	GeometrySlotTable m_slots;									// State management for geometry resources.
+	std::vector<std::unique_ptr<GeometryContent>> m_contents;	// Actual geometry data (CPU data and GPU resources).
 };
 
 } // namespace rendering::detail

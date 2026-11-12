@@ -2,7 +2,7 @@
 #include "EditorRenderAssets.h"
 
 #include "EditorShaderLoader.h"
-#include "Engine/Graphics/RenderingConversions.h"
+#include "Engine/Core/Math/Math.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Component/Collider.h"
 
@@ -221,7 +221,7 @@ rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& sh
 	//---------------------------------------------------------------------------------
 	rendering::MaterialDesc colliderDescription;
 	colliderDescription.pipeline = m_pipelines[3];
-	rendering::Vector4 identity;
+	Vector4 identity;
 	identity.x = 1;
 	identity.y = 1;
 	AddParameter(colliderDescription, "LocalQuadTransform", identity);
@@ -252,12 +252,12 @@ rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& sh
 		for (const Vertex& source : mesh.vertices)
 		{
 			rendering::MeshVertex vertex;
-			vertex.position = EngineRendering::ToRenderer(source.position);
-			vertex.normal = EngineRendering::ToRenderer(source.normal);
+			vertex.position = source.position;
+			vertex.normal = source.normal;
 			vertex.uv.x = source.uv.x;
 			vertex.uv.y = source.uv.y;
-			vertex.tangent = EngineRendering::ToRenderer(source.tangent);
-			vertex.color = EngineRendering::ToRenderer(source.color);
+			vertex.tangent = source.tangent;
+			vertex.color = source.color;
 			vertices.push_back(vertex);
 		}
 
@@ -453,7 +453,7 @@ void EditorRenderAssets::AppendColliderObject(
 	rendering::RenderObject object;
 	object.geometry = geometry;
 	object.material = m_colliderMaterial;
-	object.world = EngineRendering::ToRenderer(world);
+	object.world = world;
 	object.targetViews.push_back(pass.id);
 	rendering::AuxiliaryDraw draw;
 	draw.objectIndex = frame.objects.size();

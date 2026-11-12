@@ -1,7 +1,3 @@
-// Select, prepare, declare and record from the same original Object indices.
-// Resolve current registry revisions under single-threaded, non-reentrant Render sequencing.
-// Keep Graph ownership connections here and delegate packing/PSO/draw preparation to DrawResources.
-
 #include "FrameDrawContext.h"
 #include "SceneOutputResources.h"
 #include "Failure.h"
@@ -21,8 +17,12 @@ namespace
 // ponytail: linear deduplication keeps small Frame lists simple; index by Content if profiling warrants it.
 template <class Target> void AddUniqueUploadTarget(std::vector<Target>& targets, const Target& candidate)
 {
-	const auto existing = std::find_if(targets.begin(), targets.end(), [&candidate](const Target& target)
-                                       { return target.content == candidate.content; });
+	const auto existing = std::find_if(
+		targets.begin(), targets.end(),
+		[&candidate](const Target& target)
+		{
+			return target.content == candidate.content;
+		});
 
 	if (existing == targets.end())
 	{
@@ -194,10 +194,15 @@ Result FrameDrawContext::ResolveObjectInputs(
 	}
 
 	inputs.geometrySubstituted = geometryUnavailable;
-	AddDiagnostic(sourceDiagnostic, "Fallback",
-                  originalFailure + (geometryUnavailable ? " Using resident Geometry and Material."
-                                                         : " Using resident Material on the original Geometry."),
-                  pass);
+
+	AddDiagnostic(
+		sourceDiagnostic, "Fallback",
+		originalFailure + 
+		(geometryUnavailable ?
+			  " Using resident Geometry and Material."
+			: " Using resident Material on the original Geometry."),
+		pass);
+
 	return {};
 }
 
@@ -261,13 +266,14 @@ Result FrameDrawContext::SelectAvailableDraws(
 			}
 		}
 
-		// Resolve before culling: fallback selection must not be hidden by the
-		// original Geometry's obsolete Bounds. A submitted revision mismatch
-		// intentionally performs extra work instead of losing visible geometry.
+		// Check if the object can be culled with bounds.
+		// Procedural objects may have no bounds, but they can still be culled with a procedural bounds function.
+		// A geometry which has valid bounds (no revision mismatch) can be culled with those bounds.
 		const GeometryContent* boundsGeometry = m_resources.FindContent(object.geometry);
 		const bool proceduralBounds = object.procedural.has_value();
-		const bool currentGeometryBounds = boundsGeometry && object.boundsGeometryRevision != 0 &&
-                                           boundsGeometry->revision == object.boundsGeometryRevision;
+		const bool currentGeometryBounds =
+			boundsGeometry && object.boundsGeometryRevision != 0 &&
+			boundsGeometry->revision == object.boundsGeometryRevision;
 		const bool mayCull = proceduralBounds || currentGeometryBounds;
 
 		if (view && object.bounds && mayCull)
@@ -280,8 +286,12 @@ Result FrameDrawContext::SelectAvailableDraws(
 			{
 				DrawDiagnostic diagnostic;
 				diagnostic.objectIndex = objectIndex;
-				AddDiagnostic(diagnostic, "Cull", "Bounds must be a finite world sphere with nonnegative radius.",
-                              pass);
+
+				AddDiagnostic(
+					diagnostic,
+					"Cull", "Bounds must be a finite world sphere with nonnegative radius.",
+					pass);
+
 				continue;
 			}
 
@@ -294,6 +304,7 @@ Result FrameDrawContext::SelectAvailableDraws(
 
 			bool outside = false;
 
+			// Check each of the six frustum planes against the bounding sphere.
 			for (int planeIndex = 0; planeIndex < 6; ++planeIndex)
 			{
 				const int column = planeIndex / 2;
@@ -320,8 +331,7 @@ Result FrameDrawContext::SelectAvailableDraws(
 				plane.w = coefficients[3];
 
 				const float length = std::sqrt(plane.x * plane.x + plane.y * plane.y + plane.z * plane.z);
-				const float distance =
-					plane.x * bounds.center.x + plane.y * bounds.center.y + plane.z * bounds.center.z + plane.w;
+				const float distance = plane.x * bounds.center.x + plane.y * bounds.center.y + plane.z * bounds.center.z + plane.w;
 
 				if (distance < -bounds.radius * length)
 				{

@@ -29,7 +29,7 @@
                 {
                     "data": {
                         "billboardType": 0,
-                        "castShadow": false,
+                        "castShadow": true,
                         "color": [
                             1.0,
                             1.0,
@@ -56,6 +56,45 @@
                         "visible": true
                     },
                     "type": "SpriteRenderer"
+                },
+                {
+                    "data": {
+                        "center": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "isTrigger": false,
+                        "layer": 0,
+                        "name": "",
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            0.25
+                        ],
+                        "type": 0
+                    },
+                    "type": "Collider"
+                },
+                {
+                    "data": {
+                        "aimingFOV": 45.0,
+                        "bulletImprint": null,
+                        "bulletSpeed": 2.0,
+                        "defaultFOV": 90.0,
+                        "fireSound": null,
+                        "fovSwitchingSpeed": 0.5,
+                        "moveSlowSpeed": 2.5,
+                        "moveSpeed": 5.0,
+                        "sensitivity": 0.10000000149011612
+                    },
+                    "type": "Player"
                 }
             ],
             "is_active": true,
@@ -139,21 +178,132 @@
             "tag": "MainCamera"
         },
         {
-            "actorId": "{FBFA99A3-E21E-41EB-B498-D81DB851E0A6}",
+            "actorId": "{6BCCEF80-2EE0-4E90-B661-7C7065EC5643}",
             "components": [
                 {
                     "data": {
                         "name": "",
                         "position": [
                             0.0,
-                            0.550000011920929,
+                            -10.100000381469727,
+                            0.0
+                        ],
+                        "rotation": [
+                            -0.7071068286895752,
+                            0.0,
+                            0.0,
+                            0.7071068286895752
+                        ],
+                        "scale": [
+                            100.0,
+                            100.0,
+                            1.0
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "castShadow": true,
+                        "color": [
+                            0.48358210921287537,
+                            1.0,
+                            0.32528144121170044,
+                            1.0
+                        ],
+                        "meshAssetId": "{8C00A61A-5A71-4E70-9232-7C99B17E9831}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "MeshRenderer"
+                }
+            ],
+            "is_active": true,
+            "name": "Floor",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{76244775-577C-4F68-AE68-44AF8C78A34E}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            -3.799999952316284,
+                            -5.300000190734863,
                             0.0
                         ],
                         "rotation": [
                             0.0,
+                            -0.17149923741817474,
                             0.0,
-                            0.0,
+                            0.9851842522621155
+                        ],
+                        "scale": [
+                            0.10000000149011612,
+                            0.10000000149011612,
+                            0.10000000149011612
+                        ]
+                    },
+                    "type": "Transform"
+                },
+                {
+                    "data": {
+                        "castShadow": true,
+                        "color": [
+                            1.0,
+                            1.0,
+                            1.0,
                             1.0
+                        ],
+                        "meshAssetId": "{D155F13A-00E7-4B2F-B7B3-C4A5908082BB}",
+                        "name": "",
+                        "sortOrderInCanvas": 0,
+                        "visible": true
+                    },
+                    "type": "SkinnedMeshRenderer"
+                },
+                {
+                    "data": {
+                        "clips": {
+                            "defaultSlotAlias": "Dance",
+                            "slots": [
+                                {
+                                    "alias": "Dance",
+                                    "clipAssetId": "{422839DC-7EE1-4467-91C2-53420FE6A31C}"
+                                }
+                            ]
+                        },
+                        "loop": true,
+                        "playOnStart": true,
+                        "playbackSpeed": 1.0
+                    },
+                    "type": "AnimationPlayer"
+                }
+            ],
+            "is_active": true,
+            "name": "TestSkinning",
+            "parentId": null,
+            "tag": "None"
+        },
+        {
+            "actorId": "{FBFA99A3-E21E-41EB-B498-D81DB851E0A6}",
+            "components": [
+                {
+                    "data": {
+                        "name": "",
+                        "position": [
+                            6.0,
+                            1.100000023841858,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            -0.11537058651447296,
+                            0.0,
+                            0.9933225512504578
                         ],
                         "scale": [
                             1.0,
@@ -178,6 +328,45 @@
                         "visible": true
                     },
                     "type": "MeshRenderer"
+                },
+                {
+                    "data": {
+                        "center": [
+                            0.0,
+                            1.2999999523162842,
+                            0.0
+                        ],
+                        "isTrigger": false,
+                        "layer": 0,
+                        "name": "",
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                        ],
+                        "scale": [
+                            3.0,
+                            4.0,
+                            2.0
+                        ],
+                        "type": 2
+                    },
+                    "type": "Collider"
+                },
+                {
+                    "data": {
+                        "aimingFOV": 45.0,
+                        "bulletImprint": "{2CC5E2CE-6C94-46B6-A89A-36918FDE8540}",
+                        "bulletSpeed": 2.0,
+                        "defaultFOV": 90.0,
+                        "fireSound": null,
+                        "fovSwitchingSpeed": 0.5,
+                        "moveSlowSpeed": 2.5,
+                        "moveSpeed": 5.0,
+                        "sensitivity": 0.10000000149011612
+                    },
+                    "type": "Player"
                 }
             ],
             "is_active": true,
