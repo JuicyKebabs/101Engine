@@ -104,8 +104,10 @@ D3D12_RECT DrawScissor(const RenderObject& object, const Viewport& viewport, std
 // Common allocations may be shared inside the current preparation call, never across different Views.
 // Compute both World and inverse-transpose normal data from the derived Billboard World.
 Result DrawResources::PrepareConstantBindings(
-	const FrameRenderData& frame, const PassRecordingInputs& pass,
-	const RenderObject& object, const DrawInputs& inputs,
+	const FrameRenderData& frame,
+	const PassRecordingInputs& pass,
+	const RenderObject& object,
+	const DrawInputs& inputs,
 	FrameDrawContext& drawContext,
 	std::array<backend::ConstantAllocation, 4>& commonAllocations,
 	DrawCommand& command)
@@ -254,7 +256,7 @@ Result DrawResources::PrepareConstantBindings(
 // Resolve the same owner that declaration imported, copy its CPU SRV to the frame-visible heap,
 // while its registry/cache owner stays stable through synchronous execution.
 // Descriptor copying creates a view description; the owner protects the underlying storage.
-Result DrawResources::PrepareTextureBindings(
+Result DrawResources::PrepareSrvBindings(
 	const DrawInputs& inputs,
 	FrameDrawContext& drawContext,
 	const PassRecordingInputs& pass,
@@ -264,11 +266,46 @@ Result DrawResources::PrepareTextureBindings(
 
 	for (const auto& requirement : inputs.pipeline->layout.resources)
 	{
-		if (requirement.sampler)
+		if (requirement.kind == ShaderResourceKind::Sampler)
 		{
 			continue;
 		}
+		
+		//------------------------------------------
+		// Structured Buffer bindings.
+		//------------------------------------------
+		if (requirement.kind == ShaderResourceKind::StructuredBuffer)
+		{
+			const backend::StructuredBufferGpuData* gpuData = nullptr;
 
+			Result resolved = ResolveStructuredBuffer(inputs.material->desc, requirement, gpuData);
+		
+			if (!resolved.IsSuccess())
+			{
+				return resolved;
+			}
+
+			// Copy the structured buffer's SRV to the frame-visible heap.
+			backend::SrvBinding binding;
+			binding.rootIndex = rootIndex;
+			Result copied = gpuData->CopyFrameSrv(drawContext.Backend(), binding.descriptor);
+		
+			if (!copied.IsSuccess())
+			{
+				return copied;
+			}
+
+			command.m_packet.srvs.push_back(binding);
+			++rootIndex;
+			continue;
+		}
+
+		//-------------------------------------------------
+		// Texture bindings.
+		// There are 3 possible owners of the texture:
+		// RenderTarget, DepthTexture, or UploadedTexture.
+		//-------------------------------------------------
+		// Sampling texture kinds are resolved to the same owner that declaration imported.
 		SampledTexture sampled;
 		Result resolved = drawContext.ResolveSample(inputs.material->desc, requirement, sampled, pass);
 
@@ -302,6 +339,7 @@ Result DrawResources::PrepareTextureBindings(
 			return resolved;
 		}
 
+		// Copy the source descriptor to the frame-visible heap for this View.
 		D3D12_GPU_DESCRIPTOR_HANDLE descriptor{};
 		Result copied = drawContext.Backend().CopyFrameDescriptor(sourceDescriptor, descriptor);
 
@@ -310,12 +348,14 @@ Result DrawResources::PrepareTextureBindings(
 			return copied;
 		}
 
-		backend::TextureBinding binding;
+		// Record the binding for this draw command.
+		backend::SrvBinding binding;
 		binding.rootIndex = rootIndex;
 		binding.descriptor = descriptor;
-		command.m_packet.textures.push_back(binding);
+		command.m_packet.srvs.push_back(binding);
 		++rootIndex;
 
+		// Record the texture usage for this draw command.
 		graph::PassTextureUse read;
 		read.texture = graphTexture;
 		read.use.usage = graph::TextureUsage::ShaderRead;
@@ -331,14 +371,18 @@ Result DrawResources::PrepareTextureBindings(
 // Resolve effective viewport/scissor and remove empty clips before native recording.
 // Allocation/preparation failure aborts the unsent Graph rather than submitting a partial frame.
 Result DrawResources::PrepareCommands(
-	FrameDrawContext& drawContext, const PassRecordingInputs& pass,
-	std::span<const PlannedDraw> draws, const graph::OutputLayout& output,
+	FrameDrawContext& drawContext,
+	const PassRecordingInputs& pass,
+	std::span<const PlannedDraw> draws,
+	const graph::OutputLayout& output,
 	std::vector<DrawCommand>& commands)
 {
 	// This cache is deliberately local to one PrepareCommands call for one View.
 	// Moving it to frame-global state would reuse Camera A addresses when preparing Camera B.
 	std::array<backend::ConstantAllocation, 4> commonAllocations{};
 
+	// Create a draw command for every PlannedDraw.
+	// PlannedDraw has index of RenderObject and override settings for a draw.
 	for (const PlannedDraw& draw : draws)
 	{
 		const std::size_t objectIndex = draw.objectIndex;
@@ -390,14 +434,17 @@ Result DrawResources::PrepareCommands(
 
 		const auto& object = drawContext.Frame().objects[objectIndex];
 
+		// Copy the geometry's GPU views into the draw packet.
+		// Procedural draws do not need vertex/index buffers.
 		if (object.procedural)
-		{
+		{// Procedural draws.
 			command.m_packet.requiresVertexBuffer = false;
 			command.m_packet.count = object.procedural->vertexCount;
 		}
 		else
-		{
+		{// Non-procedural draws.
 			command.m_packet.vertices = inputs.geometry->gpuData->vertexView;
+			command.m_packet.skinVertices = inputs.geometry->gpuData->skinVertexView;
 			command.m_packet.indices = inputs.geometry->gpuData->indexView;
 
 			const bool indexed = inputs.geometry->gpuData->indexCount != 0;
@@ -433,6 +480,7 @@ Result DrawResources::PrepareCommands(
 			continue;
 		}
 
+		// Allocate and bind constants for this draw command.
 		result = PrepareConstantBindings(drawContext.Frame(), pass, object, inputs, drawContext, commonAllocations, command);
 
 		if (!result.IsSuccess())
@@ -440,7 +488,8 @@ Result DrawResources::PrepareCommands(
 			return result;
 		}
 
-		result = PrepareTextureBindings(inputs, drawContext, pass, command);
+		// Allocate and bind SRVs for this draw command.
+		result = PrepareSrvBindings(inputs, drawContext, pass, command);
 
 		if (!result.IsSuccess())
 		{

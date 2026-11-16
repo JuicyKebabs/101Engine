@@ -5,9 +5,8 @@
 #include "Engine/Resource/RenderAssetResources.h"
 #include "Renderer/Renderer.h"
 
-SubmeshRenderTemplate PrepareSubmeshRenderTemplate(
+SubmeshRenderTemplate MakeSubmeshRenderTemplate(
 	const EngineContext& context,
-	SceneBase& scene,
 	const GeometryInfo& geometry,
 	bool screen)
 {
@@ -33,11 +32,6 @@ SubmeshRenderTemplate PrepareSubmeshRenderTemplate(
 				pivot,
 				false,
 				false);
-
-		renderTemplate.materialDesc.handle =
-			context.pAssetManager->RegisterSceneMaterial(
-				scene,
-				renderTemplate.materialDesc.description);
 	}
 
 	if (context.pRenderer)
@@ -51,6 +45,25 @@ SubmeshRenderTemplate PrepareSubmeshRenderTemplate(
 			renderTemplate.meshDesc.boundsRadius = snapshot.boundsRadius;
 			renderTemplate.meshDesc.boundsRevision = snapshot.revision;
 		}
+	}
+
+	return renderTemplate;
+}
+
+SubmeshRenderTemplate PrepareSubmeshRenderTemplate(
+	const EngineContext& context,
+	SceneBase& scene,
+	const GeometryInfo& geometry,
+	bool screen)
+{
+	auto renderTemplate = MakeSubmeshRenderTemplate(context, geometry, screen);
+
+	if (context.pRenderAssets)
+	{
+		renderTemplate.materialDesc.handle =
+			context.pAssetManager->RegisterSceneMaterial(
+				scene,
+				renderTemplate.materialDesc.description);
 	}
 
 	return renderTemplate;

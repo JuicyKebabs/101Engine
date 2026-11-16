@@ -250,8 +250,9 @@ public:
 	// Render forbids replacement while any command preparation borrows exist.
 	bool OwnsContent(GeometryHandle handle, const GeometryContent* content) const noexcept
 	{
-		return content && m_slots.ValidateRegistered(handle) == ResourceHandleValidationResult::Success &&
-               m_contents[handle.slotIndex].get() == content;
+		return content &&
+			m_slots.ValidateRegistered(handle) == ResourceHandleValidationResult::Success &&
+			m_contents[handle.slotIndex].get() == content;
 	}
 
 	void CollectDestroyed()

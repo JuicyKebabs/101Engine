@@ -49,7 +49,7 @@ public:
 	void Update(float deltaTime);				// Update
 	void LateUpdate(float deltaTime);			// Late update
 
-	bool AppendRenderData(
+	rendering::Result AppendRenderData(
 		rendering::FrameRenderData& frame,
 		const rendering::ViewOutput& output,
 		const CameraInfo* overrideCameraInfo = nullptr,

@@ -13,8 +13,12 @@ struct GeometryGpuData
 {
 	Buffer vertices;
 	Buffer indices;
+	Buffer skinVertices;
+
 	D3D12_VERTEX_BUFFER_VIEW vertexView{};
+	D3D12_VERTEX_BUFFER_VIEW skinVertexView{};
 	D3D12_INDEX_BUFFER_VIEW indexView{};
+
 	std::uint32_t vertexCount = 0;
 	std::uint32_t indexCount = 0;
 };
@@ -22,6 +26,7 @@ struct GeometryGpuData
 struct GeometryUploadData
 {
 	Buffer vertices;
+	Buffer skinVertices;
 	Buffer indices;
 };
 

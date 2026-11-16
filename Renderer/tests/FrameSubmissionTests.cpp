@@ -47,6 +47,50 @@ void CheckSkipped(rendering::Renderer& renderer)
 	Require(result.disposition == rendering::RenderDisposition::SkippedNoSubmission, "Submission was consumed twice.");
 }
 
+void VerifyStructuredBufferLifecycle(rendering::Renderer& renderer)
+{
+	using namespace rendering;
+
+	std::array<std::array<float, 4>, 3> values{};
+	const auto bytes = std::as_bytes(std::span(values));
+	StructuredBufferDesc desc;
+	desc.elementStride = sizeof(values.front());
+	Require(!renderer.CreateStructuredBuffer(desc).result.IsSuccess(), "Zero element count was accepted.");
+
+	desc.elementCount = (std::numeric_limits<std::uint32_t>::max)();
+	Require(!renderer.CreateStructuredBuffer(desc).result.IsSuccess(), "Oversized element count was accepted.");
+
+	desc.elementCount = static_cast<std::uint32_t>(values.size());
+	desc.elementStride = 6;
+	Require(!renderer.CreateStructuredBuffer(desc).result.IsSuccess(), "Misaligned element stride was accepted.");
+
+	desc.elementStride = 2052;
+	Require(!renderer.CreateStructuredBuffer(desc).result.IsSuccess(), "Oversized element stride was accepted.");
+
+	desc.elementStride = sizeof(values.front());
+	const auto buffer = renderer.CreateStructuredBuffer(desc);
+	Check(buffer.result);
+	Require(!renderer.UpdateStructuredBuffer(buffer.handle, bytes.first(bytes.size() - 1)).IsSuccess(), "Partial update was accepted.");
+	Check(renderer.UpdateStructuredBuffer(buffer.handle, bytes));
+	values.front()[0] = 1.0f;
+	Check(renderer.UpdateStructuredBuffer(buffer.handle, bytes));
+
+	BufferHandle wrongOwner = buffer.handle;
+	++wrongOwner.ownerId;
+	Require(!renderer.UpdateStructuredBuffer(wrongOwner, bytes).IsSuccess(), "Buffer update accepted a wrong owner.");
+	Require(!renderer.DestroyStructuredBuffer(wrongOwner).IsSuccess(), "Buffer destruction accepted a wrong owner.");
+	Check(renderer.DestroyStructuredBuffer(buffer.handle));
+
+	const auto replacement = renderer.CreateStructuredBuffer(desc);
+	Check(replacement.result);
+	Require(replacement.handle.slotIndex == buffer.handle.slotIndex, "Destroyed buffer slot was not reused.");
+	Require(replacement.handle.generation != buffer.handle.generation, "Buffer generation was not advanced.");
+	Require(!renderer.UpdateStructuredBuffer(buffer.handle, bytes).IsSuccess(), "Stale buffer update was accepted.");
+	Require(!renderer.DestroyStructuredBuffer(buffer.handle).IsSuccess(), "Stale buffer destruction was accepted.");
+	Check(renderer.UpdateStructuredBuffer(replacement.handle, bytes));
+	Check(renderer.DestroyStructuredBuffer(replacement.handle));
+}
+
 void VerifyOutputPlanning(rendering::Renderer& renderer)
 {
 	using namespace rendering;
@@ -145,6 +189,8 @@ void VerifyFrameSubmission()
 
 	Check(renderer.Initialize(configuration));
 	CheckSkipped(renderer);
+
+	VerifyStructuredBufferLifecycle(renderer);
 
 	Win32WindowOutputDesc outputDescription{};
 	outputDescription.window = window.window;

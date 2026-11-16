@@ -14,6 +14,7 @@
 // It can be used to render animated characters with AnimationPlayer component.
 //------------------------------------------------------------------------------
 
+namespace rendering { class Renderer; }
 struct SkinnedModelView;
 
 struct SkinnedSubmeshRenderTemplate
@@ -21,12 +22,16 @@ struct SkinnedSubmeshRenderTemplate
 	SubmeshRenderTemplate renderTemplate;
 	std::vector<Matrix4x4> palette;
 	std::vector<Matrix4x4> bindPalette;
+	rendering::BufferHandle paletteBuffer;	// Handle of buffer for uploading skinnning paltette to GPU
 };
 
 class SkinnedMeshRenderer : public RendererComponent
 {
 public:
 	SkinnedMeshRenderer() { SetCastShadow(true); }
+	~SkinnedMeshRenderer() override;
+	SkinnedMeshRenderer(const SkinnedMeshRenderer&) = delete;
+	SkinnedMeshRenderer & operator=(const SkinnedMeshRenderer&) = delete;
 
 	bool SetMeshAsset(const Guid& assetId);
 	Guid GetAssetId() const { return m_meshAssetId; }
@@ -49,6 +54,9 @@ private:
 
 	// Same order as the Scene-retained model placements.
 	std::vector<SkinnedSubmeshRenderTemplate> m_submeshes;
+	rendering::Renderer* m_resourceRenderer = nullptr;
+
+	void ReleaseSubmeshes() noexcept;
 
 	void OnAttachOverride() override;
 	void OnDetachOverride() override;

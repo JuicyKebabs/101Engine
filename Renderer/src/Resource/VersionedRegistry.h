@@ -1,11 +1,19 @@
 #pragma once
 
+#include "Renderer/DrawTypes.h"
 #include "ResourceSlotTable.h"
 
 #include <algorithm>
 #include <memory>
 #include <limits>
 #include <vector>
+
+//---------------------------------------------------------------------------
+// VersionedRegistry class template
+// A registry that manages resources with versioning and ownership.
+// It provides methods for registering, updating, and destroying resources,
+// while ensuring that resources are valid and not stale.
+//---------------------------------------------------------------------------
 
 namespace rendering::detail
 {

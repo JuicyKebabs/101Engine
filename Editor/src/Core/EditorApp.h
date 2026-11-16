@@ -214,7 +214,7 @@ private:
 	void Update(float deltaTime);
 	void Render();
 
-	void AppendEditorViewport(rendering::FrameRenderData& frame, SceneBase* activeScene);
+	rendering::Result AppendEditorViewport(rendering::FrameRenderData& frame, SceneBase* activeScene);
 	bool CheckRenderingResult(const rendering::Result& result);
 
 	void RenderImGui();

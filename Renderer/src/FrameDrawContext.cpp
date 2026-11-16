@@ -95,8 +95,11 @@ bool FrameDrawContext::SelectExplicitDraw(std::size_t index, const DrawSettings&
 }
 
 Result FrameDrawContext::ResolveObjectInputs(
-	std::size_t objectIndex, const DrawSettings& settings, DrawInputs& inputs,
-	DrawDiagnostic& diagnostic, const PassRecordingInputs& pass)
+	std::size_t objectIndex,
+	const DrawSettings& settings,
+	DrawInputs& inputs,
+	DrawDiagnostic& diagnostic,
+	const PassRecordingInputs& pass)
 {
 	if (objectIndex >= m_frame.objects.size())
 	{
@@ -104,17 +107,57 @@ Result FrameDrawContext::ResolveObjectInputs(
 	}
 
 	const RenderObject& sourceObject = m_frame.objects[objectIndex];
-	Result resolved = m_resources.ResolveDrawInputs(sourceObject, objectIndex, settings, inputs, diagnostic);
+	
+	// Override the pipeline with the shadow pipeline
+	// if the Object has a Material with an explicit shadow Pipeline.
+	DrawSettings selectedSettings = settings;	// Settings considering the Material's shadow Pipeline, if any.
+	bool usesExplicitShadowPipeline = false;
 
+	if (pass.shadowPass)
+	{
+		const auto* material = m_resources.FindContent(sourceObject.material);
+
+		if (material && material->desc.shadowPipeline)
+		{
+			selectedSettings.pipelineOverride = material->desc.shadowPipeline;
+			selectedSettings.depthOverride.reset();
+			usesExplicitShadowPipeline = true;
+		}
+	}
+	
+	// Resolve the DrawInputs for the Object with the selected settings.
+	Result resolved =
+		m_resources.ResolveDrawInputs(
+			sourceObject,
+			objectIndex,
+			selectedSettings,
+			inputs,
+			diagnostic);
+
+	// Resolve structured buffer resources for its binding input.
+	if (resolved.IsSuccess())
+	{
+		resolved = m_resources.ValidateStructuredBuffers(inputs.material->desc, inputs.pipeline->layout);
+
+		if (!resolved.IsSuccess())
+		{
+			return resolved;
+		}
+	}
+
+	// Check that the texture parameters in the Material match the requirements of the Pipeline.
 	if (resolved.IsSuccess())
 	{
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler || requirement.name == "RendererShadowMap")
+			// Skip the non texture requirement and built-in shadow map texture.
+			if (requirement.kind != ShaderResourceKind::Texture2D ||
+				requirement.name == "RendererShadowMap")
 			{
 				continue;
 			}
 
+			// Get parameter from material with its name.
 			const MaterialParameter* parameter = FindMaterialParameter(inputs.material->desc, requirement.name);
 
 			if (!parameter)
@@ -146,8 +189,15 @@ Result FrameDrawContext::ResolveObjectInputs(
 		return resolved;
 	}
 
-	// Keep the first diagnostic and original public handles. This local copy is
-	// used for one resolution only; it is not a second persistent Object array.
+	// The default Pipeline cannot substitute for explicitly requested deformation.
+	if (usesExplicitShadowPipeline)
+	{
+		return resolved;
+	}
+
+	// Keep the first diagnostic and original public handles.
+	// This local copy is used for one resolution only;
+	// it is not a second persistent Object array.
 	const std::string originalFailure = resolved.message;
 	DrawDiagnostic sourceDiagnostic = diagnostic;
 	RenderObject effectiveObject = sourceObject;
@@ -191,6 +241,13 @@ Result FrameDrawContext::ResolveObjectInputs(
 	{
 		diagnostic = sourceDiagnostic;
 		return Fail(originalFailure + " Fallback is incompatible: " + resolved.message);
+	}
+
+	resolved = m_resources.ValidateStructuredBuffers(inputs.material->desc, inputs.pipeline->layout);
+
+	if (!resolved.IsSuccess())
+	{
+		return resolved;
 	}
 
 	inputs.geometrySubstituted = geometryUnavailable;
@@ -257,6 +314,11 @@ Result FrameDrawContext::SelectAvailableDraws(
 		}
 
 		const auto& object = m_frame.objects[objectIndex];
+
+		if (pass.shadowPass && !object.castShadow)
+		{
+			continue;
+		}
 
 		if (view && !object.targetViews.empty())
 		{
@@ -417,7 +479,7 @@ Result FrameDrawContext::CollectUploadTargets(
 
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler)
+			if (requirement.kind != ShaderResourceKind::Texture2D)
 			{
 				continue;
 			}
@@ -477,7 +539,7 @@ bool FrameDrawContext::AreResourcesPrepared(const DrawInputs& inputs, const Pass
 
 	for (const auto& requirement : inputs.pipeline->layout.resources)
 	{
-		if (requirement.sampler)
+		if (requirement.kind != ShaderResourceKind::Texture2D)
 		{
 			continue;
 		}
@@ -614,7 +676,7 @@ Result FrameDrawContext::DeclareDrawResources(
 
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler)
+			if (requirement.kind != ShaderResourceKind::Texture2D)
 			{
 				continue;
 			}
@@ -739,7 +801,7 @@ Result FrameDrawContext::CheckOutputReadOrder(
 
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler)
+			if (requirement.kind != ShaderResourceKind::Texture2D)
 			{
 				continue;
 			}
@@ -817,7 +879,7 @@ Result FrameDrawContext::EstimateRequirements(
 
 		for (const auto& resource : inputs.pipeline->layout.resources)
 		{
-			if (!resource.sampler)
+			if (resource.kind != ShaderResourceKind::Sampler)
 			{
 				++descriptors;
 			}

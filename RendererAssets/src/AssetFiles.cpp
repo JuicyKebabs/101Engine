@@ -222,6 +222,12 @@ GeometryDesc MeshData::Description() const
 	GeometryDesc description;
 	description.vertices = vertices;
 	description.indices = indices;
+
+	if (skin.valid)
+	{
+		description.skinVertices = skin.vertexWeights;
+	}
+
 	return description;
 }
 

@@ -8,6 +8,7 @@
 #include "Resource/TextureRegistry.h"
 #include "Resource/RenderTargetTextureRegistry.h"
 #include "Resource/VersionedRegistry.h"
+#include "Resource/BufferRegistry.h"
 #include "Backend/Backend.h"
 #include "Backend/PipelineGpu.h"
 #include "Renderer/FrameRenderData.h"
@@ -16,6 +17,9 @@
 
 //----------------------------------------------------------------------------
 // DrawResources
+// Resource registration, input validation and Pipeline variant caching.
+// Command preparation lives in DrawCommandPreparation.cpp;
+// native PSO creation belongs to Backend.
 //----------------------------------------------------------------------------
 
 namespace rendering::detail
@@ -99,7 +103,8 @@ public:
 		m_renderTargetResources(owner),
 		m_shaderResources(owner),
 		m_pipelineResources(owner),
-		m_materialResources(owner) {}
+		m_materialResources(owner),
+		m_bufferResources(owner) {}
 
 	// The Renderer owns the resident fallback resources, which are never destroyed.
 	Result InitializeFallbacks();
@@ -117,6 +122,16 @@ public:
 
 	Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
 
+	ResourceRegistrationResult<BufferHandle> CreateStructuredBuffer(backend::Backend& backend, const StructuredBufferDesc& desc)
+	{
+		return m_bufferResources.CreateStructuredBuffer(backend, desc);
+	}
+
+	Result UpdateStructuredBuffer(backend::Backend& backend, BufferHandle handle, std::span<const std::byte> data)
+	{
+		return m_bufferResources.UpdateStructuredBuffer(backend, handle, data);
+	}
+
 	Result ResolveDrawInputs(
 		const RenderObject& object,
 		std::size_t objectIndex,
@@ -129,15 +144,24 @@ public:
 		const ShaderResourceBinding& requirement,
 		TextureHandle& handle,
 		TextureContent*& content);
+	
+	Result ResolveStructuredBuffer(
+		const MaterialDesc& material,
+		const ShaderResourceBinding& requirement,
+		const backend::StructuredBufferGpuData*& outGpuData);
 
 	Result ResolveSampledTexture(
 		const MaterialDesc& material,
 		const ShaderResourceBinding& requirement,
 		SampledTexture& sampled);
 
+	Result ValidateStructuredBuffers(const MaterialDesc& material, const ShaderMetadata& layout);
+
 	Result PrepareCommands(
-		FrameDrawContext& drawContext, const PassRecordingInputs& pass,
-		std::span<const PlannedDraw> draws, const graph::OutputLayout& output,
+		FrameDrawContext& drawContext,
+		const PassRecordingInputs& pass,
+		std::span<const PlannedDraw> draws,
+		const graph::OutputLayout& output,
 		std::vector<DrawCommand>& commands);
 
 	GeometryContent* FindContent(GeometryHandle handle) { return m_geometryResources.FindRegisteredContent(handle); }
@@ -153,10 +177,10 @@ public:
 	Result Destroy(ShaderHandle handle) { return m_shaderResources.Destroy(handle); }
 	Result Destroy(PipelineHandle handle) { return m_pipelineResources.Destroy(handle); }
 	Result Destroy(MaterialHandle handle) { return m_materialResources.Destroy(handle); }
+	Result Destroy(BufferHandle handle) { return m_bufferResources.Destroy(handle); }
 
 	Result Update(GeometryHandle handle, const GeometryDesc& desc) { return m_geometryResources.Update(handle, desc); }
 	Result Update(TextureHandle handle, const TextureDesc& desc) { return m_textureResources.Update(handle, desc); }
-
 
 	void CollectgeometryDestroyed() { m_geometryResources.CollectDestroyed(); }
 	void CollectTextureDestroyed() { m_textureResources.CollectDestroyed(); }
@@ -183,21 +207,32 @@ private:
 	VersionedRegistry<ShaderHandle, ShaderContent> m_shaderResources;
 	VersionedRegistry<PipelineHandle, PipelineContent> m_pipelineResources;
 	VersionedRegistry<MaterialHandle, MaterialContent> m_materialResources;
+	BufferRegistry m_bufferResources;
 
 private:
+	Result ValidateMaterialPipelines(const MaterialDesc& desc);
+
 	Result GetOrCreatePipelineVariant(
-		const DrawInputs& inputs, const DrawDiagnostic& diagnostic,
-		const graph::OutputLayout& output, backend::Backend& backend,
+		const DrawInputs& inputs,
+		const DrawDiagnostic& diagnostic,
+		const graph::OutputLayout& output,
+		backend::Backend& backend,
 		PipelineVariant*& result);
 
 	Result PrepareConstantBindings(
-		const FrameRenderData& frame, const PassRecordingInputs& pass,
-		const RenderObject& object, const DrawInputs& inputs, FrameDrawContext& drawContext,
-		std::array<backend::ConstantAllocation, 4>& commonAllocations, DrawCommand& command);
+		const FrameRenderData& frame,
+		const PassRecordingInputs& pass,
+		const RenderObject& object,
+		const DrawInputs& inputs,
+		FrameDrawContext& drawContext,
+		std::array<backend::ConstantAllocation, 4>& commonAllocations,
+		DrawCommand& command);
 
-	Result PrepareTextureBindings(
-		const DrawInputs& inputs, FrameDrawContext& drawContext,
-		const PassRecordingInputs& pass, DrawCommand& command);
+	Result PrepareSrvBindings(
+		const DrawInputs& inputs,
+		FrameDrawContext& drawContext,
+		const PassRecordingInputs& pass,
+		DrawCommand& command);
 };
 
 Result ValidateFrameInputs(const FrameRenderData& frame);

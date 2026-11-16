@@ -19,11 +19,7 @@ struct SkinBone
 	Matrix4x4 meshToBoneBind = Matrix4x4::Identity();	// Transform from mesh space to bone space at bind pose.
 };
 
-struct VertexSkinWeight
-{
-	std::array<std::uint32_t, kMaxVertexBoneInfluences> boneIndices{};	// Which boines influence this vertex (represented by their indices in the MeshSkinData::bones array).
-	std::array<float, kMaxVertexBoneInfluences> boneWeights{};			// How much each bone influences this vertex. The sum of all weights should be 1.0f.
-};
+using VertexSkinWeight = SkinVertex;
 
 struct MeshSkinData
 {

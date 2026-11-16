@@ -1469,7 +1469,8 @@ bool EditorApp::InitInstance()
 	// shaders or resources needed for the editor UI and scene rendering or debugging tools.
 	m_editorRenderAssets = std::make_unique<EditorRenderAssets>(*m_pRenderer);
 
-	if (!CheckRenderingResult(m_editorRenderAssets->Initialize(SHADER_DIRECTORY)))
+	if (!CheckRenderingResult(m_editorRenderAssets->Initialize(
+		SHADER_DIRECTORY, m_renderAssets->SkinnedMeshVertexShader())))
 	{
 		return false;
 	}
@@ -1794,7 +1795,7 @@ void EditorApp::Render()
 		if (m_editorMode == EditorMode::Play)
 		{
 			// Use original scene output for Play Mode, as the editor viewport is not used in this mode.
-			if (!activeScene->AppendRenderData(frame, sceneOutput))
+			if (!CheckRenderingResult(activeScene->AppendRenderData(frame, sceneOutput)))
 			{
 				return;
 			}
@@ -1803,7 +1804,10 @@ void EditorApp::Render()
 		{
 			// Construct FrameRenderData for the editor viewport,
 			// including the scene and any editor-specific overlays.
-			AppendEditorViewport(frame, activeScene);
+			if (!CheckRenderingResult(AppendEditorViewport(frame, activeScene)))
+			{
+				return;
+			}
 		}
 	}
 
@@ -1856,13 +1860,13 @@ void EditorApp::Render()
 	}
 }
 
-void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBase* activeScene)
+rendering::Result EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBase* activeScene)
 {
 	EditorViewportContext* viewport = GetActiveViewportContext();
 
 	if (!viewport || !activeScene)
 	{
-		return;
+		return {};
 	}
 
 	// Change the render policy based on whether the viewport is in Canvas mode or not.
@@ -1903,13 +1907,11 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 	// Get the render target output for the scene color from the editor render assets.
 	rendering::ViewOutput output = m_editorRenderAssets->SceneColor();
 
-	if (!activeScene->AppendRenderData(
-		frame,
-		output,
-		&camera,
-		policy))
+	auto appended = activeScene->AppendRenderData(frame, output, &camera, policy);
+
+	if (!appended.IsSuccess())
 	{
-		return;
+		return {};
 	}
 
 	// Append the selected actor to the frame render data for visualizing outline in the editor viewport.
@@ -1919,14 +1921,16 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 	if (selection)
 	{
 		// Append the selected actor to the frame render data for visualizing outline in the editor viewport.
-		if (!CheckRenderingResult(m_editorRenderAssets->AppendSelection(
+		auto mask = m_editorRenderAssets->AppendSelection(
 			frame,
 			*activeScene,
 			selection->GetSelectedActorGuid(),
 			sourceView,
-			canvasPreview)))
+			canvasPreview);
+
+		if (!mask.IsSuccess())
 		{
-			return;
+			return mask;
 		}
 	}
 
@@ -1937,6 +1941,8 @@ void EditorApp::AppendEditorViewport(rendering::FrameRenderData& frame, SceneBas
 		// Append colliders to the frame render data for visualization in the editor viewport.
 		m_editorRenderAssets->AppendColliders(frame, *activeScene, sourceView);
 	}
+
+	return {};
 }
 
 

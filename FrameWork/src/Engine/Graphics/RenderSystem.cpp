@@ -189,7 +189,7 @@ void RenderSystem::FlushRegisters()
 	flush(m_uiRenderers);
 }
 
-bool RenderSystem::AppendFrame(
+rendering::Result RenderSystem::AppendFrame(
 	rendering::FrameRenderData& frame,
 	const rendering::ViewOutput& output,
 	const CameraInfo* camera,
@@ -202,14 +202,14 @@ bool RenderSystem::AppendFrame(
 {
 	if (!m_scene || width == 0 || height == 0)
 	{
-		return false;
+		return { false, "RenderSystem: Scene or output extent is invalid." };
 	}
 
 	const EngineContext* context = m_scene->GetEngineContext();
 
 	if (!context)
 	{
-		return false;
+		return { false, "RenderSystem: Engine context is unavailable." };
 	}
 
 	m_records.clear();
@@ -306,50 +306,11 @@ bool RenderSystem::AppendFrame(
 		!gather(m_spriteRenderers, SourceKind::Sprite) ||
 		!gather(m_uiRenderers, SourceKind::UI))
 	{
-		return false;
+		return { false, "RenderSystem: Could not gather renderable Components." };
 	}
 
 	//------------------------------------------------------------------------------------------------
-	// 2. Collect the skinning palette of all SkinnedMeshRenderer submissions.
-	//------------------------------------------------------------------------------------------------
-	// Check the total size of the skinning palettes to ensure it does not exceed the maximum allowed size.
-	const std::size_t paletteLimit = (std::min)(
-		frame.skinningPalettes.max_size(),
-		static_cast<std::size_t>((std::numeric_limits<std::uint32_t>::max)()));
-
-	std::size_t paletteEnd = frame.skinningPalettes.size();
-
-	if (paletteEnd > paletteLimit)
-	{
-		return false;
-	}
-
-	// Collect the skinning palettes from all SkinnedMeshRenderer submissions
-	// and append them to the frame's skinningPalettes vector.
-	for (const auto& source : sources)
-	{
-		if (source.kind != SourceKind::SkinnedMesh)
-		{
-			continue;
-		}
-
-		const auto* renderer = static_cast<const SkinnedMeshRenderer*>(source.component);
-
-		for (const auto& submesh : renderer->GetSubmeshes())
-		{
-			if (submesh.palette.size() > paletteLimit - paletteEnd)
-			{
-				return false;
-			}
-
-			paletteEnd += submesh.palette.size();
-		}
-	}
-
-	frame.skinningPalettes.reserve(paletteEnd);
-
-	//------------------------------------------------------------------------------------------------
-	// 3. Sort the submission sources for rendering order.
+	// 2. Sort the submission sources for rendering order.
 	//	  World-Space submissions always precede Screen-Space submissions.
 	//	  Screen-Space submissions are sorted by the order path to preserve Canvas hierarchy.
 	//------------------------------------------------------------------------------------------------
@@ -368,7 +329,7 @@ bool RenderSystem::AppendFrame(
 		});
 
 	//------------------------------------------------------------------------------------------------
-	// 4. Construct the RenderViews for the current frame.
+	// 3. Construct the RenderViews for the current frame.
 	//------------------------------------------------------------------------------------------------
 	if (camera && !canvasPreview && policy.renderSpaceFilter != RenderSpaceFilter::ScreenOnly)
 	{
@@ -432,14 +393,15 @@ bool RenderSystem::AppendFrame(
 	frame.views.push_back(overlay);
 
 	//------------------------------------------------------------------------------------------------
-	// 5. Append every submitted object to the RenderObject which Renderer requires for rendering.
+	// 4. Append every submitted object to the RenderObject which Renderer requires for rendering.
 	//------------------------------------------------------------------------------------------------
 	// Lambda function to append a RenderObject to the frame and record its submission source.
 	const auto append = [&](
 		rendering::RenderObject object,
 		const SubmissionSource& source,
 		const ComponentMaterialState& material,
-		bool alphaMask)
+		bool alphaMask,
+		bool skinned)
 	{
 		// Set the view where the object will be rendered.
 		object.targetViews.push_back(source.screen ? overlayViewId : sceneViewId);
@@ -449,6 +411,7 @@ bool RenderSystem::AppendFrame(
 		record.actorGuid = source.component->GetOwner()->GetGuid();
 		record.material = &material;
 		record.alphaMask = alphaMask;
+		record.skinned = skinned;
 		record.viewId = source.screen ? overlayViewId : sceneViewId;
 
 		frame.objects.push_back(std::move(object));
@@ -460,7 +423,7 @@ bool RenderSystem::AppendFrame(
 		const SubmissionSource& source,
 		const SubmeshRenderTemplate& renderTemplate,
 		const Matrix4x4& actorWorld,
-		std::optional<rendering::SkinningPaletteRange> paletteRange)
+		bool skinned)
 		{
 			rendering::RenderObject object;
 			object.geometry = renderTemplate.meshDesc.meshHandle;
@@ -470,11 +433,9 @@ bool RenderSystem::AppendFrame(
 			object.castShadow = source.component->GetCastShadow() && !source.screen;
 			object.drawRange.first = renderTemplate.meshDesc.startIndex;
 			object.drawRange.baseVertex = renderTemplate.meshDesc.baseVertex;
-			object.skinningPalette = paletteRange;
-
-			// Bounds calculation for dynamic vertex data is not supported,
-			// so only set the world bounds if there is no skinning palette.
-			if (!paletteRange)
+			
+			// Bounds are available set for static meshes currently.....
+			if (!skinned)
 			{
 				SetWorldBounds(
 					object,
@@ -484,7 +445,7 @@ bool RenderSystem::AppendFrame(
 					object.world);
 			}
 
-			append(std::move(object), source, renderTemplate.materialDesc, false);
+			append(std::move(object), source, renderTemplate.materialDesc, false, skinned);
 		};
 
 	CameraInfo emptyCamera;
@@ -500,7 +461,7 @@ bool RenderSystem::AppendFrame(
 
 			for (const auto& renderTemplate : renderer->GetRenderTemplates())
 			{
-				appendMesh(source, renderTemplate, proxy.common.worldMatrix, std::nullopt);
+				appendMesh(source, renderTemplate, proxy.common.worldMatrix, false);
 			}
 
 			continue;
@@ -513,28 +474,34 @@ bool RenderSystem::AppendFrame(
 			const auto* transform = renderer->GetOwner()->GetComponentByClass<Transform>();
 			const Matrix4x4 actorWorld = transform ? transform->GetWorldMatrix() : Matrix4x4::Identity();
 
+			// Update the skinned mesh's palette buffer with the current CPU palette before rendering.
+			// Skinning palettes have already been built by the AnimationSystem and stored in the SkinnedMeshRenderer component.
 			for (const auto& submesh : renderer->GetSubmeshes())
 			{
-				std::optional<rendering::SkinningPaletteRange> paletteRange;
+				// Check if the buffer handle is set.
+				const bool skinned = submesh.paletteBuffer != rendering::BufferHandle{};
 
-				if (!submesh.palette.empty())
+				if (skinned)
 				{
-					// Set the skinning palette range for the submesh in the frame's skinningPalettes vector.
-					rendering::SkinningPaletteRange range;
+					if (!context->pRenderer)
+					{
+						return { false, "RenderSystem: Renderer is unavailable for palette upload." };
+					}
 
-					range.begin = static_cast<std::uint32_t>(frame.skinningPalettes.size());
+					// Update the content of the GPU buffer with the current CPU palette for the submesh.
+					auto uploaded =
+						context->pRenderer->UpdateStructuredBuffer(
+							submesh.paletteBuffer, 
+							std::as_bytes(std::span(submesh.palette)));
 
-					frame.skinningPalettes.insert(
-						frame.skinningPalettes.end(),
-						submesh.palette.begin()
-						, submesh.palette.end());
-
-					range.end = static_cast<std::uint32_t>(frame.skinningPalettes.size());
-
-					paletteRange = range;
+					if (!uploaded.IsSuccess())
+					{
+						uploaded.message = "RenderSystem: Palette upload: " + uploaded.message;
+						return uploaded;
+					}
 				}
 
-				appendMesh(source, submesh.renderTemplate, actorWorld, paletteRange);
+				appendMesh(source, submesh.renderTemplate, actorWorld, skinned);
 			}
 
 			continue;
@@ -576,6 +543,7 @@ bool RenderSystem::AppendFrame(
 					center.x = center.x * local.x + local.z;
 					center.y = center.y * local.y + local.w;
 					const float localStretch = (std::max)({ std::abs(local.x), std::abs(local.y), 1.0f });
+					
 					SetWorldBounds(
 						object,
 						center,
@@ -586,11 +554,7 @@ bool RenderSystem::AppendFrame(
 			}
 
 			// Append the configured RenderObject to the frame.
-			append(
-				std::move(object),
-				source,
-				material,
-				true);
+			append(std::move(object), source, material, true, false);
 		};
 
 		if (source.kind == SourceKind::Sprite)
@@ -620,5 +584,5 @@ bool RenderSystem::AppendFrame(
 		}
 	}
 
-	return true;
+	return {};
 }

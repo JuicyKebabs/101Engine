@@ -16,8 +16,10 @@ namespace rendering::detail
 struct GeometryCpuData
 {
 	std::vector<MeshVertex> vertices;
+	std::vector<SkinVertex> skinVertices;
 	std::vector<uint32_t> indices;
 	PrimitiveTopology topology = PrimitiveTopology::TriangleList;
+
 	// Calculated once while accepting a complete CPU copy. Revision is added by
 	// the registry, so Bounds and Revision can never describe different contents.
 	Vector3 boundsCenter;

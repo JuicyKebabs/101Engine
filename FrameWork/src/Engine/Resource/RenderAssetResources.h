@@ -23,6 +23,9 @@ public:
 	rendering::GeometryHandle Quad() const noexcept { return m_quad; }
 	rendering::TextureHandle White() const noexcept { return m_white; }
 	rendering::PipelineHandle MeshPipeline(bool screen) const noexcept;
+	rendering::ShaderHandle SkinnedMeshVertexShader() const noexcept { return m_shaders[3]; }
+	rendering::PipelineHandle SkinnedMeshPipeline() const noexcept { return m_skinnedMeshPipeline; }
+	rendering::PipelineHandle SkinnedShadowPipeline() const noexcept { return m_skinnedShadowPipeline; }
 	rendering::PipelineHandle TexturedPipeline(bool screen) const noexcept;
 	rendering::MaterialDesc MakeMaterial(
 		bool mesh,
@@ -37,8 +40,11 @@ public:
 private:
 	rendering::Renderer* m_renderer = nullptr;
 
-	std::array<rendering::ShaderHandle, 3> m_shaders{};
+	std::array<rendering::ShaderHandle, 4> m_shaders{};
 	std::array<rendering::PipelineHandle, 4> m_pipelines{};
+
+	rendering::PipelineHandle m_skinnedMeshPipeline;
+	rendering::PipelineHandle m_skinnedShadowPipeline;
 
 	rendering::GeometryHandle m_quad;	// Standard quad geometry
 	rendering::TextureHandle m_white;	// Default white texture (The texture for missing is prepared in Renderer)

@@ -109,8 +109,11 @@ Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount)
 		if (!m_constants || desiredConstantBytes > currentConstantBytes)
 		{
 			replacementConstants = std::make_unique<Buffer>();
-			Result created = replacementConstants->Initialize(m_device->GetNativeDevice(), desiredConstantBytes,
-                                                              BufferMemory::Upload);
+			Result created =
+				replacementConstants->Initialize(
+					m_device->GetNativeDevice(),
+					desiredConstantBytes,
+					BufferMemory::Upload);
 
 			if (!created.IsSuccess())
 			{
@@ -123,8 +126,12 @@ Result FrameResources::EnsureCapacity(UINT constantBytes, UINT descriptorCount)
 		if (!m_descriptors || desiredDescriptors > m_descriptorCapacity)
 		{
 			replacementDescriptors = std::make_unique<DescriptorHeap>();
-			Result created = replacementDescriptors->Initialize(
-				m_device->GetNativeDevice(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, desiredDescriptors, true);
+			Result created =
+				replacementDescriptors->Initialize(
+					m_device->GetNativeDevice(),
+					D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+					desiredDescriptors,
+					true);
 
 			if (!created.IsSuccess())
 			{
@@ -210,8 +217,10 @@ Result FrameResources::AllocateConstants(std::span<const std::byte> data, Consta
 	if (paddingBytes != 0)
 	{
 		const std::array<std::byte, alignment> zeros{};
-		written = m_constants->WriteAt(m_constantOffset + data.size(),
-                                       std::span<const std::byte>(zeros.data(), paddingBytes));
+		written = 
+			m_constants->WriteAt(
+				m_constantOffset + data.size(),
+				std::span<const std::byte>(zeros.data(),paddingBytes));
 
 		if (!written.IsSuccess())
 		{
@@ -262,8 +271,11 @@ Result FrameResources::CopyDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_
 		return found;
 	}
 
-	m_device->GetNativeDevice()->CopyDescriptorsSimple(1, destinationCpu, source,
-                                                       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_device->GetNativeDevice()->CopyDescriptorsSimple(
+		1,
+		destinationCpu,
+		source,
+		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	output = destinationGpu;
 	++m_descriptorOffset;

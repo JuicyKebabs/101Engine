@@ -42,6 +42,11 @@ struct SubmeshRenderTemplate
 
 using MeshRenderTemplate = std::vector<SubmeshRenderTemplate>;
 
+SubmeshRenderTemplate MakeSubmeshRenderTemplate(
+	const EngineContext& context,
+	const GeometryInfo& geometry,
+	bool screen);
+
 SubmeshRenderTemplate PrepareSubmeshRenderTemplate(
 	const EngineContext& engineContext,
 	SceneBase& scene,

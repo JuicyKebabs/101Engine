@@ -65,6 +65,19 @@ int main()
 	valid &= Check(secondSnapshot.revision == 2, "Successful update increments revision");
 	valid &= Check(secondSnapshot.boundsRadius > firstSnapshot.boundsRadius, "Bounds and revision update together");
 
+	std::array<rendering::SkinVertex, 3> influences{};
+	description.skinVertices = std::span(influences).first(2);
+	valid &= Check(!renderer.UpdateGeometry(registration.handle, description).IsSuccess(), "Reject mismatched stream length");
+
+	description.skinVertices = influences;
+	influences[0].boneWeights[0] = -0.5f;
+	valid &= Check(!renderer.UpdateGeometry(registration.handle, description).IsSuccess(), "Reject negative skin weights");
+
+	influences[0].boneWeights[0] = 1.0f;
+	valid &= Check(renderer.UpdateGeometry(registration.handle, description).IsSuccess(), "Accept the second vertex stream");
+	valid &= Check(renderer.GetGeometryData(registration.handle, secondSnapshot).IsSuccess(), "Query Geometry with a skin stream");
+	valid &= Check(secondSnapshot.revision == 3, "Only a valid second stream changes the revision");
+
 	vertices[0].position.x = (std::numeric_limits<float>::quiet_NaN)();
 	valid &= Check(!renderer.UpdateGeometry(registration.handle, description).IsSuccess(), "Reject nonfinite update");
 

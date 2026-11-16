@@ -23,7 +23,11 @@ bool RenderAssetResources::Initialize(
 
 	try
 	{
-		const std::array<const char*, 3> shaderFiles{ "MeshVS.cso", "LitPS.cso", "TexturePS.cso" };
+		const std::array<const char*, 4> shaderFiles{
+			"MeshVS.cso",
+			"LitPS.cso",
+			"TexturePS.cso",
+			"SkinnedMeshVS.cso" };
 
 		for (std::size_t index = 0; index < shaderFiles.size(); ++index)
 		{
@@ -38,8 +42,8 @@ bool RenderAssetResources::Initialize(
 			}
 
 			rendering::ShaderDesc description;
-			description.stage = index == 0 ? rendering::ShaderStage::Vertex : rendering::ShaderStage::Pixel;
-			description.bytecode = bytes;
+			const bool isVertex = index == 0 || index == 3;
+			description.stage = isVertex ? rendering::ShaderStage::Vertex : rendering::ShaderStage::Pixel;			description.bytecode = bytes;
 			auto registration = renderer.RegisterShader(description);
 
 			if (!registration.result.IsSuccess())
@@ -81,6 +85,44 @@ bool RenderAssetResources::Initialize(
 			m_pipelines[index] = registration.handle;
 		}
 
+		// Pipeline for SkinnedMeshRenderer which requires original vertex shader.
+		rendering::PipelineDesc skinnedPipeline;
+		skinnedPipeline.vertexShader = m_shaders[3];
+		skinnedPipeline.pixelShader = m_shaders[1];
+		skinnedPipeline.cull = rendering::CullMode::None;
+		skinnedPipeline.depth = rendering::DepthMode::ReadWrite;
+		const auto skinnedRegistration = renderer.RegisterPipeline(skinnedPipeline);
+
+		if (!skinnedRegistration.result.IsSuccess())
+		{
+			DBG("Skinned Mesh Pipeline: %s", skinnedRegistration.result.message.c_str());
+			Finalize();
+			return false;
+		}
+
+		m_skinnedMeshPipeline = skinnedRegistration.handle;
+
+		// Pipeline for SkinnedMeshRenderer shadow pass
+		// which requires original vertex shader.
+		// Built-in SkinnedMeshVS processes skinning deformation in VS, so the it is also required for the shadow pass.
+		// (I wanna use the compute-shader-based skinning deformation someday!)
+		// The shadow pass uses the same Material parameters as the color draw.
+		rendering::PipelineDesc shadowPipeline;
+		shadowPipeline.vertexShader = SkinnedMeshVertexShader();
+		shadowPipeline.cull = rendering::CullMode::None;
+		shadowPipeline.depth = rendering::DepthMode::ReadWrite;
+		const auto shadowRegistration = renderer.RegisterPipeline(shadowPipeline);
+
+		if (!shadowRegistration.result.IsSuccess())
+		{
+			DBG("Skinned Shadow Pipeline: %s", shadowRegistration.result.message.c_str());
+			Finalize();
+			return false;
+		}
+
+		m_skinnedShadowPipeline = shadowRegistration.handle;
+
+		// Default white texture.
 		const std::array<std::byte, 4> whitePixels{
 			std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255}
 		};
@@ -155,6 +197,30 @@ void RenderAssetResources::Finalize() noexcept
 	if (!m_renderer)
 	{
 		return;
+	}
+
+	if (m_skinnedShadowPipeline != rendering::PipelineHandle{})
+	{
+		const auto result = m_renderer->DestroyPipeline(m_skinnedShadowPipeline);
+		
+		if (!result.IsSuccess())
+		{
+			DBG("Skinned Shadow Pipeline destruction: %s", result.message.c_str());
+		}
+		
+		m_skinnedShadowPipeline = rendering::PipelineHandle{};
+	}
+
+	if (m_skinnedMeshPipeline != rendering::PipelineHandle{})
+	{
+		const auto result = m_renderer->DestroyPipeline(m_skinnedMeshPipeline);
+		
+		if (!result.IsSuccess())
+		{
+			DBG("Skinned Mesh Pipeline destruction: %s", result.message.c_str());
+		}
+
+		m_skinnedMeshPipeline = rendering::PipelineHandle{};
 	}
 
 	// Logical destruction happens before Renderer/Window shutdown. GPU Fence

@@ -157,7 +157,7 @@ void SceneBase::LateUpdate(float deltaTime)
 }
 
 // Render
-bool SceneBase::AppendRenderData(
+rendering::Result SceneBase::AppendRenderData(
 	rendering::FrameRenderData& frame,
 	const rendering::ViewOutput& output,
 	const CameraInfo* overrideCameraInfo,

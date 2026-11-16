@@ -1,668 +1,515 @@
-#include <Windows.h>
-#include <array>
-#include <cmath>
-#include <string>
-#include <intrin.h>
-#include <cassert>
-#include <cstddef>
-#include <utility>
-#include <vector>
-#include <chrono>
-
-#include "ShaderFile.h"
 #include "Diagnostics.h"
-
+#include "ShaderFile.h"
 #include "Renderer/Renderer.h"
-#include "Renderer/Math.h"
 #include "Renderer/Win32WindowOutputDesc.h"
+#include "SkinningDemo.h"
+#include "RendererAssets/AssetFiles.h"
 
-//-------------------------------------------------
-// Entry point for the RendererSandbox application
-//-------------------------------------------------
+#include <intrin.h>
+
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <span>
+#include <string>
+#include <vector>
+#include <utility>
 
 namespace
 {
 
-constexpr wchar_t WindowClassName[] = L"101RendererSandboxWindow";
+	using namespace rendering;
 
-bool VerifyRendererMath()
-{
-	// Call out-of-line functions through the Renderer DLL.
-	const rendering::Vector3 v{3.0f, 4.0f, 0.0f};
-	const float length = v.Length();
-	const auto translation =
-		rendering::Matrix4x4::CreateTranslation({2.0f, 3.0f, 4.0f});
-	const auto transformed =
-		translation.TransformPoint({1.0f, 2.0f, 3.0f});
+	constexpr wchar_t WindowClassName[] = L"101RendererSandboxWindow";
 
-	const bool succeeded =
-		std::abs(length - 5.0f) < 1e-6f &&
-		transformed.NearEqual({3.0f, 5.0f, 7.0f});
+	ResourceRegistrationResult<ShaderHandle> LoadAndRegisterShader(Renderer& renderer,
+		const std::filesystem::path& shaderDirectory, const char* file, ShaderStage stage)
+	{
+		std::vector<std::byte> bytecode;
+		ResourceRegistrationResult<ShaderHandle> loaded;
+		loaded.result = assets::LoadShader(shaderDirectory, file, bytecode);
 
-	const std::string message =
-		std::string("[RendererSandbox] Math check ") +
-		(succeeded ? "passed" : "FAILED") +
-		": length=" + std::to_string(length) +
-		", point=(" + std::to_string(transformed.x) +
-		", " + std::to_string(transformed.y) +
-		", " + std::to_string(transformed.z) + ")\n";
-	sandbox::WriteDiagnostic(message);
-	return succeeded;
-}
+		if (!loaded.result.IsSuccess())
+		{
+			loaded.result.message = std::string(file) + ": " + loaded.result.message;
+			return loaded;
+		}
 
-void ShowWin32Error(const wchar_t* message)
-{
-	const DWORD errorCode = GetLastError();
+		ShaderDesc desc;
+		desc.stage = stage;
+		desc.bytecode = bytecode;
+		return renderer.RegisterShader(desc);
+	}
 
-	const std::wstring errorMessage = 
-		std::wstring(message) + L" failed.\nError code: " + std::to_wstring(errorCode);
+	Result UpdateTrianglePos(Renderer& renderer, BufferHandle buffer, float centerX, float centerY)
+	{
+		const std::array<std::array<float, 4>, 3> positions{ {
+			{ centerX - 0.22f, centerY - 0.20f, 0.0f, 1.0f },
+			{ centerX, centerY + 0.24f, 0.0f, 1.0f },
+			{ centerX + 0.22f, centerY - 0.20f, 0.0f, 1.0f }
+		} };
 
-	MessageBoxW(
-		nullptr,
-		errorMessage.c_str(),
-		L"RendererSandbox Error",
-		MB_OK | MB_ICONERROR);
-}
+		return renderer.UpdateStructuredBuffer(buffer, std::as_bytes(std::span(positions)));
+	}
 
-void ShowRendererFailure(HWND window, const rendering::Result& result)
-{
-	if (result.failureKind == rendering::FailureKind::GpuCompletionUnknown)
+	Result UpdateTriangleColor(Renderer& renderer, BufferHandle buffer, float r, float g, float b, float a)
+	{
+		const std::array<std::array<float, 4>, 1> color{ {
+			{ r, g, b, a }
+		} };
+
+		return renderer.UpdateStructuredBuffer(buffer, std::as_bytes(std::span(color)));
+	}
+
+	struct Triangle
+	{
+		BufferHandle buffer;
+		BufferHandle colorBuffer;
+		MaterialHandle material;
+	};
+
+	Result PrepareTriangles(Renderer& renderer, std::array<Triangle, 2>& triangles)
+	{
+		std::filesystem::path shaderDirectory;
+		try
+		{
+			shaderDirectory = sandbox::GetExecutableDirectory() / L"shaders";
+		}
+		catch (const std::exception&)
+		{
+			return {false, "Cannot resolve the Sandbox shader directory."};
+		}
+
+		const auto vertexShader = LoadAndRegisterShader(renderer, shaderDirectory, "TriangleVS.cso", ShaderStage::Vertex);
+		if (!vertexShader.result.IsSuccess())
+		{
+			return vertexShader.result;
+		}
+
+		const auto pixelShader = LoadAndRegisterShader(renderer, shaderDirectory, "TrianglePS.cso", ShaderStage::Pixel);
+		if (!pixelShader.result.IsSuccess())
+		{
+			return pixelShader.result;
+		}
+
+		std::array<ShaderMetadata, 2> metadata;
+		Result reflected = renderer.GetShaderMetadata(vertexShader.handle, metadata[0]);
+		if (!reflected.IsSuccess())
+		{
+			return reflected;
+		}
+
+		reflected = renderer.GetShaderMetadata(pixelShader.handle, metadata[1]);
+		if (!reflected.IsSuccess())
+		{
+			return reflected;
+		}
+
+		PipelineDesc pipelineDesc;
+		pipelineDesc.vertexShader = vertexShader.handle;
+		pipelineDesc.pixelShader = pixelShader.handle;
+		pipelineDesc.depth = DepthMode::Disabled;
+		pipelineDesc.cull = CullMode::None;
+		const auto pipeline = renderer.RegisterPipeline(pipelineDesc);
+		if (!pipeline.result.IsSuccess())
+		{
+			return pipeline.result;
+		}
+
+		// A white texel keeps the animated color unchanged while exercising a texture SRV.
+		const std::array pixels{std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255}};
+		TextureMipDesc mip;
+		mip.pixels = pixels;
+		mip.rowPitch = pixels.size();
+
+		TextureDesc textureDesc;
+		textureDesc.width = 1;
+		textureDesc.height = 1;
+		textureDesc.mips = std::span(&mip, 1);
+		const auto texture = renderer.RegisterTexture(textureDesc);
+		if (!texture.result.IsSuccess())
+		{
+			return texture.result;
+		}
+
+		// Reflection supplies each parameter name and stride. The demo supplies its data and element count.
+		const ShaderResourceBinding* positions = nullptr;
+		const ShaderResourceBinding* color = nullptr;
+		MaterialDesc materialDesc;
+		materialDesc.pipeline = pipeline.handle;
+		for (const auto& stage : metadata)
+		{
+			for (const auto& resource : stage.resources)
+			{
+				if (resource.kind == ShaderResourceKind::Sampler)
+				{
+					continue;
+				}
+
+				if (resource.kind == ShaderResourceKind::StructuredBuffer && resource.name == "Positions")
+				{
+					positions = &resource;
+				}
+				else if (resource.kind == ShaderResourceKind::StructuredBuffer && resource.name == "Color")
+				{
+					color = &resource;
+				}
+				else if (resource.kind == ShaderResourceKind::Texture2D && resource.name == "DemoTexture")
+				{
+					MaterialParameter parameter;
+					parameter.name = resource.name;
+					parameter.value = texture.handle;
+					materialDesc.parameters.push_back(std::move(parameter));
+				}
+				else
+				{
+					return {false, "Sandbox has no value for shader resource: " + resource.name};
+				}
+			}
+		}
+
+		if (!positions || !color || materialDesc.parameters.size() != 1)
+		{
+			return {false, "The Sandbox shaders must declare Positions, Color and DemoTexture."};
+		}
+
+		constexpr std::uint32_t float4Stride = sizeof(std::array<float, 4>);
+		if (positions->elementStride != float4Stride || color->elementStride != float4Stride)
+		{
+			return {false, "The Sandbox position and color buffers require float4 elements."};
+		}
+
+		StructuredBufferDesc positionDesc;
+		positionDesc.elementCount = 3;
+		positionDesc.elementStride = positions->elementStride;
+		StructuredBufferDesc colorDesc;
+		colorDesc.elementCount = 1;
+		colorDesc.elementStride = color->elementStride;
+		constexpr std::array centers{-0.48f, 0.48f};
+
+		for (std::size_t index = 0; index < triangles.size(); ++index)
+		{
+			const auto positionBuffer = renderer.CreateStructuredBuffer(positionDesc);
+			if (!positionBuffer.result.IsSuccess())
+			{
+				return positionBuffer.result;
+			}
+
+			Result initialized = UpdateTrianglePos(renderer, positionBuffer.handle, centers[index], 0.0f);
+			if (!initialized.IsSuccess())
+			{
+				return initialized;
+			}
+
+			const auto colorBuffer = renderer.CreateStructuredBuffer(colorDesc);
+			if (!colorBuffer.result.IsSuccess())
+			{
+				return colorBuffer.result;
+			}
+
+			initialized = UpdateTriangleColor(renderer, colorBuffer.handle, 0.25f, 0.75f, 0.5f, 1.0f);
+			if (!initialized.IsSuccess())
+			{
+				return initialized;
+			}
+
+			MaterialDesc triangleMaterial = materialDesc;
+			MaterialParameter positionParameter;
+			positionParameter.name = positions->name;
+			positionParameter.value = positionBuffer.handle;
+			triangleMaterial.parameters.push_back(std::move(positionParameter));
+
+			MaterialParameter colorParameter;
+			colorParameter.name = color->name;
+			colorParameter.value = colorBuffer.handle;
+			triangleMaterial.parameters.push_back(std::move(colorParameter));
+
+			const auto material = renderer.RegisterMaterial(triangleMaterial);
+			if (!material.result.IsSuccess())
+			{
+				return material.result;
+			}
+
+			triangles[index].buffer = positionBuffer.handle;
+			triangles[index].colorBuffer = colorBuffer.handle;
+			triangles[index].material = material.handle;
+		}
+
+		return {};
+	}
+
+	void ShowRendererFailure(HWND window, const Result& result)
 	{
 		sandbox::WriteDiagnostic(result.message);
-		OutputDebugStringW(
-			L"\n[RendererSandbox] Fatal GPU synchronization failure.\n");
+		if (result.failureKind == FailureKind::GpuCompletionUnknown)
+		{
+			// The Renderer still owns resources that may be in flight.
+			__fastfail(FAST_FAIL_FATAL_APP_EXIT);
+		}
 
-		// Do not unwind through GPU-owning destructors.
-		__fastfail(FAST_FAIL_FATAL_APP_EXIT);
+		const auto message = sandbox::Utf8ToWide(result.message);
+		MessageBoxW(window, message.c_str(), L"RendererSandbox Error", MB_OK | MB_ICONERROR);
 	}
 
-	const std::wstring message = sandbox::Utf8ToWide(result.message);
+	Result RunDemo(Renderer& renderer, HWND window, int showCommand, bool useSkinningDemo)
+	{
+		RendererConfiguration configuration;
+		configuration.enableDebugLayer = true;
+		configuration.enableGpuValidation = true;
+		Result result = renderer.Initialize(configuration);
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
 
-	OutputDebugStringW(message.c_str());
-	OutputDebugStringW(L"\n");
+		RECT clientRect{};
+		if (!GetClientRect(window, &clientRect))
+		{
+			return { false, "GetClientRect failed." };
+		}
 
-	MessageBoxW(
-		window,
-		message.c_str(),
-		L"RendererSandbox Error",
-		MB_OK | MB_ICONERROR);
+		LONG width = clientRect.right - clientRect.left;
+		LONG height = clientRect.bottom - clientRect.top;
+		if (width <= 0 || height <= 0)
+		{
+			return { false, "The initial client area must have a positive size." };
+		}
+
+		Win32WindowOutputDesc outputDesc;
+		outputDesc.window = window;
+		outputDesc.width = static_cast<std::uint32_t>(width);
+		outputDesc.height = static_cast<std::uint32_t>(height);
+		const auto output = renderer.CreateWindowOutput(outputDesc);
+		if (!output.status.IsSuccess())
+		{
+			return output.status;
+		}
+
+		std::array<Triangle, 2> triangles{};
+		sandbox::SkinningDemo skinningDemo;
+		if (useSkinningDemo)
+		{
+			std::filesystem::path shaderDirectory;
+			try
+			{
+				shaderDirectory = sandbox::GetExecutableDirectory() / L"shaders";
+			}
+			catch (const std::exception&)
+			{
+				return { false, "Cannot resolve the Sandbox shader directory." };
+			}
+			const auto vs = LoadAndRegisterShader(renderer, shaderDirectory, "SkinnedMeshVS.cso", ShaderStage::Vertex);
+			if (!vs.result.IsSuccess())
+			{
+				return vs.result;
+			}
+
+			const auto ps = LoadAndRegisterShader(renderer, shaderDirectory, "LitPS.cso", ShaderStage::Pixel);
+			if (!ps.result.IsSuccess())
+			{
+				return ps.result;
+			}
+
+			result = sandbox::PrepareSkinningDemo(renderer, vs.handle, ps.handle, skinningDemo);
+		}
+		else
+		{
+			result = PrepareTriangles(renderer, triangles);
+		}
+
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
+
+		ShowWindow(window, showCommand);
+		const auto start = std::chrono::steady_clock::now();
+
+		for (;;)
+		{
+			MSG message{};
+			while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+			{
+				if (message.message == WM_QUIT)
+				{
+					return {};
+				}
+
+				TranslateMessage(&message);
+				DispatchMessageW(&message);
+			}
+
+			if (!GetClientRect(window, &clientRect))
+			{
+				return { false, "GetClientRect failed." };
+			}
+
+			const LONG nextWidth = clientRect.right - clientRect.left;
+			const LONG nextHeight = clientRect.bottom - clientRect.top;
+
+			if (IsIconic(window) || nextWidth <= 0 || nextHeight <= 0)
+			{
+				if (!WaitMessage())
+				{
+					return { false, "WaitMessage failed." };
+				}
+				continue;
+			}
+
+			if (nextWidth != width || nextHeight != height)
+			{
+				result = renderer.ResizeWindowOutput(output.handle, static_cast<std::uint32_t>(nextWidth),
+					static_cast<std::uint32_t>(nextHeight));
+				if (!result.IsSuccess())
+				{
+					return result;
+				}
+
+				width = nextWidth;
+				height = nextHeight;
+			}
+			
+			FrameRenderData frame;
+			RenderView view;
+			view.output = output.handle;
+
+			if (useSkinningDemo)
+			{
+				if (GetAsyncKeyState('1') & 1)
+				{
+					result = sandbox::UpdateSkinningPose(renderer, skinningDemo.palettes[1], sandbox::SkinningPose::Bind);
+				}
+				else if (GetAsyncKeyState('2') & 1)
+				{
+					result = sandbox::UpdateSkinningPose(renderer, skinningDemo.palettes[1], sandbox::SkinningPose::Translation);
+				}
+				else if (GetAsyncKeyState('3') & 1)
+				{
+					result = sandbox::UpdateSkinningPose(renderer, skinningDemo.palettes[1], sandbox::SkinningPose::Blend);
+				}
+
+				sandbox::AppendSkinningDemo(frame, skinningDemo);
+			}
+			else
+			{
+				const float seconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
+				const float wave = std::sin(seconds);
+				result = UpdateTrianglePos(renderer, triangles[1].buffer, 0.48f, wave * 0.4f);
+				if (result.IsSuccess())
+				{
+					result = UpdateTriangleColor(renderer, triangles[1].colorBuffer,
+						0.25f + wave * 0.25f, 0.75f - wave * 0.25f, 0.5f, 1.0f);
+				}
+
+				view.kind = ViewKind::Overlay;
+
+				for (const auto& triangle : triangles)
+				{
+					ProceduralGeometry geometry;
+					geometry.vertexCount = 3;
+
+					RenderObject object;
+					object.material = triangle.material;
+					object.procedural = geometry;
+					frame.objects.push_back(object);
+				}
+			}
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			frame.views.push_back(view);
+
+			result = renderer.SubmitFrameRenderData(std::move(frame));
+			if (!result.IsSuccess())
+			{
+				if (result.failureKind == FailureKind::GpuCompletionUnknown)
+				{
+					ShowRendererFailure(window, result);
+				}
+				return result;
+			}
+
+			const auto rendered = renderer.Render();
+			if (!rendered.status.IsSuccess())
+			{
+				if (rendered.status.failureKind == FailureKind::GpuCompletionUnknown)
+				{
+					ShowRendererFailure(window, rendered.status);
+				}
+				return rendered.status;
+			}
+
+			if (!rendered.diagnostics.empty())
+			{
+				return { false, rendered.diagnostics.front().message };
+			}
+
+			// A Scene view also records the display transform draw.
+			const std::size_t expectedDraws = useSkinningDemo ? skinningDemo.materials.size() + 1 : triangles.size();
+			if (rendered.drawnObjects != expectedDraws)
+			{
+				return { false, "Unexpected Sandbox draw count." };
+			}
+		}
+	}
+
+	LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+	{
+		if (message == WM_CLOSE)
+		{
+			PostQuitMessage(0);
+			return 0;
+		}
+
+		return DefWindowProcW(window, message, wParam, lParam);
+	}
+
 }
 
-LRESULT CALLBACK WindowProcedure(
-	HWND window,
-	UINT message,
-	WPARAM wParam,
-	LPARAM lParam)
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int showCommand)
 {
-	switch (message)
-	{
-	case WM_CLOSE:
-		PostQuitMessage(0);
-		return 0;
-
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-
-	case WM_PAINT:
-	{
-		PAINTSTRUCT paint{};
-		BeginPaint(window, &paint);
-		EndPaint(window, &paint);
-		return 0;
-	}
-	}
-
-	return DefWindowProcW(
-		window,
-		message,
-		wParam,
-		lParam);
-}
-
-}
-
-int WINAPI wWinMain(
-	HINSTANCE instance,
-	HINSTANCE,
-	PWSTR,
-	int showCommand)
-{
-	if (!VerifyRendererMath())
-	{
-		return 1;
-	}
-
-	// Rigister the window class and its window procedure
-	WNDCLASSEXW windowClass{};
-	windowClass.cbSize = sizeof(windowClass);
-	windowClass.style = CS_HREDRAW | CS_VREDRAW;
+	const bool useSkinningDemo = std::wstring_view(commandLine) == L"--skinning";	WNDCLASSW windowClass{};
+	
 	windowClass.lpfnWndProc = WindowProcedure;
 	windowClass.hInstance = instance;
 	windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	windowClass.lpszClassName = WindowClassName;
 
-	if (RegisterClassExW(&windowClass) == 0)
+	if (!RegisterClassW(&windowClass))
 	{
-		ShowWin32Error(L"RegisterClassEx");
+		MessageBoxW(nullptr, L"RegisterClassW failed.", L"RendererSandbox Error", MB_OK | MB_ICONERROR);
 		return 1;
 	}
 
-	// Create a registered window
-	const HWND window = CreateWindowExW(
-		0,
-		WindowClassName,
-		L"RendererSandbox",
-		WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		1920,
-		1080,
-		nullptr,
-		nullptr,
-		instance,
-		nullptr);
+	const HWND window = CreateWindowExW(0, WindowClassName,
+		useSkinningDemo ?
+		L"Skinning | 1: Bind  2: Translation  3: Blend" :
+		L"StructuredBuffer Demo | Left: fixed | Right: animated",
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1920, 1080,
+		nullptr, nullptr, instance, nullptr);
 
-	if (window == nullptr)
+	if (!window)
 	{
-		ShowWin32Error(L"CreateWindowExW");
+		MessageBoxW(nullptr, L"CreateWindowExW failed.", L"RendererSandbox Error", MB_OK | MB_ICONERROR);
 		UnregisterClassW(WindowClassName, instance);
 		return 1;
 	}
-
-	// Try to get the client rect of the window,
-	RECT clientRect{};
-
-	if (!GetClientRect(window, &clientRect))
-	{
-		ShowWin32Error(L"GetClientRect");
-
-		DestroyWindow(window);
-		UnregisterClassW(WindowClassName, instance);
-		return 1;
-	}
-
-	// Calculate the client area size and check if it is valid.
-	LONG clientWidth = clientRect.right - clientRect.left;
-	LONG clientHeight = clientRect.bottom - clientRect.top;
-
-	// Client area must be bigger than zero,
-	if (clientWidth <= 0 || clientHeight <= 0)
-	{
-		MessageBoxW(
-			window,
-			L"The initial client area must have a positive size.",
-			L"RendererSandbox Error",
-			MB_OK | MB_ICONERROR);
-
-		DestroyWindow(window);
-		UnregisterClassW(WindowClassName, instance);
-		return 1;
-	}
-
-	// Initialize the renderer
-
-	// Send the window information to the renderer to create the swapchain.
-	const rendering::Win32WindowOutputDesc windowOutputDesc
-	{
-		window,
-		static_cast<uint32_t>(clientWidth),
-		static_cast<uint32_t>(clientHeight)
-	};
 
 	int exitCode = 0;
-
 	{
-		rendering::Renderer renderer;
-
-		// Prepare configuration for the renderer initialization
-		rendering::RendererConfiguration configuration{};
-		configuration.enableDebugLayer = true;
-		configuration.enableGpuValidation = true;
-
-		// Initialize the renderer
-		rendering::Result result = renderer.Initialize(configuration);
-
-		// Create the window output for the renderer to render to the created window.
-		rendering::WindowOutputHandle windowOutput{};
-
-		if (result.IsSuccess())
-		{
-			const rendering::WindowOutputCreationResult creation = renderer.CreateWindowOutput(windowOutputDesc);
-
-			result = creation.status;
-
-			if (result.IsSuccess())
-			{
-				windowOutput = creation.handle;
-
-				const std::string message =
-					"[RendererSandbox] Window output created. Handle: "
-					+ std::to_string(windowOutput.value)
-					+ "\n";
-
-				sandbox::WriteDiagnostic(message);
-			}
-		}
-
-		rendering::GeometryHandle geometryHandle;
-		rendering::TextureHandle textureHandle;
-		rendering::MaterialHandle materialHandle;
-		rendering::MaterialHandle alternateMaterial;
-		rendering::PipelineHandle extraPipeline;
-
-		if (result.IsSuccess())
-		{
-			// Build an indexed cube with independent normals and UVs for each face.
-			std::vector<rendering::MeshVertex> vertices;
-			std::vector<std::uint32_t> indices;
-
-			const rendering::Vector3 normals[] =
-			{
-				{ 0, 0, -1 },
-				{ 0, 0, 1 },
-				{ -1, 0, 0 },
-				{ 1, 0, 0 },
-				{ 0, 1, 0 },
-				{ 0, -1, 0 }
-			};
-
-			const rendering::Vector3 corners[][4] =
-			{
-				{{-1, -1, -1}, {-1, 1, -1}, {1, 1, -1}, {1, -1, -1}},
-				{{1, -1, 1}, {1, 1, 1}, {-1, 1, 1}, {-1, -1, 1}},
-				{{-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}, {-1, -1, -1}},
-				{{1, -1, -1}, {1, 1, -1}, {1, 1, 1}, {1, -1, 1}},
-				{{-1, 1, -1}, {-1, 1, 1}, {1, 1, 1}, {1, 1, -1}},
-				{{-1, -1, 1}, {-1, -1, -1}, {1, -1, -1}, {1, -1, 1}}
-			};
-
-			for (std::uint32_t face = 0; face < 6; ++face)
-			{
-				const rendering::Vector2 uv[] = {{0, 1}, {0, 0}, {1, 0}, {1, 1}};
-
-				for (std::uint32_t v = 0; v < 4; ++v)
-				{
-					rendering::MeshVertex vertex;
-					vertex.position = corners[face][v] * 0.35f;
-					vertex.normal = normals[face];
-					vertex.uv = uv[v];
-					vertices.push_back(vertex);
-				}
-
-				for (auto i : {0u, 1u, 2u, 0u, 2u, 3u})
-				{
-					indices.push_back(face * 4 + i);
-				}
-			}
-
-			rendering::GeometryDesc geometryDesc{ vertices, indices };
-
-			const auto geometry = renderer.RegisterGeometry(geometryDesc);
-			result = geometry.result;
-			geometryHandle = geometry.handle;
-		}
-
-		if (result.IsSuccess())
-		{
-			const std::array<std::byte, 4> pixels{ std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255} };
-			const std::array<rendering::TextureMipDesc, 1> mips{ { { pixels, 4 } } };
-
-			rendering::TextureDesc textureDesc{};
-			textureDesc.width = 1;
-			textureDesc.height = 1;
-			textureDesc.mips = mips;
-
-			const auto texture = renderer.RegisterTexture(textureDesc);
-			result = texture.result;
-			textureHandle = texture.handle;
-		}
-
-		if (result.IsSuccess())
-		{
-			try
-			{
-				const auto vsBytes = sandbox::ReadShader(L"MeshVS.cso");
-				const auto psBytes = sandbox::ReadShader(L"LitPS.cso");
-				const auto extraBytes = sandbox::ReadShader(L"ExtraPS.cso");
-
-				auto vs = renderer.RegisterShader({rendering::ShaderStage::Vertex, vsBytes});
-				auto ps = renderer.RegisterShader({rendering::ShaderStage::Pixel, psBytes});
-				auto extra = renderer.RegisterShader({rendering::ShaderStage::Pixel, extraBytes});
-
-				result = vs.result;
-
-				if (result.IsSuccess())
-				{
-					result = ps.result;
-				}
-
-				if (result.IsSuccess())
-				{
-					result = extra.result;
-				}
-
-				if (result.IsSuccess())
-				{
-					rendering::PipelineDesc pipelineDesc{ vs.handle, ps.handle };
-					pipelineDesc.cull = rendering::CullMode::None;
-
-					// Register the regular and override pipelines.
-					const auto pipeline = renderer.RegisterPipeline(pipelineDesc);
-					result = pipeline.result;
-
-					pipelineDesc.pixelShader = extra.handle;
-					const auto overridePipeline = renderer.RegisterPipeline(pipelineDesc);
-
-					if (result.IsSuccess())
-					{
-						result = overridePipeline.result;
-					}
-
-					extraPipeline = overridePipeline.handle;
-
-					if (result.IsSuccess())
-					{
-						rendering::MaterialDesc material;
-						material.pipeline = pipeline.handle;
-
-						rendering::Vector4 baseColor{};
-					baseColor.x = 1;
-					baseColor.y = 0.3f;
-					baseColor.z = 0.15f;
-					baseColor.w = 1;
-
-					rendering::MaterialParameter colorParameter{};
-					colorParameter.name = "BaseColor";
-					colorParameter.value = baseColor;
-
-					rendering::Vector4 identityTransform{};
-					identityTransform.x = 1;
-					identityTransform.y = 1;
-
-					rendering::MaterialParameter uvParameter{};
-					uvParameter.name = "UVTransform";
-					uvParameter.value = identityTransform;
-
-					rendering::MaterialParameter localParameter{};
-					localParameter.name = "LocalQuadTransform";
-					localParameter.value = identityTransform;
-
-					rendering::MaterialParameter textureParameter{};
-					textureParameter.name = "BaseTexture";
-					textureParameter.value = textureHandle;
-
-					rendering::MaterialParameter extraParameter{};
-					extraParameter.name = "ExtraTexture";
-					extraParameter.value = textureHandle;
-
-					material.parameters.push_back(colorParameter);
-					material.parameters.push_back(uvParameter);
-					material.parameters.push_back(localParameter);
-					material.parameters.push_back(textureParameter);
-					material.parameters.push_back(extraParameter);
-
-						auto registered = renderer.RegisterMaterial(material);
-						result = registered.result;
-						materialHandle = registered.handle;
-
-						// Keep a second material for the per-view override.
-						material.parameters[0].value = rendering::Vector4{ 0.15f, 0.5f, 1, 1 };
-						auto other = renderer.RegisterMaterial(material);
-
-						if (result.IsSuccess())
-						{
-							result = other.result;
-						}
-
-						alternateMaterial = other.handle;
-					}
-				}
-			}
-			catch (const sandbox::ShaderFileError& e)
-			{
-				result = {false, e.what()};
-			}
-			catch (const std::exception&)
-			{
-				// 任意の例外メッセージの文字コードは規定されていない。
-				result = {false, "Unexpected exception while preparing shader resources."};
-			}
-		}
-
+		Renderer renderer;
+		const Result result = RunDemo(renderer, window, showCommand, true);
 		if (!result.IsSuccess())
 		{
 			ShowRendererFailure(window, result);
 			exitCode = 1;
 		}
-		else
-		{
-			ShowWindow(window, showCommand);
-
-			MSG message{};
-			bool firstFramePresented = false;
-			bool useMaterialOverride = false;
-			bool usePipelineOverride = false;
-
-			const auto startTime = std::chrono::steady_clock::now();
-
-			for (;;)
-			{
-				if (PeekMessageW(
-					&message,
-					nullptr,
-					0,
-					0,
-					PM_REMOVE))
-				{
-					if (message.message == WM_QUIT)
-					{
-						exitCode = static_cast<int>(message.wParam);
-						break;
-					}
-
-					TranslateMessage(&message);
-					DispatchMessageW(&message);
-					continue;
-				}
-
-				if (IsIconic(window))
-				{
-					if (!WaitMessage())
-					{
-						ShowWin32Error(L"WaitMessage");
-						exitCode = 1;
-						break;
-					}
-
-					continue;
-				}
-
-				// Window size belongs to this host. Resolve it outside Render,
-				// then replace the output before publishing the new projection.
-				RECT currentClientRect{};
-
-				if (!GetClientRect(window, &currentClientRect))
-				{
-					ShowWin32Error(L"GetClientRect");
-					exitCode = 1;
-					break;
-				}
-
-				const LONG requestedWidth = currentClientRect.right - currentClientRect.left;
-				const LONG requestedHeight = currentClientRect.bottom - currentClientRect.top;
-
-				if (requestedWidth <= 0 || requestedHeight <= 0)
-				{
-					// Do not submit a zero extent or overwrite the last valid
-					// projection. Resume after a later positive-size message.
-					if (!WaitMessage())
-					{
-						ShowWin32Error(L"WaitMessage");
-						exitCode = 1;
-						break;
-					}
-
-					continue;
-				}
-
-				if (requestedWidth != clientWidth || requestedHeight != clientHeight)
-				{
-					result = renderer.ResizeWindowOutput(windowOutput,
-						static_cast<std::uint32_t>(requestedWidth),
-						static_cast<std::uint32_t>(requestedHeight));
-
-					if (!result.IsSuccess())
-					{
-						// A partial native replacement may be unavailable.
-						// Stop before Submit; do not render with mixed extents.
-						ShowRendererFailure(window, result);
-						exitCode = 1;
-						break;
-					}
-
-					clientWidth = requestedWidth;
-					clientHeight = requestedHeight;
-				}
-
-				const float seconds =
-					std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
-
-				if (GetAsyncKeyState('O') & 1)
-				{
-					useMaterialOverride = !useMaterialOverride;
-				}
-
-				if (GetAsyncKeyState('P') & 1)
-				{
-					usePipelineOverride = !usePipelineOverride;
-				}
-
-				if (GetAsyncKeyState('M') & 1)
-				{
-					rendering::MaterialDesc material;
-					material.pipeline = extraPipeline;
-
-					rendering::Vector4 baseColor{};
-					baseColor.x = 0.4f;
-					baseColor.y = 1;
-					baseColor.z = 0.2f;
-					baseColor.w = 1;
-
-					rendering::MaterialParameter colorParameter{};
-					colorParameter.name = "BaseColor";
-					colorParameter.value = baseColor;
-
-					rendering::Vector4 identityTransform{};
-					identityTransform.x = 1;
-					identityTransform.y = 1;
-
-					rendering::MaterialParameter uvParameter{};
-					uvParameter.name = "UVTransform";
-					uvParameter.value = identityTransform;
-
-					rendering::MaterialParameter localParameter{};
-					localParameter.name = "LocalQuadTransform";
-					localParameter.value = identityTransform;
-
-					rendering::MaterialParameter textureParameter{};
-					textureParameter.name = "BaseTexture";
-					textureParameter.value = textureHandle;
-
-					rendering::MaterialParameter extraParameter{};
-					extraParameter.name = "ExtraTexture";
-					extraParameter.value = textureHandle;
-
-					material.parameters.push_back(colorParameter);
-					material.parameters.push_back(uvParameter);
-					material.parameters.push_back(localParameter);
-					material.parameters.push_back(textureParameter);
-					material.parameters.push_back(extraParameter);
-
-					result = renderer.UpdateMaterial(materialHandle, material);
-
-					if (!result.IsSuccess())
-					{
-						ShowRendererFailure(window, result);
-						exitCode = 1;
-						break;
-					}
-				}
-
-				// Submit two animated cubes through the shared draw path.
-				rendering::FrameRenderData frame;
-				frame.time = seconds;
-				frame.directionalLight = rendering::DirectionalLight{};
-
-				rendering::RenderObject object{ geometryHandle, materialHandle };
-				object.world = rendering::Matrix4x4::CreateRotationY(seconds) *
-					rendering::Matrix4x4::CreateTranslation({ -0.45f, 0, 0 });
-				frame.objects.push_back(object);
-
-				object.world = rendering::Matrix4x4::CreateRotationX(seconds) *
-					rendering::Matrix4x4::CreateTranslation({ 0.45f, 0, 0.25f });
-				object.material = alternateMaterial;
-				frame.objects.push_back(object);
-
-				// Move the camera and apply the selected per-view overrides.
-				rendering::RenderView view;
-				view.output = windowOutput;
-				view.cameraPosition = { std::sin(seconds * 0.2f) * 0.6f, 0.7f, -2.5f };
-				view.view =
-					rendering::Matrix4x4::CreateLookAt(view.cameraPosition, { 0, 0, 0 }, { 0, 1, 0 });
-				view.projection = rendering::Matrix4x4::CreatePerspectiveFov(
-					rendering::PI / 3,
-					static_cast<float>(clientWidth) / clientHeight,
-					0.1f,
-					100);
-
-				if (useMaterialOverride)
-				{
-					view.drawSettings.materialOverride = alternateMaterial;
-				}
-
-				if (usePipelineOverride)
-				{
-					view.drawSettings.pipelineOverride = extraPipeline;
-				}
-
-				frame.views.push_back(view);
-
-				result = renderer.SubmitFrameRenderData(std::move(frame));
-
-				rendering::RenderResult rendered;
-
-				if (result.IsSuccess())
-				{
-					rendered = renderer.Render();
-					result = std::move(rendered.status);
-				}
-
-				if (!result.IsSuccess())
-				{
-					ShowRendererFailure(window, result);
-					exitCode = 1;
-					break;
-				}
-
-				if (!firstFramePresented && rendered.disposition == rendering::RenderDisposition::Processed)
-				{
-					OutputDebugStringW(L"[RendererSandbox] First frame presented.\n");
-					firstFramePresented = true;
-				}
-			}
-		}
-
-		renderer.Finalize();
 	}
 
-	// Destroy the window and unregister the window class before exiting the application.
-	if (IsWindow(window))
-	{
-		DestroyWindow(window);
-	}
-
+	DestroyWindow(window);
 	UnregisterClassW(WindowClassName, instance);
-
 	return exitCode;
 }
