@@ -92,7 +92,7 @@ rendering::Result RegisterSubmeshResources(
 
 		if (!buffer.result.IsSuccess())
 		{
-			return { false, "RegisterSubmeshResources: Palette buffer creation failed: " + buffer.result.message };
+			return { false, "RegisterSubmeshResources: Palette buffer creation failed: " + buffer.result.message, buffer.result.failureKind };
 		}
 
 		submesh.paletteBuffer = buffer.handle;
@@ -102,6 +102,11 @@ rendering::Result RegisterSubmeshResources(
 			renderer.UpdateStructuredBuffer(
 				buffer.handle,
 				std::as_bytes(std::span(submesh.bindPalette)));
+
+		if (!initialized.IsSuccess())
+		{
+			return { false, "RegisterSubmeshResources: Palette buffer initial update is failed: " + initialized.message, initialized.failureKind };
+		}
 
 		// Set the material's pipeline and shadow pipeline to the built-in SkinnedMeshRenderer pipelines.
 		material.description.pipeline = assets.SkinnedMeshPipeline();
@@ -151,9 +156,6 @@ void SkinnedMeshRenderer::OnAttachOverride()
 	{
 		scene->GetRenderSystem()->Register(this);
 	}
-
-	ReleaseSubmeshes();
-	m_hasAnimationPose = false;
 }
 
 void SkinnedMeshRenderer::OnDetachOverride()
@@ -165,6 +167,10 @@ void SkinnedMeshRenderer::OnDetachOverride()
 	{
 		scene->GetRenderSystem()->Unregister(this);
 	}
+
+	ReleaseSubmeshes();
+	m_hasAnimationPose = false;
+
 }
 
 bool SkinnedMeshRenderer::SetMeshAsset(const Guid& assetId)

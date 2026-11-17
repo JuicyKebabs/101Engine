@@ -178,25 +178,19 @@ bool BindTracks(
 	return true;
 }
 
-bool EvaluatePose(
+bool EvaluateLocalPose(
 	const AnimationClip& clip,
 	std::span<const TrackBinding> bindings,
-	std::span<const ModelNode> modelNodes,
+	std::span<const rendering::assets::ModelNode> modelNodes,
 	double timeSeconds,
-	std::vector<Matrix4x4>& output)
+	LocalPose& output)
 {
 	if (bindings.size() != clip.tracks.size() || !std::isfinite(timeSeconds))
 	{
 		return false;
 	}
 
-	std::vector<Matrix4x4> localPose;
-	localPose.reserve(modelNodes.size());
-
-	for (const auto& node : modelNodes)
-	{
-		localPose.push_back(node.localTransform);
-	}
+	LocalPose localPose(modelNodes.size());
 
 	// For each binding, sample the animation track at the specified time
 	// and update the local pose of the corresponding model node.
@@ -216,7 +210,7 @@ bool EvaluatePose(
 		}
 
 		const auto& defaults = binding.defaultLocalTransform;
-		
+
 		// Sample the position, rotation, and scale from the animation track at the specified time.
 		Transform3D localTransform;
 		localTransform.position = Sample(track.positions, timeSeconds, defaults.position);
@@ -224,10 +218,125 @@ bool EvaluatePose(
 		localTransform.scale = Sample(track.scales, timeSeconds, defaults.scale);
 
 		// Update the local pose of the model node with the sampled transform.
-		localPose[binding.targetNodeIndex] = localTransform.GetMatrix();
+		localPose[binding.targetNodeIndex] = localTransform;
 	}
 
-	return skinning::BuildModelPose(modelNodes, localPose, output);
+	output = std::move(localPose);
+	return true;
+}
+
+bool BlendLocalPoses(
+	std::span<const rendering::assets::ModelNode> modelNodes,
+	const LocalPose& source,
+	const LocalPose& destination,
+	float weight,
+	LocalPose& output)
+{
+	if (source.size() != modelNodes.size() || destination.size() != modelNodes.size() || !std::isfinite(weight))
+	{
+		return false;
+	}
+
+	if (!std::isfinite(weight) || weight < 0.0f || weight > 1.0f)
+	{
+		return false;
+	}
+
+	if (weight == 0.0f)
+	{
+		output = source;
+		return true;
+	}
+
+	if (weight == 1.0f)
+	{
+		output = destination;
+		return true;
+	}
+
+	LocalPose blended(modelNodes.size());
+
+	// For each model node, blend the source and destination local poses based on the specified weight.
+	for (std::size_t index = 0; index < modelNodes.size(); ++index)
+	{
+		auto from = source[index];
+		auto to = destination[index];
+
+		if (!from && !to)
+		{
+			continue;
+		}
+
+		if (!from || !to)
+		{
+			Transform3D bind;
+			const auto& matrix = modelNodes[index].localTransform;
+
+			// Decompose the model node's local transform into position, rotation, and scale.
+			if (!matrix.Decompose(bind.position, bind.rotation, bind.scale))
+			{
+				return false;
+			}
+
+			// If one of the poses is missing,
+			// use the bind pose as the missing value.
+			if (!from)
+			{
+				from = bind;
+			}
+			else
+			{
+				to = bind;
+			}
+		}
+
+		// Interpolate between the source and destination transforms based on the weight.
+		Transform3D node;
+		node.position = Vector3::Lerp(from->position, to->position, weight);
+		node.rotation = Quaternion::Slerp(from->rotation, to->rotation, weight);
+		node.scale = Vector3::Lerp(from->scale, to->scale, weight);
+
+		blended[index] = node;
+	}
+
+	output = std::move(blended);
+	return true;
+}
+
+bool BuildModelPoseFromLocal(
+	std::span<const rendering::assets::ModelNode> modelNodes,
+	const LocalPose& pose,
+	std::vector<Matrix4x4>& output)
+{
+	if (pose.size() != modelNodes.size())
+	{
+		return false;
+	}
+
+	std::vector<Matrix4x4> matrices;
+	matrices.reserve(modelNodes.size());
+
+	for (std::size_t index = 0; index < modelNodes.size(); ++index)
+	{
+		matrices.push_back(
+			pose[index] ? pose[index]->GetMatrix()
+			: modelNodes[index].localTransform);
+	}
+
+	return skinning::BuildModelPose(modelNodes, matrices, output);
+}
+
+bool EvaluatePose(
+	const AnimationClip& clip,
+	std::span<const TrackBinding> bindings,
+	std::span<const ModelNode> modelNodes,
+	double timeSeconds,
+	std::vector<Matrix4x4>& output)
+{
+	LocalPose localPose;
+
+	return EvaluateLocalPose(clip, bindings, modelNodes, timeSeconds, localPose) &&
+		   BuildModelPoseFromLocal(modelNodes, localPose, output);
 }
 
 }

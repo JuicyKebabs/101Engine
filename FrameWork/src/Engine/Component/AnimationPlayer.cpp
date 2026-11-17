@@ -21,19 +21,14 @@ bool IsValidAlias(std::string_view alias)
 	return !alias.empty() && alias.find('\0') == std::string_view::npos;
 }
 
-bool ApplyPose(
-	SkinnedMeshRenderer& target,
-	const SkinnedModelView& model,
-	const AnimationClip& clip,
-	std::span<const animation::TrackBinding> bindings,
-	double timeSeconds)
+double AdvanceClipTime(double time, double step, double duration, bool loop)
 {
-	std::vector<Matrix4x4> nodeToModel;
+	if (loop && duration > 0.0f)
+	{
+		return std::fmod(time + step, duration);
+	}
 
-	// Evaluate the animation pose for the given clip and bindings at the specified time
-	// and store the resulting node-to-model transforms in nodeToModel.
-	return animation::EvaluatePose(clip, bindings, model.nodes, timeSeconds, nodeToModel) &&
-		   target.ApplyAnimationPose(model, nodeToModel);
+	return (std::min)(time + step, duration);
 }
 
 }
@@ -44,9 +39,9 @@ AnimationClipSlots AnimationPlayer::GetClipSlots() const
 	value.defaultSlotAlias = m_defaultSlotAlias;
 	value.slots.reserve(m_clipSlots.size());
 
-	for (const Slot& slot : m_clipSlots)
+	for (const AnimationClipSlot& slot : m_clipSlots)
 	{
-		value.slots.push_back(slot.setting);
+		value.slots.push_back(slot);
 	}
 
 	return value;
@@ -55,19 +50,17 @@ AnimationClipSlots AnimationPlayer::GetClipSlots() const
 bool AnimationPlayer::TrySetClipSlots(const AnimationClipSlots& value)
 {
 	std::unordered_set<std::string_view> aliases;
-	std::vector<Slot> slots;
+	std::vector<AnimationClipSlot> slots;
 	slots.reserve(value.slots.size());
 
 	// Validate each clip slot's alias and ensure there are no duplicates.
-	for (const AnimationClipSlot& setting : value.slots)
+	for (const AnimationClipSlot& slot : value.slots)
 	{
-		if (!IsValidAlias(setting.alias) || !aliases.insert(setting.alias).second)
+		if (!IsValidAlias(slot.alias) || !aliases.insert(slot.alias).second)
 		{
 			return false;
 		}
 
-		Slot slot;
-		slot.setting = setting;
 		slots.push_back(std::move(slot));
 	}
 
@@ -132,16 +125,16 @@ bool AnimationPlayer::ResolveReferences(SceneBase& scene)
 	return ResolveClipSlots(m_clipSlots, *context->pAssetManager);
 }
 
-bool AnimationPlayer::ResolveClipSlots(std::vector<Slot>& slots, AssetManager& assets)
+bool AnimationPlayer::ResolveClipSlots(std::vector<AnimationClipSlot>& slots, AssetManager& assets)
 {
-	for (const Slot& slot : slots)
+	for (const AnimationClipSlot& slot : slots)
 	{
-		if (!slot.setting.clipAssetId.IsValid())
+		if (!slot.clipAssetId.IsValid())
 		{
 			continue;
 		}
 
-		const AssetEntry* entry = assets.GetAssetEntry(slot.setting.clipAssetId);
+		const AssetEntry* entry = assets.GetAssetEntry(slot.clipAssetId);
 
 		if (entry && entry->type != AssetType::AnimationClip)
 		{
@@ -149,20 +142,12 @@ bool AnimationPlayer::ResolveClipSlots(std::vector<Slot>& slots, AssetManager& a
 		}
 	}
 
-	// Load animation clips for each valid slot into the AssetManager.
-	// and store the resulting handles in the corresponding slots.
-	for (Slot& slot : slots)
+	// Preload available clips. Active cursors own their runtime handles.
+	for (const AnimationClipSlot& slot : slots)
 	{
-		slot.clipHandle = {};
-
-		if (!slot.setting.clipAssetId.IsValid())
+		if (slot.clipAssetId.IsValid())
 		{
-			continue;
-		}
-
-		if (const auto handle = assets.LoadAnimationClip(slot.setting.clipAssetId))
-		{
-			slot.clipHandle = *handle;
+			(void)assets.LoadAnimationClip(slot.clipAssetId);
 		}
 	}
 
@@ -181,9 +166,9 @@ bool AnimationPlayer::AddClip(std::string alias, const Guid& clipGuid)
 	// Check duplicate alias in the existing clip slots.
 	const auto existing = std::find_if(
 		m_clipSlots.begin(), m_clipSlots.end(),
-		[&alias](const Slot& slot)
+		[&alias](const AnimationClipSlot& slot)
 		{
-			return slot.setting.alias == alias;
+			return slot.alias == alias;
 		});
 
 	if (existing != m_clipSlots.end())
@@ -200,18 +185,22 @@ bool AnimationPlayer::AddClip(std::string alias, const Guid& clipGuid)
 	}
 
 	// Add the new clip slot with the alias and handle.
-	Slot slot;
-	slot.setting.alias = std::move(alias);
-	slot.setting.clipAssetId = clipGuid;
-	slot.clipHandle = *handle;
+	AnimationClipSlot slot;
+	slot.alias = std::move(alias);
+	slot.clipAssetId = clipGuid;
 
 	m_clipSlots.push_back(std::move(slot));
 
 	return true;
 }
 
-bool AnimationPlayer::SwitchClip(std::string_view alias)
+bool AnimationPlayer::SwitchClip(std::string_view alias, float blendSeconds)
 {
+	if (!std::isfinite(blendSeconds) || blendSeconds < 0.0f)
+	{
+		return false;
+	}
+
 	// Get the target SkinnedMeshRenderer component from the owning actor.
 	SkinnedMeshRenderer* target = ResolveSkinnedMeshRenderer();
 
@@ -226,9 +215,9 @@ bool AnimationPlayer::SwitchClip(std::string_view alias)
 	// Check if the alias exists in the current clip slots.
 	const auto found = std::find_if(
 		m_clipSlots.begin(), m_clipSlots.end(),
-		[alias](const Slot& slot)
+		[alias](const AnimationClipSlot& slot)
 		{
-			return slot.setting.alias == alias;
+			return slot.alias == alias;
 		});
 
 	if (found == m_clipSlots.end() || !context || !context->pAssetManager)
@@ -239,30 +228,73 @@ bool AnimationPlayer::SwitchClip(std::string_view alias)
 
 	// Get the  animation clip and the skinned model view for the target renderer.
 	AssetManager& assetManager = *context->pAssetManager;
-	const auto handle = assetManager.LoadAnimationClip(found->setting.clipAssetId);
+	const auto handle = assetManager.LoadAnimationClip(found->clipAssetId);
 	const AnimationClip* clip = handle ? assetManager.FindAnimationClip(*handle) : nullptr;
 	const auto model = assetManager.FindLoadedSkinnedModel(target->GetAssetId());
 	
 	Playback candidate;
 
 	// Check if the clip is suitable for the model by attempting to bind its tracks to the model's nodes.
-	if (!clip || !model || !animation::BindTracks(*clip, model->nodes, candidate.bindings))
-	{
+	if (!clip || !model || !animation::BindTracks(*clip, model->nodes, candidate.current.bindings)) {
 		DBG("AnimationPlayer: Clip is unavailable or its tracks do not match the model.");
 		return false;
 	}
 
-	// Apply the initial pose of the clip to the target renderer at time 0.0 seconds.
-	if (!ApplyPose(*target, *model, *clip, candidate.bindings, candidate.timeSeconds))
+	candidate.slotIndex = static_cast<std::size_t>(std::distance(m_clipSlots.begin(), found));
+	candidate.modelId = target->GetAssetId();
+	candidate.modelRevision = model->revision;
+	candidate.current.clipHandle = *handle;
+
+	animation::LocalPose initialPose;
+	std::vector<Matrix4x4> initialModelPose;
+
+	if (!animation::EvaluateLocalPose(*clip, candidate.current.bindings, model->nodes, 0.0, initialPose) ||
+		!animation::BuildModelPoseFromLocal(model->nodes, initialPose, initialModelPose))
 	{
-		DBG("AnimationPlayer: Failed to apply the clip's initial pose.");
+		DBG("AnimationPlayer: Failed to evaluate the clip's initial pose.");
 		return false;
 	}
 
-	// Update the playback state with the new clip and its associated data.
-	candidate.slotIndex = static_cast<std::size_t>(std::distance(m_clipSlots.begin(), found));
-	candidate.modelRevision = model->revision;
-	found->clipHandle = *handle;
+	const bool hasVisiblePose = m_playback && target->HasAnimationPose();
+	const bool canBlend =
+		hasVisiblePose && m_playback->modelId == candidate.modelId &&
+		m_playback->modelRevision == candidate.modelRevision;
+
+	if (blendSeconds > 0.0f && canBlend)
+	{
+		// Validate bind-pose decomposition for nodes animated by only one side.
+		animation::LocalPose intermediate;
+
+		if (!animation::BlendLocalPoses(model->nodes, m_playback->appliedPose, initialPose, 0.5f, intermediate))
+		{
+			DBG("AnimationPlayer: Failed to prepare the clip transition.");
+			return false;
+		}
+
+		auto& transition = candidate.transition.emplace();
+		transition.durationSeconds = blendSeconds;
+		candidate.appliedPose = m_playback->appliedPose;
+
+		if (m_playback->transition)
+		{
+			transition.frozenPose = candidate.appliedPose;
+		}
+		else
+		{
+			transition.outgoing = m_playback->current;
+		}
+	}
+	else
+	{
+		if (!target->ApplyAnimationPose(*model, initialModelPose))
+		{
+			DBG("AnimationPlayer: Failed to apply the clip's initial pose.");
+			return false;
+		}
+
+		candidate.appliedPose = std::move(initialPose);
+	}
+
 	m_playback = std::move(candidate);
 
 	if (clip->sourceModelGuid != target->GetAssetId())
@@ -278,7 +310,7 @@ void AnimationPlayer::RestartCurrentClip()
 	if (m_playback)
 	{
 		// Reset the playback time to 0.0 seconds and reapply the initial pose of the current clip.
-		SwitchClip(m_clipSlots[m_playback->slotIndex].setting.alias);
+		SwitchClip(m_clipSlots[m_playback->slotIndex].alias);
 	}
 }
 
@@ -354,7 +386,7 @@ void AnimationPlayer::ProcessAnimation(float deltaTime)
 	// Get the current playback state and the associated animation clip and model.
 	auto& playback = *m_playback;
 	const auto& assets = *context->pAssetManager;
-	const AnimationClip* clip = assets.FindAnimationClip(m_clipSlots[playback.slotIndex].clipHandle);
+	const AnimationClip* clip = assets.FindAnimationClip(playback.current.clipHandle);
 	const auto model = assets.FindLoadedSkinnedModel(target->GetAssetId());
 
 	if (!clip || !model)
@@ -368,12 +400,18 @@ void AnimationPlayer::ProcessAnimation(float deltaTime)
 	}
 
 	// Check if the model has changed since the last playback update.
-	const bool modelChanged = playback.modelRevision != model->revision;
+	const Guid modelId = target->GetAssetId();
+	const bool modelChanged = playback.modelId != modelId || playback.modelRevision != model->revision;
+
+	if (modelChanged || !target->HasAnimationPose())
+	{
+		playback.transition.reset();
+	}
 
 	if (modelChanged)
 	{
 		// Re-bind the tracks of the clip to the new model's nodes.
-		if (!animation::BindTracks(*clip, model->nodes, playback.bindings))
+		if (!animation::BindTracks(*clip, model->nodes, playback.current.bindings))
 		{
 			DBG("AnimationPlayer: Active clip cannot bind to the new model.");
 			target->ResetToBindPose();
@@ -382,6 +420,7 @@ void AnimationPlayer::ProcessAnimation(float deltaTime)
 			return;
 		}
 
+		playback.modelId = modelId;
 		playback.modelRevision = model->revision;
 
 		if (clip->sourceModelGuid != target->GetAssetId())
@@ -390,51 +429,117 @@ void AnimationPlayer::ProcessAnimation(float deltaTime)
 		}
 	}
 
-	// Advance the playback time based on deltaTime, speed, and looping settings.
-	double nextTime = playback.timeSeconds;
-	bool reachedEnd = false;
+	const bool validDelta = std::isfinite(deltaTime) && deltaTime >= 0.0f;
+	const bool advance = m_isPlaying && !playback.holdFirstPose && validDelta;
+	const double frameStep = advance ? static_cast<double>(deltaTime) : 0.0;
+	const double clipStep = frameStep * m_speed;
 
-	if (m_isPlaying && !playback.holdFirstPose && std::isfinite(deltaTime) && deltaTime >= 0.0f)
+	auto& current = playback.current;
+	const double nextTime = advance
+		? AdvanceClipTime(current.timeSeconds, clipStep, clip->durationSeconds, m_loop)
+		: current.timeSeconds;
+
+	const bool loop = m_loop && clip->durationSeconds > 0.0;
+	const bool reachedEnd = advance && !loop && nextTime >= clip->durationSeconds;
+
+	auto* transition = playback.transition ? &*playback.transition : nullptr;
+	const double nextElapsed = transition
+		? (std::min)(transition->elapsedSeconds + frameStep, transition->durationSeconds)
+		: 0.0;
+
+	const bool blendChanged = transition && nextElapsed != transition->elapsedSeconds;
+	const bool poseChanged = modelChanged || !target->HasAnimationPose() || nextTime != current.timeSeconds;
+
+	if (poseChanged || blendChanged)
 	{
-		const double duration = clip->durationSeconds;
-		const double advanced = nextTime + static_cast<double>(deltaTime) * m_speed;
+		animation::LocalPose pose;
+		bool evaluated = animation::EvaluateLocalPose(*clip, current.bindings, model->nodes, nextTime, pose);
+		double nextSourceTime = 0.0;
+		bool blendActive = transition && nextElapsed < transition->durationSeconds;
 
-		if (m_loop && duration > 0.0)
+		if (evaluated && blendActive)
 		{
-			// Wrap the playback time around using modulo to loop the animation.
-			nextTime = std::fmod(advanced, duration);
+			animation::LocalPose sampledSource;
+			const animation::LocalPose * sourcePose = &transition->frozenPose;
+
+			if (transition->outgoing)
+			{
+				auto& outgoing = *transition->outgoing;
+				const auto* sourceClip = assets.FindAnimationClip(outgoing.clipHandle);
+
+				if (sourceClip)
+				{
+					nextSourceTime = AdvanceClipTime(
+						outgoing.timeSeconds,
+						clipStep,
+						sourceClip->durationSeconds,
+						m_loop);
+
+					evaluated =
+						animation::EvaluateLocalPose(
+							*sourceClip,
+							outgoing.bindings,
+							model->nodes,
+							nextSourceTime,
+							sampledSource);
+
+					sourcePose = &sampledSource;
+				}
+				else
+				{
+					DBG("AnimationPlayer: Outgoing clip is no longer available.");
+					blendActive = false;
+				}
+			}
+
+			if (evaluated && blendActive)
+			{
+				const float weight = static_cast<float>(nextElapsed / transition->durationSeconds);
+				evaluated = animation::BlendLocalPoses(model->nodes, *sourcePose, pose, weight, pose);
+			}
+		}
+
+		std::vector<Matrix4x4> nodeToModel;
+		const bool applied =
+			evaluated &&
+			animation::BuildModelPoseFromLocal(model->nodes, pose, nodeToModel)&&
+			target->ApplyAnimationPose(*model, nodeToModel);
+
+		if (!applied)
+		{
+			DBG("AnimationPlayer: Failed to apply the evaluated pose.");
+
+			if (modelChanged)
+			{
+				target->ResetToBindPose();
+				m_playback.reset();
+			}
+			
+			m_isPlaying = false;
+			return;
+		}
+
+		playback.appliedPose = std::move(pose);
+
+		if (blendActive)
+		{
+			transition->elapsedSeconds = nextElapsed;
+
+			if (transition->outgoing)
+			{
+				transition->outgoing->timeSeconds = nextSourceTime;
+			}
 		}
 		else
 		{
-			// Clamp the playback time to the duration of the clip
-			// and check if the end has been reached.
-			nextTime = (std::min)(advanced, duration);
-			reachedEnd = advanced >= duration;
+			playback.transition.reset();
 		}
 	}
 
-	// Determine if the pose needs to be evaluated and applied based on model changes, animation state, and time.
-	const bool needsPose = modelChanged || !target->HasAnimationPose() || nextTime != playback.timeSeconds;
-
-	// If the pose needs to be updated, evaluate the animation clip at the new time and apply it to the target renderer.
-	if (needsPose && !ApplyPose(*target, *model, *clip, playback.bindings, nextTime))
-	{
-		DBG("AnimationPlayer: Failed to apply the evaluated pose.");
-
-		if (modelChanged)
-		{
-			target->ResetToBindPose();
-			m_playback.reset();
-		}
-
-		m_isPlaying = false;
-		return;
-	}
-
-	playback.timeSeconds = nextTime;
+	current.timeSeconds = nextTime;
 	playback.holdFirstPose = false;
 
-	if (reachedEnd)
+	if (reachedEnd && !playback.transition)
 	{
 		m_isPlaying = false;
 	}

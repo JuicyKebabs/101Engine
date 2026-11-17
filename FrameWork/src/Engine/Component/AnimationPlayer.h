@@ -24,7 +24,7 @@ class AnimationPlayer : public Component
 {
 public:
 	bool AddClip(std::string alias, const Guid& clipGuid);
-	bool SwitchClip(std::string_view alias);
+	bool SwitchClip(std::string_view alias, float blendSeconds = 0.0f);
 	void RestartCurrentClip();
 
 	void SetIsPlaying(bool isPlaying) { m_isPlaying = isPlaying; }
@@ -41,25 +41,36 @@ public:
 	bool ResolveReferences(SceneBase& scene) override;
 
 private:
-	// One slot per animation clip, identified by alias.
-	struct Slot
+
+	struct ClipCursor
 	{
-		AnimationClipSlot setting;
 		AnimationClipHandle clipHandle;
+		std::vector<animation::TrackBinding> bindings;
+		double timeSeconds = 0.0;
+	};
+
+	struct Transition
+	{
+		std::optional<ClipCursor> outgoing;
+		animation::LocalPose frozenPose;
+		double durationSeconds = 0.0;
+		double elapsedSeconds = 0.0;
 	};
 
 	// Playback state for the currently active clip.
 	struct Playback
 	{
 		std::size_t slotIndex = 0;
+		Guid modelId;
 		std::uint64_t modelRevision = 0;
-		std::vector<animation::TrackBinding> bindings;
-		double timeSeconds = 0.0;
+		ClipCursor current;
+		animation::LocalPose appliedPose;
+		std::optional<Transition> transition;
 		bool holdFirstPose = true;
 	};
 
 	// All registered animation clips, each identified by an alias.
-	std::vector<Slot> m_clipSlots;
+	std::vector<AnimationClipSlot> m_clipSlots;
 	std::string m_defaultSlotAlias;	// The alias of the clip used for initial playback.
 
 	// Optional playback state for the currently active clip.
@@ -81,7 +92,7 @@ private:
 	void OnDestroyOverride() override {}
 
 	SkinnedMeshRenderer* ResolveSkinnedMeshRenderer() const;
-	static bool ResolveClipSlots(std::vector<Slot>& slots, AssetManager& assets);
+	static bool ResolveClipSlots(std::vector<AnimationClipSlot>& slots, AssetManager& assets);
 
 	void ProcessAnimation(float deltaTime);
 

@@ -2,6 +2,8 @@
 
 #include "Renderer/Renderer.h"
 #include "Engine/Core/GUID/Guid.h"
+#include "Engine/Core/Math/Math.h"
+
 #include <array>
 #include <filesystem>
 
@@ -15,6 +17,8 @@ public:
 	explicit EditorRenderAssets(rendering::Renderer& renderer) : m_renderer(renderer) {}
 	~EditorRenderAssets();
 
+	// Receives the frame work built-in skinned vertex shader,
+	// which is used for the selection mask auxiliary pass.
 	rendering::Result Initialize(
 		const std::filesystem::path& shaderDirectory,
 		rendering::ShaderHandle skinnedVertex);
