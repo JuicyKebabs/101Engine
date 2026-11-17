@@ -1,10 +1,7 @@
-// Reflection is the contract between accepted Shader bytecode and common Draw inputs.
-// SV_VertexID is supplied by the pipeline and is not a user Vertex Buffer input.
-// The existing corrected MergeMetadata binding comparison is preserved, not reimplemented here.
-
 #include "ShaderData.h"
 #include "ShaderCommonInputs.h"
 #include "Failure.h"
+
 #include <d3dcompiler.h>
 #include <d3d12shader.h>
 #include <wrl/client.h>
@@ -40,7 +37,12 @@ ValueType TypeOf(const MaterialValue& value) noexcept
 		return ValueType::Texture2D;
 	}
 
-	static_assert(std::variant_size_v<MaterialValue> == 16);
+	if (std::holds_alternative<BufferHandle>(value))
+	{
+		return ValueType::StructuredBuffer;
+	}
+
+	static_assert(std::variant_size_v<MaterialValue> == 17);
 	return static_cast<ValueType>(value.index());
 }
 
@@ -126,17 +128,17 @@ Result CommonSchema(const ShaderConstantBuffer& buffer)
 	const std::vector<std::vector<Field>> fields{
 		{{"time", ValueType::Float, 0}},
 		{{"view", ValueType::Matrix4x4, offsetof(ViewConstants, view)},
-         {"projection", ValueType::Matrix4x4, offsetof(ViewConstants, projection)},
-         {"cameraPosition", ValueType::Float4, offsetof(ViewConstants, cameraPosition)},
-         {"shadowViewProjection", ValueType::Matrix4x4, offsetof(ViewConstants, shadowViewProjection)},
-         {"shadowInformation", ValueType::Float4, offsetof(ViewConstants, shadowInformation)}},
+		 {"projection", ValueType::Matrix4x4, offsetof(ViewConstants, projection)},
+		 {"cameraPosition", ValueType::Float4, offsetof(ViewConstants, cameraPosition)},
+		 {"shadowViewProjection", ValueType::Matrix4x4, offsetof(ViewConstants, shadowViewProjection)},
+		 {"shadowInformation", ValueType::Float4, offsetof(ViewConstants, shadowInformation)}},
 		{{"lightDirection", ValueType::Float4, 0},
-         {"lightColor", ValueType::Float4, 16},
-         {"ambient", ValueType::Float4, 32}},
+		 {"lightColor", ValueType::Float4, 16},
+		 {"ambient", ValueType::Float4, 32}},
 		{{"passColor", ValueType::Float4, 0}},
 		{{"world", ValueType::Matrix4x4, offsetof(ObjectConstants, world)},
-         {"normalMatrix", ValueType::Matrix4x4, offsetof(ObjectConstants, normalMatrix)},
-         {"tint", ValueType::Float4, offsetof(ObjectConstants, tint)}}};
+		 {"normalMatrix", ValueType::Matrix4x4, offsetof(ObjectConstants, normalMatrix)},
+		 {"tint", ValueType::Float4, offsetof(ObjectConstants, tint)}}};
 
 	// Reserved names and sizes for the common schema buffers which Renderer expects.
 	const char* names[]{"RendererFrame", "RendererView", "RendererLight", "RendererPass", "RendererObject"};
@@ -165,8 +167,11 @@ Result CommonSchema(const ShaderConstantBuffer& buffer)
 
 		if (var.name != field.name || var.type != field.type || var.offset != field.offset)
 		{
-			return {false, "CommonSchema: buffer '" + buffer.name + "' variable '" + var.name +
-                               "' does not match the expected schema."};
+			return {false, 
+				"CommonSchema: buffer '" +
+				buffer.name +
+				"' variable '" + var.name +
+				"' does not match the expected schema."};
 		}
 
 		if (var.type == ValueType::Matrix4x4 && !var.rowMajor)
@@ -317,19 +322,24 @@ Result ReflectBindings(
 			return {false, "ReflectShader: GetResourceBindingDesc failed."};
 		}
 
-		if (bindDesc.BindCount != 1 || !bindDesc.Name)
+		if (bindDesc.BindCount != 1 || !bindDesc.Name || bindDesc.Space != 0)
 		{
 			return {false, "ReflectShader: unsupported resource binding."};
 		}
 
-		if (!resourceBindings.emplace(bindDesc.Type, bindDesc.BindPoint).second)
+		// Texture2D and StructuredBuffer share the t-register namespace.
+		const auto bindingType = bindDesc.Type ==
+			D3D_SIT_STRUCTURED ?
+			D3D_SIT_TEXTURE : bindDesc.Type;
+
+		if (!resourceBindings.emplace(bindingType, bindDesc.BindPoint).second)
 		{
 			return {false, "ReflectShader: duplicate resource binding."};
 		}
 
-		//----------------------------
+		//-----------------------------
 		// Constant buffer reflection
-		//----------------------------
+		//-----------------------------
 		if (bindDesc.Type == D3D_SIT_CBUFFER)
 		{
 			ShaderConstantBuffer buffer;
@@ -342,9 +352,9 @@ Result ReflectBindings(
 
 			metadata.constants.push_back(std::move(buffer));
 		}
-		//----------------------------
+		//-----------------------------
 		// Texture reflection
-		//----------------------------
+		//-----------------------------
 		else if (bindDesc.Type == D3D_SIT_TEXTURE &&
 				 bindDesc.Dimension == D3D_SRV_DIMENSION_TEXTURE2D &&
 				 bindDesc.ReturnType == D3D_RETURN_TYPE_FLOAT)
@@ -366,28 +376,54 @@ Result ReflectBindings(
 				return Fail("Unknown reserved Renderer texture name.");
 			}
 
-			resource.sampler = false;
+			resource.kind = ShaderResourceKind::Texture2D;
 			resource.stages = stages;
 			metadata.resources.push_back(std::move(resource));
 		}
-		//----------------------------
+		//-----------------------------
 		// Sampler reflection
-		//----------------------------
+		//-----------------------------
 		else if (bindDesc.Type == D3D_SIT_SAMPLER &&
-                 ((bindDesc.BindPoint <= 1 && !(bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER)) ||
-                  (bindDesc.BindPoint == 2 && std::string(bindDesc.Name) == "RendererShadowSampler" &&
-                   (bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER))))
+				((bindDesc.BindPoint <= 1 && !(bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER)) ||
+				(bindDesc.BindPoint == 2 && std::string(bindDesc.Name) == "RendererShadowSampler" &&
+				(bindDesc.uFlags & D3D_SIF_COMPARISON_SAMPLER))))
 		{
 			ShaderResourceBinding resource;
 			resource.name = bindDesc.Name;
 			resource.binding = bindDesc.BindPoint;
-			resource.sampler = true;
+			resource.kind = ShaderResourceKind::Sampler;
 			resource.stages = stages;
 			metadata.resources.push_back(std::move(resource));
 		}
-		//----------------------------
+		//-----------------------------
+		// StructuredBuffer reflection
+		//-----------------------------
+		else if (bindDesc.Type == D3D_SIT_STRUCTURED &&
+				 bindDesc.Dimension == D3D10_1_SRV_DIMENSION_BUFFER)
+		{
+			ShaderResourceBinding resource;
+			resource.name = bindDesc.Name;
+			resource.binding = bindDesc.BindPoint;
+			resource.kind = ShaderResourceKind::StructuredBuffer;
+			resource.stages = stages;
+			resource.elementStride = bindDesc.NumSamples;
+
+			// t15 has already used by Renderer for shadow map texture.
+			if (resource.binding == 15 || resource.name.starts_with("Renderer"))
+			{
+				return Fail("ReflectShader: reserved StructuredBuffer name or register.");
+			}
+
+			if (resource.elementStride == 0)
+			{
+				return Fail("ReflectShader: StructuredBuffer stride is unavailable.");
+			}
+
+			metadata.resources.push_back(std::move(resource));
+		}
+		//-----------------------------
 		// Unsupported resource type
-		//----------------------------
+		//-----------------------------
 		else
 		{
 			return {false, "ReflectShader: unsupported resource or sampler: " + std::string(bindDesc.Name)};
@@ -428,9 +464,15 @@ Result ReflectVertexInputs(ID3D12ShaderReflection& reflection, const D3D12_SHADE
 			return Fail("ReflectShader: unsupported vertex system input.");
 		}
 
-		if (inputDesc.ComponentType != D3D_REGISTER_COMPONENT_FLOAT32)
+		VertexComponentType componentType = VertexComponentType::Float32;
+		
+		if (inputDesc.ComponentType == D3D_REGISTER_COMPONENT_UINT32)
 		{
-			return {false, "ReflectShader: unsupported vertex component type"};
+			componentType = VertexComponentType::UInt32;
+		}
+		else if (inputDesc.ComponentType != D3D_REGISTER_COMPONENT_FLOAT32)
+		{
+			return { false, "ReflectShader: unsupported vertex component type" };
 		}
 
 		UINT count = 0;
@@ -450,6 +492,7 @@ Result ReflectVertexInputs(ID3D12ShaderReflection& reflection, const D3D12_SHADE
 		input.semantic = inputDesc.SemanticName;
 		input.index = inputDesc.SemanticIndex;
 		input.components = count;
+		input.componentType = componentType;
 
 		// Add the vertex input to the shader metadata as validated and reflected.
 		metadata.vertexInputs.push_back(input);
@@ -496,7 +539,9 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 		return {false, "ReflectShader: unsupported shader stage."};
 	}
 
+	//--------------------------------------------------------------------
 	// Generate a shader reflection object from the compiled bytecode
+	//--------------------------------------------------------------------
 	Microsoft::WRL::ComPtr<ID3D12ShaderReflection> reflection;
 	HRESULT hr = D3DReflect(desc.bytecode.data(), desc.bytecode.size(), IID_PPV_ARGS(&reflection));
 
@@ -530,6 +575,9 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 
 	const auto stages = desc.stage == ShaderStage::Vertex ? ShaderStages::Vertex : ShaderStages::Pixel;
 
+	//--------------------------------------------------------------------
+	// Reflect bindings declared in HLSH code.
+	//--------------------------------------------------------------------
 	Result reflected = ReflectBindings(*reflection.Get(), shader, stages, candidate.metadata);
 
 	if (!reflected.IsSuccess())
@@ -537,7 +585,10 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 		return reflected;
 	}
 
-	reflected = desc.stage == 
+	//--------------------------------------------------------------------
+	// Reflect vertex inputs or color outputs based on shader stage.
+	//--------------------------------------------------------------------
+	reflected = desc.stage ==
 		ShaderStage::Vertex ? ReflectVertexInputs(*reflection.Get(), shader, candidate.metadata)
 		: ReflectColorOutputs(*reflection.Get(), shader, candidate.metadata);
 
@@ -546,7 +597,9 @@ Result ReflectShader(const ShaderDesc& desc, ShaderContent& output)
 		return reflected;
 	}
 
+	//--------------------------------------------------------------------
 	// Copy the bytecode (executable shader code) to the output structure.
+	//--------------------------------------------------------------------
 	candidate.bytecode.assign(desc.bytecode.begin(), desc.bytecode.end());
 	output = std::move(candidate);
 
@@ -559,7 +612,9 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 
 	if (pixel)
 	{
+		//----------------------------------------------
 		// Merge constant buffer
+		//----------------------------------------------
 		for (const auto& cb : pixel->constants)
 		{
 			// Collect duplicated bindings for being merged.
@@ -592,47 +647,61 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 			}
 		}
 
-		// Merge bindings (textures and samplers)
+		//----------------------------------------------
+		// Merge other bindings
+		// (textures, structured buffer, and samplers)
+		//----------------------------------------------
 		for (const auto& pixelBind : pixel->resources)
 		{
-			for (const auto& vertexBind : candidate.resources)
-			{
-				if (vertexBind.sampler == pixelBind.sampler)
-				{
-					// Same binding requires same name, and same name requires same binding.
-					bool sameBinding = vertexBind.binding == pixelBind.binding;
-					bool sameName = vertexBind.name == pixelBind.name;
+			const bool pixelIsSampler = pixelBind.kind == ShaderResourceKind::Sampler;
+			ShaderResourceBinding* matchingBinding = nullptr;
 
-					if (sameBinding != sameName)
+			for (auto& vertexBind : candidate.resources)
+			{
+				// Check if the both bindings are sampler.
+				const bool vertexIsSampler = vertexBind.kind == ShaderResourceKind::Sampler;
+				
+				if (vertexIsSampler != pixelIsSampler)
+				{
+					continue;
+				}
+
+				// When sharing the register on both VS and PS,
+				// the name of its binding need to be same to avoid collision when they are merged.
+				const bool sameRegister = vertexBind.binding == pixelBind.binding;
+				const bool sameName = vertexBind.name == pixelBind.name;
+				
+				if (sameRegister != sameName)
+				{
+					return Fail("MergeMetadata: VS/PS resource name/register collision: " + pixelBind.name);
+				}
+
+				if (sameRegister)
+				{
+					//The kind of resources which are using same registry need to be same.
+					if (vertexBind.kind != pixelBind.kind || vertexBind.elementStride != pixelBind.elementStride)
 					{
-						return {false, "MergeMetadata: VS/PS resource name/register collision: " + vertexBind.name + " & " + pixelBind.name};
+						return Fail("MergeMetadata: VS/PS resource kind/stride mismatch: " + pixelBind.name);
 					}
+
+					matchingBinding = &vertexBind;
+					break;
 				}
 			}
 
-			// Find same binding reaources
-			auto found = std::find_if(
-				candidate.resources.begin(), candidate.resources.end(),
-				[&](const auto& vertexBind)
-				{
-					const bool sameResourceKind = vertexBind.sampler == pixelBind.sampler;
-					const bool sameRegister = vertexBind.binding == pixelBind.binding;
-					return sameResourceKind && sameRegister;
-				});
-
-			if (found == candidate.resources.end())
+			if (matchingBinding)
 			{
-				// New binding is added.
-				candidate.resources.push_back(pixelBind);
+				matchingBinding->stages = matchingBinding->stages | pixelBind.stages;
 			}
 			else
 			{
-				// Save which shader stages use this resource (vertex, pixel, or both).
-				found->stages = found->stages | pixelBind.stages;
+				candidate.resources.push_back(pixelBind);
 			}
 		}
 
+		//----------------------------------------------
 		// Merge color outputs
+		//----------------------------------------------
 		candidate.colorOutputs = pixel->colorOutputs;
 	}
 
@@ -656,7 +725,10 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 	// Detect duplicate resource names in the common schema (binding 5) and resource names.
 	for (const auto& bind : candidate.resources)
 	{
-		if (!bind.sampler && ((bind.name.starts_with("Renderer") && bind.name != "RendererShadowMap") ||  !names.insert(bind.name).second))
+		if (bind.kind != ShaderResourceKind::Sampler &&
+			((bind.name.starts_with("Renderer") &&
+			  bind.name != "RendererShadowMap") ||
+			  !names.insert(bind.name).second))
 		{
 			return {false, "MergeMetadata: duplicate resource name '" + bind.name + "' in common schema."};
 		}
@@ -714,8 +786,10 @@ Result ValidateMaterial(const MaterialDesc& desc)
 				}
 				else if constexpr (std::is_same_v<T, Vector4>)
 				{
-					finite = std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z) &&
-                             std::isfinite(value.w);
+					finite = std::isfinite(value.x) &&
+							 std::isfinite(value.y) &&
+							 std::isfinite(value.z) &&
+							 std::isfinite(value.w);
 				}
 				else if constexpr (std::is_same_v<T, Matrix4x4>)
 				{
@@ -763,9 +837,12 @@ Result PackMaterial(const ShaderConstantBuffer& layout, const MaterialDesc& mate
 		// Check if the type of the material parameter matches the expected type in the layout.
 		if (TypeOf(found->value) != var.type)
 		{
-			return {false, "PackMaterial: Material type mismatch: " + var.name +
-                               " expected=" + std::to_string(static_cast<int>(var.type)) +
-                               " actual=" + std::to_string(static_cast<int>(TypeOf(found->value)))};
+			return {false,
+				"PackMaterial: Material type mismatch: " +
+				var.name +
+				" expected=" +
+				std::to_string(static_cast<int>(var.type)) +
+				"actual=" + std::to_string(static_cast<int>(TypeOf(found->value)))};
 		}
 
 		Result status;

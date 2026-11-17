@@ -24,6 +24,8 @@ struct VertexField
 	UINT count;
 	UINT offset;
 	DXGI_FORMAT format;
+	UINT inputSlot = 0;
+	VertexComponentType componentType = VertexComponentType::Float32;
 };
 
 std::vector<VertexField> VertexFields();

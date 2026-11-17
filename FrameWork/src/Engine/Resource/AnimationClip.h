@@ -1,13 +1,22 @@
 #pragma once
 
-#include "Engine/Core/Math/Math.h"
 #include "Engine/Core/GUID/Guid.h"
-#include "Renderer/Math.h"
+#include "Engine/Core/Math/Math.h"
 #include "nlohmann/json.hpp"
 
 #include <string>
 #include <vector>
 #include <cstdint>
+
+
+
+struct AnimationClipHandle
+{
+	static const std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
+
+	std::uint32_t index = InvalidIndex;
+	std::uint32_t generation = 0;
+};
 
 template<class T>
 struct AnimationKey
@@ -19,9 +28,9 @@ struct AnimationKey
 struct AnimationTrack
 {
 	std::uint32_t nodeIndex = 0;
-	std::vector<AnimationKey<rendering::Vector3>> positions;
-	std::vector<AnimationKey<rendering::Quaternion>> rotations;
-	std::vector<AnimationKey<rendering::Vector3>> scales;
+	std::vector<AnimationKey<Vector3>> positions;
+	std::vector<AnimationKey<Quaternion>> rotations;
+	std::vector<AnimationKey<Vector3>> scales;
 };
 
 struct AnimationClipNode

@@ -105,9 +105,13 @@ add_custom_target(EditorShaderAssets
         "$<TARGET_FILE_DIR:101Editor>/shaders"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${EDITOR_SHADER_OUTPUTS}
+        "${FRAMEWORK_SKINNING_SHADER}"
         "$<TARGET_FILE_DIR:101Editor>/shaders"
     DEPENDS ${EDITOR_SHADER_OUTPUTS}
+    "${FRAMEWORK_SKINNING_SHADER}"
     VERBATIM
 )
+
+add_dependencies(EditorShaderAssets FrameworkShaderAssets)
 
 add_dependencies(101Editor EditorShaderAssets)

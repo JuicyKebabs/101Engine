@@ -176,6 +176,7 @@ Result ValidateShaderLink(const ShaderContent& vertex, const ShaderContent* pixe
 // An in-range Index Buffer slice alone cannot guarantee that Vertex Buffer references are in range.
 Result ValidateGeometrySelection(const RenderObject& object, const DrawInputs& inputs)
 {
+	// Validation for provedural (no VB).
 	if (object.procedural)
 	{
 		if (object.geometry != GeometryHandle{} || object.procedural->vertexCount == 0)
@@ -199,6 +200,19 @@ Result ValidateGeometrySelection(const RenderObject& object, const DrawInputs& i
 	}
 
 	const auto& geometry = inputs.geometry->cpuData;
+	const auto& vertexInputs = inputs.vertexShader->metadata.vertexInputs;
+	const bool requiresSkinVertices = std::any_of(
+		vertexInputs.begin(), vertexInputs.end(),
+		[](const ShaderVertexInput& input)
+		{
+			return input.semantic == "BLENDINDICES" || input.semantic == "BLENDWEIGHT";
+		});
+
+	if (requiresSkinVertices && geometry.skinVertices.empty())
+	{
+		return Fail("The selected Vertex Shader requires the skin vertex stream.");
+	}
+
 	const bool indexed = !geometry.indices.empty();
 	const std::size_t availableCount = indexed ? geometry.indices.size() : geometry.vertices.size();
 
@@ -243,30 +257,64 @@ Result ValidateFrameInputs(const FrameRenderData& data)
 {
 	if (!std::isfinite(data.time))
 	{
-		return {false, "ValidateFrameInputs: invalid Frame time input"};
+		return Fail("ValidateFrameInputs : Time must be a finite value.");
 	}
 
+	// Validate the value of optional directional light.
 	if (data.directionalLight.has_value())
 	{
 		auto checked = ValidateLight(data.directionalLight.value());
 
 		if (!checked.IsSuccess())
 		{
-			return {false, "ValidateFrameInputs: invalid Frame light input"};
+			return {false, "ValidateFrameInputs : invalid Frame light input"};
 		}
 	}
 
+	// Validate each view's parameters.
 	for (const auto& view : data.views)
 	{
 		if (!std::isfinite(view.exposure) || view.exposure < 0)
 		{
-			return Fail("Exposure must be a finite nonnegative multiplier.");
+			return Fail("ValidateFrameInputs : Exposure must be a finite nonnegative multiplier.");
 		}
 
 		if (!Finite(view.view) || !Finite(view.projection) ||
 			!Finite(Vector4{view.cameraPosition.x, view.cameraPosition.y, view.cameraPosition.z, 0}))
 		{
-			return {false, "ValidateFrameInputs: invalid Frame view input"};
+			return {false, "ValidateFrameInputs : invalid Frame view input"};
+		}
+	}
+
+	return {};
+}
+
+Result DrawResources::ValidateMaterialPipelines(const MaterialDesc& desc)
+{
+	if (!m_pipelineResources.FindForNewUse(desc.pipeline))
+	{
+		return Fail("ValidateMaterialPipelines :Material Pipeline handle is invalid.");
+	}
+
+	// Check for the optional shadow pipleine.
+	// This pipleine is used when the material is drawn in the built-in Shadow pass.
+	if (desc.shadowPipeline)
+	{
+		const auto* shadow = m_pipelineResources.FindForNewUse(*desc.shadowPipeline);
+
+		if (!shadow)
+		{
+			return Fail("ValidateMaterialPipelines :Material Shadow Pipeline handle is invalid.");
+		}
+
+		const PipelineDesc& shadowDesc = shadow->desc;
+
+		// Shadow pipeline must be opaque, depth-read/write.
+		if (shadowDesc.pixelShader != ShaderHandle{} ||
+			shadowDesc.blend != BlendMode::Opaque ||
+			shadowDesc.depth != DepthMode::ReadWrite)
+		{
+			return Fail("ValidateMaterialPipelines :Material Shadow Pipeline must be opaque, depth-write, and pixel shader-less.");
 		}
 	}
 
@@ -306,6 +354,7 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 		return {checked, {}};
 	}
 
+	// Find shader resources.
 	auto* vs = m_shaderResources.FindForNewUse(desc.vertexShader);
 	auto* ps = m_shaderResources.FindForNewUse(desc.pixelShader);
 
@@ -319,6 +368,7 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 		return {{false, "RegisterPipeline: Pixel shader handle is invalid or not a pixel shader."}, {}};
 	}
 
+	// Check the correspondence between output from VS and input to PS. 
 	checked = ValidateShaderLink(*vs, ps);
 
 	if (!checked.IsSuccess())
@@ -330,6 +380,7 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 
 	candidate->desc = desc;
 
+	// Merge bindings shared between VS and PS.
 	checked = MergeMetadata(vs->metadata, ps ? &ps->metadata : nullptr, candidate->layout);
 
 	if (!checked.IsSuccess())
@@ -339,13 +390,16 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 
 	auto fields = backend::VertexFields();
 
+	// Check if the VS requirnig correct vertex input.
 	for (const auto& input : vs->metadata.vertexInputs)
 	{
 		bool mismatchVertex = std::none_of(
 				fields.begin(), fields.end(),
 				[&](const backend::VertexField& field)
 				{
-					return input.semantic == field.semantic && input.components == field.count;
+					return input.semantic == field.semantic &&
+						   input.components == field.count &&
+						   input.componentType == field.componentType;
 				});
 
 		if (input.index != 0 || mismatchVertex)
@@ -358,7 +412,7 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 		candidate->layout.resources.begin(), candidate->layout.resources.end(),
 		[](const auto& binding)
 		{
-			return !binding.sampler;
+			return binding.kind != ShaderResourceKind::Sampler;
 		});
 
 	if (candidate->layout.constants.size() * 2 + tables > 64)
@@ -371,16 +425,21 @@ ResourceRegistrationResult<PipelineHandle> DrawResources::Register(const Pipelin
 
 ResourceRegistrationResult<MaterialHandle> DrawResources::Register(const MaterialDesc& desc)
 {
-	auto checked = ValidateMaterial(desc);
+	// Validate the material description.
+	Result checked = ValidateMaterial(desc);
 
 	if (!checked.IsSuccess())
 	{
 		return {checked, {}};
 	}
 
-	if (!m_pipelineResources.FindForNewUse(desc.pipeline))
+	// Validate that the material's pipeline
+	// and optional shadow pipeline are valid.
+	checked = ValidateMaterialPipelines(desc);
+
+	if (!checked.IsSuccess())
 	{
-		return {{false, "RegisterMaterial: Pipeline handle is invalid."}, {}};
+		return { checked,{} };
 	}
 
 	auto candidate = std::make_unique<MaterialContent>();
@@ -391,16 +450,18 @@ ResourceRegistrationResult<MaterialHandle> DrawResources::Register(const Materia
 
 Result DrawResources::UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc)
 {
-	auto checked = ValidateMaterial(desc);
+	Result checked = ValidateMaterial(desc);
 
 	if (!checked.IsSuccess())
 	{
 		return checked;
 	}
 
-	if (!m_pipelineResources.FindForNewUse(desc.pipeline))
+	checked = ValidateMaterialPipelines(desc);
+
+	if (!checked.IsSuccess())
 	{
-		return {false, "UpdateMaterial: Pipeline handle is invalid."};
+		return checked;
 	}
 
 	auto candidate = std::make_unique<MaterialContent>();
@@ -440,6 +501,61 @@ Result DrawResources::ResolveTextureInput(
 	if (!content || !m_textureResources.FindForNewUse(handle))
 	{
 		return Fail("Texture and resident substitute unavailable: " + requirement.name);
+	}
+
+	return {};
+}
+
+Result DrawResources::ResolveStructuredBuffer(
+	const MaterialDesc& material,
+	const ShaderResourceBinding& requirement,
+	const backend::StructuredBufferGpuData*& outGpuData)
+{
+	const auto* parameter = FindMaterialParameter(material, requirement.name);
+
+	if (!parameter)
+	{
+		return Fail("Missing StructuredBuffer Material parameter: " + requirement.name);
+	}
+
+	const auto* handle = std::get_if<BufferHandle>(&parameter->value);
+
+	if (!handle)
+	{
+		return Fail("StructuredBuffer Material type mismatch: " + requirement.name);
+	}
+
+	Result resolved = m_bufferResources.Resolve(
+		*handle,
+		requirement.elementStride,
+		outGpuData
+	);
+
+	if (!resolved.IsSuccess())
+	{
+		resolved.message = requirement.name + ": " + resolved.message;
+	}
+
+	return resolved;
+}
+
+Result DrawResources::ValidateStructuredBuffers(const MaterialDesc& material, const ShaderMetadata& layout)
+{
+	for (const auto& resource : layout.resources)
+	{
+		if (resource.kind != ShaderResourceKind::StructuredBuffer)
+		{
+			continue;
+		}
+
+		const backend::StructuredBufferGpuData* gpuData = nullptr;
+
+		Result resolved = ResolveStructuredBuffer(material, resource, gpuData);
+
+		if (!resolved.IsSuccess())
+		{
+			return resolved;
+		}
 	}
 
 	return {};
@@ -565,8 +681,11 @@ Result DrawResources::ResolveDrawInputs(
 
 	if (!selected.vertexShader || requiredPixelMissing)
 	{
-		return {false, "Dependent Shader unavailable: VS " + m_shaderResources.DescribeUnavailable(diagnostic.vertexShader) +
-                           "; PS " + m_shaderResources.DescribeUnavailable(diagnostic.pixelShader)};
+		return {false,
+			"Dependent Shader unavailable: VS " +
+			m_shaderResources.DescribeUnavailable(diagnostic.vertexShader) +
+			"; PS " +
+			m_shaderResources.DescribeUnavailable(diagnostic.pixelShader)};
 	}
 
 	diagnostic.vertexRevision = selected.vertexShader->revision;
@@ -646,7 +765,7 @@ Result DrawResources::ResolveDrawInputs(
 			continue;
 		}
 
-		if (requirement.sampler)
+		if (requirement.kind != ShaderResourceKind::Texture2D)
 		{
 			continue;
 		}
@@ -664,6 +783,8 @@ Result DrawResources::ResolveDrawInputs(
 	inputs = selected;
 	return {};
 }
+
+
 
 Result DrawResources::GetOrCreatePipelineVariant(
 	const DrawInputs& inputs, const DrawDiagnostic& diagnostic,

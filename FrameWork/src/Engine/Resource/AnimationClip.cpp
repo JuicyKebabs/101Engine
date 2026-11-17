@@ -51,7 +51,7 @@ json WriteKeys(const std::vector<AnimationKey<T>>& keys)
 		const auto& v = key.value;
 		auto components = json::array({ v.x, v.y, v.z });
 
-		if constexpr (std::is_same_v<T, rendering::Quaternion>)
+		if constexpr (std::is_same_v<T, Quaternion>)
 		{
 			components.push_back(v.w);
 		}
@@ -80,7 +80,7 @@ float ReadComponent(const json& value)
 template<class T>
 std::vector<AnimationKey<T>> ReadKeys(const json& input)
 {
-	constexpr bool isRotation = std::is_same_v<T, rendering::Quaternion>;
+	constexpr bool isRotation = std::is_same_v<T, Quaternion>;
 
 	std::vector<AnimationKey<T>> keys;
 	keys.reserve(input.size());
@@ -227,9 +227,9 @@ AnimationClip DeserializeAnimationClip(const json& json)
 
 		AnimationTrack track;
 		track.nodeIndex = static_cast<std::uint32_t>(index);
-		track.positions = ReadKeys<rendering::Vector3>(ReadArray(entry, "positions"));
-		track.rotations = ReadKeys<rendering::Quaternion>(ReadArray(entry, "rotations"));
-		track.scales = ReadKeys<rendering::Vector3>(ReadArray(entry, "scales"));
+		track.positions = ReadKeys<Vector3>(ReadArray(entry, "positions"));
+		track.rotations = ReadKeys<Quaternion>(ReadArray(entry, "rotations"));
+		track.scales = ReadKeys<Vector3>(ReadArray(entry, "scales"));
 
 		clip.tracks.push_back(std::move(track));
 	}

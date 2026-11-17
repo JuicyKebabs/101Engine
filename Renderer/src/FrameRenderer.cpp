@@ -23,6 +23,7 @@ PassRecordingInputs MakePassRecordingInputs(const FrameRenderData& frame, const 
 	inputs.shadow = pass.shadow;
 	inputs.viewId = pass.renderView.id;
 	inputs.passName = pass.name;
+	inputs.shadowPass = pass.shadowPass;
 	inputs.extentOverride = pass.extentOverride;
 	return inputs;
 }
@@ -210,15 +211,18 @@ Result FrameRenderer::SelectViewDraws(
 
 	// Use the View matrix, not world Z or another View's Camera.
 	// This is Object-origin sorting, not a general solution for intersecting transparent triangles.
-	std::stable_sort(transparent.begin(), transparent.end(),
-                     [&frame, &view](std::size_t left, std::size_t right)
-                     {
-                         const auto leftPosition = frame.objects[left].world.GetTranslation();
-                         const auto rightPosition = frame.objects[right].world.GetTranslation();
-                         return view.view.TransformPoint(leftPosition).z > view.view.TransformPoint(rightPosition).z;
-                     });
+	std::stable_sort(
+		transparent.begin(), transparent.end(),
+		[&frame, &view](std::size_t left, std::size_t right)
+		{
+			const auto leftPosition = frame.objects[left].world.GetTranslation();
+			const auto rightPosition = frame.objects[right].world.GetTranslation();
+			return view.view.TransformPoint(leftPosition).z > view.view.TransformPoint(rightPosition).z;
+		});
+
 	opaque.insert(opaque.end(), transparent.begin(), transparent.end());
 	indices = std::move(opaque);
+
 	return {};
 }
 
@@ -441,10 +445,8 @@ Result FrameRenderer::BuildPassPlan(
 		sceneShadowInputs.texture = &context.DisabledShadow();
 
 		const bool hasDirectionalLight = frame.directionalLight.has_value();
-		const bool isShadowPreparationSuccessful =
-			shadowPreparationResult.IsSuccess();
-		const bool hasShadowDepthTexture =
-			sceneImages->shadowDepth != nullptr;
+		const bool isShadowPreparationSuccessful = shadowPreparationResult.IsSuccess();
+		const bool hasShadowDepthTexture = sceneImages->shadowDepth != nullptr;
 
 		const bool canPlanShadowPass =
 			hasDirectionalLight &&
@@ -459,17 +461,17 @@ Result FrameRenderer::BuildPassPlan(
 		{
 			PlannedPass shadowPass;
 			shadowPass.sourceViewIndex = viewIndex;
-			shadowPass.name =
-				"Shadow[" + std::to_string(sourceView.id) + "]";
+			shadowPass.name = "Shadow[" + std::to_string(sourceView.id) + "]";
 
 			// Derive a View from the light using the source Camera View.
-			shadowPass.renderView = MakeShadowView(
-				sourceView,
-				*frame.directionalLight,
-				sceneImages->hdrColor);
+			shadowPass.renderView =
+				MakeShadowView(
+					sourceView,
+					*frame.directionalLight,
+					sceneImages->hdrColor);
 
-			shadowPass.renderView.drawSettings.pipelineOverride =
-				context.ShadowPipeline();
+			shadowPass.shadowPass = true;
+			shadowPass.renderView.drawSettings.pipelineOverride = context.ShadowPipeline();
 			shadowPass.renderView.drawSettings.materialOverride.reset();
 
 			// Clear and use only the Shadow Depth attachment, with no Color output.
@@ -477,42 +479,32 @@ Result FrameRenderer::BuildPassPlan(
 			shadowPass.depth = sceneImages->shadowDepth.get();
 			shadowPass.shadow.texture = &context.DisabledShadow();
 
-			const auto shadowDepthDescription =
-				sceneImages->shadowDepth->Resource()->GetDesc();
+			const auto shadowDepthDescription = sceneImages->shadowDepth->Resource()->GetDesc();
 
 			Extent2D shadowExtent;
-			shadowExtent.width =
-				static_cast<std::uint32_t>(shadowDepthDescription.Width);
-			shadowExtent.height = shadowDepthDescription.Height;
+			shadowExtent.width = static_cast<std::uint32_t>(shadowDepthDescription.Width);
+			shadowExtent.height = static_cast<std::uint32_t>(shadowDepthDescription.Height);
 
 			shadowPass.extentOverride = shadowExtent;
 
 			// Select using the light View rather than reusing Camera visibility.
-			const PassRecordingInputs shadowRecordingInputs =
-				MakePassRecordingInputs(frame, shadowPass);
+			const PassRecordingInputs shadowRecordingInputs = MakePassRecordingInputs(frame, shadowPass);
 
 			detail::RenderList shadowObjectIndices;
 
-			const Result shadowSelectionResult = context.SelectAvailableDraws(
-				shadowPass.renderView.drawSettings,
-				shadowObjectIndices,
-				shadowRecordingInputs);
+			const Result shadowSelectionResult =
+				context.SelectAvailableDraws(
+					shadowPass.renderView.drawSettings,
+					shadowObjectIndices,
+					shadowRecordingInputs);
 
 			if (!shadowSelectionResult.IsSuccess())
 			{
 				return shadowSelectionResult;
 			}
 
-			// Include only selected Objects that cast shadows.
-
 			for (std::size_t objectIndex : shadowObjectIndices)
 			{
-				const bool castsShadow = frame.objects[objectIndex].castShadow;
-
-				if (!castsShadow)
-				{
-					continue;
-				}
 
 				PlannedDraw shadowDraw;
 				shadowDraw.objectIndex = objectIndex;
@@ -523,9 +515,7 @@ Result FrameRenderer::BuildPassPlan(
 
 			// Finalize Shadow inputs for the following SceneHDR and Auxiliary passes.
 			sceneShadowInputs.texture = sceneImages->shadowDepth.get();
-			sceneShadowInputs.viewProjection =
-				shadowPass.renderView.view *
-				shadowPass.renderView.projection;
+			sceneShadowInputs.viewProjection = shadowPass.renderView.view * shadowPass.renderView.projection;
 			sceneShadowInputs.enabled = true;
 
 			plannedPasses.push_back(std::move(shadowPass));
@@ -590,13 +580,14 @@ Result FrameRenderer::BuildPassPlan(
 		// 4. Plan Auxiliary passes associated with this Scene View.
 		// --------------------------------------------------------------------
 
-		const Result sceneAuxiliaryResult = AppendAuxiliaryPasses(
-			frame,
-			context,
-			viewIndex,
-			sceneImages,
-			sceneShadowInputs,
-			plannedPasses);
+		const Result sceneAuxiliaryResult =
+			AppendAuxiliaryPasses(
+				frame,
+				context,
+				viewIndex,
+				sceneImages,
+				sceneShadowInputs,
+				plannedPasses);
 
 		if (!sceneAuxiliaryResult.IsSuccess())
 		{
@@ -609,8 +600,7 @@ Result FrameRenderer::BuildPassPlan(
 
 		PlannedPass displayPass;
 		displayPass.sourceViewIndex = viewIndex;
-		displayPass.name =
-			"DisplayTransform[" + std::to_string(sourceView.id) + "]";
+		displayPass.name = "DisplayTransform[" + std::to_string(sourceView.id) + "]";
 
 		// Render to the output specified by the source View.
 		displayPass.renderView = sourceView;
@@ -625,10 +615,11 @@ Result FrameRenderer::BuildPassPlan(
 		displayPass.renderView.drawSettings = displayDrawSettings;
 
 		// Use a private ID so the internal Object cannot enter normal Scene selection.
-		const Result displayIdReservationResult = ReserveInternalId(
-			frame,
-			plannedPasses,
-			displayPass.renderView.id);
+		const Result displayIdReservationResult =
+			ReserveInternalId(
+				frame,
+				plannedPasses,
+				displayPass.renderView.id);
 
 		if (!displayIdReservationResult.IsSuccess())
 		{
@@ -677,8 +668,7 @@ Result FrameRenderer::BuildPassPlan(
 
 		PlannedPass overlayPass;
 		overlayPass.sourceViewIndex = viewIndex;
-		overlayPass.name =
-			"Overlay[" + std::to_string(sourceView.id) + "]";
+		overlayPass.name = "Overlay[" + std::to_string(sourceView.id) + "]";
 
 		overlayPass.renderView = sourceView;
 		overlayPass.renderView.drawSettings.depthOverride =
@@ -718,17 +708,17 @@ Result FrameRenderer::BuildPassPlan(
 			overlayPass.colorLoad = graph::AttachmentLoadOp::Load;
 		}
 
-		const PassRecordingInputs overlayRecordingInputs =
-			MakePassRecordingInputs(frame, overlayPass);
+		const PassRecordingInputs overlayRecordingInputs = MakePassRecordingInputs(frame, overlayPass);
 
 		detail::RenderList overlayObjectIndices;
 
 		// SelectViewDraws preserves input order without sorting Overlay Objects.
-		const Result overlaySelectionResult = SelectViewDraws(
-			frame,
-			overlayRecordingInputs,
-			context,
-			overlayObjectIndices);
+		const Result overlaySelectionResult =
+			SelectViewDraws(
+				frame,
+				overlayRecordingInputs,
+				context,
+				overlayObjectIndices);
 
 		if (!overlaySelectionResult.IsSuccess())
 		{
@@ -754,13 +744,14 @@ Result FrameRenderer::BuildPassPlan(
 
 		detail::SceneOutputImages* overlaySceneImages = nullptr;
 
-		const Result overlayAuxiliaryResult = AppendAuxiliaryPasses(
-			frame,
-			context,
-			viewIndex,
-			overlaySceneImages,
-			overlayShadowInputs,
-			plannedPasses);
+		const Result overlayAuxiliaryResult =
+			AppendAuxiliaryPasses(
+				frame,
+				context,
+				viewIndex,
+				overlaySceneImages,
+				overlayShadowInputs,
+				plannedPasses);
 
 		if (!overlayAuxiliaryResult.IsSuccess())
 		{

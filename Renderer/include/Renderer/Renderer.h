@@ -11,6 +11,7 @@
 #include "RenderTargetTexture.h"
 #include "Renderer/FrameRenderData.h"
 #include "RenderResult.h"
+#include "StructuredBufferDesc.h"
 
 //---------------------------------------------------------------------------
 // Renderer class
@@ -80,6 +81,12 @@ public:
 	// Later imprementaion....
 	// RENDERER_API Result UpdatePipeline(PipelineHandle handle, const PipelineDesc& desc);
 	// RENDERER_API Result UpdateShader(ShaderHandle handle, const ShaderDesc& desc);
+
+	// Structured buffer APIs for creating, updating, and destroying structured buffers.
+	RENDERER_API ResourceRegistrationResult<BufferHandle> CreateStructuredBuffer(const StructuredBufferDesc& desc);
+	RENDERER_API Result UpdateStructuredBuffer(BufferHandle handle, std::span<const std::byte> data);
+	RENDERER_API Result DestroyStructuredBuffer(BufferHandle handle);
+
 
 	// Query accepted local Bounds and matching Content revision as an owned value.
 	// Destroy-requested registrations reject new queries; upload readiness is unrelated.

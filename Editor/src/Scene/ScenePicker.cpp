@@ -1,5 +1,5 @@
 #include "Engine/Actor/ActorHierarchyActivity.h"
-#include "Engine/Graphics/RenderingConversions.h"
+#include "Engine/Core/Math/Math.h"
 #include "ScenePicker.h"
 #include "Engine/Actor/Actor.h"
 #include "Engine/Scene/SceneBase.h"
@@ -119,20 +119,14 @@ std::optional<ScenePickHit> ScenePicker::Pick(
 
 			if (spriteRenderer->GetBillboardType() != BillboardType::None)
 			{
-				auto rendererWorld = EngineRendering::ToRenderer(pickMatrix);
-				const auto cameraPosition = EngineRendering::ToRenderer(cameraInfo.position);
-				const auto cameraUp = EngineRendering::ToRenderer(cameraInfo.up);
-
 				if (spriteRenderer->GetBillboardType() == BillboardType::Spherical)
 				{
-					rendererWorld = rendererWorld.ToBillboard(cameraPosition, cameraUp);
+					pickMatrix = pickMatrix.ToBillboard(cameraInfo.position, cameraInfo.up);
 				}
 				else
 				{
-					rendererWorld = rendererWorld.ToCylindricalBillboard(cameraPosition, cameraUp);
+					pickMatrix = pickMatrix.ToCylindricalBillboard(cameraInfo.position, cameraInfo.up);
 				}
-
-				pickMatrix = EngineRendering::FromRenderer(rendererWorld);
 			}
 
 			hit = IntersectSprite(

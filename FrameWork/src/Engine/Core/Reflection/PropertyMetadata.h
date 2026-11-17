@@ -1,8 +1,11 @@
 #pragma once
+
 #include "Engine/Actor/ActorReference.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Core/Reflection/PropertyPath.h"
 #include "Engine/Resource/AssetReference.h"
+#include "Engine/Animation/AnimationClipSlots.h"
+
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -41,6 +44,7 @@ enum class PropertyLogicalType
 	Enum,
 	ActorReference,
 	AssetReference,
+	AnimationClipSlots,
 };
 
 // Format setting of how enum values are serialized and deserialized.
@@ -113,7 +117,8 @@ using PropertyValue = std::variant<
 	Quaternion,
 	EnumPropertyValue,
 	ActorReference,
-	AssetReferenceValue>;
+	AssetReferenceValue,
+	AnimationClipSlots>;
 
 // Represents a single enumration with its declaration name and underlying value.
 struct EnumEntry
@@ -406,6 +411,10 @@ namespace PropertyMetadataDetail
 		{
 			return PropertyLogicalType::AssetReference;
 		}
+		else if constexpr (std::is_same_v<T, AnimationClipSlots>)
+		{
+			return PropertyLogicalType::AnimationClipSlots;
+		}
 		else
 		{
 			return PropertyLogicalType::Invalid;
@@ -434,7 +443,9 @@ namespace PropertyMetadataDetail
 	{
 		using T = CleanType<ValueType>;
 
+		//---------------------------------------------------------------------
 		// Directly supported types are copied into the PropertyValue variant.
+		//---------------------------------------------------------------------
 		if constexpr (std::is_same_v<T, bool> ||
 			std::is_same_v<T, float> ||
 			std::is_same_v<T, double> ||
@@ -443,7 +454,8 @@ namespace PropertyMetadataDetail
 			std::is_same_v<T, Vector3> ||
 			std::is_same_v<T, Vector4> ||
 			std::is_same_v<T, Quaternion> ||
-			std::is_same_v<T, ActorReference>)
+			std::is_same_v<T, ActorReference> ||
+			std::is_same_v<T, AnimationClipSlots>)
 		{
 			outValue = source;
 			return true;
@@ -454,7 +466,10 @@ namespace PropertyMetadataDetail
 			return true;
 		}
 
-		// Types that are not directly supported by PropertyValue are converted to a compatible type.
+		//---------------------------------------------------------------------
+		// Types that are not directly supported by PropertyValue
+		// are converted to a compatible type. (integers and enums)
+		//---------------------------------------------------------------------
 		else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
 		{// Signed integers to int64_t
 			outValue = static_cast<std::int64_t>(source);
@@ -491,7 +506,8 @@ namespace PropertyMetadataDetail
 			std::is_same_v<T, Vector3> ||
 			std::is_same_v<T, Vector4> ||
 			std::is_same_v<T, Quaternion> ||
-			std::is_same_v<T, ActorReference>)
+			std::is_same_v<T, ActorReference> ||
+			std::is_same_v<T, AnimationClipSlots>)
 		{
 			const T* value = std::get_if<T>(&source); // Conversion from PropertyValue to T, if the type matches.
 

@@ -33,15 +33,21 @@ Result CreateRootSignature(
 
 		if (errorBlob)
 		{
-			errorMessage += " Error: " + std::string(static_cast<const char*>(errorBlob->GetBufferPointer()),
-                                                     errorBlob->GetBufferSize());
+			errorMessage +=
+				" Error: " +
+				std::string(static_cast<const char*>(
+					errorBlob->GetBufferPointer()),
+					errorBlob->GetBufferSize());
 		}
 
 		return MakeApiFailure(errorMessage.c_str(), hr);
 	}
 
-	hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
-                                     IID_PPV_ARGS(&output));
+	hr = device->CreateRootSignature(
+		0,
+		signatureBlob->GetBufferPointer(),
+		signatureBlob->GetBufferSize(),
+		IID_PPV_ARGS(&output));
 
 	if (FAILED(hr))
 	{
@@ -90,6 +96,25 @@ std::vector<VertexField> VertexFields()
 	fields.push_back(VertexField{"TANGENT", 3, offset(&vertex.tangent), DXGI_FORMAT_R32G32B32_FLOAT});
 	fields.push_back(VertexField{"COLOR", 4, offset(&vertex.color), DXGI_FORMAT_R32G32B32A32_FLOAT});
 
+	static_assert(sizeof(SkinVertex) == 32);
+
+	VertexField boneIndices{};
+	boneIndices.semantic = "BLENDINDICES";
+	boneIndices.count = 4;
+	boneIndices.offset = static_cast<UINT>(offsetof(SkinVertex, boneIndices));
+	boneIndices.format = DXGI_FORMAT_R32G32B32A32_UINT;
+	boneIndices.inputSlot = 1;
+	boneIndices.componentType = VertexComponentType::UInt32;
+	fields.push_back(boneIndices);
+
+	VertexField boneWeights{};
+	boneWeights.semantic = "BLENDWEIGHT";
+	boneWeights.count = 4;
+	boneWeights.offset = static_cast<UINT>(offsetof(SkinVertex, boneWeights));
+	boneWeights.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	boneWeights.inputSlot = 1;
+	fields.push_back(boneWeights);
+
 	return fields;
 }
 
@@ -125,11 +150,14 @@ Result BuildRootSignature(
 	std::vector<D3D12_ROOT_PARAMETER> rootParameters;
 	std::vector<D3D12_DESCRIPTOR_RANGE> descriptorRanges;
 
-	const auto textureCount = std::count_if(inputs.layout->resources.begin(), inputs.layout->resources.end(),
-											[](const auto& x)
-											{
-												return !x.sampler; // Count only texture resources, not samplers.
-											});
+	const auto textureCount =
+		std::count_if(
+			inputs.layout->resources.begin(), inputs.layout->resources.end(),
+			[](const auto& x)
+			{
+				// Count only texture resources, not samplers.
+				return x.kind != ShaderResourceKind::Sampler;
+			});
 
 	descriptorRanges.reserve(textureCount);
 	rootParameters.reserve(inputs.layout->constants.size() + textureCount);
@@ -146,7 +174,7 @@ Result BuildRootSignature(
 
 	for (const auto& resource : inputs.layout->resources)
 	{
-		if (resource.sampler)
+		if (resource.kind == ShaderResourceKind::Sampler)
 		{
 			continue;
 		}
@@ -173,7 +201,7 @@ Result BuildRootSignature(
 
 	for (const auto& sampler : inputs.layout->resources)
 	{
-		if (!sampler.sampler)
+		if (sampler.kind != ShaderResourceKind::Sampler)
 		{
 			continue;
 		}
@@ -226,8 +254,12 @@ Result BuildInputLayout(
 
 	for (const auto& required : vertexInputs)
 	{
-		auto field = std::find_if(fields.begin(), fields.end(),
-                                  [&](const VertexField& f) { return f.semantic == required.semantic; });
+		auto field = std::find_if(
+			fields.begin(), fields.end(),
+			[&](const VertexField& f)
+			{
+				return f.semantic == required.semantic;
+			});
 
 		if (field == fields.end())
 		{
@@ -238,7 +270,7 @@ Result BuildInputLayout(
 		element.SemanticName = field->semantic;
 		element.SemanticIndex = 0;
 		element.Format = field->format;
-		element.InputSlot = 0;
+		element.InputSlot = field->inputSlot;
 		element.AlignedByteOffset = field->offset;
 		element.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 		element.InstanceDataStepRate = 0;
@@ -283,25 +315,31 @@ Result BuildPipeline(ID3D12Device* device, const PipelineBuildInputs& inputs, Pi
 	psoDesc.SampleDesc.Count = inputs.output->sampleCount;
 	psoDesc.SampleDesc.Quality = inputs.output->sampleQuality;
 	psoDesc.RasterizerState.FillMode =
-		inputs.description->fill == FillMode::Wireframe ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
+		inputs.description->fill == FillMode::Wireframe ?
+		D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
 
-	auto cullMode = inputs.description->cull == CullMode::None
-						? D3D12_CULL_MODE_NONE
-						: (inputs.description->cull == CullMode::Back ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_FRONT);
+	auto cullMode = inputs.description->cull == 
+		CullMode::None? D3D12_CULL_MODE_NONE
+		: (inputs.description->cull == CullMode::Back ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_FRONT);
 
 	psoDesc.RasterizerState.CullMode = cullMode;
 	psoDesc.RasterizerState.DepthClipEnable = TRUE;
 	psoDesc.DepthStencilState.DepthEnable = inputs.depth != DepthMode::Disabled;
 
 	auto depthWriteMask =
-		inputs.depth == DepthMode::ReadWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+		inputs.depth == DepthMode::ReadWrite ?
+		D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 
 	psoDesc.DepthStencilState.DepthWriteMask = depthWriteMask;
 	psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	psoDesc.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
 	psoDesc.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-	psoDesc.DepthStencilState.FrontFace = {D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP,
-                                           D3D12_COMPARISON_FUNC_ALWAYS};
+	psoDesc.DepthStencilState.FrontFace = {
+		D3D12_STENCIL_OP_KEEP,
+		D3D12_STENCIL_OP_KEEP,
+		D3D12_STENCIL_OP_KEEP,
+		D3D12_COMPARISON_FUNC_ALWAYS};
+
 	psoDesc.DepthStencilState.BackFace = psoDesc.DepthStencilState.FrontFace;
 
 	auto& blendDesc = psoDesc.BlendState.RenderTarget[0];

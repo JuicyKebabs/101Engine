@@ -113,6 +113,27 @@ Result ValidateGeometryDesc(const GeometryDesc& desc)
 		return { false, "Index array is too large." };
 	}
 
+	if (!desc.skinVertices.empty() && desc.skinVertices.size() != desc.vertices.size())
+	{
+		return { false, "Skin vertex count must match the Geometry vertex count." };
+	}
+
+	if (desc.skinVertices.size() > maxBufferBytes / sizeof(SkinVertex))
+	{
+		return { false, "Skin vertex array is too large." };
+	}
+
+	for (const auto& skinVertex : desc.skinVertices)
+	{
+		for (float weight : skinVertex.boneWeights)
+		{
+			if (!std::isfinite(weight) || weight < 0.0f)
+			{
+				return { false, "Geometry has an invalid skin weight." };
+			}
+		}
+	}
+
 	for (const auto& vertex : desc.vertices)
 	{
 		const float values[]{
@@ -159,6 +180,7 @@ Result CopyGeometryCpuData(const GeometryDesc& desc, GeometryCpuData& output)
 		GeometryCpuData copied;
 		copied.topology = desc.topology;
 		copied.vertices.assign(desc.vertices.begin(), desc.vertices.end());
+		copied.skinVertices.assign(desc.skinVertices.begin(), desc.skinVertices.end());
 
 		if (!desc.indices.empty())
 		{
@@ -176,6 +198,7 @@ Result CopyGeometryCpuData(const GeometryDesc& desc, GeometryCpuData& output)
 		output.boundsCenter = copied.boundsCenter;
 		output.boundsRadius = copied.boundsRadius;
 		output.vertices.swap(copied.vertices);
+		output.skinVertices.swap(copied.skinVertices);
 		output.indices.swap(copied.indices);
 		output.topology = copied.topology;
 		return {};

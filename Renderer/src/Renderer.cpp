@@ -53,7 +53,9 @@ namespace
 using GeometryUploadTarget = detail::GeometryUploadTarget;
 using TextureUploadTarget = detail::TextureUploadTarget;
 
-template <class Target, class Upload> struct UploadWork
+// A helper struct to manage the upload of resources to the GPU.
+template <class Target, class Upload>
+struct UploadWork
 {
 	Target target;
 	std::unique_ptr<Upload> upload;
@@ -105,6 +107,23 @@ struct Renderer::impl
 	Result UploadSelectedResources(
 		std::span<const GeometryUploadTarget> geometries,
 		std::span<const TextureUploadTarget> textures);
+
+	Result CheckBufferMutation() const
+	{
+		Result available = CheckPublicCall();
+
+		if (!available.IsSuccess())
+		{
+			return available;
+		}
+
+		if (backend.HasPendingFrameResources())
+		{
+			return detail::Fail("Renderer : Buffer update or destruction requires completed frame resources.");
+		}
+
+		return {};
+	}
 
 	Result ObserveFailure(Result result)
 	{
@@ -1026,23 +1045,6 @@ ResourceRegistrationResult<MaterialHandle> Renderer::RegisterMaterial(const Mate
 		});
 }
 
-// Resource updates run outside Render, after the previous GPU work has completed.
-Result Renderer::UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc)
-{
-	return ResourceCall(
-		[&]()
-		{
-			auto result = m_pImpl->CheckPublicCall();
-
-			if (!result.IsSuccess())
-			{
-				return result;
-			}
-
-			return m_pImpl->drawResources->UpdateMaterial(handle, desc);
-		});
-}
-
 // The Registry copies the caller's CPU arrays before returning.
 // GPU preparation is deferred; its failure will diagnose/skip the accepted revision rather than use old
 // pixels/vertices.
@@ -1078,6 +1080,80 @@ Result Renderer::UpdateTexture(TextureHandle handle, const TextureDesc& desc)
 
 			return m_pImpl->drawResources->Update(handle, desc);
 		});
+}
+
+// Resource updates run outside Render, after the previous GPU work has completed.
+Result Renderer::UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc)
+{
+	return ResourceCall(
+		[&]()
+		{
+			auto result = m_pImpl->CheckPublicCall();
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			return m_pImpl->drawResources->UpdateMaterial(handle, desc);
+		});
+}
+
+ResourceRegistrationResult<BufferHandle> Renderer::CreateStructuredBuffer(const StructuredBufferDesc& desc)
+{
+	// Call create function within a ResourceCall to
+	// handle exceptions and check for renderer state.
+	return ResourceCall(
+		[&]()
+		{
+			ResourceRegistrationResult<BufferHandle> created;
+			created.result = m_pImpl->CheckPublicCall();
+
+			if (!created.result.IsSuccess())
+			{
+				return created;
+			}
+
+			// Create the structured buffer using the backend and return the result.
+			created = m_pImpl->drawResources->CreateStructuredBuffer(m_pImpl->backend, desc);
+			created.result = m_pImpl->ObserveFailure(std::move(created.result));
+
+			return created;
+		}
+	);
+}
+
+Result Renderer::UpdateStructuredBuffer(BufferHandle handle, std::span<const std::byte> data)
+{
+	// Call update function within a ResourceCall to
+	// handle exceptions and check for renderer state.
+	return ResourceCall(
+		[&]()
+		{
+			Result available = m_pImpl->CheckBufferMutation();
+
+			if (!available.IsSuccess())
+			{
+				return available;
+			}
+
+			Result updated = m_pImpl->drawResources->UpdateStructuredBuffer(m_pImpl->backend, handle, data);
+			return m_pImpl->ObserveFailure(std::move(updated));
+		});
+}
+
+Result Renderer::DestroyStructuredBuffer(BufferHandle handle)
+{
+	// Checking for buffer mutation to avoid destroying
+	// a buffer while it is still in use by the GPU.
+	Result available = m_pImpl->CheckBufferMutation();
+
+	if (!available.IsSuccess())
+	{
+		return available;
+	}
+
+	return m_pImpl->drawResources->Destroy(handle);
 }
 
 Result Renderer::GetGeometryData(GeometryHandle handle, GeometryData& output) const

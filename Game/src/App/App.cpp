@@ -285,7 +285,7 @@ void App::Render()
 	// Constructs FrameRenderData from the current Scene and its Components.
 	if (SceneBase* scene = m_scenes->GetCurrentScene())
 	{
-		if (!scene->AppendRenderData(frame, output))
+		if (!CheckRenderingResult(scene->AppendRenderData(frame, output)))
 		{
 			return;
 		}

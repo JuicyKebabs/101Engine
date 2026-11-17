@@ -1,7 +1,3 @@
-// Select, prepare, declare and record from the same original Object indices.
-// Resolve current registry revisions under single-threaded, non-reentrant Render sequencing.
-// Keep Graph ownership connections here and delegate packing/PSO/draw preparation to DrawResources.
-
 #include "FrameDrawContext.h"
 #include "SceneOutputResources.h"
 #include "Failure.h"
@@ -21,8 +17,12 @@ namespace
 // ponytail: linear deduplication keeps small Frame lists simple; index by Content if profiling warrants it.
 template <class Target> void AddUniqueUploadTarget(std::vector<Target>& targets, const Target& candidate)
 {
-	const auto existing = std::find_if(targets.begin(), targets.end(), [&candidate](const Target& target)
-                                       { return target.content == candidate.content; });
+	const auto existing = std::find_if(
+		targets.begin(), targets.end(),
+		[&candidate](const Target& target)
+		{
+			return target.content == candidate.content;
+		});
 
 	if (existing == targets.end())
 	{
@@ -95,8 +95,11 @@ bool FrameDrawContext::SelectExplicitDraw(std::size_t index, const DrawSettings&
 }
 
 Result FrameDrawContext::ResolveObjectInputs(
-	std::size_t objectIndex, const DrawSettings& settings, DrawInputs& inputs,
-	DrawDiagnostic& diagnostic, const PassRecordingInputs& pass)
+	std::size_t objectIndex,
+	const DrawSettings& settings,
+	DrawInputs& inputs,
+	DrawDiagnostic& diagnostic,
+	const PassRecordingInputs& pass)
 {
 	if (objectIndex >= m_frame.objects.size())
 	{
@@ -104,17 +107,57 @@ Result FrameDrawContext::ResolveObjectInputs(
 	}
 
 	const RenderObject& sourceObject = m_frame.objects[objectIndex];
-	Result resolved = m_resources.ResolveDrawInputs(sourceObject, objectIndex, settings, inputs, diagnostic);
+	
+	// Override the pipeline with the shadow pipeline
+	// if the Object has a Material with an explicit shadow Pipeline.
+	DrawSettings selectedSettings = settings;	// Settings considering the Material's shadow Pipeline, if any.
+	bool usesExplicitShadowPipeline = false;
 
+	if (pass.shadowPass)
+	{
+		const auto* material = m_resources.FindContent(sourceObject.material);
+
+		if (material && material->desc.shadowPipeline)
+		{
+			selectedSettings.pipelineOverride = material->desc.shadowPipeline;
+			selectedSettings.depthOverride.reset();
+			usesExplicitShadowPipeline = true;
+		}
+	}
+	
+	// Resolve the DrawInputs for the Object with the selected settings.
+	Result resolved =
+		m_resources.ResolveDrawInputs(
+			sourceObject,
+			objectIndex,
+			selectedSettings,
+			inputs,
+			diagnostic);
+
+	// Resolve structured buffer resources for its binding input.
+	if (resolved.IsSuccess())
+	{
+		resolved = m_resources.ValidateStructuredBuffers(inputs.material->desc, inputs.pipeline->layout);
+
+		if (!resolved.IsSuccess())
+		{
+			return resolved;
+		}
+	}
+
+	// Check that the texture parameters in the Material match the requirements of the Pipeline.
 	if (resolved.IsSuccess())
 	{
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler || requirement.name == "RendererShadowMap")
+			// Skip the non texture requirement and built-in shadow map texture.
+			if (requirement.kind != ShaderResourceKind::Texture2D ||
+				requirement.name == "RendererShadowMap")
 			{
 				continue;
 			}
 
+			// Get parameter from material with its name.
 			const MaterialParameter* parameter = FindMaterialParameter(inputs.material->desc, requirement.name);
 
 			if (!parameter)
@@ -146,8 +189,15 @@ Result FrameDrawContext::ResolveObjectInputs(
 		return resolved;
 	}
 
-	// Keep the first diagnostic and original public handles. This local copy is
-	// used for one resolution only; it is not a second persistent Object array.
+	// The default Pipeline cannot substitute for explicitly requested deformation.
+	if (usesExplicitShadowPipeline)
+	{
+		return resolved;
+	}
+
+	// Keep the first diagnostic and original public handles.
+	// This local copy is used for one resolution only;
+	// it is not a second persistent Object array.
 	const std::string originalFailure = resolved.message;
 	DrawDiagnostic sourceDiagnostic = diagnostic;
 	RenderObject effectiveObject = sourceObject;
@@ -193,11 +243,23 @@ Result FrameDrawContext::ResolveObjectInputs(
 		return Fail(originalFailure + " Fallback is incompatible: " + resolved.message);
 	}
 
+	resolved = m_resources.ValidateStructuredBuffers(inputs.material->desc, inputs.pipeline->layout);
+
+	if (!resolved.IsSuccess())
+	{
+		return resolved;
+	}
+
 	inputs.geometrySubstituted = geometryUnavailable;
-	AddDiagnostic(sourceDiagnostic, "Fallback",
-                  originalFailure + (geometryUnavailable ? " Using resident Geometry and Material."
-                                                         : " Using resident Material on the original Geometry."),
-                  pass);
+
+	AddDiagnostic(
+		sourceDiagnostic, "Fallback",
+		originalFailure + 
+		(geometryUnavailable ?
+			  " Using resident Geometry and Material."
+			: " Using resident Material on the original Geometry."),
+		pass);
+
 	return {};
 }
 
@@ -253,6 +315,11 @@ Result FrameDrawContext::SelectAvailableDraws(
 
 		const auto& object = m_frame.objects[objectIndex];
 
+		if (pass.shadowPass && !object.castShadow)
+		{
+			continue;
+		}
+
 		if (view && !object.targetViews.empty())
 		{
 			if (std::find(object.targetViews.begin(), object.targetViews.end(), view->id) == object.targetViews.end())
@@ -261,13 +328,14 @@ Result FrameDrawContext::SelectAvailableDraws(
 			}
 		}
 
-		// Resolve before culling: fallback selection must not be hidden by the
-		// original Geometry's obsolete Bounds. A submitted revision mismatch
-		// intentionally performs extra work instead of losing visible geometry.
+		// Check if the object can be culled with bounds.
+		// Procedural objects may have no bounds, but they can still be culled with a procedural bounds function.
+		// A geometry which has valid bounds (no revision mismatch) can be culled with those bounds.
 		const GeometryContent* boundsGeometry = m_resources.FindContent(object.geometry);
 		const bool proceduralBounds = object.procedural.has_value();
-		const bool currentGeometryBounds = boundsGeometry && object.boundsGeometryRevision != 0 &&
-                                           boundsGeometry->revision == object.boundsGeometryRevision;
+		const bool currentGeometryBounds =
+			boundsGeometry && object.boundsGeometryRevision != 0 &&
+			boundsGeometry->revision == object.boundsGeometryRevision;
 		const bool mayCull = proceduralBounds || currentGeometryBounds;
 
 		if (view && object.bounds && mayCull)
@@ -280,8 +348,12 @@ Result FrameDrawContext::SelectAvailableDraws(
 			{
 				DrawDiagnostic diagnostic;
 				diagnostic.objectIndex = objectIndex;
-				AddDiagnostic(diagnostic, "Cull", "Bounds must be a finite world sphere with nonnegative radius.",
-                              pass);
+
+				AddDiagnostic(
+					diagnostic,
+					"Cull", "Bounds must be a finite world sphere with nonnegative radius.",
+					pass);
+
 				continue;
 			}
 
@@ -294,6 +366,7 @@ Result FrameDrawContext::SelectAvailableDraws(
 
 			bool outside = false;
 
+			// Check each of the six frustum planes against the bounding sphere.
 			for (int planeIndex = 0; planeIndex < 6; ++planeIndex)
 			{
 				const int column = planeIndex / 2;
@@ -320,8 +393,7 @@ Result FrameDrawContext::SelectAvailableDraws(
 				plane.w = coefficients[3];
 
 				const float length = std::sqrt(plane.x * plane.x + plane.y * plane.y + plane.z * plane.z);
-				const float distance =
-					plane.x * bounds.center.x + plane.y * bounds.center.y + plane.z * bounds.center.z + plane.w;
+				const float distance = plane.x * bounds.center.x + plane.y * bounds.center.y + plane.z * bounds.center.z + plane.w;
 
 				if (distance < -bounds.radius * length)
 				{
@@ -407,7 +479,7 @@ Result FrameDrawContext::CollectUploadTargets(
 
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler)
+			if (requirement.kind != ShaderResourceKind::Texture2D)
 			{
 				continue;
 			}
@@ -467,7 +539,7 @@ bool FrameDrawContext::AreResourcesPrepared(const DrawInputs& inputs, const Pass
 
 	for (const auto& requirement : inputs.pipeline->layout.resources)
 	{
-		if (requirement.sampler)
+		if (requirement.kind != ShaderResourceKind::Texture2D)
 		{
 			continue;
 		}
@@ -604,7 +676,7 @@ Result FrameDrawContext::DeclareDrawResources(
 
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler)
+			if (requirement.kind != ShaderResourceKind::Texture2D)
 			{
 				continue;
 			}
@@ -729,7 +801,7 @@ Result FrameDrawContext::CheckOutputReadOrder(
 
 		for (const auto& requirement : inputs.pipeline->layout.resources)
 		{
-			if (requirement.sampler)
+			if (requirement.kind != ShaderResourceKind::Texture2D)
 			{
 				continue;
 			}
@@ -807,7 +879,7 @@ Result FrameDrawContext::EstimateRequirements(
 
 		for (const auto& resource : inputs.pipeline->layout.resources)
 		{
-			if (!resource.sampler)
+			if (resource.kind != ShaderResourceKind::Sampler)
 			{
 				++descriptors;
 			}

@@ -4,7 +4,6 @@
 #include "Engine/Component/RectTransform.h"
 #include "Engine/Component/Transform.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
-#include <cmath>
 
 std::unique_ptr<TypeMetadata> PersistentComponentMetadata::Transform(std::string stableTypeName)
 {

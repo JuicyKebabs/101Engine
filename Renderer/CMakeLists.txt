@@ -32,6 +32,8 @@ add_library(101Renderer SHARED
     src/Backend/DepthTexture.cpp
     src/Backend/DrawPacket.cpp
     src/Backend/PipelineGpu.cpp
+    src/Backend/StructuredBufferGpuData.cpp
+    src/Resource/BufferRegistry.cpp
 )
 
 # ディレクトリのインクルード
@@ -124,7 +126,13 @@ file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/FullscreenVS.hlsl" BUILTIN_FULLSC
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayTransform.hlsli" DISPLAY_FUNCTIONS)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/shaders/DisplayPS.hlsl" BUILTIN_DISPLAY)
 string(REPLACE "#include \"DisplayTransform.hlsli\"" "${DISPLAY_FUNCTIONS}" BUILTIN_DISPLAY "${BUILTIN_DISPLAY}")
+
 configure_file(src/BuiltinShaderSources.h.in generated/BuiltinShaderSources.h @ONLY)
+
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    shaders/Common.hlsli shaders/MaterialParams.hlsli shaders/MeshVS.hlsl shaders/FullscreenVS.hlsl
-    shaders/DisplayTransform.hlsli shaders/DisplayPS.hlsl)
+    shaders/Common.hlsli
+    shaders/MaterialParams.hlsli
+    shaders/MeshVS.hlsl
+    shaders/FullscreenVS.hlsl
+    shaders/DisplayTransform.hlsli
+    shaders/DisplayPS.hlsl)

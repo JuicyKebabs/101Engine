@@ -20,10 +20,13 @@ Result PrepareGeometryUpload(
 
 	constexpr auto maxBytes = (std::numeric_limits<std::uint32_t>::max)();
 
+	//--------------------------------------------------
 	// Validate the CPU geometry data
+	//--------------------------------------------------
 	if (cpuData.topology != PrimitiveTopology::TriangleList ||
 		cpuData.vertices.empty() ||
 		cpuData.vertices.size() > maxBytes / sizeof(MeshVertex) ||
+		cpuData.skinVertices.size() > maxBytes / sizeof(SkinVertex) ||
 		cpuData.indices.size() > maxBytes / sizeof(std::uint32_t))
 	{
 		return  { false, "Geometry CPU data is not supported." };
@@ -35,7 +38,7 @@ Result PrepareGeometryUpload(
 		auto uploadData = std::make_unique<GeometryUploadData>();
 
 		// Helper lambda to prepare a buffer for upload and GPU usage
-		const auto prepareBuffer = 
+		const auto prepareBuffer =
 			[&](std::span<const std::byte> bytes, Buffer& destination, Buffer& source) -> Result
 			{
 				Result result = destination.Initialize(device, bytes.size(), BufferMemory::Default);
@@ -55,7 +58,9 @@ Result PrepareGeometryUpload(
 				return source.Write(bytes);
 			};
 
+		//--------------------------------------------------
 		// Prepare vertex buffer
+		//--------------------------------------------------
 		Result result = prepareBuffer(
 			std::as_bytes(std::span{ cpuData.vertices }),
 			gpuData->vertices,
@@ -71,7 +76,29 @@ Result PrepareGeometryUpload(
 		gpuData->vertexView.SizeInBytes = static_cast<UINT>(gpuData->vertices.GetSize());
 		gpuData->vertexView.StrideInBytes = static_cast<UINT>(sizeof(MeshVertex));
 
-		// Prepare index buffer if indices are provided
+		//--------------------------------------------------
+		// Prepare skin vertex buffer (if needed).
+		//--------------------------------------------------
+		if (!cpuData.skinVertices.empty())
+		{
+			result = prepareBuffer(
+				std::as_bytes(std::span{ cpuData.skinVertices }),
+				gpuData->skinVertices,
+				uploadData->skinVertices);
+
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
+
+			gpuData->skinVertexView.BufferLocation = gpuData->skinVertices.GetNativeResource()->GetGPUVirtualAddress();
+			gpuData->skinVertexView.SizeInBytes = static_cast<UINT>(gpuData->skinVertices.GetSize());
+			gpuData->skinVertexView.StrideInBytes = static_cast<UINT>(sizeof(SkinVertex));
+		}
+
+		//--------------------------------------------------
+		// Prepare index buffer if indices are provided.
+		//--------------------------------------------------
 		if (!cpuData.indices.empty())
 		{
 			result = prepareBuffer(
@@ -90,7 +117,9 @@ Result PrepareGeometryUpload(
 			gpuData->indexView.Format = DXGI_FORMAT_R32_UINT;
 		}
 
-		// Move to the output after successful preparation
+		//--------------------------------------------------
+		// Move to the output after successful preparation.
+		//--------------------------------------------------
 		gpuOutput = std::move(gpuData);
 		uploadOutput = std::move(uploadData);
 		return {};
@@ -106,6 +135,8 @@ Result RecordGeometryUpload(
 	const GeometryGpuData& gpuData,
 	const GeometryUploadData& uploadData)
 {
+	// lambda to validate the buffer pair for upload.
+	// Both buffers must be valid and have the same size.
 	const auto validPair = [](const Buffer& destination, const Buffer& source) -> bool
 		{
 			bool validResources = destination.GetNativeResource() && source.GetNativeResource();
@@ -113,25 +144,39 @@ Result RecordGeometryUpload(
 			return validResources && validSizes;
 		};
 
+	// The CommandContext must be recording (not while GPU executing) to accept copy commands.
 	if (!context.IsRecording())
 	{
 		return { false, "RecordGeometryUpload: CommandContext is not recording." };
 	}
 
+	// Validate the buffer pairs for vertex.
 	if (!validPair(gpuData.vertices, uploadData.vertices))
 	{
 		return { false, "RecordGeometryUpload: Invalid vertex buffer pair." };
 	}
 
+	// Validate the buffer pairs for skin vertices.
+	const bool hasSkinVertices = gpuData.skinVertexView.BufferLocation != 0;
+	const bool validSkinPair = validPair(gpuData.skinVertices, uploadData.skinVertices);
+	const bool skinBuffersPresent = gpuData.skinVertices.GetNativeResource() || uploadData.skinVertices.GetNativeResource();
+
+	if ((hasSkinVertices && !validSkinPair) || (!hasSkinVertices && skinBuffersPresent))
+	{
+		return { false, "Geometry skin vertex upload buffers are inconsistent." };
+	}
+
+	// Validate the buffer pairs for indices.
 	const bool indexed = gpuData.indexCount != 0;
 	const bool validIndexPair = validPair(gpuData.indices, uploadData.indices);
 	const bool indexBuffersPresent = gpuData.indices.GetNativeResource() || uploadData.indices.GetNativeResource();
-	
+
 	if ((indexed && !validIndexPair) || (!indexed && indexBuffersPresent))
 	{
 		return { false, "Geometry index upload buffers are inconsistent." };
 	}
 
+	// Helper lambda to record a copy and transition for a buffer pair.
 	const auto recordBuffer =
 		[&](const Buffer& destination, const Buffer& source, D3D12_RESOURCE_STATES finalState)->Result
 		{
@@ -147,12 +192,14 @@ Result RecordGeometryUpload(
 				return result;
 			}
 
+			// End the state as a destination of a copy.
 			return context.TransitionResource(
 				destination.GetNativeResource(),
 				D3D12_RESOURCE_STATE_COPY_DEST,
 				finalState);
 		};
 
+	// Record the vertex buffer copy and transition.
 	Result result = recordBuffer(
 		gpuData.vertices,
 		uploadData.vertices,
@@ -161,6 +208,20 @@ Result RecordGeometryUpload(
 	if (!result.IsSuccess())
 	{
 		return result;
+	}
+
+	// Record the skin vertex buffer copy and transition if present.
+	if (hasSkinVertices)
+	{
+		result = recordBuffer(
+			gpuData.skinVertices,
+			uploadData.skinVertices,
+			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
 	}
 
 	if (indexed)

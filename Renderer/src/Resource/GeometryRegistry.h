@@ -250,8 +250,9 @@ public:
 	// Render forbids replacement while any command preparation borrows exist.
 	bool OwnsContent(GeometryHandle handle, const GeometryContent* content) const noexcept
 	{
-		return content && m_slots.ValidateRegistered(handle) == ResourceHandleValidationResult::Success &&
-               m_contents[handle.slotIndex].get() == content;
+		return content &&
+			m_slots.ValidateRegistered(handle) == ResourceHandleValidationResult::Success &&
+			m_contents[handle.slotIndex].get() == content;
 	}
 
 	void CollectDestroyed()
@@ -284,8 +285,8 @@ private:
 		}
 	}
 
-	GeometrySlotTable m_slots;                                // State management for geometry resources.
-	std::vector<std::unique_ptr<GeometryContent>> m_contents; // Actual geometry data (CPU data and GPU resources).
+	GeometrySlotTable m_slots;									// State management for geometry resources.
+	std::vector<std::unique_ptr<GeometryContent>> m_contents;	// Actual geometry data (CPU data and GPU resources).
 };
 
 } // namespace rendering::detail

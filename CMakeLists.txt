@@ -22,6 +22,11 @@ option(ENGINE101_BUILD_RENDERER_SANDBOX "Build RendererSandbox" ON)
 
 add_subdirectory(Renderer)
 
+if(ENGINE101_BUILD_ENGINE OR ENGINE101_BUILD_RENDERER_SANDBOX)
+    add_subdirectory(RendererAssets)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/FrameWork/cmake/FrameworkShaderAssets.cmake")
+endif()
+
 # Renderer専用実行環境
 if(ENGINE101_BUILD_RENDERER_SANDBOX)
     add_subdirectory(RendererSandbox)
@@ -29,7 +34,6 @@ endif()
 
 # Engine実行環境
 if(ENGINE101_BUILD_ENGINE)
-    add_subdirectory(RendererAssets)
     add_subdirectory(Framework)
     add_subdirectory(Game/GameCode)
     add_subdirectory(Editor)

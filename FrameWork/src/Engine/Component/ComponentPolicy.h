@@ -6,6 +6,7 @@ class RectTransform;
 class Behaviour;
 class Camera;
 class MeshRenderer;
+class SkinnedMeshRenderer;
 class SpriteRenderer;
 class UIRenderer;
 class UIImage;
@@ -77,6 +78,13 @@ struct ComponentPolicy<Camera>
 
 template<>
 struct ComponentPolicy<MeshRenderer>
+{
+	static constexpr ComponentCardinality cardinality = ComponentCardinality::UniqueOptional;
+	static constexpr ComponentFamily family = ComponentFamily::Renderer;
+};
+
+template<>
+struct ComponentPolicy<SkinnedMeshRenderer>
 {
 	static constexpr ComponentCardinality cardinality = ComponentCardinality::UniqueOptional;
 	static constexpr ComponentFamily family = ComponentFamily::Renderer;

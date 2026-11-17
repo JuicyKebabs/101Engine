@@ -1,0 +1,424 @@
+{
+  "durationSeconds": 1.0,
+  "formatVersion": 1,
+  "nodes": [
+    {
+      "name": "RootNode",
+      "parentIndex": -1
+    },
+    {
+      "name": "dai",
+      "parentIndex": 0
+    },
+    {
+      "name": "hole",
+      "parentIndex": 0
+    },
+    {
+      "name": "wall_capacitor",
+      "parentIndex": 0
+    },
+    {
+      "name": "pCube10",
+      "parentIndex": 0
+    },
+    {
+      "name": "polySurface1_$AssimpFbx$_RotationPivot",
+      "parentIndex": 0
+    },
+    {
+      "name": "polySurface1_$AssimpFbx$_RotationPivotInverse",
+      "parentIndex": 5
+    },
+    {
+      "name": "polySurface1_$AssimpFbx$_ScalingPivot",
+      "parentIndex": 6
+    },
+    {
+      "name": "polySurface1_$AssimpFbx$_ScalingPivotInverse",
+      "parentIndex": 7
+    },
+    {
+      "name": "polySurface1",
+      "parentIndex": 8
+    },
+    {
+      "name": "pCylinder2",
+      "parentIndex": 0
+    },
+    {
+      "name": "pCylinder3",
+      "parentIndex": 0
+    },
+    {
+      "name": "pCylinder4",
+      "parentIndex": 0
+    },
+    {
+      "name": "pCylinder5",
+      "parentIndex": 0
+    },
+    {
+      "name": "group1_$AssimpFbx$_Translation",
+      "parentIndex": 0
+    },
+    {
+      "name": "group1_$AssimpFbx$_RotationPivot",
+      "parentIndex": 14
+    },
+    {
+      "name": "group1_$AssimpFbx$_Rotation",
+      "parentIndex": 15
+    },
+    {
+      "name": "group1_$AssimpFbx$_RotationPivotInverse",
+      "parentIndex": 16
+    },
+    {
+      "name": "group1_$AssimpFbx$_ScalingPivot",
+      "parentIndex": 17
+    },
+    {
+      "name": "group1_$AssimpFbx$_Scaling",
+      "parentIndex": 18
+    },
+    {
+      "name": "group1_$AssimpFbx$_ScalingPivotInverse",
+      "parentIndex": 19
+    },
+    {
+      "name": "group1",
+      "parentIndex": 20
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_Translation",
+      "parentIndex": 21
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_RotationOffset",
+      "parentIndex": 22
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_RotationPivot",
+      "parentIndex": 23
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_Rotation",
+      "parentIndex": 24
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_RotationPivotInverse",
+      "parentIndex": 25
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_ScalingOffset",
+      "parentIndex": 26
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_ScalingPivot",
+      "parentIndex": 27
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_Scaling",
+      "parentIndex": 28
+    },
+    {
+      "name": "pCube12_$AssimpFbx$_ScalingPivotInverse",
+      "parentIndex": 29
+    },
+    {
+      "name": "pCube12",
+      "parentIndex": 30
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_Translation",
+      "parentIndex": 21
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_RotationOffset",
+      "parentIndex": 32
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_RotationPivot",
+      "parentIndex": 33
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_Rotation",
+      "parentIndex": 34
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_RotationPivotInverse",
+      "parentIndex": 35
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_ScalingOffset",
+      "parentIndex": 36
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_ScalingPivot",
+      "parentIndex": 37
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_Scaling",
+      "parentIndex": 38
+    },
+    {
+      "name": "pCube11_$AssimpFbx$_ScalingPivotInverse",
+      "parentIndex": 39
+    },
+    {
+      "name": "pCube11",
+      "parentIndex": 40
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_Translation",
+      "parentIndex": 21
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_RotationOffset",
+      "parentIndex": 42
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_RotationPivot",
+      "parentIndex": 43
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_Rotation",
+      "parentIndex": 44
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_RotationPivotInverse",
+      "parentIndex": 45
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_ScalingOffset",
+      "parentIndex": 46
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_ScalingPivot",
+      "parentIndex": 47
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_Scaling",
+      "parentIndex": 48
+    },
+    {
+      "name": "pCube14_$AssimpFbx$_ScalingPivotInverse",
+      "parentIndex": 49
+    },
+    {
+      "name": "pCube14",
+      "parentIndex": 50
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_Translation",
+      "parentIndex": 21
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_RotationOffset",
+      "parentIndex": 52
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_RotationPivot",
+      "parentIndex": 53
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_Rotation",
+      "parentIndex": 54
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_RotationPivotInverse",
+      "parentIndex": 55
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_ScalingOffset",
+      "parentIndex": 56
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_ScalingPivot",
+      "parentIndex": 57
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_Scaling",
+      "parentIndex": 58
+    },
+    {
+      "name": "pCube13_$AssimpFbx$_ScalingPivotInverse",
+      "parentIndex": 59
+    },
+    {
+      "name": "pCube13",
+      "parentIndex": 60
+    },
+    {
+      "name": "pCylinder1",
+      "parentIndex": 21
+    }
+  ],
+  "sourceModelGuid": "{677F165C-0785-4FDB-8D80-66F12F911B3C}",
+  "tracks": [
+    {
+      "nodeIndex": 14,
+      "positions": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            0.0,
+            0.0,
+            -0.0
+          ]
+        },
+        {
+          "timeSeconds": 1.0,
+          "value": [
+            0.0,
+            0.0,
+            -0.0
+          ]
+        }
+      ],
+      "rotations": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            -0.0,
+            -0.0,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "scales": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "nodeIndex": 16,
+      "positions": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            0.0,
+            0.0,
+            -0.0
+          ]
+        }
+      ],
+      "rotations": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            -0.0,
+            -0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "timeSeconds": 0.24861111110389394,
+          "value": [
+            0.0,
+            0.9999619126319885,
+            -0.0,
+            0.008726561442017555
+          ]
+        },
+        {
+          "timeSeconds": 0.4972222222077879,
+          "value": [
+            0.0,
+            0.017452457919716835,
+            -0.0,
+            -0.9998477101325989
+          ]
+        },
+        {
+          "timeSeconds": 0.7458333333116818,
+          "value": [
+            -0.0,
+            -0.9996573328971863,
+            0.0,
+            -0.02617678791284561
+          ]
+        },
+        {
+          "timeSeconds": 0.9944444444372272,
+          "value": [
+            -0.0,
+            -0.034899599850177765,
+            0.0,
+            0.9993908405303955
+          ]
+        },
+        {
+          "timeSeconds": 1.0,
+          "value": [
+            -0.0,
+            1.7484555314695172e-07,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "scales": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "nodeIndex": 19,
+      "positions": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            0.0,
+            0.0,
+            -0.0
+          ]
+        }
+      ],
+      "rotations": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            -0.0,
+            -0.0,
+            0.0,
+            1.0
+          ]
+        }
+      ],
+      "scales": [
+        {
+          "timeSeconds": 0.0,
+          "value": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "timeSeconds": 1.0,
+          "value": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    }
+  ]
+}

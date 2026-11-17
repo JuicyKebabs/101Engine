@@ -2,6 +2,8 @@
 
 #include "Renderer/Renderer.h"
 #include "Engine/Core/GUID/Guid.h"
+#include "Engine/Core/Math/Math.h"
+
 #include <array>
 #include <filesystem>
 
@@ -15,14 +17,21 @@ public:
 	explicit EditorRenderAssets(rendering::Renderer& renderer) : m_renderer(renderer) {}
 	~EditorRenderAssets();
 
-	rendering::Result Initialize(const std::filesystem::path& shaderDirectory);
+	// Receives the frame work built-in skinned vertex shader,
+	// which is used for the selection mask auxiliary pass.
+	rendering::Result Initialize(
+		const std::filesystem::path& shaderDirectory,
+		rendering::ShaderHandle skinnedVertex);
+
 	rendering::Result Resize(std::uint32_t width, std::uint32_t height);
+
 	rendering::Result AppendSelection(
 		rendering::FrameRenderData& frame,
 		SceneBase& scene,
 		const Guid& selectedActor,
 		rendering::ViewId sourceView,
 		bool canvasPreview);
+
 	void AppendColliders(rendering::FrameRenderData& frame, SceneBase& scene, rendering::ViewId sourceView);
 
 	rendering::RenderTargetTextureHandle SceneColor() const { return m_sceneColor; }
@@ -41,6 +50,7 @@ private:
 	rendering::Result AppendMaskMaterial(
 		const rendering::MaterialDesc& source,
 		bool alphaMask,
+		bool  skinned,
 		std::size_t slot,
 		rendering::MaterialHandle& output);
 
@@ -55,11 +65,12 @@ private:
 	rendering::RenderTargetTextureHandle m_sceneColor;
 	rendering::RenderTargetTextureHandle m_selectionMask;
 
-	std::uint32_t m_width = 1280;
-	std::uint32_t m_height = 720;
+	std::uint32_t m_width = 1920;
+	std::uint32_t m_height = 1080;
 
 	std::array<rendering::ShaderHandle, 6> m_shaders{};
 	std::array<rendering::PipelineHandle, 4> m_pipelines{};
+	rendering::PipelineHandle m_skinnedMaskPipeline;
 	std::array<rendering::GeometryHandle, 3> m_debugGeometry{};
 	std::vector<rendering::MaterialHandle> m_maskMaterials;
 

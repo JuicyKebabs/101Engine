@@ -1,7 +1,3 @@
-// Final native validation and recording for both Geometry and procedural draws.
-// Bind the required state explicitly, including scissor and removal of old VB/IB bindings.
-// No resource preparation, ownership transfer or late capacity growth belongs at this point.
-
 #include "CommandContext.h"
 #include "Failure.h"
 
@@ -110,11 +106,11 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 		}
 	}
 
-	for (const auto& texture : packet.textures)
+	for (const auto& srv : packet.srvs)
 	{
-		if (!texture.descriptor.ptr)
+		if (!srv.descriptor.ptr)
 		{
-			return detail::Fail("RecordDraw: Texture Descriptor is null.");
+			return detail::Fail("RecordDraw: Srv Descriptor is null.");
 		}
 	}
 
@@ -130,13 +126,14 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 		m_commandList->SetGraphicsRootConstantBufferView(constant.rootIndex, constant.gpuAddress);
 	}
 
-	for (const auto& texture : packet.textures)
+	for (const auto& srv : packet.srvs)
 	{
-		m_commandList->SetGraphicsRootDescriptorTable(texture.rootIndex, texture.descriptor);
+		m_commandList->SetGraphicsRootDescriptorTable(srv.rootIndex, srv.descriptor);
 	}
 
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	// Set slot 0 with normal vertices or empty vertex view.
 	if (packet.requiresVertexBuffer)
 	{
 		m_commandList->IASetVertexBuffers(0, 1, &packet.vertices);
@@ -149,6 +146,10 @@ Result CommandContext::RecordDraw(const DrawPacket& packet)
 		m_commandList->IASetVertexBuffers(0, 1, &emptyVertices);
 	}
 
+	// Set slot 1 for skin vetrices (if not skinned, empty view is set).
+	m_commandList->IASetVertexBuffers(1, 1, &packet.skinVertices);
+
+	// Record draw command based on if vertices are indexed.
 	if (packet.kind == DrawKind::Indexed)
 	{
 		m_commandList->IASetIndexBuffer(&packet.indices);

@@ -1,8 +1,6 @@
-#include "Engine/Actor/ActorHierarchyActivity.h"
 #include "EditorRenderAssets.h"
-
+#include "Engine/Actor/ActorHierarchyActivity.h"
 #include "EditorShaderLoader.h"
-#include "Engine/Graphics/RenderingConversions.h"
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Component/Collider.h"
 
@@ -62,6 +60,12 @@ EditorRenderAssets::~EditorRenderAssets()
 		}
 	}
 
+	if (m_skinnedMaskPipeline != rendering::PipelineHandle{})
+	{
+		const auto result = m_renderer.DestroyPipeline(m_skinnedMaskPipeline);
+		(void)result;
+	}
+
 	for (const auto handle : m_shaders)
 	{
 		if (handle != rendering::ShaderHandle{})
@@ -106,7 +110,9 @@ rendering::Result EditorRenderAssets::RegisterPipeline(
 	return registration.result;
 }
 
-rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& shaderDirectory)
+rendering::Result EditorRenderAssets::Initialize(
+	const std::filesystem::path& shaderDirectory,
+	rendering::ShaderHandle skinnedVertex)
 {
 	//---------------------------------------------------------------------------------
 	// Register vertex shaders (Renderer built-in) for the editor's auxiliary passes.
@@ -170,6 +176,24 @@ rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& sh
 	}
 
 	//---------------------------------------------------------------------------------
+	// Register a pipeline for selection mask rendering of skinned meshes.
+	// This is a special case because the vertex shader is provided externally.
+	//---------------------------------------------------------------------------------
+	rendering::PipelineDesc skinnedMask;
+	skinnedMask.vertexShader = skinnedVertex;
+	skinnedMask.pixelShader = m_shaders[vsCount];
+	skinnedMask.depth = rendering::DepthMode::Disabled;
+	skinnedMask.cull = rendering::CullMode::None;
+	const auto skinnedMaskRegistration = m_renderer.RegisterPipeline(skinnedMask);
+	
+	if (!skinnedMaskRegistration.result.IsSuccess())
+	{
+		return skinnedMaskRegistration.result;
+	}
+	
+	m_skinnedMaskPipeline = skinnedMaskRegistration.handle;
+
+	//---------------------------------------------------------------------------------
 	// Create render target textures for scene color.
 	//---------------------------------------------------------------------------------
 	rendering::RenderTargetTextureDesc target;
@@ -221,7 +245,7 @@ rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& sh
 	//---------------------------------------------------------------------------------
 	rendering::MaterialDesc colliderDescription;
 	colliderDescription.pipeline = m_pipelines[3];
-	rendering::Vector4 identity;
+	Vector4 identity;
 	identity.x = 1;
 	identity.y = 1;
 	AddParameter(colliderDescription, "LocalQuadTransform", identity);
@@ -252,12 +276,12 @@ rendering::Result EditorRenderAssets::Initialize(const std::filesystem::path& sh
 		for (const Vertex& source : mesh.vertices)
 		{
 			rendering::MeshVertex vertex;
-			vertex.position = EngineRendering::ToRenderer(source.position);
-			vertex.normal = EngineRendering::ToRenderer(source.normal);
+			vertex.position = source.position;
+			vertex.normal = source.normal;
 			vertex.uv.x = source.uv.x;
 			vertex.uv.y = source.uv.y;
-			vertex.tangent = EngineRendering::ToRenderer(source.tangent);
-			vertex.color = EngineRendering::ToRenderer(source.color);
+			vertex.tangent = source.tangent;
+			vertex.color = source.color;
 			vertices.push_back(vertex);
 		}
 
@@ -306,6 +330,7 @@ rendering::Result EditorRenderAssets::Resize(std::uint32_t width, std::uint32_t 
 rendering::Result EditorRenderAssets::AppendMaskMaterial(
 	const rendering::MaterialDesc& source,
 	bool alphaMask,
+	bool  skinned,
 	std::size_t slot,
 	rendering::MaterialHandle& output)
 {
@@ -318,6 +343,14 @@ rendering::Result EditorRenderAssets::AppendMaskMaterial(
 
 	rendering::MaterialDesc description = source;
 	description.pipeline = m_pipelines[alphaMask ? 1 : 0];
+	description.shadowPipeline.reset();
+
+	// Override the pipeline for skinned meshes,
+	// which use a different vertex shader for skinning.
+	if (skinned)
+	{
+		description.pipeline = m_skinnedMaskPipeline;
+	}
 
 	if (!alphaMask)
 	{
@@ -390,6 +423,7 @@ rendering::Result EditorRenderAssets::AppendSelection(
 		auto prepared = AppendMaskMaterial(
 			record.material->description,
 			record.alphaMask,
+			record.skinned,
 			materialSlot++,
 			maskMaterial);
 
@@ -453,7 +487,7 @@ void EditorRenderAssets::AppendColliderObject(
 	rendering::RenderObject object;
 	object.geometry = geometry;
 	object.material = m_colliderMaterial;
-	object.world = EngineRendering::ToRenderer(world);
+	object.world = world;
 	object.targetViews.push_back(pass.id);
 	rendering::AuxiliaryDraw draw;
 	draw.objectIndex = frame.objects.size();

@@ -41,6 +41,7 @@ struct PassRecordingInputs
 	ShadowInputs shadow;
 	ViewId viewId = 0;
 	std::string passName;
+	bool shadowPass = false;
 	std::optional<Extent2D> extentOverride;
 	Extent2D extent;
 	Viewport viewport;
@@ -52,6 +53,7 @@ struct PlannedPass
 	RenderView renderView;
 	std::string name;
 	std::vector<PlannedDraw> draws;
+	bool shadowPass = false;
 	backend::DepthTexture* depth = nullptr;
 	ShadowInputs shadow;
 	std::optional<Extent2D> extentOverride;

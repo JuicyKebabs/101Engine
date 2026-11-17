@@ -50,8 +50,8 @@ struct AssetTypeOf<SceneAsset>
 };
 
 // Type-erased value used while an AssetReference passes through Reflection.
-// Recognize thr type by the expectedType field.
-// guid is the unique ID of the asset with no type information
+// Recognize the type by the expectedType field.
+// Guid is the unique ID of the asset with no type information
 struct AssetReferenceValue
 {
 	Guid guid;

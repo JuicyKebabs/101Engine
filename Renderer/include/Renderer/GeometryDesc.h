@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <span>
+#include <array>
 
 //------------------------------------------------------------------------
 // Geometry description
@@ -27,11 +28,18 @@ struct MeshVertex
 	Vector4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
+struct SkinVertex
+{
+	std::array<std::uint32_t, 4> boneIndices{};
+	std::array<float, 4> boneWeights{};
+};
+
 struct GeometryDesc
 {
 	std::span<const MeshVertex> vertices;
 	std::span<const uint32_t> indices;
 	PrimitiveTopology topology = PrimitiveTopology::TriangleList;
+	std::span<const SkinVertex> skinVertices{};
 };
 
 }

@@ -1,6 +1,7 @@
 #include "ActorImprintPropertyOverrides.h"
 #include "Engine/Core/Debug/Debug.h"
 #include "Engine/Core/Reflection/PropertyMetadata.h"
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -237,23 +238,33 @@ namespace
 		case PropertyLogicalType::Bool:
 			return value.is_boolean() ? RepresentationCompatibility::Compatible
 									  : RepresentationCompatibility::Incompatible;
+
 		case PropertyLogicalType::SignedInteger:
+
 		case PropertyLogicalType::UnsignedInteger:
 			return value.is_number_integer() ? RepresentationCompatibility::Compatible
 											 : RepresentationCompatibility::Incompatible;
+
 		case PropertyLogicalType::Float:
+
 		case PropertyLogicalType::Double:
 			return value.is_number_float() ? RepresentationCompatibility::Compatible
 										   : RepresentationCompatibility::Incompatible;
+
 		case PropertyLogicalType::String:
 			return value.is_string() ? RepresentationCompatibility::Compatible
 									 : RepresentationCompatibility::Incompatible;
+
 		case PropertyLogicalType::Vector2:
+
 		case PropertyLogicalType::Vector3:
+
 		case PropertyLogicalType::Vector4:
+
 		case PropertyLogicalType::Quaternion:
 			return value.is_array() ? RepresentationCompatibility::Compatible
 									: RepresentationCompatibility::Incompatible;
+
 		case PropertyLogicalType::Enum:
 		{
 			const auto format = property.GetEnumSerializationFormat();
@@ -263,13 +274,19 @@ namespace
 				return RepresentationCompatibility::InvalidMetadata;
 			}
 
-			const bool compatible = *format == EnumSerializationFormat::Name
-				? value.is_string() : value.is_number_integer();
+			const bool compatible =
+				*format == EnumSerializationFormat::Name
+				? value.is_string()
+				: value.is_number_integer();
+
 			return compatible ? RepresentationCompatibility::Compatible : RepresentationCompatibility::Incompatible;
 		}
+
 		case PropertyLogicalType::ActorReference:
 			return value.is_null() || value.is_object()
-				? RepresentationCompatibility::Compatible : RepresentationCompatibility::Incompatible;
+				? RepresentationCompatibility::Compatible
+				: RepresentationCompatibility::Incompatible;
+		
 		case PropertyLogicalType::AssetReference:
 			if (property.GetAssetType() == AssetType::Unknown)
 			{
@@ -277,7 +294,14 @@ namespace
 			}
 
 			return value.is_null() || value.is_string()
-				? RepresentationCompatibility::Compatible : RepresentationCompatibility::Incompatible;
+				? RepresentationCompatibility::Compatible
+				: RepresentationCompatibility::Incompatible;
+		
+		case PropertyLogicalType::AnimationClipSlots:
+			return value.is_object() 
+				? RepresentationCompatibility::Compatible
+				: RepresentationCompatibility::Incompatible;
+
 		default:
 			return RepresentationCompatibility::InvalidMetadata;
 		}
@@ -286,8 +310,7 @@ namespace
 	bool NormalizeEntries(std::vector<ActorImprintPropertyOverrideEntry>& properties)
 	{
 		std::sort(
-			properties.begin(),
-			properties.end(),
+			properties.begin(), properties.end(),
 			[](const auto& left, const auto& right)
 			{
 				return left.path.ToString() < right.path.ToString();
@@ -323,8 +346,7 @@ namespace
 	}
 }
 
-bool ActorImprintPropertyOverrides::ValidateStructure(
-	const ActorImprintPropertyOverrideTarget& overrides)
+bool ActorImprintPropertyOverrides::ValidateStructure(const ActorImprintPropertyOverrideTarget& overrides)
 {
 	if (overrides.targetLocalObjectId == InvalidLocalObjectId)
 	{
@@ -382,8 +404,7 @@ bool ActorImprintPropertyOverrides::Diff(
 		}
 
 		std::sort(
-			properties.begin(),
-			properties.end(),
+			properties.begin(), properties.end(),
 			[](const auto* left, const auto* right)
 			{
 				return left->GetPath().ToString() < right->GetPath().ToString();
@@ -455,12 +476,12 @@ bool ActorImprintPropertyOverrides::Merge(
 
 		auto properties = overrides.properties;
 		std::sort(
-			properties.begin(),
-			properties.end(),
+			properties.begin(), properties.end(),
 			[](const auto& left, const auto& right)
 			{
 				return left.path.ToString() < right.path.ToString();
 			});
+
 		json completed = normalizedDefault;
 		std::vector<ActorImprintPropertyOverrideEntry> applied;
 		ActorImprintPropertyOverrideMigration migration;

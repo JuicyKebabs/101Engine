@@ -46,21 +46,13 @@ constexpr ShaderStages operator|(ShaderStages a, ShaderStages b) noexcept
 // Do not change the order of this enum, because it is used in shader reflection and material parameter value type.
 enum class ValueType
 {
-	Float,
-	Float2,
-	Float3,
-	Float4,
-	Int,
-	Int2,
-	Int3,
-	Int4,
-	UInt,
-	UInt2,
-	UInt3,
-	UInt4,
+	Float, Float2, Float3, Float4,
+	Int, Int2, Int3, Int4,
+	UInt, UInt2, UInt3, UInt4,
 	Bool,
 	Matrix4x4,
-	Texture2D
+	Texture2D,
+	StructuredBuffer
 };
 
 // Material parameter value type, which can be one of the following types:
@@ -69,10 +61,16 @@ enum class ValueType
 // Adding this public alternative requires clients to rebuild against the matching header/DLL.
 using MaterialValue = 
 	std::variant<
-		float, Vector2, Vector3, Vector4, std::int32_t, std::array<std::int32_t, 2>,
-		std::array<std::int32_t, 3>, std::array<std::int32_t, 4>, std::uint32_t,
-		std::array<std::uint32_t, 2>, std::array<std::uint32_t, 3>,
-		std::array<std::uint32_t, 4>, bool, Matrix4x4, TextureHandle, RenderTargetTextureHandle>;
+		float,
+		Vector2, Vector3, Vector4,
+		std::int32_t,
+		std::array<std::int32_t, 2>, std::array<std::int32_t, 3>, std::array<std::int32_t, 4>,
+		std::uint32_t, std::array<std::uint32_t, 2>, std::array<std::uint32_t, 3>, std::array<std::uint32_t, 4>,
+		bool,
+		Matrix4x4,
+		TextureHandle,
+		RenderTargetTextureHandle,
+		BufferHandle>;
 
 struct MaterialParameter
 {
@@ -98,12 +96,28 @@ struct ShaderConstantBuffer
 	std::vector<ShaderVariable> variables;	// List of variables in the constant buffer.
 };
 
+// Declaration of resources which can be reflected from HLSL. 
+enum class ShaderResourceKind
+{
+	Texture2D,
+	StructuredBuffer,
+	Sampler
+};
+
 struct ShaderResourceBinding
 {
-	std::string name;							// Name of the resource binding in the shader.
-	std::uint32_t binding = 0;					// Register number (e.g., t0, s0, etc.)
-	bool sampler = false;						// True if the resource is a sampler, false if it is a texture.
-	ShaderStages stages = ShaderStages::None;	// Shader stages that use this resource binding.
+	std::string name;											// Name of the resource binding in the shader.
+	std::uint32_t binding = 0;									// Register number (e.g., t0, s0, etc.)
+	ShaderResourceKind kind = ShaderResourceKind::Texture2D;	// Kind of this a reflected resource.
+	ShaderStages stages = ShaderStages::None;					// Shader stages that use this resource binding.
+
+	std::uint32_t elementStride = 0; // Reflected byte stride for a StructuredBuffer
+};
+
+enum class VertexComponentType
+{
+	Float32,
+	UInt32
 };
 
 struct ShaderVertexInput
@@ -111,6 +125,7 @@ struct ShaderVertexInput
 	std::string semantic;
 	std::uint32_t index = 0;
 	std::uint32_t components = 0;
+	VertexComponentType componentType = VertexComponentType::Float32;
 };
 
 struct ShaderMetadata
@@ -185,6 +200,10 @@ struct MaterialDesc
 {
 	PipelineHandle pipeline;
 	std::vector<MaterialParameter> parameters;
+
+	// Optional opaque, depth-writing Pipeline for the built-in Shadow pass.
+	// It uses the same Material parameters as the color draw.
+	std::optional<PipelineHandle> shadowPipeline;
 };
 
 //----------------------------------------------------------------
@@ -196,6 +215,7 @@ struct DrawSettings
 {
 	std::optional<MaterialHandle> materialOverride;
 	std::optional<PipelineHandle> pipelineOverride;
+
 	// A View can disable attachment testing without replacing every Material's
 	// Shader/blend intent, e.g. Canvas preview of mixed Mesh/Sprite renderers.
 	std::optional<DepthMode> depthOverride;

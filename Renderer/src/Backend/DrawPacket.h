@@ -28,7 +28,7 @@ struct ConstantBinding
 	D3D12_GPU_VIRTUAL_ADDRESS gpuAddress{};
 };
 
-struct TextureBinding
+struct SrvBinding
 {
 	UINT rootIndex = 0;
 	D3D12_GPU_DESCRIPTOR_HANDLE descriptor{};
@@ -39,16 +39,21 @@ struct DrawPacket
 	ID3D12PipelineState* pipeline = nullptr;
 	ID3D12RootSignature* root = nullptr;
 	ID3D12DescriptorHeap* heap = nullptr;
+
 	D3D12_VERTEX_BUFFER_VIEW vertices{};
+	D3D12_VERTEX_BUFFER_VIEW skinVertices{};
 	D3D12_INDEX_BUFFER_VIEW indices{};
+
 	DrawKind kind = DrawKind::Vertices;
 	UINT count = 0;	// Number of vertices or indices to draw.
 	UINT first = 0;
 	INT baseVertex = 0;
 	bool requiresVertexBuffer = true;
+
 	D3D12_RECT scissor{};
+
 	std::vector<ConstantBinding> constants;
-	std::vector<TextureBinding> textures;
+	std::vector<SrvBinding> srvs;
 };
 
 }
