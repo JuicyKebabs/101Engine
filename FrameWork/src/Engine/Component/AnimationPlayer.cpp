@@ -431,6 +431,7 @@ void AnimationPlayer::ProcessAnimation(float deltaTime)
 
 	const bool validDelta = std::isfinite(deltaTime) && deltaTime >= 0.0f;
 	const bool advance = m_isPlaying && !playback.holdFirstPose && validDelta;
+	
 	const double frameStep = advance ? static_cast<double>(deltaTime) : 0.0;
 	const double clipStep = frameStep * m_speed;
 
