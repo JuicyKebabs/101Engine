@@ -137,6 +137,9 @@ DXGI_FORMAT NativeFormat(graph::GraphTextureFormat format)
 	case graph::GraphTextureFormat::D32_Float:
 		return DXGI_FORMAT_D32_FLOAT;
 
+	case graph::GraphTextureFormat::R32_UInt:
+		return DXGI_FORMAT_R32_UINT;
+
 	default:
 		return DXGI_FORMAT_UNKNOWN;
 	}
@@ -285,6 +288,21 @@ Result BuildInputLayout(
 
 Result BuildPipeline(ID3D12Device* device, const PipelineBuildInputs& inputs, PipelineGpuData& output)
 {
+	if (inputs.pixel && !inputs.output->colorFormats.empty())
+	{
+		const bool targetIsUInt = inputs.output->colorFormats.front() == graph::GraphTextureFormat::R32_UInt;
+
+		if (inputs.pixel->metadata.colorOutputIsUInt != targetIsUInt)
+		{
+			return { false, "BuildPipeline: pixel output type does not match the RTV format." };
+		}
+
+		if (targetIsUInt && inputs.description->blend != BlendMode::Opaque)
+		{
+			return { false, "BuildPipeline: integer color targets require blending to be disabled." };
+		}
+	}
+
 	Result prepared = BuildRootSignature(device, inputs, output.rootSignature);
 
 	if (!prepared.IsSuccess())

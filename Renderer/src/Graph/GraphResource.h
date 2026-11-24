@@ -59,7 +59,8 @@ enum class GraphTextureFormat
 	RGBA8_UNorm,
 	RGBA8_sRGB,
 	RGBA16_Float,
-	D32_Float
+	D32_Float,
+	R32_UInt,
 };
 
 enum class TextureDimension
@@ -91,7 +92,8 @@ enum class TextureUsage
 	ShaderRead,
 	ColorAttachment,
 	DepthAttachment,
-	Present
+	Present,
+	CopySource
 };
 
 struct TextureUse
@@ -107,6 +109,7 @@ enum class TextureStateKind
 	ShaderRead,
 	ColorAttachment,
 	DepthWrite,
+	CopySource
 };
 
 struct TextureState

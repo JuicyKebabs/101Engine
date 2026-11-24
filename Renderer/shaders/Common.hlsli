@@ -56,6 +56,22 @@ struct PixelInput
     float3 worldPosition : TEXCOORD1;
 };
 
+// Common function to transform a mesh vertex to pixel input,
+PixelInput TransformMeshVertex(VertexInput input, float4 localQuadTransform)
+{
+    float3 localPosition = input.position;
+    localPosition.xy = localPosition.xy * localQuadTransform.xy + localQuadTransform.zw;
+    
+    PixelInput output;
+    float4 worldPosition = mul(float4(localPosition, 1), world);
+    output.position = mul(mul(worldPosition, view), projection);
+    output.worldPosition = worldPosition.xyz;
+    output.normal = mul(float4(input.normal, 0), normalMatrix).xyz;
+    output.uv = input.uv;
+    output.color = input.color * tint;
+    return output;
+}
+
 // Shared by visible textured draws and selection-alpha masks. Keep UV out of
 // RenderObject: Material owns the logical parameters used by these shaders.
 float2 ApplyMaterialUV(float2 inputUV, float4 transform)

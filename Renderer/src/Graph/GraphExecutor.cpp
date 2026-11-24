@@ -69,6 +69,10 @@ Result DescribeTexture(const GraphTextureBinding& texture, ImportedTextureDesc& 
 		desc.format = GraphTextureFormat::D32_Float;
 		break;
 
+	case DXGI_FORMAT_R32_UINT:
+		desc.format = GraphTextureFormat::R32_UInt;
+		break;
+
 	default:
 		return {false, "unsupported native View format"};
 	}
@@ -193,6 +197,10 @@ Result ToNativeState(TextureState state, D3D12_RESOURCE_STATES& output)
 
 		return {};
 
+	case TextureStateKind::CopySource:
+		output = D3D12_RESOURCE_STATE_COPY_SOURCE;
+		return {};
+
 	default:
 		return {false, "unknown texture state."};
 	}
@@ -298,9 +306,14 @@ Result GraphExecutor::ImportTexture(
 // Prepare commit storage now so ownership/state publication after Signal cannot allocate or throw.
 Result GraphExecutor::Preflight(const CompiledPlan& plan, std::vector<StateCommit>& commits) const
 {
+	// Check the all passes have at most one color attachment, or no attachments if it is a copy pass.
 	for (const auto& pass : plan.passes)
 	{
-		if (pass.colors.size() > 1 || (pass.colors.empty() && !pass.depth))
+		const bool copy = 
+			pass.uses.size() == 1 &&
+			pass.uses.front().use.usage == TextureUsage::CopySource;
+
+		if (pass.colors.size() > 1 || (pass.colors.empty() && !pass.depth && !copy)) 
 		{
 			return {false, "GraphExecutor: pass has no attachments or too many color attachments."};
 		}
@@ -560,53 +573,56 @@ Result GraphExecutor::Execute()
 				return fail(std::move(result));
 			}
 
-			// Collect the RTVs for the color attachments of this pass.
-			std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvs;
-
-			for (const auto& color : compiled.colors)
+			if (!compiled.colors.empty() || compiled.depth.has_value())
 			{
-				rtvs.push_back(FindBinding(color.texture)->Rtv());
-			}
+				// Collect the RTVs for the color attachments of this pass.
+				std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvs;
 
-			// Determine the extent of the render target for this pass.
-			const auto extent = compiled.colors.empty() ? compiled.depth->texture : compiled.colors.front().texture;
-
-			const auto* desc = m_graph.FindTexture(extent);
-
-			D3D12_CPU_DESCRIPTOR_HANDLE dsv =
-				compiled.depth ? FindBinding(compiled.depth->texture)->dsv : D3D12_CPU_DESCRIPTOR_HANDLE{};
-
-			// Prepare the output of this pass and set it as the current render target.
-			result = commands.SetRasterOutput(rtvs, desc->width, desc->height, dsv);
-
-			if (!result.IsSuccess())
-			{
-				return fail(std::move(result));
-			}
-
-			// Clear the render target and depth buffer if required by the pass.
-			for (std::size_t i = 0; i < compiled.colors.size(); ++i)
-			{
-				if (compiled.colors[i].loadOp != AttachmentLoadOp::Clear)
+				for (const auto& color : compiled.colors)
 				{
-					continue;
+					rtvs.push_back(FindBinding(color.texture)->Rtv());
 				}
 
-				result = commands.ClearRenderTarget(rtvs[i], compiled.colors[i].clearColor);
+				// Determine the extent of the render target for this pass.
+				const auto extent = compiled.colors.empty() ? compiled.depth->texture : compiled.colors.front().texture;
+
+				const auto* desc = m_graph.FindTexture(extent);
+
+				D3D12_CPU_DESCRIPTOR_HANDLE dsv =
+					compiled.depth ? FindBinding(compiled.depth->texture)->dsv : D3D12_CPU_DESCRIPTOR_HANDLE{};
+
+				// Prepare the output of this pass and set it as the current render target.
+				result = commands.SetRasterOutput(rtvs, desc->width, desc->height, dsv);
 
 				if (!result.IsSuccess())
 				{
 					return fail(std::move(result));
 				}
-			}
 
-			if (compiled.depth && compiled.depth->loadOp == AttachmentLoadOp::Clear)
-			{
-				result = commands.ClearDepth(dsv, compiled.depth->clearDepth);
-
-				if (!result.IsSuccess())
+				// Clear the render target and depth buffer if required by the pass.
+				for (std::size_t i = 0; i < compiled.colors.size(); ++i)
 				{
-					return fail(std::move(result));
+					if (compiled.colors[i].loadOp != AttachmentLoadOp::Clear)
+					{
+						continue;
+					}
+
+					result = commands.ClearRenderTarget(rtvs[i], compiled.colors[i].clearColor);
+
+					if (!result.IsSuccess())
+					{
+						return fail(std::move(result));
+					}
+				}
+
+				if (compiled.depth && compiled.depth->loadOp == AttachmentLoadOp::Clear)
+				{
+					result = commands.ClearDepth(dsv, compiled.depth->clearDepth);
+
+					if (!result.IsSuccess())
+					{
+						return fail(std::move(result));
+					}
 				}
 			}
 

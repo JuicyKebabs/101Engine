@@ -140,6 +140,33 @@ Result RenderPassBuilder::SetExecute(ExecuteCallback execute)
 	return {};
 }
 
+Result RenderPassBuilder::CopyTextureSource(GraphTextureHandle texture)
+{
+	if (m_consumed)
+	{
+		return { false, "Builder: already consumed." };
+	}
+
+	try
+	{
+		PassTextureUse source{};
+		source.texture = texture;
+		source.use = { TextureUsage::CopySource, ShaderStage::None };
+		source.requiresValidContents = true;
+		m_description.uses.push_back(source);
+
+		return {};
+	}
+	catch (const std::bad_alloc&)
+	{
+		return { false, "Builder: copy source allocation failed." };
+	}
+	catch (const std::length_error&)
+	{
+		return { false, "Builder: too many texture uses." };
+	}
+}
+
 Result RenderPassBuilder::Build(std::optional<RenderPass>& output)&&
 {
 	output.reset();
@@ -168,10 +195,17 @@ Result RenderPassBuilder::Build(std::optional<RenderPass>& output)&&
 			return fail("Execute callback is empty.");
 		}
 
-		if (m_description.colors.empty() && !m_description.depth)
-		{
+		const bool hasAttachments =
+			!m_description.colors.empty() || m_description.depth.has_value();
 
-			return fail("Raster requires an attachment.");
+		const bool isCopyPass =
+			!hasAttachments &&
+			m_description.uses.size() == 1 &&
+			m_description.uses.front().use.usage == TextureUsage::CopySource;
+
+		if (!hasAttachments && !isCopyPass)
+		{
+			return fail("Pass requires an attachment or a single copy source.");
 		}
 
 		if (m_description.colors.size() > 1)
@@ -179,16 +213,24 @@ Result RenderPassBuilder::Build(std::optional<RenderPass>& output)&&
 			return fail("only one color attachment is supported.");
 		}
 
-		for (const auto& read : m_description.uses)
+		for (const auto& entry : m_description.uses)
 		{
-			if (!IsValid(read.texture))
+			if (!IsValid(entry.texture))
 			{
-				return fail("Read has an invalid Graph handle.");
+				return fail("Texture use has an invalid Graph handle.");
 			}
 
-			if (!IsValidStages(read.use.stages))
+			if (isCopyPass)
 			{
-				return fail("Read requires supported Vertex/Pixel stages.");
+				if (entry.use.stages != ShaderStage::None)
+				{
+					return fail("Copy source cannot specify shader stages.");
+				}
+			}
+			else if (entry.use.usage != TextureUsage::ShaderRead ||
+				!IsValidStages(entry.use.stages))
+			{
+				return fail("Raster texture reads require supported Vertex/Pixel stages.");
 			}
 		}
 
