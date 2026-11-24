@@ -236,6 +236,7 @@ Result FrameResourceBindings::ImportRenderTarget(
 	TextureUse finalUse;
 	finalUse.usage = TextureUsage::ShaderRead;
 	finalUse.stages = ShaderStage::Vertex | ShaderStage::Pixel;
+
 	return m_graph.SetFinalUsage(texture, finalUse);
 }
 

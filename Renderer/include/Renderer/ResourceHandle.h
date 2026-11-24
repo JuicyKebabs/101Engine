@@ -22,6 +22,7 @@ struct ShaderTag;
 struct PipelineTag;
 struct MaterialTag;
 struct BufferTag;
+struct ReadbackTag;
 
 template <class Tag>
 struct ResourceHandle
@@ -49,6 +50,7 @@ using ShaderHandle = detail::ResourceHandle<detail::ShaderTag>;
 using PipelineHandle = detail::ResourceHandle<detail::PipelineTag>;
 using MaterialHandle = detail::ResourceHandle<detail::MaterialTag>;
 using BufferHandle = detail::ResourceHandle<detail::BufferTag>;
+using ReadbackHandle = detail::ResourceHandle<detail::ReadbackTag>;
 
 // Static assertions to ensure the size of the resource handles is as expected.
 static constexpr std::size_t ResourceHandleSize = sizeof(std::uint32_t) * 3;
@@ -59,5 +61,6 @@ static_assert(sizeof(ShaderHandle) == ResourceHandleSize);
 static_assert(sizeof(PipelineHandle) == ResourceHandleSize);
 static_assert(sizeof(MaterialHandle) == ResourceHandleSize);
 static_assert(sizeof(BufferHandle) == ResourceHandleSize);
+static_assert(sizeof(ReadbackHandle) == ResourceHandleSize);
 
 }

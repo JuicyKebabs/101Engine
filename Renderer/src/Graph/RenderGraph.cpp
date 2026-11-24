@@ -81,6 +81,14 @@ namespace
 
 			break;
 
+		case TextureUsage::CopySource:
+			if (!HasCapability(desc.capabilities, TextureCapability::ColorAttachment) ||
+				HasCapability(desc.capabilities, TextureCapability::Present))
+			{
+				return { false, "CopySource requires an offscreen color attachment." };
+			}
+			break;
+
 		default:
 			return { false, "unsupported texture usage." };
 		}
@@ -103,6 +111,9 @@ namespace
 
 		case TextureUsage::Present:
 			return { TextureStateKind::Present };
+
+		case TextureUsage::CopySource:
+			return { TextureStateKind::CopySource };
 
 		default:
 			return {}; // Callers validate first; an unsupported use never reaches here.
@@ -143,6 +154,8 @@ namespace
 		case GraphTextureFormat::RGBA8_sRGB:
 		case GraphTextureFormat::RGBA16_Float:
 		case GraphTextureFormat::D32_Float:
+		case GraphTextureFormat::R32_UInt:
+
 			break;
 		default:
 			return { false, "ValidateImport: unsupported texture format." };
@@ -206,6 +219,9 @@ namespace
 
 		case TextureStateKind::DepthWrite:
 			return ValidateUse(desc, { TextureUsage::DepthAttachment });
+
+		case TextureStateKind::CopySource:
+			return ValidateUse(desc, { TextureUsage::CopySource });
 
 		default:
 			return { false, "ValidateImport: unsupported initial texture state." };
@@ -564,9 +580,14 @@ Result RenderGraph::Compile()
 			}
 
 			// ShaderRead and Present require valid contents in order for their contents to be used.
-			if ((finalUse.usage == TextureUsage::ShaderRead || finalUse.usage == TextureUsage::Present) && !contentsValid[index])
+			const bool finalRequiresContents =
+				finalUse.usage == TextureUsage::ShaderRead ||
+				finalUse.usage == TextureUsage::Present ||
+				finalUse.usage == TextureUsage::CopySource;
+
+			if (finalRequiresContents && !contentsValid[index])
 			{
-				return { false, "Compile final usage: Texture[" + std::to_string(index) + "] '" + resource.desc.name + "': ShaderRead/Present requires valid contents." };
+				return { false, "Compile final usage requires valid texture contents." };
 			}
 
 			const GraphTextureHandle texture{ m_id, static_cast<std::uint32_t>(index) };

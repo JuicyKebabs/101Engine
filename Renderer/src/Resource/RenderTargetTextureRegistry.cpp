@@ -211,9 +211,15 @@ Result RenderTargetTextureRegistry::QueryInfo(RenderTargetTextureHandle handle, 
 	case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
 		information.format = TextureFormat::RGBA8_sRGB;
 		break;
+
 	case DXGI_FORMAT_R16G16B16A16_FLOAT:
 		information.format = TextureFormat::RGBA16_Float;
 		break;
+
+	case DXGI_FORMAT_R32_UINT:
+		information.format = TextureFormat::R32_UInt;
+		break;
+	
 	default:
 		information.format = TextureFormat::RGBA8_UNorm;
 		break;

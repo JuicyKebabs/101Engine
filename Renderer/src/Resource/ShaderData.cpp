@@ -513,15 +513,23 @@ Result ReflectColorOutputs(ID3D12ShaderReflection& reflection, const D3D12_SHADE
 			return {false, "ReflectShader: Shader output lookup failed"};
 		}
 
-		if (targetDesc.SystemValueType != D3D_NAME_TARGET || targetDesc.SemanticIndex != 0 ||
-			targetDesc.ComponentType != D3D10_REGISTER_COMPONENT_FLOAT32)
+		const bool isFloat = targetDesc.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32;
+		const bool isScalarUInt =
+			targetDesc.ComponentType == D3D_REGISTER_COMPONENT_UINT32 &&
+			targetDesc.Mask == 0x1;
+
+		if (metadata.colorOutputs != 0 ||
+			targetDesc.SystemValueType != D3D_NAME_TARGET ||
+			targetDesc.SemanticIndex != 0 ||
+			(!isFloat && !isScalarUInt))
 		{
-			return {false, "ReflectShader: only a single floating color output is supported"};
+			return { false, "ReflectShader: unsupported color output." };
 		}
 
-		// Count the number of components in the output mask (e.g., float4 has 4 components).
-		++metadata.colorOutputs;
+		metadata.colorOutputs = 1;
+		metadata.colorOutputIsUInt = isScalarUInt;
 	}
+
 	return {};
 }
 
@@ -703,6 +711,7 @@ Result MergeMetadata(const ShaderMetadata& vertex, const ShaderMetadata* pixel, 
 		// Merge color outputs
 		//----------------------------------------------
 		candidate.colorOutputs = pixel->colorOutputs;
+		candidate.colorOutputIsUInt = pixel->colorOutputIsUInt;
 	}
 
 	// Detect duplicate variable names in the common schema (binding 5) and resource names.

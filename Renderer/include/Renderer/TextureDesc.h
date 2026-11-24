@@ -21,6 +21,7 @@ enum class TextureFormat
 	// Generated color outputs only (currently for the intermediate HDR texture);
 	// CPU upload remains RGBA8.
 	RGBA16_Float,
+	R32_UInt
 };
 
 struct TextureMipDesc

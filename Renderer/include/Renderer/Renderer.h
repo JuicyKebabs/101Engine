@@ -12,6 +12,7 @@
 #include "Renderer/FrameRenderData.h"
 #include "RenderResult.h"
 #include "StructuredBufferDesc.h"
+#include "TextureReadback.h"
 
 //---------------------------------------------------------------------------
 // Renderer class
@@ -51,6 +52,15 @@ public:
 	RENDERER_API Result ResizeRenderTargetTexture(RenderTargetTextureHandle handle, std::uint32_t width, std::uint32_t height);
 	RENDERER_API Result DestroyRenderTargetTexture(RenderTargetTextureHandle handle);
 	RENDERER_API Result GetRenderTargetTextureInfo(RenderTargetTextureHandle handle, RenderTargetTextureInfo& output) const;
+
+	// Queue a copy at the requested boundary of a submitted Render.
+	// A Render without a submission does not consume requests.
+	RENDERER_API ReadbackRequestResult RequestTextureReadback(const TextureReadbackDesc& desc);
+	
+	// Ready moves the CPU result and consumes the request handle.
+	// Failed leaves an accepted request available for Release.
+	RENDERER_API ReadbackPollResult TryTakeTextureReadback(ReadbackHandle handle, TextureReadbackData& output);
+	RENDERER_API Result ReleaseTextureReadback(ReadbackHandle handle);
 
 	// Submit takes ownership of Frame values only after acceptance. Render consumes one submission.
 	// Resource contents are resolved during Render: intervening Updates affect that submission.

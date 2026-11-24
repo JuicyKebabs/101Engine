@@ -57,7 +57,7 @@
 #include "Command/InstantiateActorImprintCommand.h"
 #include "ActorImprint/ActorImprintEditingContext.h"
 #include "UI/EditorTheme.h"
-#include "Scene/ScenePicker.h"
+#include "Engine/Actor/ActorHierarchyActivity.h"
 #include "Scene/SceneCloner.h"
 #include "Scene/SceneAssetWorkflow.h"
 #include "Engine/Project/ProjectSettings.h"
@@ -1771,9 +1771,13 @@ void EditorApp::Render()
 		return;
 	}
 
+	m_nextPickingImage.reset();
+
 	// Panels may activate/close a document. Extract only after those changes,
 	// so submitted values never borrow a document destroyed during ImGui work.
 	RenderImGui();
+
+	m_displayedPickingImage.reset();
 
 	if (m_renderingStopped)
 	{
@@ -1845,13 +1849,40 @@ void EditorApp::Render()
 	// Submit the frame render data to the renderer for processing and rendering.
 	if (!CheckRenderingResult(m_pRenderer->SubmitFrameRenderData(std::move(frame))))
 	{
+		CancelViewportPick();
 		return;
 	}
 
 	// Render the frame and check the result for any diagnostics or errors.
 	const auto result = m_pRenderer->Render();
 
-	CheckRenderingResult(result.status);
+	// If the rendering result is successful and the render disposition indicates
+	// that the frame was processed, apply any viewport picking logic.
+	if (CheckRenderingResult(result.status) && result.disposition == rendering::RenderDisposition::Processed)
+	{
+		ApplyViewportPick();
+
+		if (m_nextPickingImage)
+		{
+			const auto source = m_nextPickingImage->sourceView;
+			const bool incomplete =
+				std::any_of(
+					result.diagnostics.begin(), result.diagnostics.end(),
+					[source](const rendering::DrawDiagnostic& diagnostic)
+					{
+						return diagnostic.viewId == source || diagnostic.viewId == EditorRenderAssets::PickingPassId;
+					});
+
+			if (!incomplete)
+			{
+				m_displayedPickingImage = std::move(m_nextPickingImage);
+			}
+		}
+	}
+	else
+	{
+		CancelViewportPick();
+	}
 
 	// Log any diagnostics from the rendering process for debugging purposes.
 	for (const auto& diagnostic : result.diagnostics)
@@ -1916,7 +1947,43 @@ rendering::Result EditorApp::AppendEditorViewport(rendering::FrameRenderData& fr
 
 	// Append the selected actor to the frame render data for visualizing outline in the editor viewport.
 	EditorSelection* selection = GetActiveSelection();
-	const rendering::ViewId sourceView = canvasPreview ? 2 : 1;	// Decide target view ID based on whether it's canvas preview or normal 3D scene view.
+	const rendering::ViewId sourceView = canvasPreview ? 2 : 1;
+
+	PickingImage image;
+	image.document = m_documentManager.GetActiveDocumentId();
+	image.mode = viewport->GetViewMode();
+
+	if (editingCanvas && editingCanvas->GetOwner())
+	{
+		image.canvas = editingCanvas->GetOwner()->GetGuid();
+	}
+
+	image.sourceView = sourceView;
+	auto picking = m_pRenderer->GetRenderTargetTextureInfo(m_editorRenderAssets->PickingTarget(), image.output);
+
+	if (picking.IsSuccess())
+	{
+		picking = 
+			m_editorRenderAssets->AppendPicking(
+				frame,
+				activeScene->GetRenderSystem()->GetExtractedObjects(),
+				sourceView,
+				canvasPreview,
+				image.actors);
+	}
+
+	if (picking.IsSuccess())
+	{
+		m_nextPickingImage = std::move(image);
+	}
+	else if (picking.failureKind != rendering::FailureKind::General)
+	{
+		return picking;
+	}
+	else
+	{
+		DBG("EditorApp::AppendEditorViewport: Failed to append picking render data.");
+	}
 
 	if (selection)
 	{
@@ -2538,56 +2605,7 @@ void EditorApp::RenderSceneViewPanel()
 			return;
 		}
 
-		// Validate necessary pointers before proceeding with picking
-		if (!activeScene)
-		{
-			return;
-		}
-
-		// Build the camera info for picking based on the current view mode (Scene or Canvas)
-		const CameraInfo pickCameraInfo = BuildViewportCameraInfo(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
-
-		// Determine the render space for picking based on the current view mode
-		// World(3D) for Scene View, Screen(2D) for Canvas View
-		const RenderSpace targetRenderSpace =
-			viewport->GetViewMode() == EditorViewportMode::Scene
-			? RenderSpace::World : RenderSpace::Screen;
-
-		// Resolve the canvas for picking if in Canvas View mode
-		Canvas* editingCanvas = nullptr;
-
-		if (viewport->GetViewMode() == EditorViewportMode::Canvas)
-		{
-			editingCanvas = viewport->GetCanvasEditContext().ResolveCanvas(*activeScene);
-		}
-
-		// Get the picked Actor information
-		const std::optional<ScenePickHit> hit =
-			ScenePicker::Pick(
-				*activeScene,
-				pickCameraInfo,
-				pickUV,
-				targetRenderSpace,
-				editingCanvas);
-
-		if (hit)
-		{
-			StopAllEditTransactions();
-
-			if (selection)
-			{
-				selection->SelectActor(hit->actorGuid);
-			}
-		}
-		else
-		{
-			StopAllEditTransactions();
-
-			if (selection)
-			{
-				selection->Clear();
-			}
-		}
+		RequestViewportPick(pickUV);
 	}
 }
 
@@ -4605,6 +4623,159 @@ void EditorApp::StopAllEditTransactions()
 	m_inspectorPanel.CancelActiveEdit();
 	CancelTransformEdit();
 	CancelRectTransformEdit();
+}
+
+bool EditorApp::IsPickingContextCurrent(const PickingImage& image)
+{
+	auto* viewport = GetActiveViewportContext();
+	auto* scene = GetActiveScene();
+
+	if (m_editorMode != EditorMode::Edit || !viewport || !scene)
+	{
+		return false;
+	}
+
+	if (m_documentManager.GetActiveDocumentId() != image.document || viewport->GetViewMode() != image.mode)
+	{
+		return false;
+	}
+
+	if (image.mode == EditorViewportMode::Canvas)
+	{
+		const auto* canvas = viewport->GetCanvasEditContext().ResolveCanvas(*scene);
+		const auto* owner = canvas ? canvas->GetOwner() : nullptr;
+		const Guid guid = owner ? owner->GetGuid() : Guid{};
+
+		if (image.canvas != guid)
+		{
+			return false;
+		}
+	}
+
+	rendering::RenderTargetTextureInfo info;
+	const auto result = m_pRenderer->GetRenderTargetTextureInfo(m_editorRenderAssets->PickingTarget(), info);
+
+	return result.IsSuccess() && info.revision == image.output.revision;
+}
+
+void EditorApp::RequestViewportPick(const Vector2& uv)
+{
+	CancelViewportPick();
+
+	if (!m_displayedPickingImage || !IsPickingContextCurrent(*m_displayedPickingImage))
+	{
+		return;
+	}
+
+	const bool validX = std::isfinite(uv.x) && uv.x >= 0.0f && uv.x <= 1.0f;
+	const bool validY = std::isfinite(uv.y) && uv.y >= 0.0f && uv.y <= 1.0f;
+	const auto* selection = GetActiveSelection();
+
+	if (!validX || !validY || !selection)
+	{
+		return;
+	}
+
+	const auto& output = m_displayedPickingImage->output;
+
+	// Request a readback of the picking texture at the specified UV coordinates
+	rendering::TextureReadbackDesc request;
+	request.sourceTexture = m_editorRenderAssets->PickingTarget();
+	request.expectedSourceRevision = output.revision;
+	request.region.x = std::min(static_cast<std::uint32_t>(uv.x * output.width), output.width - 1);
+	request.region.y = std::min(static_cast<std::uint32_t>(uv.y * output.height), output.height - 1);
+	request.region.width = request.region.height = 1;
+	request.timing = rendering::ReadbackTiming::BeforeRendering;
+
+	const auto accepted = m_pRenderer->RequestTextureReadback(request);
+
+	if (!accepted.status.IsSuccess())
+	{
+		DBG("Editor Renderer: Failed to request picking readback: %s", accepted.status.message.c_str());
+		return;
+	}
+
+	// Store the pending picking result.
+	auto& pending = m_pendingPick.emplace();
+	pending.handle = accepted.handle;
+	pending.image = std::move(*m_displayedPickingImage);
+	pending.selectionAtClick = selection->GetSelectedActorGuid();
+
+	m_displayedPickingImage.reset();
+}
+
+void EditorApp::ApplyViewportPick()
+{
+	if (!m_pendingPick)
+	{
+		return;
+	}
+
+	auto* selection = GetActiveSelection();
+
+	if (!selection ||
+		!IsPickingContextCurrent(m_pendingPick->image) ||
+		selection->GetSelectedActorGuid() != m_pendingPick->selectionAtClick)
+	{
+		CancelViewportPick();
+		return;
+	}
+
+	// Attempt to take the readback result from the renderer for the pending picking request
+	rendering::TextureReadbackData data;
+	const auto result = m_pRenderer->TryTakeTextureReadback(m_pendingPick->handle, data);
+
+	if (result.state == rendering::ReadbackState::Pending)
+	{
+		return;
+	}
+
+	if (result.state == rendering::ReadbackState::Failed)
+	{
+		DBG("Editor Renderer: Picking readback failed: %s", result.error.message.c_str());
+		CancelViewportPick();
+		return;
+	}
+
+	// The readback result is now available. Attempt to resolve the picking pixel data to a valid actor GUID.
+	Guid guid;
+	const bool valid = EditorRenderAssets::ResolvePickingPixel(data, m_pendingPick->image.actors, guid);
+
+	m_pendingPick.reset(); // Ready consumes the Renderer handle.
+
+	if (!valid)
+	{
+		DBG("Editor Renderer: Picking readback returned invalid pixel data.");
+		return;
+	}
+
+	if (!guid.IsValid())
+	{
+		StopAllEditTransactions();
+		selection->Clear();
+		return;
+	}
+
+	// Resolve the picked actor from the active scene and
+	// check if it is part of the active hierarchy before selecting it.
+	Actor* actor = GetActiveScene()->ResolveActor(guid);
+
+	if (IsActorHierarchyActive(actor))
+	{
+		StopAllEditTransactions();
+
+		// Select the picked actor in the hierarchy panel
+		selection->SelectActor(guid);
+	}
+}
+
+void EditorApp::CancelViewportPick()
+{
+	if (m_pendingPick)
+	{
+		(void)m_pRenderer->ReleaseTextureReadback(m_pendingPick->handle);
+		m_pendingPick.reset();
+	}
 }
 
 bool EditorApp::CheckRenderingResult(const rendering::Result& result)

@@ -49,12 +49,19 @@ Result RenderTargetTextureGpuData::Initialize(ID3D12Device* device, const Render
 	case TextureFormat::RGBA8_UNorm:
 		nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		break;
+
 	case TextureFormat::RGBA8_sRGB:
 		nativeFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 		break;
+
 	case TextureFormat::RGBA16_Float:
 		nativeFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 		break;
+
+	case TextureFormat::R32_UInt:
+		nativeFormat = DXGI_FORMAT_R32_UINT;
+		break;
+
 	default:
 		return detail::Fail("RenderTargetTexture: unsupported generated color format.");
 	}

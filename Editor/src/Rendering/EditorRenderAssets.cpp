@@ -4,6 +4,10 @@
 #include "Engine/Scene/SceneBase.h"
 #include "Engine/Component/Collider.h"
 
+#include <cstring>
+#include <limits>
+#include <unordered_map>
+
 namespace
 {
 rendering::Result Failure(const std::string& message)
@@ -27,6 +31,15 @@ EditorRenderAssets::~EditorRenderAssets()
 {
 	// Order is logical dependencies first. Each request is independent from
 	// physical GPU release, so a still-executing previous frame stays valid.
+
+	for (const auto handle : m_pickingMaterials)
+	{
+		if (handle != rendering::MaterialHandle{})
+		{
+			(void)m_renderer.DestroyMaterial(handle);
+		}
+	}
+
 	for (const auto handle : m_maskMaterials)
 	{
 		const auto result = m_renderer.DestroyMaterial(handle);
@@ -72,6 +85,22 @@ EditorRenderAssets::~EditorRenderAssets()
 		{
 			const auto result = m_renderer.DestroyShader(handle);
 			(void)result;
+		}
+	}
+
+	for (const auto handle : m_pickingPipelines)
+	{
+		if (handle != rendering::PipelineHandle{})
+		{
+			(void)m_renderer.DestroyPipeline(handle);
+		}
+	}
+
+	for (const auto handle : m_pickingShaders)
+	{
+		if (handle != rendering::ShaderHandle{})
+		{
+			(void)m_renderer.DestroyShader(handle);
 		}
 	}
 
@@ -213,6 +242,7 @@ rendering::Result EditorRenderAssets::Initialize(
 	// Create render target textures for selection mask.
 	//---------------------------------------------------------------------------------
 	target.format = rendering::TextureFormat::RGBA8_UNorm;
+
 	// Numeric coverage: Alpha zero means unselected. Match allocation advice
 	// to the actual auxiliary Clear without changing the Outline algorithm.
 	target.optimizedClearColor.fill(0.0f);
@@ -224,6 +254,62 @@ rendering::Result EditorRenderAssets::Initialize(
 	}
 
 	m_selectionMask = mask.handle;
+
+	//---------------------------------------------------------------------------------
+	// Create render target textures for picking Actor IDs.
+	//---------------------------------------------------------------------------------
+	
+	target.format = rendering::TextureFormat::R32_UInt;
+	const auto picking = m_renderer.CreateRenderTargetTexture(target);
+
+	if (!picking.result.IsSuccess())
+	{
+		return picking.result;
+	}
+
+	m_pickingTarget = picking.handle;
+
+	// Register shaders for picking Actor IDs.
+	const std::array<const char*, 3> pickingFiles{ "PickingVS.cso", "PickingSolidPS.cso", "PickingTexturePS.cso" };
+	
+	for (std::size_t index = 0; index < pickingFiles.size(); ++index)
+	{
+		const auto stage = index == 0 ? rendering::ShaderStage::Vertex : rendering::ShaderStage::Pixel;
+
+		auto registered = LoadAndRegisterShader(m_renderer, shaderDirectory, pickingFiles[index], stage);
+
+		if (!registered.result.IsSuccess())
+		{
+			return registered.result;
+		}
+
+		m_pickingShaders[index] = registered.handle;
+	}
+
+	//---------------------------------------------------------------------------------
+	// Register pipelines for picking Actor IDs.
+	//---------------------------------------------------------------------------------
+	
+	// Standard geometry, textured quad, skinned geometry.
+	// All built-in inputs are shared with the editor's auxiliary passes.
+	for (std::size_t index = 0; index < m_pickingPipelines.size(); ++index)
+	{
+		rendering::PipelineDesc description;
+		description.vertexShader = index == 2 ? skinnedVertex : m_pickingShaders[0];
+		description.pixelShader = m_pickingShaders[index == 1 ? 2 : 1];
+		description.cull = rendering::CullMode::None;
+		description.depth = rendering::DepthMode::ReadOnly;
+		
+		const auto registered = m_renderer.RegisterPipeline(description);
+
+		if (!registered.result.IsSuccess())
+		{
+			return registered.result;
+		}
+
+		m_pickingPipelines[index] = registered.handle;
+	}
+
 
 	//---------------------------------------------------------------------------------
 	// Create materials for selection outline visualization.
@@ -305,9 +391,9 @@ rendering::Result EditorRenderAssets::Initialize(
 rendering::Result EditorRenderAssets::Resize(std::uint32_t width, std::uint32_t height)
 {
 	// Each Renderer resize replaces its own complete physical resource set.
-	// This pair is not a transaction: Color can commit before Mask fails.
-	// Publish dimensions only after both succeed. The host must propagate
 	// failure to stop this frame and exit; it does not retry or draw the pair.
+	// Each target commits independently. Publish dimensions only after all succeed.
+	// The host stops rendering on failure rather than drawing mismatched extents.
 	auto color = m_renderer.ResizeRenderTargetTexture(m_sceneColor, width, height);
 
 	if (!color.IsSuccess())
@@ -320,6 +406,13 @@ rendering::Result EditorRenderAssets::Resize(std::uint32_t width, std::uint32_t 
 	if (!mask.IsSuccess())
 	{
 		return mask;
+	}
+
+	auto picking = m_renderer.ResizeRenderTargetTexture(m_pickingTarget, width, height);
+
+	if (!picking.IsSuccess())
+	{
+		return picking;
 	}
 
 	m_width = width;
@@ -476,6 +569,152 @@ rendering::Result EditorRenderAssets::AppendSelection(
 	frame.auxiliaryPasses.push_back(std::move(outline));
 
 	return {};
+}
+
+rendering::Result EditorRenderAssets::AppendPicking(
+	rendering::FrameRenderData& frame,
+	std::span<const ExtractedObjectRecord> objects,
+	rendering::ViewId sourceView,
+	bool canvasPreview,
+	std::vector<Guid>& actorIds)
+{
+	rendering::AuxiliaryPass pass;
+	pass.id = PickingPassId;
+	pass.sourceViewId = sourceView;
+	pass.name = "Editor.Picking";
+
+	// The timing of picking pass is depend on the kind of view.
+	pass.stage = 
+		canvasPreview ? rendering::AuxiliaryStage::AfterOverlay
+		: rendering::AuxiliaryStage::BeforeDisplayTransform;
+
+	pass.colorOutput = m_pickingTarget;
+	pass.colorLoad = rendering::AuxiliaryColorLoad::Clear;
+
+	// Scene view uses the depth based ordering for picking.
+	pass.useSourceDepth = !canvasPreview;
+
+	std::vector<Guid> ids(1);	// Actor IDs which have already been recorded with picking IDs.
+
+	std::unordered_map<Guid, std::uint32_t> actorIdTable;	// Maps Actor GUIDs to their picking ID (index in the ids vector).
+
+	for (const auto& record : objects)
+	{
+		if (record.viewId != sourceView)
+		{
+			continue;
+		}
+
+		if (!record.material || !record.actorGuid.IsValid())
+		{
+			return Failure("AppendPicking: invalid material or actor GUID.");
+		}
+
+		if (ids.size() > (std::numeric_limits<std::uint32_t>::max)())
+		{
+			return Failure("AppendPicking: too many actors for picking.");
+		}
+
+		// Map Actor GUID to a picking ID (index in the ids vector).
+		// Picking ID is consecutive and starts at 1. Index 0 is reserved for "no actor".
+		const auto [entry, inserted] = actorIdTable.try_emplace(record.actorGuid, static_cast<std::uint32_t>(ids.size()));
+
+		if (inserted)
+		{
+			// New Actor GUID, add it to the list of Actor IDs for this picking pass.
+			ids.push_back(record.actorGuid);
+		}
+
+		// Skinned meshs requires the pipeline with the skinned vertex shader.
+		// (magic number 2 is the index of the skinned pipeline in m_pickingPipelines.)
+		const std::size_t pipelineIndex = record.skinned ? 2 : (record.alphaMask ? 1 : 0);
+
+		// Create a new Material for this object, using the original Material's description.
+		// Currently, before implementing MaterialInstance, we have to create a new material for every picking ID.
+		rendering::MaterialDesc material;
+		material.pipeline = m_pickingPipelines[pipelineIndex];
+		material.parameters = record.material->description.parameters;
+		AddParameter(material, "SelectionId", entry->second);
+
+		// Reserve a slot in the picking materials vector for this object.
+		const auto slot = pass.draws.size();
+
+		if (slot == m_pickingMaterials.size())
+		{
+			m_pickingMaterials.emplace_back();
+		}
+
+		// Register the new Material with the Renderer 
+		// and store the handle in m_pickingMaterials.
+		auto& handle = m_pickingMaterials[slot];
+
+		if (handle == rendering::MaterialHandle{})
+		{
+			// Register a new Material with the Renderer.
+			const auto registered = m_renderer.RegisterMaterial(material);
+
+			if (!registered.result.IsSuccess())
+			{
+				return registered.result;
+			}
+
+			handle = registered.handle;
+		}
+		else
+		{
+			// Update the existing Material with the new description.
+			const auto updated = m_renderer.UpdateMaterial(handle, material);
+
+			if (!updated.IsSuccess())
+			{
+				return updated;
+			}
+		}
+
+		// Add a draw command to the picking auxiliary pass for this object
+		// with the picking Material that was just created or updated.
+		rendering::AuxiliaryDraw draw;
+		draw.objectIndex = record.objectIndex;
+		draw.materialOverride = handle;
+		pass.draws.push_back(draw);
+	}
+
+	// Even if there is no object to draw, 
+	// it is needed to clear the picking render target
+	// to zero for picking "no actor" in the next frame.
+	frame.auxiliaryPasses.push_back(std::move(pass));
+	actorIds = std::move(ids);
+
+	return {};
+}
+
+bool EditorRenderAssets::ResolvePickingPixel(
+	const rendering::TextureReadbackData& data,
+	std::span<const Guid> actorIds,
+	Guid& actor)
+{
+	// Picking single R32_UINT pixel in tightly packed format is expected.
+	const bool isPixel = data.width == 1 && data.height == 1;
+	const bool isUInt = data.format == rendering::TextureFormat::R32_UInt;
+	const bool tightlyPacked = 
+		data.rowPitch == sizeof(std::uint32_t) &&
+		data.pixels.size() == data.rowPitch;
+
+	if (!isPixel || !isUInt || !tightlyPacked)
+	{
+		return false;
+	}
+
+	std::uint32_t id = 0;
+	std::memcpy(&id, data.pixels.data(), sizeof(id));
+
+	if (id >= actorIds.size())
+	{
+		return false;
+	}
+
+	actor = actorIds[id];
+	return true;
 }
 
 void EditorRenderAssets::AppendColliderObject(

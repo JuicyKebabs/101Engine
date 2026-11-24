@@ -141,6 +141,27 @@ private:
 
 	std::vector<AssetBrowserPanel::FileDrop> m_pendingExplorerDrops;
 
+	struct PickingImage
+	{
+		EditorDocumentId document;
+		EditorViewportMode mode = EditorViewportMode::Scene;
+		Guid canvas;
+		rendering::ViewId sourceView = 0;
+		rendering::RenderTargetTextureInfo output;
+		std::vector<Guid> actors;
+	};
+	
+	struct PendingPick
+	{
+		rendering::ReadbackHandle handle;
+		PickingImage image;
+		Guid selectionAtClick;
+	};
+
+	std::optional<PickingImage> m_displayedPickingImage;
+	std::optional<PickingImage> m_nextPickingImage;
+	std::optional<PendingPick> m_pendingPick;
+
 private:
 	// Struct to track transform edits for undo/redo
 	struct TransformEditTransaction
@@ -278,6 +299,12 @@ private:
 	// Stop all ongoing edit transactions (transform, RectTransform, etc.)
 	void StopAllEditTransactions();
 
+	// Picking related functions.
+	bool IsPickingContextCurrent(const PickingImage& image);
+	void RequestViewportPick(const Vector2 & uv);
+	void ApplyViewportPick();
+	void CancelViewportPick();
+	
 	bool HandleWindowCloseRequest();
 	void CompleteExitRequest();
 };

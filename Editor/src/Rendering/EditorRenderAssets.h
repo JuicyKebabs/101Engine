@@ -6,7 +6,9 @@
 
 #include <array>
 #include <filesystem>
+#include <span>
 
+struct ExtractedObjectRecord;
 class SceneBase;
 
 // These registrations belong to the Editor, outside every document/Play Scene.
@@ -31,6 +33,22 @@ public:
 		const Guid& selectedActor,
 		rendering::ViewId sourceView,
 		bool canvasPreview);
+
+	static constexpr rendering::ViewId PickingPassId = 13;
+
+	rendering::Result AppendPicking(
+		rendering::FrameRenderData& frame,
+		std::span<const ExtractedObjectRecord> objects,
+		rendering::ViewId sourceView,
+		bool canvasPreview,
+		std::vector<Guid>& actorIds);
+
+	static bool ResolvePickingPixel(
+		const rendering::TextureReadbackData& data,
+		std::span<const Guid> actorIds,
+		Guid& actor);
+
+	rendering::RenderTargetTextureHandle PickingTarget() const { return m_pickingTarget; }
 
 	void AppendColliders(rendering::FrameRenderData& frame, SceneBase& scene, rendering::ViewId sourceView);
 
@@ -64,6 +82,7 @@ private:
 
 	rendering::RenderTargetTextureHandle m_sceneColor;
 	rendering::RenderTargetTextureHandle m_selectionMask;
+	rendering::RenderTargetTextureHandle m_pickingTarget;
 
 	std::uint32_t m_width = 1920;
 	std::uint32_t m_height = 1080;
@@ -73,6 +92,9 @@ private:
 	rendering::PipelineHandle m_skinnedMaskPipeline;
 	std::array<rendering::GeometryHandle, 3> m_debugGeometry{};
 	std::vector<rendering::MaterialHandle> m_maskMaterials;
+	std::array<rendering::ShaderHandle, 3> m_pickingShaders{};
+	std::array<rendering::PipelineHandle, 3> m_pickingPipelines{};
+	std::vector<rendering::MaterialHandle> m_pickingMaterials;
 
 	rendering::MaterialHandle m_outlineMaterial;
 	rendering::MaterialHandle m_colliderMaterial;

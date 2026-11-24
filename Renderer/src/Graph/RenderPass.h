@@ -103,6 +103,8 @@ public:
 	Result DepthOutput(DepthAttachment attachment);
 	Result SetExecute(ExecuteCallback execute);
 
+	Result CopyTextureSource(GraphTextureHandle texture);
+
 	// One-shot operation, including failure. Output is empty when failure.
 	Result Build(std::optional<RenderPass>& output)&&;
 

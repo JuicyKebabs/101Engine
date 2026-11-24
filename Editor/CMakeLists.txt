@@ -61,8 +61,18 @@ add_custom_command(TARGET 101Editor POST_BUILD
 set(EDITOR_SHADER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 set(EDITOR_SHADER_OUTPUTS "")
 
-foreach(EDITOR_SHADER EditorVS EditorPS SolidMaskPS AlphaMask OutlinePS Collider)
-    if(EDITOR_SHADER STREQUAL "EditorVS")
+foreach(EDITOR_SHADER EditorVS EditorPS SolidMaskPS AlphaMask OutlinePS Collider PickingVS PickingSolidPS PickingTexturePS)
+    set(EDITOR_SHADER_ENTRY main)
+    set(EDITOR_SHADER_SOURCE
+    "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${EDITOR_SHADER}.hlsl")
+
+    if(EDITOR_SHADER MATCHES "^Picking")
+    set(EDITOR_SHADER_SOURCE
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Picking.hlsl")
+    set(EDITOR_SHADER_ENTRY "${EDITOR_SHADER}")
+    endif()
+
+    if(EDITOR_SHADER STREQUAL "EditorVS" OR EDITOR_SHADER STREQUAL "PickingVS")
         set(EDITOR_SHADER_PROFILE vs_5_0)
     else()
         set(EDITOR_SHADER_PROFILE ps_5_0)
@@ -78,6 +88,9 @@ foreach(EDITOR_SHADER EditorVS EditorPS SolidMaskPS AlphaMask OutlinePS Collider
 
     set(EDITOR_SHADER_SOURCE
         "${CMAKE_CURRENT_SOURCE_DIR}/shaders/${EDITOR_SHADER}.hlsl")
+        if(EDITOR_SHADER MATCHES "^Picking")
+            set(EDITOR_SHADER_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/shaders/Picking.hlsl")
+        endif()
     set(EDITOR_SHADER_OUTPUT
         "${EDITOR_SHADER_DIRECTORY}/${EDITOR_SHADER_FILE}.cso")
 
@@ -88,12 +101,13 @@ foreach(EDITOR_SHADER EditorVS EditorPS SolidMaskPS AlphaMask OutlinePS Collider
         COMMAND "${RENDERER_FXC}"
             /nologo
             /T ${EDITOR_SHADER_PROFILE}
-            /E main
+            /E ${EDITOR_SHADER_ENTRY}
             /Fo "${EDITOR_SHADER_OUTPUT}"
             "${EDITOR_SHADER_SOURCE}"
         DEPENDS
             "${EDITOR_SHADER_SOURCE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/shaders/EditorCommon.hlsli"
+            "${CMAKE_SOURCE_DIR}/Renderer/shaders/Common.hlsli"
         VERBATIM
     )
 
