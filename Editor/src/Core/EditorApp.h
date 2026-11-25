@@ -176,26 +176,46 @@ private:
 	std::optional<TransformEditTransaction> m_transformEditTransaction;
 
 	void ApplySceneTransformGizmo(
-		Actor& actor, Transform& transform, const Transform3D& parentWorld,
+		Actor& actor,
+		Transform& transform,
+		const Transform3D& parentWorld,
 		const SceneTransformGizmo& gizmo);
+
 	void ApplyTransformPreview(Actor& actor, Transform& transform, const Transform3D& state);
 	void BeginTransformEdit(const Actor& actor, const Transform3D& before);
 	void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
 	void CancelTransformEdit();
 
-	// Struct to track RectTransform edits for undo/redo
 	struct RectTransformEditTransaction
 	{
+		EditorDocumentId documentId;
 		Guid actorGuid;
+		Guid canvasGuid;
+		ActorHandle parent;
 		RectTransformEditState before;
+		CanvasRectHandle handle = CanvasRectHandle::None;
+		Vector2 mouseStart;
+		Vector2 parentX;
+		Vector2 parentY;
+		Vector2 rectRight;
+		Vector2 rectDown;
+		ImVec2 imageMin;
+		ImVec2 imageMax;
 	};
 
-	// Optional to track an ongoing RectTransform edit transaction
 	std::optional<RectTransformEditTransaction> m_rectTransformEditTransaction;
 
-	// Helper functions for callbacks from the InspectorPanel to track RectTransform edits for undo/redo
-	void BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before);
-	void EndRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& after);
+	void ApplyCanvasRectGizmo(
+		Actor& actor,
+		RectTransform& rect,
+		const CanvasRectGizmo& gizmo);
+
+	void BeginRectTransformEdit(
+		const Actor& actor,
+		const RectTransformEditState& before,
+		const CanvasRectGizmo& gizmo);
+
+	void EndRectTransformEdit(const RectTransformEditState& after);
 	void CancelRectTransformEdit();
 
 private:
@@ -260,10 +280,12 @@ private:
 	void RebuildAssetBrowserView();
 
 	AssetBrowserPanel::AssetActions QueryAssetActions(const Guid& guid) const;
+
 	bool PerformAssetAction(
 		AssetBrowserPanel::AssetAction action,
 		const Guid & guid,
 		std::string_view name);
+
 	void PerformAssetMove(const Guid& guid, const std::filesystem::path& directory);
 	void CompleteAssetPathChange(const Guid& guid, const std::string& path);
 	
@@ -285,7 +307,10 @@ private:
 	CameraInfo BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight);
 
 	// Build Canvas guide rectangles for the current Scene/Canvas View mode.
-	ViewportOverlayData BuildViewportOverlayData(UINT viewportWidth, UINT viewportHeight);
+	ViewportOverlayData BuildViewportOverlayData(
+		UINT viewportWidth,
+		UINT viewportHeight,
+		CanvasRectGizmo* canvasGizmo);
 
 	// Helper function to synchronize the Canvas view navigation state with the currently editing Canvas
 	// Used when the editing root Canvas is changed in the Canvas View to update the displaying state of the Canvas view

@@ -2498,6 +2498,109 @@ namespace
 		return static_cast<Transform*>(actor->GetComponentByExactType(typeid(Transform), 0));
 	}
 
+	RectTransform* ResolveCanvasRect(Actor* actor)
+	{
+		if (!actor || actor->IsDestroyed())
+		{
+			return nullptr;
+		}
+
+		return static_cast<RectTransform*>(actor->GetComponentByExactType(typeid(RectTransform), 0));
+	}
+
+	const Vector3 canvasUnitCorners[4]{
+		{ -0.5f,  0.5f, 0.0f }, { 0.5f,  0.5f, 0.0f },
+		{  0.5f, -0.5f, 0.0f }, {-0.5f, -0.5f, 0.0f }
+	};
+
+	ViewportCanvasRect ProjectViewportRect(const Vector3(&corners)[4],
+		const Matrix4x4& toClip, ViewportCanvasRole role)
+	{
+		ViewportCanvasRect rect;
+		rect.role = role;
+
+		for (size_t i = 0; i < 4; i++)
+		{
+			const Vector3 ndc = toClip.TransformPoint(corners[i]);
+			rect.corners[i] = Vector2(ndc.x * 0.5f + 0.5f, 0.5f - ndc.y * 0.5f);
+		}
+
+		return rect;
+	}
+
+	// Solve the projected 2D basis, including its rotation and non-uniform scale.
+	std::optional<Vector2> ResolveCanvasDelta(
+		const Vector2& axisX, const Vector2& axisY, const Vector2& delta)
+	{
+		const double determinant = double(axisX.x) * axisY.y - double(axisX.y) * axisY.x;
+		const double basisArea = std::hypot(double(axisX.x), double(axisX.y)) *
+			std::hypot(double(axisY.x), double(axisY.y));
+
+		if (!(std::fabs(determinant) > basisArea * 0.00001))
+		{
+			return std::nullopt;
+		}
+
+		const Vector2 result(
+			static_cast<float>((double(delta.x) * axisY.y - double(delta.y) * axisY.x) / determinant),
+			static_cast<float>((double(axisX.x) * delta.y - double(axisX.y) * delta.x) / determinant));
+		if (!ValueValidation::Finite2(result))
+		{
+			return std::nullopt;
+		}
+
+		return result;
+	}
+
+	void SetCanvasPivot(RectTransformEditState& state, const Vector2& pivot)
+	{
+		const Vector2 clamped(std::clamp(pivot.x, 0.0f, 1.0f), std::clamp(pivot.y, 0.0f, 1.0f));
+		const Vector2 delta = clamped - state.pivot;
+		state.anchoredPosition += Vector2(delta.x * state.size.x, delta.y * state.size.y);
+		state.pivot = clamped;
+	}
+
+	bool PrepareCanvasRectGizmo(Actor& actor, const RectTransform& rect,
+		const Matrix4x4& worldToClip, CanvasRectGizmo& gizmo)
+	{
+		gizmo.outline = ProjectViewportRect(canvasUnitCorners, rect.GetWorldMatrix() * worldToClip,
+			ViewportCanvasRole::Selected);
+		for (const Vector2& corner : gizmo.outline.corners)
+		{
+			if (!ValueValidation::Finite2(corner))
+			{
+				return false;
+			}
+		}
+
+		gizmo.pivot = rect.GetPivot();
+		if (!ValueValidation::Finite2(gizmo.pivot) || !ValueValidation::Finite2(rect.GetAnchoredPosition()))
+		{
+			return false;
+		}
+
+		Actor* parent = actor.GetParent();
+		const Transform* parentTransform = parent ? parent->GetComponentByClass<Transform>() : nullptr;
+		const Matrix4x4 parentWorld = parentTransform
+			? parentTransform->GetWorldTransform().GetMatrix() : Matrix4x4::Identity();
+		const Matrix4x4 parentToClip = parentWorld * worldToClip;
+		const Vector3 x = parentToClip.TransformDirection(Vector3::Right());
+		const Vector3 y = parentToClip.TransformDirection(Vector3::Up());
+		gizmo.parentX = Vector2(x.x * 0.5f, -x.y * 0.5f);
+		gizmo.parentY = Vector2(y.x * 0.5f, -y.y * 0.5f);
+
+		const auto& corners = gizmo.outline.corners;
+		const Vector2 right = corners[1] - corners[0];
+		const Vector2 down = corners[3] - corners[0];
+		const Vector2 zero = Vector2::Zero();
+		gizmo.canMove = ResolveCanvasDelta(gizmo.parentX, gizmo.parentY, zero).has_value();
+		gizmo.canDragPivot = ResolveCanvasDelta(right, down, zero).has_value();
+		const Vector2 size = rect.GetSize();
+		const bool hasPositiveSize = size.x > 0.0f && size.y > 0.0f && ValueValidation::Finite2(size);
+		gizmo.canResize = gizmo.canMove && gizmo.canDragPivot && hasPositiveSize;
+		return true;
+	}
+
 	bool CanMoveSceneTransform(const Transform3D& parentWorld)
 	{
 		constexpr float minimumScale = 0.000001f;
@@ -2596,14 +2699,6 @@ void EditorApp::RenderSceneViewPanel()
 			closeDocumentRequest = id;
 		};
 
-	// Build the overlay data for the scene view panel based on the current view mode and any selected screen canvas
-	ViewportOverlayData overlayData;
-
-	if (m_editorMode == EditorMode::Edit)
-	{
-		overlayData = BuildViewportOverlayData(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
-	}
-
 	const bool canEditScene =
 		m_editorMode == EditorMode::Edit &&
 		viewport &&
@@ -2612,6 +2707,35 @@ void EditorApp::RenderSceneViewPanel()
 	
 	Actor* gizmoActor = canUseGizmo && selection ? selection->ResolveActor(GetEditScene()) : nullptr;
 	Transform* gizmoTransform = ResolveSceneTransform(gizmoActor);
+	CanvasRectGizmo canvasGizmo;
+	ViewportOverlayData overlayData;
+
+	if (m_editorMode == EditorMode::Edit)
+	{
+		overlayData = BuildViewportOverlayData(m_editorRenderAssets->Width(), m_editorRenderAssets->Height(),
+			canUseGizmo ? &canvasGizmo : nullptr);
+	}
+
+	RectTransform* gizmoRect = canvasGizmo.actorGuid.IsValid() ? ResolveCanvasRect(gizmoActor) : nullptr;
+
+	if (m_rectTransformEditTransaction)
+	{
+		const auto& edit = *m_rectTransformEditTransaction;
+		const bool sameContext = edit.documentId == canvasGizmo.document && edit.canvasGuid == canvasGizmo.canvasGuid;
+		const bool sameTarget = gizmoRect && edit.actorGuid == canvasGizmo.actorGuid &&
+			edit.parent == gizmoActor->GetParentHandle();
+		const bool cancelRequested = ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::GetIO().AppFocusLost;
+
+		if (!sameContext || !sameTarget || cancelRequested)
+		{
+			CancelRectTransformEdit();
+			gizmoRect = nullptr; // The overlay was built from the pose before rollback.
+		}
+		else
+		{
+			canvasGizmo.activeHandle = edit.handle;
+		}
+	}
 
 	if (m_transformEditTransaction)
 	{
@@ -2689,6 +2813,7 @@ void EditorApp::RenderSceneViewPanel()
 		overlayData,
 		canEditScene,
 		gizmoTransform ? &transformGizmo : nullptr,
+		gizmoRect ? &canvasGizmo : nullptr,
 		documents,
 		documentCallbacks
 	);
@@ -2733,6 +2858,15 @@ void EditorApp::RenderSceneViewPanel()
 		CancelTransformEdit();
 	}
 
+	if (canvasGizmo.wasDrawn && gizmoRect)
+	{
+		ApplyCanvasRectGizmo(*gizmoActor, *gizmoRect, canvasGizmo);
+	}
+	else if (m_rectTransformEditTransaction)
+	{
+		CancelRectTransformEdit();
+	}
+
 	if (m_editorMode == EditorMode::Edit && viewport)
 	{
 		SceneBase* activeScene = GetActiveScene();
@@ -2768,6 +2902,7 @@ void EditorApp::RenderSceneViewPanel()
 
 			if (canvasActor && !canvasActor->IsDestroyed() && canvasActor->GetComponentByClass<Canvas>())
 			{
+				CancelRectTransformEdit();
 				viewport->GetCanvasEditContext().OpenFromActor(canvasActor);
 			}
 		}
@@ -4020,85 +4155,167 @@ void EditorApp::CancelTransformEdit()
 	}
 }
 
-void EditorApp::BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before)
+namespace
 {
-	if (m_editorMode != EditorMode::Edit)
+	bool TryApplyCanvasRectDrag(CanvasRectHandle handle, const Vector2& delta,
+		const Vector2& parentX, const Vector2& parentY, const Vector2& rectRight, const Vector2& rectDown,
+		const RectTransformEditState& before, RectTransformEditState& after)
 	{
-		return;
+		after = before;
+
+		if (handle == CanvasRectHandle::Move)
+		{
+			const auto offset = ResolveCanvasDelta(parentX, parentY, delta);
+			if (!offset)
+			{
+				return false;
+			}
+
+			after.anchoredPosition += *offset;
+			return ValueValidation::Finite2(after.anchoredPosition);
+		}
+
+		const auto offset = ResolveCanvasDelta(rectRight, rectDown, delta);
+		if (!offset)
+		{
+			return false;
+		}
+
+		if (handle == CanvasRectHandle::Pivot)
+		{
+			SetCanvasPivot(after, before.pivot + *offset);
+			return ValueValidation::Finite2(after.anchoredPosition);
+		}
+
+		if (handle != CanvasRectHandle::Resize)
+		{
+			return false;
+		}
+
+		const Vector2 minimumSize(std::min(before.size.x, 1.0f), std::min(before.size.y, 1.0f));
+		after.size = Vector2(
+			std::max(minimumSize.x, before.size.x * (1.0f + offset->x)),
+			std::max(minimumSize.y, before.size.y * (1.0f + offset->y)));
+
+		if (!ValueValidation::Finite2(after.size))
+		{
+			return false;
+		}
+
+		const Vector2 sizeDelta = after.size - before.size;
+		const Vector2 centerShift = (rectRight * (sizeDelta.x / before.size.x) +
+			rectDown * (sizeDelta.y / before.size.y)) * 0.5f;
+		const auto parentShift = ResolveCanvasDelta(parentX, parentY, centerShift);
+		if (!parentShift)
+		{
+			return false;
+		}
+
+		// Preserve the opposite corner and compensate for the engine's pivot offset.
+		after.anchoredPosition += *parentShift + Vector2(
+			(before.pivot.x - 0.5f) * sizeDelta.x,
+			(before.pivot.y - 0.5f) * sizeDelta.y);
+		return ValueValidation::Finite2(after.anchoredPosition);
 	}
 
-	SceneBase* editScene = GetEditScene();
-
-	if (!editScene || !actorGuid.IsValid())
+	void ApplyRectTransformPreview(Actor& actor, RectTransform& rect, const RectTransformEditState& state)
 	{
-		CancelRectTransformEdit();
-		return;
+		state.ApplyTo(rect);
+		actor.FlushTransform();
 	}
-
-	Actor* actor = editScene->ResolveActor(actorGuid);
-
-	std::type_index rectTransformType = std::type_index(typeid(RectTransform));
-	Component* component = actor ? actor->GetComponentByExactType(rectTransformType, 0) : nullptr;
-
-	RectTransform* rectTransform = dynamic_cast<RectTransform*>(component);
-
-	if (!rectTransform)
-	{
-		CancelRectTransformEdit();
-		return;
-	}
-
-	// Stop any ongoing transform edit transaction
-	CancelTransformEdit();
-	CancelRectTransformEdit();
-
-	m_rectTransformEditTransaction = RectTransformEditTransaction{ actorGuid, before };
 }
 
-void EditorApp::EndRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& after)
+void EditorApp::ApplyCanvasRectGizmo(Actor& actor, RectTransform& rect, const CanvasRectGizmo& gizmo)
 {
-	if (m_editorMode != EditorMode::Edit)
-	{
-		return;
-	}
-
 	if (!m_rectTransformEditTransaction)
 	{
+		if (gizmo.pressedHandle != CanvasRectHandle::None && gizmo.mouseUV)
+		{
+			BeginRectTransformEdit(actor, RectTransformEditState::Capture(rect), gizmo);
+			CancelViewportPick();
+		}
 		return;
 	}
 
-	if (m_rectTransformEditTransaction->actorGuid != actorGuid)
+	const auto& edit = *m_rectTransformEditTransaction;
+	const ImVec2 imageMin = m_sceneViewPanel.GetImageMin();
+	const ImVec2 imageMax = m_sceneViewPanel.GetImageMax();
+	const bool sameImageMin = imageMin.x == edit.imageMin.x && imageMin.y == edit.imageMin.y;
+	const bool sameImageMax = imageMax.x == edit.imageMax.x && imageMax.y == edit.imageMax.y;
+	const bool sameParentAxes = edit.parentX.NearEqual(gizmo.parentX, 0.00000001f) &&
+		edit.parentY.NearEqual(gizmo.parentY, 0.00000001f);
+	if (!sameImageMin || !sameImageMax || !sameParentAxes)
 	{
 		CancelRectTransformEdit();
 		return;
 	}
 
-	const RectTransformEditState before = m_rectTransformEditTransaction->before;
+	if (gizmo.mouseUV)
+	{
+		const Vector2 delta = *gizmo.mouseUV - edit.mouseStart;
+		RectTransformEditState after;
+		const bool valid = TryApplyCanvasRectDrag(edit.handle, delta, edit.parentX, edit.parentY,
+			edit.rectRight, edit.rectDown, edit.before, after);
+		if (valid && !(after == RectTransformEditState::Capture(rect)))
+		{
+			ApplyRectTransformPreview(actor, rect, after);
+		}
+	}
 
-	// Do not create a command if the before and after states are identical (no change)
-	if (before == after)
+	if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+	{
+		EndRectTransformEdit(RectTransformEditState::Capture(rect));
+	}
+}
+
+void EditorApp::BeginRectTransformEdit(const Actor& actor, const RectTransformEditState& before,
+	const CanvasRectGizmo& gizmo)
+{
+	CancelTransformEdit();
+
+	RectTransformEditTransaction edit;
+	edit.documentId = gizmo.document;
+	edit.actorGuid = actor.GetGuid();
+	edit.canvasGuid = gizmo.canvasGuid;
+	edit.parent = actor.GetParentHandle();
+	edit.before = before;
+	edit.handle = gizmo.pressedHandle;
+	edit.mouseStart = gizmo.mouseUV.value_or(Vector2::Zero());
+	edit.parentX = gizmo.parentX;
+	edit.parentY = gizmo.parentY;
+	edit.rectRight = gizmo.outline.corners[1] - gizmo.outline.corners[0];
+	edit.rectDown = gizmo.outline.corners[3] - gizmo.outline.corners[0];
+	edit.imageMin = m_sceneViewPanel.GetImageMin();
+	edit.imageMax = m_sceneViewPanel.GetImageMax();
+	m_rectTransformEditTransaction = edit;
+}
+
+void EditorApp::EndRectTransformEdit(const RectTransformEditState& after)
+{
+	const auto& edit = *m_rectTransformEditTransaction;
+	if (edit.before == after)
+	{
+		CancelRectTransformEdit();
+		return;
+	}
+
+	IEditorDocument* document = m_documentManager.FindDocument(edit.documentId);
+	SceneBase* scene = document ? document->GetWorkingScene() : nullptr;
+	if (!scene)
+	{
+		CancelRectTransformEdit();
+		return;
+	}
+
+	// The last preview already applied the final value.
+	if (!document->RecordExecutedCommand(std::make_unique<RectTransformEditCommand>(
+		scene, edit.actorGuid, edit.before, after)))
 	{
 		CancelRectTransformEdit();
 		return;
 	}
 
 	m_rectTransformEditTransaction.reset();
-	IEditorDocument* document = GetActiveEditDocument();
-	SceneBase* editScene = document ? document->GetWorkingScene() : nullptr;
-
-	if (!document || !editScene)
-	{
-		return;
-	}
-
-	document->ExecuteCommand(
-		std::make_unique<RectTransformEditCommand>(
-			editScene,
-			actorGuid,
-			before,
-			after
-		)
-	);
 }
 
 void EditorApp::CancelRectTransformEdit()
@@ -4108,37 +4325,17 @@ void EditorApp::CancelRectTransformEdit()
 		return;
 	}
 
-	const Guid actorGuid = m_rectTransformEditTransaction->actorGuid;
-	SceneBase* editScene = GetEditScene();
+	const auto edit = *m_rectTransformEditTransaction;
+	m_rectTransformEditTransaction.reset();
 
-	if (!editScene || !actorGuid.IsValid())
+	IEditorDocument* document = m_documentManager.FindDocument(edit.documentId);
+	SceneBase* scene = document ? document->GetWorkingScene() : nullptr;
+	Actor* actor = scene ? scene->ResolveActor(edit.actorGuid) : nullptr;
+	if (RectTransform* rect = ResolveCanvasRect(actor))
 	{
-		m_rectTransformEditTransaction.reset();
-		return;
+		ApplyRectTransformPreview(*actor, *rect, edit.before);
 	}
-
-	Actor* actor = editScene->ResolveActor(actorGuid);
-
-	std::type_index rectTransformType = std::type_index(typeid(RectTransform));
-	Component* component = actor ? actor->GetComponentByExactType(rectTransformType, 0) : nullptr;
-
-	RectTransform* rectTransform = dynamic_cast<RectTransform*>(component);
-
-	if (!rectTransform)
-	{
-		m_rectTransformEditTransaction.reset();
-		return;
-	}
-
-	// Reset the RectTransform to its "before" state from the edit transaction
-	m_rectTransformEditTransaction->before.ApplyTo(*rectTransform);
-
-	m_rectTransformEditTransaction = {};
 }
-
-
-
-
 
 CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportHeight)
 {
@@ -4197,7 +4394,8 @@ CameraInfo EditorApp::BuildViewportCameraInfo(UINT viewportWidth, UINT viewportH
 	return cameraInfo;
 }
 
-ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT viewportHeight)
+ViewportOverlayData EditorApp::BuildViewportOverlayData(
+	UINT viewportWidth, UINT viewportHeight, CanvasRectGizmo* canvasGizmo)
 {
 	ViewportOverlayData overlayData;
 	EditorViewportContext* viewport = GetActiveViewportContext();
@@ -4210,21 +4408,26 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 		return overlayData;
 	}
 
-	const CameraInfo cameraInfo = BuildViewportCameraInfo(viewportWidth, viewportHeight);
-	const Matrix4x4 viewProjection = cameraInfo.viewMatrix * cameraInfo.projMatrix;
-
-	// Built overlay data for the Canvas View mode
-	// In Canvas View, we need to display the editing canvas and ancestor Canvases of the selected Canvas up to the editing canvas
-	if (viewport->GetViewMode() == EditorViewportMode::Canvas)
+	const bool isCanvasView = viewport->GetViewMode() == EditorViewportMode::Canvas;
+	Canvas* editingCanvas = nullptr;
+	if (isCanvasView)
 	{
-		// Resolve editing canvas from the CanvasEditContext, which is the root canvas for the Canvas View
-		Canvas* editingCanvas = viewport->GetCanvasEditContext().ResolveCanvas(*activeScene);
-
+		editingCanvas = viewport->GetCanvasEditContext().ResolveCanvas(*activeScene);
 		if (!editingCanvas)
 		{
 			return overlayData;
 		}
 
+		SyncCanvasViewNavigation(editingCanvas);
+	}
+
+	const CameraInfo cameraInfo = BuildViewportCameraInfo(viewportWidth, viewportHeight);
+	const Matrix4x4 viewProjection = cameraInfo.viewMatrix * cameraInfo.projMatrix;
+
+	// Built overlay data for the Canvas View mode
+	// In Canvas View, we need to display the editing canvas and ancestor Canvases of the selected Canvas up to the editing canvas
+	if (isCanvasView)
+	{
 		std::vector<Canvas*> breadcrumbPath;
 
 		for (Actor* current = editingCanvas->GetOwner();
@@ -4290,24 +4493,10 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 		const Vector2 referenceSize = editingCanvas->GetLayoutReferenceSize();
 		const Matrix4x4 worldToEditingCanvas = editingCanvas->GetContentWorldMatrix().Inverse();
 
-		// Lambda function to append a ViewportCanvasRect to the overlay data,
-		// transforming the corners from local space to NDC space using the provided transform and view-projection matrix
 		const auto appendRect = [&overlayData, &viewProjection](
-			const Vector3(&corners)[4],
-			const Matrix4x4& transform,
-			ViewportCanvasRole role)
+			const Vector3(&corners)[4], const Matrix4x4& transform, ViewportCanvasRole role)
 		{
-			ViewportCanvasRect rect;
-			rect.role = role;
-
-			for (size_t i = 0; i < 4; i++)
-			{
-				const Vector3 position = transform.TransformPoint(corners[i]);
-				const Vector3 ndc = viewProjection.TransformPoint(position);
-				rect.corners[i] = {ndc.x * 0.5f + 0.5f, 0.5f - ndc.y * 0.5f};
-			}
-
-			overlayData.canvasRects.push_back(rect);
+			overlayData.canvasRects.push_back(ProjectViewportRect(corners, transform * viewProjection, role));
 		};
 
 		// Original corners of the editing canvas in its local space, based on its reference size
@@ -4349,12 +4538,6 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 			// Reverse the path to have the editing canvas first and the selected canvas last
 			std::reverse(path.begin(), path.end());
 
-			const Vector3 unitCorners[4]
-			{
-				{ -0.5f, -0.5f, 0.0f }, { -0.5f, 0.5f, 0.0f },
-				{  0.5f,  0.5f, 0.0f }, {  0.5f, -0.5f, 0.0f }
-			};
-
 			// Append overlay rects for each ancestor canvas in the path,
 			// transforming their local rects to world space and then to the editing canvas's local space
 			for (size_t i = 1; i < path.size(); i++)
@@ -4377,7 +4560,29 @@ ViewportOverlayData EditorApp::BuildViewportOverlayData(UINT viewportWidth, UINT
 					(i + 1 == path.size()) ? ViewportCanvasRole::Selected : ViewportCanvasRole::Ancestor;
 
 				// Appending
-				appendRect(unitCorners, transform, role);
+				appendRect(canvasUnitCorners, transform, role);
+			}
+		}
+
+		const bool isEditableChild = selectedActor && selectedActor != editingCanvas->GetOwner() &&
+			IsActorHierarchyActive(selectedActor);
+		const bool isVisibleInCanvas = selectedCanvas && editingCanvas->ContainsCanvas(selectedCanvas) &&
+			selectedCanvas->IsHierarchyVisible();
+		if (canvasGizmo && isEditableChild && isVisibleInCanvas)
+		{
+			const RectTransform* rect = ResolveCanvasRect(selectedActor);
+			const Matrix4x4 worldToClip = worldToEditingCanvas * viewProjection;
+			if (rect && PrepareCanvasRectGizmo(*selectedActor, *rect, worldToClip, *canvasGizmo))
+			{
+				canvasGizmo->document = m_documentManager.GetActiveDocumentId();
+				canvasGizmo->actorGuid = selectedActor->GetGuid();
+				canvasGizmo->canvasGuid = editingCanvas->GetOwner()->GetGuid();
+
+				// A selected nested Canvas already has its outline in the list.
+				if (selectedActor != selectedCanvas->GetOwner())
+				{
+					overlayData.canvasRects.push_back(canvasGizmo->outline);
+				}
 			}
 		}
 
