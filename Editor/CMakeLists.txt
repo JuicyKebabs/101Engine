@@ -1,5 +1,7 @@
 # Editor
 
+set(IMGUIZMO_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/ImGuizmo/src")
+
 set(IMGUI_SOURCES
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui.cpp
     ${CMAKE_SOURCE_DIR}/third_party/ImGui/imgui_draw.cpp
@@ -17,6 +19,7 @@ file(GLOB_RECURSE EDITOR_SOURCES
 add_executable(101Editor WIN32
     ${EDITOR_SOURCES}
     ${IMGUI_SOURCES}
+    "${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp"
     ${CMAKE_SOURCE_DIR}/Config/Windows/101Engine.manifest
 )
 
@@ -26,6 +29,7 @@ target_compile_definitions(101Editor PRIVATE
 
 target_include_directories(101Editor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    "${IMGUIZMO_SOURCE_DIR}"
 )
 
 add_custom_command(TARGET 101Editor POST_BUILD

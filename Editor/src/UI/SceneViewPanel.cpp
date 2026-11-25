@@ -2,6 +2,7 @@
 #include <cmath>
 #include "SceneViewPanel.h"
 #include "imgui.h"
+#include "ImGuizmo.h"
 
 void SceneViewPanel::Render(
 	ImTextureID sceneTextureHandle,
@@ -9,6 +10,9 @@ void SceneViewPanel::Render(
 	UINT textureHeight,
 	EditorViewportContext* viewportContext,
 	const ViewportOverlayData& overlayData,
+	bool canEditScene,
+	SceneTransformGizmo* transformGizmo,
+	CanvasRectGizmo* canvasGizmo,
 	std::span<const EditorDocumentInfo> documents,
 	const DocumentTabBar::Callbacks& documentCallbacks
 )
@@ -34,6 +38,8 @@ void SceneViewPanel::Render(
 	}
 
 	const auto getViewMode = [viewportContext]() { return viewportContext->GetViewMode(); };
+	const bool isDraggingCanvasRect = canvasGizmo &&
+		canvasGizmo->activeHandle != CanvasRectHandle::None;
 
 	// Display the resolution of the render target
 	ImGui::Text(
@@ -98,11 +104,13 @@ void SceneViewPanel::Render(
 	{
 		ImGui::SameLine();
 
+		ImGui::BeginDisabled(isDraggingCanvasRect);
 		if (ImGui::SmallButton("Fit"))
 		{
 			m_canvasNavigationInput.fitRequested = true;
 			m_hasCanvasNavigationInput = true;
 		}
+		ImGui::EndDisabled();
 	}
 
 	// Render the tab bar for switching between Scene and Canvas view modes
@@ -121,6 +129,23 @@ void SceneViewPanel::Render(
 		}
 
 		ImGui::EndTabBar();
+	}
+
+	const ImGuiIO& io = ImGui::GetIO();
+	const bool isCameraGesture = io.KeyAlt ||
+		ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
+		ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+	const bool isDraggingTransform = transformGizmo && transformGizmo->isDragging;
+	const bool acceptsToolShortcut = m_isFocused && !io.WantTextInput &&
+		!io.KeyCtrl && !io.KeyShift && !io.KeySuper;
+
+	if (canEditScene && getViewMode() == EditorViewportMode::Scene)
+	{
+		DrawTransformTools(!isCameraGesture && !isDraggingTransform, acceptsToolShortcut);
+	}
+	else if (canEditScene && getViewMode() == EditorViewportMode::Canvas)
+	{
+		DrawCanvasRectTools(!isCameraGesture && !isDraggingCanvasRect, acceptsToolShortcut);
 	}
 
 	// Get the available size of the content region in the ImGui window
@@ -189,8 +214,22 @@ void SceneViewPanel::Render(
 	m_imageMin = ImGui::GetItemRectMin();
 	m_imageMax = ImGui::GetItemRectMax();
 
+	const bool imageHovered = ImGui::IsItemHovered();
+	const bool imageClicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+	const bool cameraInput = imageHovered &&
+		(isCameraGesture || io.MouseWheel != 0.0f || ImGui::IsKeyPressed(ImGuiKey_F, false));
+	bool blocksPicking = isDraggingTransform || isDraggingCanvasRect;
+
+	if (transformGizmo && getViewMode() == EditorViewportMode::Scene)
+	{
+		if (isDraggingTransform || !cameraInput)
+		{
+			blocksPicking = DrawTransformGizmo(*transformGizmo, imageHovered);
+		}
+	}
+
 	// Mouse input detection in Canvas View
-	if (getViewMode() == EditorViewportMode::Canvas && ImGui::IsItemHovered())
+	if (getViewMode() == EditorViewportMode::Canvas && imageHovered && !isDraggingCanvasRect)
 	{
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -220,7 +259,7 @@ void SceneViewPanel::Render(
 			m_hasCanvasNavigationInput = true;
 		}
 	}
-	else if (getViewMode() == EditorViewportMode::Scene && ImGui::IsItemHovered())
+	else if (getViewMode() == EditorViewportMode::Scene && imageHovered && !isDraggingTransform)
 	{
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -367,6 +406,14 @@ void SceneViewPanel::Render(
 
 		// Draw the canvas overlay rectangles for the currently editing canvas and its ancestors
 		drawCanvasRects(overlayData.canvasRects);
+
+		if (canvasGizmo && m_canvasRectTool != CanvasRectTool::View)
+		{
+			const bool isNavigating = isCameraGesture || io.MouseWheel != 0.0f ||
+				m_canvasNavigationInput.fitRequested;
+			const bool canStart = imageClicked && !isNavigating && !ImGui::IsAnyItemActive();
+			blocksPicking |= DrawCanvasRectHandles(*canvasGizmo, canStart);
+		}
 	}
 	else
 	{// Scene View Mode
@@ -375,7 +422,7 @@ void SceneViewPanel::Render(
 	}
 
 	// Handle mouse click events for picking actors in the scene
-	if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
+	if (imageClicked && !io.KeyAlt && !blocksPicking)
 	{
 		// Get the current mouse position in the ImGui window
 		const ImVec2 mousePosition = ImGui::GetMousePos();
@@ -398,6 +445,204 @@ void SceneViewPanel::Render(
 	}
 
 	ImGui::End();
+}
+
+void SceneViewPanel::DrawCanvasRectTools(bool canSwitch, bool acceptsKeyboard)
+{
+	ImGui::BeginDisabled(!canSwitch);
+	const auto drawTool = [&](const char* label, ImGuiKey key, CanvasRectTool tool)
+	{
+		const bool clicked = ImGui::RadioButton(label, m_canvasRectTool == tool);
+		const bool shortcut = acceptsKeyboard && ImGui::IsKeyPressed(key, false);
+		if (canSwitch && (clicked || shortcut))
+		{
+			m_canvasRectTool = tool;
+		}
+	};
+
+	drawTool("View (Q)", ImGuiKey_Q, CanvasRectTool::View);
+	ImGui::SameLine();
+	drawTool("Rect (W)", ImGuiKey_W, CanvasRectTool::Rect);
+	ImGui::SameLine();
+	drawTool("Pivot (E)", ImGuiKey_E, CanvasRectTool::Pivot);
+
+	ImGui::EndDisabled();
+}
+
+bool SceneViewPanel::DrawCanvasRectHandles(CanvasRectGizmo& gizmo, bool canStart)
+{
+	const float width = m_imageMax.x - m_imageMin.x;
+	const float height = m_imageMax.y - m_imageMin.y;
+	const ImVec2 mouse = ImGui::GetMousePos();
+
+	gizmo.wasDrawn = true;
+	if (ImGui::IsMousePosValid(&mouse))
+	{
+		gizmo.mouseUV = Vector2((mouse.x - m_imageMin.x) / width, (mouse.y - m_imageMin.y) / height);
+	}
+
+	const auto& corners = gizmo.outline.corners;
+	const Vector2 center = (corners[0] + corners[2]) * 0.5f;
+	const Vector2 pivot = corners[0] + (corners[1] - corners[0]) * gizmo.pivot.x +
+		(corners[3] - corners[0]) * gizmo.pivot.y;
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	drawList->PushClipRect(m_imageMin, m_imageMax, true);
+
+	const auto drawHandle = [&](CanvasRectHandle handle, const Vector2& uv, bool enabled)
+	{
+		constexpr float radius = 6.0f;
+		const ImVec2 point(m_imageMin.x + uv.x * width, m_imageMin.y + uv.y * height);
+		const bool hit = std::fabs(mouse.x - point.x) <= radius &&
+			std::fabs(mouse.y - point.y) <= radius;
+		const bool canPress = canStart && enabled && hit;
+		const bool isIdle = gizmo.activeHandle == CanvasRectHandle::None &&
+			gizmo.pressedHandle == CanvasRectHandle::None;
+
+		if (canPress && isIdle)
+		{
+			gizmo.pressedHandle = handle;
+		}
+
+		ImU32 color = enabled ? IM_COL32(75, 183, 255, 255) : IM_COL32(125, 135, 145, 180);
+		if (gizmo.activeHandle == handle || gizmo.pressedHandle == handle)
+		{
+			color = IM_COL32(255, 191, 72, 255);
+		}
+
+		if (handle == CanvasRectHandle::Resize)
+		{
+			const ImVec2 min(point.x - radius, point.y - radius);
+			const ImVec2 max(point.x + radius, point.y + radius);
+			drawList->AddRectFilled(min, max, color);
+		}
+		else
+		{
+			drawList->AddCircleFilled(point, radius, color);
+		}
+	};
+
+	if (m_canvasRectTool == CanvasRectTool::Pivot)
+	{
+		drawHandle(CanvasRectHandle::Pivot, pivot, gizmo.canDragPivot);
+	}
+	else
+	{
+		// The resize handle wins if a small rectangle makes the hit areas overlap.
+		drawHandle(CanvasRectHandle::Resize, corners[2], gizmo.canResize);
+		drawHandle(CanvasRectHandle::Move, center, gizmo.canMove);
+	}
+
+	drawList->PopClipRect();
+	return gizmo.activeHandle != CanvasRectHandle::None || gizmo.pressedHandle != CanvasRectHandle::None;
+}
+
+void SceneViewPanel::DrawTransformTools(bool canSwitch, bool acceptsKeyboard)
+{
+	// Show the buttons to switch betweenthe different transform tools
+	// (View, Move, Rotate, Scale)
+	struct ToolButton
+	{
+		const char* label;
+		ImGuiKey key;
+		SceneTransformTool tool;
+	};
+
+	static constexpr ToolButton tools[] = {
+		{ "View (Q)", ImGuiKey_Q, SceneTransformTool::View },
+		{ "Move (W)", ImGuiKey_W, SceneTransformTool::Move },
+		{ "Rotate (E)", ImGuiKey_E, SceneTransformTool::Rotate },
+		{ "Scale (R)", ImGuiKey_R, SceneTransformTool::Scale }
+	};
+
+	ImGui::BeginDisabled(!canSwitch);
+
+	for (const ToolButton& button : tools)
+	{
+		const bool clicked = ImGui::RadioButton(button.label, m_transformTool == button.tool);
+		const bool shortcut = acceptsKeyboard && ImGui::IsKeyPressed(button.key, false);
+
+		if (canSwitch && (clicked || shortcut))
+		{
+			m_transformTool = button.tool;
+		}
+
+		ImGui::SameLine();
+	}
+
+	const bool canSwitchAxes =
+		m_transformTool == SceneTransformTool::Move ||
+		m_transformTool == SceneTransformTool::Rotate;
+	const bool localAxes = m_useLocalTransformAxes || m_transformTool == SceneTransformTool::Scale;
+	
+	ImGui::BeginDisabled(!canSwitchAxes);
+
+	if (ImGui::SmallButton(localAxes ? "Local" : "Global"))
+	{
+		m_useLocalTransformAxes = !m_useLocalTransformAxes;
+	}
+
+	ImGui::EndDisabled();
+	ImGui::EndDisabled();
+}
+
+bool SceneViewPanel::DrawTransformGizmo(SceneTransformGizmo& gizmo, bool imageHovered)
+{
+	gizmo.tool = m_transformTool;
+
+	if (gizmo.tool == SceneTransformTool::View)
+	{
+		return false;
+	}
+
+	const Vector3 viewPosition = gizmo.view.TransformPoint(gizmo.matrix.GetTranslation());
+	const float clipDepth = viewPosition.z * gizmo.projection._33 + gizmo.projection._43;
+	constexpr float minimumClipDepth = 0.001f;
+
+	// ImGuizmo's perspective early return leaves its draw-list clip stack unbalanced.
+	if (!std::isfinite(clipDepth) || clipDepth <= minimumClipDepth)
+	{
+		return gizmo.isDragging;
+	}
+
+	ImGuizmo::OPERATION operation = ImGuizmo::TRANSLATE;
+
+	if (gizmo.tool == SceneTransformTool::Rotate)
+	{
+		operation = ImGuizmo::ROTATE;
+	}
+	else if (gizmo.tool == SceneTransformTool::Scale)
+	{
+		operation = ImGuizmo::SCALE;
+	}
+
+	const bool canUseTool = gizmo.tool != SceneTransformTool::Move || gizmo.canMove;
+	const bool canStart = imageHovered && canUseTool;
+	const bool localAxes = m_useLocalTransformAxes || operation == ImGuizmo::SCALE;
+	const ImGuizmo::MODE mode = localAxes ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+
+	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+	ImGuizmo::SetRect(
+		m_imageMin.x, m_imageMin.y,
+		m_imageMax.x - m_imageMin.x,
+		m_imageMax.y - m_imageMin.y);
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::Enable(canStart || gizmo.isDragging);
+
+	gizmo.wasDrawn = true;
+	gizmo.changed =
+		ImGuizmo::Manipulate(
+			&gizmo.view._11,
+			&gizmo.projection._11,
+			operation, mode,
+			&gizmo.matrix._11);
+	gizmo.isUsing = ImGuizmo::IsUsing();
+
+	return gizmo.isDragging || gizmo.isUsing || (canStart && ImGuizmo::IsOver(operation));
+}
+
+void SceneViewPanel::ResetTransformGizmo()
+{
+	ImGuizmo::Enable(false);
 }
 
 bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)

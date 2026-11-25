@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <span>
+#include <optional>
 #include "imgui.h"
 #include "Engine/Core/Math/Math.h"
 #include "Engine/Core/Guid/Guid.h"
@@ -88,6 +89,57 @@ struct ViewportOverlayData
 	std::vector<CanvasBreadcrumbItem> canvasBreadcrumbs;
 };
 
+enum class SceneTransformTool
+{
+	View,
+	Move,
+	Rotate,
+	Scale
+};
+
+// Frame-local input and result for the selected Actor's transform handle.
+struct SceneTransformGizmo
+{
+	Matrix4x4 view;
+	Matrix4x4 projection;
+	Matrix4x4 matrix;
+	bool canMove = false;
+	bool isDragging = false;
+
+	SceneTransformTool tool = SceneTransformTool::View;
+	bool wasDrawn = false;
+	bool isUsing = false;
+	bool changed = false;
+};
+
+enum class CanvasRectHandle
+{
+	None,
+	Move,
+	Resize,
+	Pivot
+};
+
+// Frame-local data. The panel reports input while EditorApp owns the edit.
+struct CanvasRectGizmo
+{
+	ViewportCanvasRect outline;	// Top-left, top-right, bottom-right, bottom-left in rectangle space.
+	EditorDocumentId document;
+	Guid actorGuid;
+	Guid canvasGuid;
+	Vector2 pivot;
+	Vector2 parentX;
+	Vector2 parentY;
+	bool canMove = false;
+	bool canResize = false;
+	bool canDragPivot = false;
+	CanvasRectHandle activeHandle = CanvasRectHandle::None;
+
+	bool wasDrawn = false;
+	CanvasRectHandle pressedHandle = CanvasRectHandle::None;
+	std::optional<Vector2> mouseUV;
+};
+
 class SceneViewPanel
 {
 public:
@@ -97,9 +149,14 @@ public:
 		UINT textureHeight,
 		EditorViewportContext* viewportContext,
 		const ViewportOverlayData& overlayData,
+		bool canEditScene,
+		SceneTransformGizmo* transformGizmo,
+		CanvasRectGizmo* canvasGizmo,
 		std::span<const EditorDocumentInfo> documents,
 		const DocumentTabBar::Callbacks& documentCallbacks
 	);
+
+	void ResetTransformGizmo();
 
 	// Consume a resize request from the scene view panel and return the new width and height
 	bool ConsumeResizeRequest(UINT& outWidth, UINT& outHeight);
@@ -124,6 +181,22 @@ public:
 	ImVec2 GetImageMax() const { return m_imageMax; }
 
 private:
+	enum class CanvasRectTool
+	{
+		View,
+		Rect,
+		Pivot
+	};
+
+	void DrawTransformTools(bool canSwitch, bool acceptsKeyboard);
+	bool DrawTransformGizmo(SceneTransformGizmo& gizmo, bool imageHovered);
+	void DrawCanvasRectTools(bool canSwitch, bool acceptsKeyboard);
+	bool DrawCanvasRectHandles(CanvasRectGizmo& gizmo, bool canStart);
+
+	SceneTransformTool m_transformTool = SceneTransformTool::Move;
+	bool m_useLocalTransformAxes = false;
+	CanvasRectTool m_canvasRectTool = CanvasRectTool::Rect;
+
 	static constexpr float kRenderScale = 1.0f; // Scale factor for rendering the scene view panel
 
 	bool m_isHovered = false;

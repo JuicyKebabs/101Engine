@@ -7,6 +7,7 @@
 | 保存ファイル | 取得元 | 確認・抽出方法 |
 |---|---|---|
 | [imgui-LICENSE.txt](imgui-LICENSE.txt) | [third_party/ImGui/LICENSE.txt](../third_party/ImGui/LICENSE.txt) | 同梱ファイルのバイト列をそのままコピー |
+| [imguizmo-LICENSE.txt](imguizmo-LICENSE.txt) | [ImGuizmo の固定コミット `49f0102`](https://github.com/CedricGuillemet/ImGuizmo/tree/49f0102a4697689cf34cca9c88e5697dadf39390) | `LICENSE` と [マニピュレーターのソース](../third_party/ImGuizmo/src/) を同一コミットから取得し、上流の Git blob と照合（2026年11月25日） |
 | [assimp-LICENSE.txt](assimp-LICENSE.txt) | [https://github.com/assimp/assimp/blob/v6.0.5/LICENSE](https://github.com/assimp/assimp/blob/v6.0.5/LICENSE) | 公式 v6.0.5（392a658）から VS 2026 x64 で Debug・Release をビルド。ヘッダーは同じビルドのインストール出力 |
 | [nlohmann-json-LICENSE.txt](nlohmann-json-LICENSE.txt) | [https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT](https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT) | 同梱両ヘッダーがv3.12.0と改行・BOMを除き一致 |
 | [directxtex-LICENSE.txt](directxtex-LICENSE.txt) | [https://github.com/microsoft/DirectXTex/blob/c0cb97764379ebd20dbd2016c58965db85f5b307/LICENSE](https://github.com/microsoft/DirectXTex/blob/c0cb97764379ebd20dbd2016c58965db85f5b307/LICENSE) | 同梱コードのMIT・Microsoft著作権表記と照合。ソースのリリース版の一致を示すものではない |
