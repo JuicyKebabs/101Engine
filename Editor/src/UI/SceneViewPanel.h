@@ -88,6 +88,29 @@ struct ViewportOverlayData
 	std::vector<CanvasBreadcrumbItem> canvasBreadcrumbs;
 };
 
+enum class SceneTransformTool
+{
+	View,
+	Move,
+	Rotate,
+	Scale
+};
+
+// Frame-local input and result for the selected Actor's transform handle.
+struct SceneTransformGizmo
+{
+	Matrix4x4 view;
+	Matrix4x4 projection;
+	Matrix4x4 matrix;
+	bool canMove = false;
+	bool isDragging = false;
+
+	SceneTransformTool tool = SceneTransformTool::View;
+	bool wasDrawn = false;
+	bool isUsing = false;
+	bool changed = false;
+};
+
 class SceneViewPanel
 {
 public:
@@ -97,9 +120,13 @@ public:
 		UINT textureHeight,
 		EditorViewportContext* viewportContext,
 		const ViewportOverlayData& overlayData,
+		bool canEditScene,
+		SceneTransformGizmo* transformGizmo,
 		std::span<const EditorDocumentInfo> documents,
 		const DocumentTabBar::Callbacks& documentCallbacks
 	);
+
+	void ResetTransformGizmo();
 
 	// Consume a resize request from the scene view panel and return the new width and height
 	bool ConsumeResizeRequest(UINT& outWidth, UINT& outHeight);
@@ -124,6 +151,12 @@ public:
 	ImVec2 GetImageMax() const { return m_imageMax; }
 
 private:
+	void DrawTransformTools(bool canSwitch);
+	bool DrawTransformGizmo(SceneTransformGizmo& gizmo, bool imageHovered);
+
+	SceneTransformTool m_transformTool = SceneTransformTool::Move;
+	bool m_useLocalTransformAxes = false;
+
 	static constexpr float kRenderScale = 1.0f; // Scale factor for rendering the scene view panel
 
 	bool m_isHovered = false;

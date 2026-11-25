@@ -166,15 +166,20 @@ private:
 	// Struct to track transform edits for undo/redo
 	struct TransformEditTransaction
 	{
+		EditorDocumentId documentId;
 		Guid actorGuid;
+		ActorHandle parent;
 		Transform3D before;
 	};
 
 	// Optional to track an ongoing transform edit transaction
 	std::optional<TransformEditTransaction> m_transformEditTransaction;
 
-	// Helper functions for callbacks from the InspectorPanel to track transform edits for undo/redo
-	void BeginTransformEdit(const Guid& actorGuid, const Transform3D& before);
+	void ApplySceneTransformGizmo(
+		Actor& actor, Transform& transform, const Transform3D& parentWorld,
+		const SceneTransformGizmo& gizmo);
+	void ApplyTransformPreview(Actor& actor, Transform& transform, const Transform3D& state);
+	void BeginTransformEdit(const Actor& actor, const Transform3D& before);
 	void EndTransformEdit(const Guid& actorGuid, const Transform3D& after);
 	void CancelTransformEdit();
 

@@ -2,6 +2,7 @@
 #include <cmath>
 #include "SceneViewPanel.h"
 #include "imgui.h"
+#include "ImGuizmo.h"
 
 void SceneViewPanel::Render(
 	ImTextureID sceneTextureHandle,
@@ -9,6 +10,8 @@ void SceneViewPanel::Render(
 	UINT textureHeight,
 	EditorViewportContext* viewportContext,
 	const ViewportOverlayData& overlayData,
+	bool canEditScene,
+	SceneTransformGizmo* transformGizmo,
 	std::span<const EditorDocumentInfo> documents,
 	const DocumentTabBar::Callbacks& documentCallbacks
 )
@@ -123,6 +126,17 @@ void SceneViewPanel::Render(
 		ImGui::EndTabBar();
 	}
 
+	const ImGuiIO& io = ImGui::GetIO();
+	const bool isCameraGesture = io.KeyAlt ||
+		ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
+		ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+	const bool isDraggingTransform = transformGizmo && transformGizmo->isDragging;
+
+	if (canEditScene && getViewMode() == EditorViewportMode::Scene)
+	{
+		DrawTransformTools(!isCameraGesture && !isDraggingTransform);
+	}
+
 	// Get the available size of the content region in the ImGui window
 	const ImVec2 availableSize = ImGui::GetContentRegionAvail();
 
@@ -189,8 +203,22 @@ void SceneViewPanel::Render(
 	m_imageMin = ImGui::GetItemRectMin();
 	m_imageMax = ImGui::GetItemRectMax();
 
+	const bool imageHovered = ImGui::IsItemHovered();
+	const bool imageClicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+	const bool cameraInput = imageHovered &&
+		(isCameraGesture || io.MouseWheel != 0.0f || ImGui::IsKeyPressed(ImGuiKey_F, false));
+	bool blocksPicking = isDraggingTransform;
+
+	if (transformGizmo && getViewMode() == EditorViewportMode::Scene)
+	{
+		if (isDraggingTransform || !cameraInput)
+		{
+			blocksPicking = DrawTransformGizmo(*transformGizmo, imageHovered);
+		}
+	}
+
 	// Mouse input detection in Canvas View
-	if (getViewMode() == EditorViewportMode::Canvas && ImGui::IsItemHovered())
+	if (getViewMode() == EditorViewportMode::Canvas && imageHovered)
 	{
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -220,7 +248,7 @@ void SceneViewPanel::Render(
 			m_hasCanvasNavigationInput = true;
 		}
 	}
-	else if (getViewMode() == EditorViewportMode::Scene && ImGui::IsItemHovered())
+	else if (getViewMode() == EditorViewportMode::Scene && imageHovered && !isDraggingTransform)
 	{
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -375,7 +403,7 @@ void SceneViewPanel::Render(
 	}
 
 	// Handle mouse click events for picking actors in the scene
-	if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
+	if (imageClicked && !io.KeyAlt && !blocksPicking)
 	{
 		// Get the current mouse position in the ImGui window
 		const ImVec2 mousePosition = ImGui::GetMousePos();
@@ -398,6 +426,119 @@ void SceneViewPanel::Render(
 	}
 
 	ImGui::End();
+}
+
+void SceneViewPanel::DrawTransformTools(bool canSwitch)
+{
+	// Show the buttons to switch betweenthe different transform tools
+	// (View, Move, Rotate, Scale)
+	struct ToolButton
+	{
+		const char* label;
+		ImGuiKey key;
+		SceneTransformTool tool;
+	};
+
+	static constexpr ToolButton tools[] = {
+		{ "View (Q)", ImGuiKey_Q, SceneTransformTool::View },
+		{ "Move (W)", ImGuiKey_W, SceneTransformTool::Move },
+		{ "Rotate (E)", ImGuiKey_E, SceneTransformTool::Rotate },
+		{ "Scale (R)", ImGuiKey_R, SceneTransformTool::Scale }
+	};
+
+	const ImGuiIO& io = ImGui::GetIO();
+	const bool hasModifier = io.KeyCtrl || io.KeyShift || io.KeySuper;
+	const bool acceptsKeyboard = m_isFocused && !io.WantTextInput && !hasModifier;
+
+	ImGui::BeginDisabled(!canSwitch);
+
+	for (const ToolButton& button : tools)
+	{
+		const bool clicked = ImGui::RadioButton(button.label, m_transformTool == button.tool);
+		const bool shortcut = acceptsKeyboard && ImGui::IsKeyPressed(button.key, false);
+
+		if (canSwitch && (clicked || shortcut))
+		{
+			m_transformTool = button.tool;
+		}
+
+		ImGui::SameLine();
+	}
+
+	const bool canSwitchAxes =
+		m_transformTool == SceneTransformTool::Move ||
+		m_transformTool == SceneTransformTool::Rotate;
+	const bool localAxes = m_useLocalTransformAxes || m_transformTool == SceneTransformTool::Scale;
+	
+	ImGui::BeginDisabled(!canSwitchAxes);
+
+	if (ImGui::SmallButton(localAxes ? "Local" : "Global"))
+	{
+		m_useLocalTransformAxes = !m_useLocalTransformAxes;
+	}
+
+	ImGui::EndDisabled();
+	ImGui::EndDisabled();
+}
+
+bool SceneViewPanel::DrawTransformGizmo(SceneTransformGizmo& gizmo, bool imageHovered)
+{
+	gizmo.tool = m_transformTool;
+
+	if (gizmo.tool == SceneTransformTool::View)
+	{
+		return false;
+	}
+
+	const Vector3 viewPosition = gizmo.view.TransformPoint(gizmo.matrix.GetTranslation());
+	const float clipDepth = viewPosition.z * gizmo.projection._33 + gizmo.projection._43;
+	constexpr float minimumClipDepth = 0.001f;
+
+	// ImGuizmo's perspective early return leaves its draw-list clip stack unbalanced.
+	if (!std::isfinite(clipDepth) || clipDepth <= minimumClipDepth)
+	{
+		return gizmo.isDragging;
+	}
+
+	ImGuizmo::OPERATION operation = ImGuizmo::TRANSLATE;
+
+	if (gizmo.tool == SceneTransformTool::Rotate)
+	{
+		operation = ImGuizmo::ROTATE;
+	}
+	else if (gizmo.tool == SceneTransformTool::Scale)
+	{
+		operation = ImGuizmo::SCALE;
+	}
+
+	const bool canUseTool = gizmo.tool != SceneTransformTool::Move || gizmo.canMove;
+	const bool canStart = imageHovered && canUseTool;
+	const bool localAxes = m_useLocalTransformAxes || operation == ImGuizmo::SCALE;
+	const ImGuizmo::MODE mode = localAxes ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+
+	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+	ImGuizmo::SetRect(
+		m_imageMin.x, m_imageMin.y,
+		m_imageMax.x - m_imageMin.x,
+		m_imageMax.y - m_imageMin.y);
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::Enable(canStart || gizmo.isDragging);
+
+	gizmo.wasDrawn = true;
+	gizmo.changed =
+		ImGuizmo::Manipulate(
+			&gizmo.view._11,
+			&gizmo.projection._11,
+			operation, mode,
+			&gizmo.matrix._11);
+	gizmo.isUsing = ImGuizmo::IsUsing();
+
+	return gizmo.isDragging || gizmo.isUsing || (canStart && ImGuizmo::IsOver(operation));
+}
+
+void SceneViewPanel::ResetTransformGizmo()
+{
+	ImGuizmo::Enable(false);
 }
 
 bool SceneViewPanel::ConsumeResizeRequest(UINT& outWidth, UINT& outHeight)

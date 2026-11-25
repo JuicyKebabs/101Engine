@@ -21,11 +21,13 @@
 #include "Engine/Input/InputManager.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "ImGuizmo.h"
 #include "backends/imgui_impl_win32.h"
 #include "Core/EditorScene.h"
 #include "Document/SceneEditorDocument.h"
 #include "Document/ActorImprintEditorDocument.h"
 #include "Engine/Core/Math/Math.h"
+#include "Engine/Core/Math/ValueValidation.h"
 #include "Engine/Actor/ActorFactory.h"
 #include "Engine/Actor/ActorTag.h"
 #include "Engine/Component/Transform.h"
@@ -412,6 +414,7 @@ int EditorApp::Run()
 				// windows can be drawn from within Update().
 				ImGui_ImplWin32_NewFrame();
 				ImGui::NewFrame();
+				ImGuizmo::BeginFrame();
 
 				float deltaTime = m_timeManager.GetDeltaTime();
 				m_timeManager.Update();
@@ -2483,6 +2486,94 @@ void EditorApp::RenderInspectorPanel()
 		callbacks);
 }
 
+namespace
+{
+	Transform* ResolveSceneTransform(Actor* actor)
+	{
+		if (!actor || actor->IsDestroyed())
+		{
+			return nullptr;
+		}
+
+		return static_cast<Transform*>(actor->GetComponentByExactType(typeid(Transform), 0));
+	}
+
+	bool CanMoveSceneTransform(const Transform3D& parentWorld)
+	{
+		constexpr float minimumScale = 0.000001f;
+		const Vector3& scale = parentWorld.scale;
+		return ValueValidation::Finite3(scale) &&
+			std::fabs(scale.x) > minimumScale &&
+			std::fabs(scale.y) > minimumScale &&
+			std::fabs(scale.z) > minimumScale;
+	}
+
+	bool TryApplySceneTransform(
+		const SceneTransformGizmo& gizmo,
+		const Transform3D& parentWorld,
+		const Transform3D& before,
+		Transform3D& after)
+	{
+		after = before;
+
+		switch (gizmo.tool)
+		{
+		case SceneTransformTool::Move:
+			if (!gizmo.canMove)
+			{
+				return false;
+			}
+
+			after.position = parentWorld.GetInverseMatrix().TransformPoint(gizmo.matrix.GetTranslation());
+			return ValueValidation::Finite3(after.position);
+
+		case SceneTransformTool::Rotate:
+		{
+			Vector3 position;
+			Vector3 scale;
+			Quaternion worldRotation;
+
+			if (!gizmo.matrix.Decompose(position, worldRotation, scale))
+			{
+				return false;
+			}
+
+			after.rotation = parentWorld.rotation.Inverse() * worldRotation;
+			
+			if (!ValueValidation::NormalizeRotation(after.rotation))
+			{
+				return false;
+			}
+
+			// Match the starting quaternion's sign for Transform3D equality.
+			if (after.rotation.Dot(before.rotation) < 0.0f)
+			{
+				after.rotation = Quaternion(-after.rotation.x, -after.rotation.y,
+					-after.rotation.z, -after.rotation.w);
+			}
+
+			return true;
+		}
+
+		case SceneTransformTool::Scale:
+		{
+			const Vector3 factor = gizmo.matrix.GetScale();
+			after.scale = Vector3(
+				before.scale.x * factor.x,
+				before.scale.y * factor.y,
+				before.scale.z * factor.z);
+
+			return ValueValidation::Finite3(after.scale);
+		}
+
+		case SceneTransformTool::View:
+			return false;
+		}
+
+		return false;
+	}
+}
+
 void EditorApp::RenderSceneViewPanel()
 {
 	EditorViewportContext* viewport = GetActiveViewportContext();
@@ -2513,6 +2604,82 @@ void EditorApp::RenderSceneViewPanel()
 		overlayData = BuildViewportOverlayData(m_editorRenderAssets->Width(), m_editorRenderAssets->Height());
 	}
 
+	const bool canEditScene =
+		m_editorMode == EditorMode::Edit &&
+		viewport &&
+		!m_documentWorkflow.IsExitPending();
+	const bool canUseGizmo = canEditScene && !m_inspectorPanel.HasActiveEdit();
+	
+	Actor* gizmoActor = canUseGizmo && selection ? selection->ResolveActor(GetEditScene()) : nullptr;
+	Transform* gizmoTransform = ResolveSceneTransform(gizmoActor);
+
+	if (m_transformEditTransaction)
+	{
+		const auto& edit = *m_transformEditTransaction;
+		const bool sameDocument = edit.documentId == m_documentManager.GetActiveDocumentId();
+		const bool sameTarget =
+			gizmoTransform &&
+			edit.actorGuid == gizmoActor->GetGuid() &&
+			edit.parent == gizmoActor->GetParentHandle();
+
+		if (!sameDocument || !sameTarget)
+		{
+			CancelTransformEdit();
+		}
+		else if (ImGui::GetIO().AppFocusLost || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+		{
+			CancelTransformEdit();
+		}
+	}
+
+	SceneTransformGizmo transformGizmo;
+	Transform3D parentWorld;
+
+	if (gizmoTransform)
+	{
+		// EditorUpdate skips inactive roots. Refresh the world pose for a hierarchy selection.
+		if (!IsActorHierarchyActive(gizmoActor))
+		{
+			Actor* root = gizmoActor;
+
+			while (Actor* parent = root->GetParent())
+			{
+				root = parent;
+			}
+
+			root->FlushTransform();
+		}
+
+		Actor* parent = gizmoActor->GetParent();
+		Transform* parentTransform = parent ? parent->GetComponentByClass<Transform>() : nullptr;
+
+		if (parentTransform)
+		{
+			parentWorld = parentTransform->GetWorldTransform();
+		}
+
+		Transform3D handle = gizmoTransform->GetWorldTransform();
+		handle.scale = Vector3::One();
+		const bool hasValidPose =
+			ValueValidation::Finite3(handle.position) &&
+			ValueValidation::NormalizeRotation(handle.rotation);
+
+		if (hasValidPose)
+		{
+			// A tab click can enter Scene during Render, so use its 3D camera directly.
+			const CameraInfo& camera = viewport->GetSceneCamera().GetCamera().GetCameraInfo();
+			transformGizmo.view = camera.viewMatrix;
+			transformGizmo.projection = camera.projMatrix;
+			transformGizmo.matrix = handle.GetMatrix();
+			transformGizmo.canMove = CanMoveSceneTransform(parentWorld);
+			transformGizmo.isDragging = m_transformEditTransaction.has_value();
+		}
+		else
+		{
+			gizmoTransform = nullptr;
+		}
+	}
+
 	// Render the scene view panel with the scene color render target
 	m_sceneViewPanel.Render(
 		m_sceneImage,
@@ -2520,6 +2687,8 @@ void EditorApp::RenderSceneViewPanel()
 		m_editorRenderAssets->Height(),
 		viewport,
 		overlayData,
+		canEditScene,
+		gizmoTransform ? &transformGizmo : nullptr,
 		documents,
 		documentCallbacks
 	);
@@ -2553,6 +2722,15 @@ void EditorApp::RenderSceneViewPanel()
 		}
 
 		return;
+	}
+
+	if (transformGizmo.wasDrawn && gizmoTransform)
+	{
+		ApplySceneTransformGizmo(*gizmoActor, *gizmoTransform, parentWorld, transformGizmo);
+	}
+	else if (m_transformEditTransaction)
+	{
+		CancelTransformEdit();
 	}
 
 	if (m_editorMode == EditorMode::Edit && viewport)
@@ -3725,92 +3903,99 @@ void EditorApp::ApplySceneRenderTargetSizeToScene(SceneBase& scene)
 	}
 }
 
-void EditorApp::BeginTransformEdit(const Guid& actorGuid, const Transform3D& before)
+void EditorApp::ApplySceneTransformGizmo(
+	Actor& actor,
+	Transform& transform,
+	const Transform3D& parentWorld,
+	const SceneTransformGizmo& gizmo)
 {
-	if (m_editorMode != EditorMode::Edit)
+	if (gizmo.isUsing && !m_transformEditTransaction)
 	{
-		return;
+		CancelViewportPick();
+		BeginTransformEdit(actor, transform.GetLocalTransform());
 	}
 
-	SceneBase* editScene = GetEditScene();
-
-	// Validate the actorGuid
-	if (!editScene || !actorGuid.IsValid())
-	{
-		CancelTransformEdit();
-		return;
-	}
-
-	Actor* actor = editScene->ResolveActor(actorGuid);
-
-	std::type_index transformType = std::type_index(typeid(Transform));
-	Component* component = actor ? actor->GetComponentByExactType(transformType, 0) : nullptr;
-
-	Transform* transform = dynamic_cast<Transform*>(component);
-
-	if (!transform)
-	{
-		CancelTransformEdit();
-		return;
-	}
-
-	// Stop any ongoing edit transaction
-	CancelTransformEdit();
-	CancelRectTransformEdit();
-
-	// Store the actorGuid and the "before" transform in a new TransformEditTransaction
-	m_transformEditTransaction = TransformEditTransaction{actorGuid, before};
-}
-
-void EditorApp::EndTransformEdit(const Guid& actorGuid, const Transform3D& after)
-{
-	if (m_editorMode != EditorMode::Edit)
-	{
-		return;
-	}
-
-	// Validate that there is an ongoing transform edit transaction and that the actorGuid matches
 	if (!m_transformEditTransaction)
 	{
 		return;
 	}
 
-	if (m_transformEditTransaction->actorGuid != actorGuid)
+	if (gizmo.changed)
+	{
+		Transform3D after;
+		const Transform3D& before = m_transformEditTransaction->before;
+
+		if (TryApplySceneTransform(gizmo, parentWorld, before, after) &&
+			!(after == transform.GetLocalTransform()))
+		{
+			ApplyTransformPreview(actor, transform, after);
+		}
+	}
+
+	// A release over another window may not reach ImGuizmo's current handle.
+	if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+	{
+		EndTransformEdit(actor.GetGuid(), transform.GetLocalTransform());
+	}
+}
+
+void EditorApp::ApplyTransformPreview(Actor& actor, Transform& transform, const Transform3D& state)
+{
+	transform.SetLocalTransform(state);
+	actor.FlushTransform();
+
+	if (m_showColliders)
+	{
+		actor.FlushColliderTransforms();
+	}
+}
+
+void EditorApp::BeginTransformEdit(const Actor& actor, const Transform3D& before)
+{
+	CancelRectTransformEdit();
+
+	TransformEditTransaction edit;
+	edit.documentId = m_documentManager.GetActiveDocumentId();
+	edit.actorGuid = actor.GetGuid();
+	edit.parent = actor.GetParentHandle();
+	edit.before = before;
+	m_transformEditTransaction = edit;
+}
+
+void EditorApp::EndTransformEdit(const Guid& actorGuid, const Transform3D& after)
+{
+	if (!m_transformEditTransaction)
+	{
+		return;
+	}
+
+	const auto& edit = *m_transformEditTransaction;
+	
+	if (edit.actorGuid != actorGuid || edit.before == after)
 	{
 		CancelTransformEdit();
 		return;
 	}
 
-	// Store the "before" transform from the transaction before resetting it
-	const Transform3D before = m_transformEditTransaction->before;
-
-	// Do not create a command if the before and after states are identical (no change)
-	if (before == after)
+	IEditorDocument* document = m_documentManager.FindDocument(edit.documentId);
+	SceneBase* scene = document ? document->GetWorkingScene() : nullptr;
+	
+	if (!scene)
 	{
 		CancelTransformEdit();
 		return;
 	}
 
-	// Reset the transaction to indicate that the transform edit has ended
+	// The preview already applied the final value. Redo uses Execute as usual.
+	if (!document->RecordExecutedCommand(std::make_unique<TransformEditCommand>(
+		scene, actorGuid, edit.before, after)))
+	{
+		CancelTransformEdit();
+		return;
+	}
+
 	m_transformEditTransaction.reset();
-
-	IEditorDocument* document = GetActiveEditDocument();
-	SceneBase* editScene = document ? document->GetWorkingScene() : nullptr;
-
-	if (!document || !editScene)
-	{
-		return;
-	}
-
-	// Add a TransformEditCommand to the active Document history.
-	document->ExecuteCommand(
-		std::make_unique<TransformEditCommand>(
-			editScene,
-			actorGuid,
-			before,
-			after
-		)
-	);
+	m_sceneViewPanel.ResetTransformGizmo();
 }
 
 void EditorApp::CancelTransformEdit()
@@ -3820,32 +4005,19 @@ void EditorApp::CancelTransformEdit()
 		return;
 	}
 
-	const Guid actorGuid = m_transformEditTransaction->actorGuid;
-	SceneBase* editScene = GetEditScene();
+	const TransformEditTransaction edit = *m_transformEditTransaction;
+	m_transformEditTransaction.reset();
+	m_sceneViewPanel.ResetTransformGizmo();
 
-	if (!editScene || !actorGuid.IsValid())
+	IEditorDocument* document = m_documentManager.FindDocument(edit.documentId);
+	SceneBase* scene = document ? document->GetWorkingScene() : nullptr;
+	Actor* actor = scene ? scene->ResolveActor(edit.actorGuid) : nullptr;
+	Transform* transform = ResolveSceneTransform(actor);
+
+	if (transform)
 	{
-		m_transformEditTransaction.reset();
-		return;
+		ApplyTransformPreview(*actor, *transform, edit.before);
 	}
-
-	Actor* actor = editScene->ResolveActor(actorGuid);
-
-	std::type_index transformType = std::type_index(typeid(Transform));
-	Component* component = actor ? actor->GetComponentByExactType(transformType, 0) : nullptr;
-
-	Transform* transform = dynamic_cast<Transform*>(component);
-
-	if (!transform)
-	{
-		m_transformEditTransaction.reset();
-		return;
-	}
-
-	// Reset the Transform to its "before" state from the edit transaction
-	transform->SetLocalTransform(m_transformEditTransaction->before);
-
-	m_transformEditTransaction = {};
 }
 
 void EditorApp::BeginRectTransformEdit(const Guid& actorGuid, const RectTransformEditState& before)
