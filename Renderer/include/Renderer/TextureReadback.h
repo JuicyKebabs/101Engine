@@ -50,13 +50,14 @@ struct TextureReadbackData
 	std::vector<std::byte> pixels;
 };
 
-struct ReadbackRequestResult
+struct [[nodiscard]] ReadbackRequestResult
 {
 	Result status;
 	ReadbackHandle handle;
 };
 
-struct ReadbackPollResult
+
+struct [[nodiscard]] ReadbackPollResult
 {
 	ReadbackState state = ReadbackState::Pending;
 	Result error;

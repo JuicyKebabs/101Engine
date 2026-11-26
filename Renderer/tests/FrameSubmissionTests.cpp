@@ -6,9 +6,11 @@
 
 #include <Windows.h>
 #include <intrin.h>
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -136,6 +138,143 @@ void VerifyOutputPlanning(rendering::Renderer& renderer)
 
 	Check(renderer.DestroyRenderTargetTexture(first.handle));
 	Check(renderer.DestroyRenderTargetTexture(second.handle));
+}
+
+void VerifyTextureReadback(
+	rendering::Renderer& renderer,
+	rendering::TextureFormat format,
+	const std::array<std::byte, 4>& expectedBefore,
+	const std::array<std::byte, 4>& expectedAfter)
+{
+	using namespace rendering;
+
+	const std::array<float, 4> red{ 1.0f, 0.0f, 0.0f, 1.0f };
+	const std::array<float, 4> green{ 0.0f, 1.0f, 0.0f, 1.0f };
+
+	RenderTargetTextureDesc targetDesc;
+	targetDesc.width = 8;
+	targetDesc.height = 8;
+	targetDesc.format = format;
+	targetDesc.optimizedClearColor = red;
+	const auto target = renderer.CreateRenderTargetTexture(targetDesc);
+	Check(target.result);
+
+	const auto submitClear = [&](const std::array<float, 4>& color)
+	{
+		FrameRenderData frame;
+		RenderView view;
+		view.kind = ViewKind::Overlay;
+		view.output = target.handle;
+		view.clearColor = color;
+		frame.views.push_back(view);
+		Check(renderer.SubmitFrameRenderData(std::move(frame)));
+		CheckProcessed(renderer.Render());
+	};
+
+	submitClear(red);
+
+	RenderTargetTextureInfo info;
+	Check(renderer.GetRenderTargetTextureInfo(target.handle, info));
+	TextureReadbackDesc request;
+	request.sourceTexture = target.handle;
+	request.expectedSourceRevision = info.revision;
+	request.region.x = 1;
+	request.region.y = 2;
+	request.region.width = (std::numeric_limits<std::uint32_t>::max)();
+	request.region.height = 2;
+	Require(!renderer.RequestTextureReadback(request).status.IsSuccess(), "Readback accepted a wrapping rectangle.");
+
+	request.region.x = 0;
+	request.region.width = info.width + 1;
+	Require(!renderer.RequestTextureReadback(request).status.IsSuccess(), "Readback accepted a rectangle wider than the source.");
+
+	request.region.x = 1;
+	request.region.width = 3;
+	request.timing = ReadbackTiming::BeforeRendering;
+	const auto before = renderer.RequestTextureReadback(request);
+	Check(before.status);
+	const auto secondBefore = renderer.RequestTextureReadback(request);
+	Check(secondBefore.status);
+	request.timing = ReadbackTiming::AfterRendering;
+	const auto after = renderer.RequestTextureReadback(request);
+	Check(after.status);
+
+	TextureReadbackData data;
+	CheckSkipped(renderer);
+	const auto pending = renderer.TryTakeTextureReadback(before.handle, data);
+	Require(pending.state == ReadbackState::Pending, "A skipped frame consumed a readback.");
+	submitClear(green);
+
+	const auto checkPixels = [&](ReadbackHandle handle, const std::array<std::byte, 4>& expected)
+	{
+		const auto poll = renderer.TryTakeTextureReadback(handle, data);
+		Check(poll.error);
+		Require(poll.state == ReadbackState::Ready, "Readback did not complete.");
+		Require(data.format == format, "Readback format was incorrect.");
+		Require(data.width == 3 && data.height == 2, "Readback extent was incorrect.");
+		Require(data.rowPitch == 12 && data.pixels.size() == 24, "Readback included row padding.");
+
+		for (std::size_t index = 0; index < data.pixels.size(); index += 4)
+		{
+			const auto* pixel = data.pixels.data() + index;
+			Require(std::equal(expected.begin(), expected.end(), pixel), "Readback returned the wrong pixel.");
+		}
+	};
+
+	checkPixels(before.handle, expectedBefore);
+	checkPixels(secondBefore.handle, expectedBefore);
+	checkPixels(after.handle, expectedAfter);
+	Require(!renderer.ReleaseTextureReadback(before.handle).IsSuccess(), "Ready readback handle was reusable.");
+
+	CheckSkipped(renderer);
+
+	const auto stale = renderer.RequestTextureReadback(request);
+	Check(stale.status);
+	Check(renderer.ResizeRenderTargetTexture(target.handle, 16, 16));
+	submitClear(red);
+	const auto failed = renderer.TryTakeTextureReadback(stale.handle, data);
+	Require(failed.state == ReadbackState::Failed, "Readback used an unexpected source revision.");
+	Require(!failed.error.IsSuccess() && !failed.error.message.empty(), "Readback lost its failure result.");
+	Check(renderer.ReleaseTextureReadback(stale.handle));
+	Check(renderer.DestroyRenderTargetTexture(target.handle));
+}
+
+void VerifyReadbackBudget(rendering::Renderer& renderer)
+{
+	using namespace rendering;
+
+	RenderTargetTextureDesc targetDesc;
+	targetDesc.width = 2048;
+	targetDesc.height = 2048;
+	const auto target = renderer.CreateRenderTargetTexture(targetDesc);
+	Check(target.result);
+
+	RenderTargetTextureInfo info;
+	Check(renderer.GetRenderTargetTextureInfo(target.handle, info));
+	TextureReadbackDesc request;
+	request.sourceTexture = target.handle;
+	request.expectedSourceRevision = info.revision;
+	request.region.width = info.width;
+	request.region.height = info.height;
+
+	// Each request reserves 16 MiB for the GPU copy and 16 MiB for the CPU pixels.
+	std::array<ReadbackHandle, 4> handles;
+
+	for (auto& handle : handles)
+	{
+		const auto accepted = renderer.RequestTextureReadback(request);
+		Check(accepted.status);
+		handle = accepted.handle;
+	}
+
+	Require(!renderer.RequestTextureReadback(request).status.IsSuccess(), "Readback budget excluded CPU pixels.");
+
+	for (const auto handle : handles)
+	{
+		Check(renderer.ReleaseTextureReadback(handle));
+	}
+
+	Check(renderer.DestroyRenderTargetTexture(target.handle));
 }
 
 struct TestWindow
@@ -293,6 +432,15 @@ void VerifyFrameSubmission()
 	CheckProcessed(renderer.Render());
 
 	VerifyOutputPlanning(renderer);
+
+	const std::array<std::byte, 4> redPixel{ std::byte{ 255 }, std::byte{ 0 }, std::byte{ 0 }, std::byte{ 255 } };
+	const std::array<std::byte, 4> greenPixel{ std::byte{ 0 }, std::byte{ 255 }, std::byte{ 0 }, std::byte{ 255 } };
+	VerifyTextureReadback(renderer, TextureFormat::RGBA8_UNorm, redPixel, greenPixel);
+
+	const std::array<std::byte, 4> onePixel{ std::byte{ 1 } };
+	const std::array<std::byte, 4> zeroPixel{};
+	VerifyTextureReadback(renderer, TextureFormat::R32_UInt, onePixel, zeroPixel);
+	VerifyReadbackBudget(renderer);
 
 	renderer.Finalize();
 	renderer.Finalize();

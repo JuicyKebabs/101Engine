@@ -19,7 +19,7 @@ class RenderTargetTextureGpuData
 public:
 	Result Initialize(ID3D12Device* device, const RenderTargetTextureDesc& description);
 
-	ID3D12Resource* Resource() const noexcept { return m_color.Get(); }
+	ID3D12Resource* GetNativeResource() const noexcept { return m_color.Get(); }
 	D3D12_CPU_DESCRIPTOR_HANDLE Rtv() const noexcept { return m_rtv; }
 	D3D12_CPU_DESCRIPTOR_HANDLE Srv() const noexcept { return m_srv; }
 	DepthTexture& Depth() noexcept { return *m_depth; }

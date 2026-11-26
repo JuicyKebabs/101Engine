@@ -1,13 +1,12 @@
 #include "Renderer/Renderer.h"
 #include "Backend/Backend.h"
 #include "Backend/DepthTexture.h"
-#include "Backend/ApiResult.h"
 #include "Graph/FrameResourceBindings.h"
 #include "Graph/GraphExecutor.h"
+#include "Graph/RenderPassContext.h"
 #include "FrameRenderer.h"
 #include "FrameDrawContext.h"
 #include "SceneOutputResources.h"
-#include "Resource/ResourceSlotTable.h"
 #include "Resource/GeometryRegistry.h"
 #include "Resource/TextureRegistry.h"
 #include "Resource/RenderTargetTextureRegistry.h"
@@ -25,7 +24,6 @@
 #include <vector>
 #include <type_traits>
 #include <utility>
-#include <cstring>
 
 namespace rendering
 {
@@ -65,32 +63,6 @@ struct UploadWork
 	std::unique_ptr<Upload> upload;
 	bool prepared = false;
 };
-
-constexpr std::size_t MaxReadbackRequests = 32;				// Maximum number of concurrent readback requests allowed.
-constexpr std::size_t MaxReadbackBytes = 128 * 1024 * 1024;	// Maximum total bytes allowed for all readback requests combined (128 MB).
-
-// Single request for texture readback.
-struct ReadbackRequest
-{
-	TextureReadbackDesc description;
-	ReadbackState state = ReadbackState::Pending;
-	Result error;
-	TextureReadbackData data;								// Where the CPU result is stored after a successful readback.
-	Microsoft::WRL::ComPtr<ID3D12Resource> readbackBuffer;	// Where the GPU writes the readback data before it is copied to the CPU-accessible memory.
-	D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};			// The layout of the readback buffer for the requested texture region.
-	std::uint64_t transferBytes = 0;
-	std::size_t reservedBytes = 0;
-};
-
-// Check if the specified region is within the bounds of the texture dimensions.
-bool ContainsRegion(std::uint32_t width, std::uint32_t height, const PixelRect& region)
-{
-	const bool validOrigin = region.x < width && region.y < height;
-	const bool nonEmpty = region.width > 0 && region.height > 0;
-	const bool withinBounds = (region.x + region.width <= width) && (region.y + region.height <= height);
-
-	return validOrigin && nonEmpty && withinBounds;
-}
 
 } // namespace
 
@@ -182,7 +154,6 @@ struct Renderer::impl
 	// Readback management
 	//-------------------------------------------------------
 	std::optional<detail::ResourceSlotTable<ReadbackHandle>> readbackSlots;
-	std::vector<std::optional<ReadbackRequest>> readbacks;
 
 	// Add readback passes to the render graph for the specified timing and passes.
 	// For all readback requests, this will create a render pass 
@@ -192,13 +163,6 @@ struct Renderer::impl
 		const std::vector<PlannedPass>& passes,
 		graph::FrameResourceBindings& bindings,
 		graph::RenderGraph& graph);
-
-	// 
-	void CompleteReadbacks();
-
-
-	void FailPendingReadbacks(const Result & failure);
-	Result ReleaseReadback(ReadbackHandle handle);
 };
 
 Renderer::Renderer() : m_pImpl(std::make_unique<impl>())
@@ -238,7 +202,6 @@ Result Renderer::Initialize(const RendererConfiguration& configuration)
 
 	// Send the owner ID to each resource registry for tracking ownership.
 	m_pImpl->drawResources.emplace(ownerId);
-	m_pImpl->readbackSlots.emplace(ownerId);
 	m_pImpl->sceneDepth.emplace();
 	m_pImpl->sceneOutputResources.emplace();
 	m_pImpl->resourceOwnerId = ownerId;
@@ -304,8 +267,6 @@ void Renderer::Finalize()
 	m_pImpl->submittedFrame.reset();
 	m_pImpl->backend.Finalize();
 	
-	m_pImpl->readbacks.clear();
-	m_pImpl->readbackSlots.reset();
 	m_pImpl->drawResources.reset();
 	m_pImpl->sceneDepth.reset();
 	m_pImpl->sceneOutputResources.reset();
@@ -350,7 +311,7 @@ Result Renderer::SubmitFrameRenderData(FrameRenderData&& frame)
 	const auto rejectSubmission =
 		[&state](Result failure)
 		{
-			state.FailPendingReadbacks(failure);
+			state.drawResources->Readbacks().FailPendingRequests(failure);
 			return failure;
 		};
 
@@ -471,7 +432,7 @@ RenderResult Renderer::Render()
 	// Do not keep readback requests after a failed submission.
 	if (hadSubmission && !result.IsSuccess())
 	{
-		state.FailPendingReadbacks(result);
+		state.drawResources->Readbacks().FailPendingRequests(result);
 	}
 
 	// Cleanup failure is not hidden by an earlier draw error, and fatal classification is never downgraded.
@@ -496,16 +457,9 @@ RenderResult Renderer::Render()
 		const Result cleanup = state.backend.EndFrameResources();
 		mergeCleanup(cleanup);
 
-		// Rerealse any readback buffers that were used in this frame.
 		if (cleanup.IsSuccess())
 		{
-			for (auto& request : state.readbacks)
-			{
-				if (request)
-				{
-					request->readbackBuffer.Reset();
-				}
-			}
+			state.drawResources->Readbacks().ReleaseFrameBuffers();
 		}
 	}
 
@@ -681,6 +635,11 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		built = AddReadbackPasses(ReadbackTiming::AfterRendering, lists, bindings, graph);
 	}
 
+	if (!built.IsSuccess())
+	{
+		return built;
+	}
+
 	//----------------------------------------------------------------------------------------------
 	// 8. Compile the graph (confirm all dependencies and state transitions of graph resources).
 	//----------------------------------------------------------------------------------------------
@@ -702,12 +661,18 @@ Result Renderer::impl::ProcessSubmittedFrame(FrameRenderData&& frame, std::vecto
 		return executed;
 	}
 
+	// Store the all readback completion result for this frame,
+	// which must be completed after the GPU work is finished.
+	Result completed = drawResources->Readbacks().CompleteFrame(backend);
+
+	if (!completed.IsSuccess())
+	{
+		return completed;
+	}
+
 	//----------------------------------------------------------------------------------------------
 	// 10. Present all Window outputs in the frame.
 	//----------------------------------------------------------------------------------------------
-	
-	CompleteReadbacks();
-	
 	std::vector<std::uint64_t> presentedWindows;
 
 	for (const auto& view : frame.views)
@@ -1047,280 +1012,114 @@ Result Renderer::impl::AddReadbackPasses(
 	graph::FrameResourceBindings& bindings,
 	graph::RenderGraph& graph)
 {
-	// Iterate through all readback requests.
-	for (auto& entry : readbacks)
-	{
-		// Only pending and matching timing requests are processed in this pass.
-		if (!entry ||
-			entry->state != ReadbackState::Pending ||
-			entry->description.timing != timing)
+	// Lambda to add a readback pass for a single pending readback request.
+	auto addReadbackPass =
+		[&](detail::TextureReadbackRequest& request)->Result
 		{
-			continue;
-		}
+			// Find a render target texture which will be copied
+			// to the CPU-accessible readback buffer.
+			const auto& desc = request.desc;
+			auto* source = drawResources->FindContent(desc.sourceTexture);
 
-		auto& request = *entry;
-		const auto& desc = request.description;
-		auto* source = drawResources->FindContent(desc.sourceTexture);
-
-		// Validate the target texture.
-		if (!source ||
-			!source->gpuData ||
-			source->revision != desc.expectedSourceRevision)
-		{
-			request.state = ReadbackState::Failed;
-			request.error = detail::Fail("Readback source texture is invalid or has changed since request.");
-
-			continue;
-		}
-
-		const auto& gpu = *source->gpuData;
-
-		// Check if the source texture was written to in this frame.
-		const bool writtenInFrame =
-			std::any_of(
-				passes.begin(), passes.end(),
-				[&](const PlannedPass& pass)
-				{
-					const auto* target = std::get_if<RenderTargetTextureHandle>(&pass.renderView.output);
-					return target && *target == desc.sourceTexture && pass.colorLoad.has_value();
-				});
-
-		// Check if the requested region is valid within the source texture dimensions.
-		const bool validRegion = ContainsRegion(gpu.width, gpu.height, desc.region);
-		
-		// Check if the timing is valid for the readback.
-		// Beforerendering requires the source texture to be initialized successfully.
-		// Afterrendering requires the source texture to be written to in this frame.
-		const bool validTiming = timing == ReadbackTiming::BeforeRendering ? gpu.contentsValid : writtenInFrame;
-
-		if (!validRegion || !validTiming)
-		{
-			request.state = ReadbackState::Failed;
-			request.error = detail::Fail("Readback source texture is invalid or has changed since request.");
-
-			continue;
-		}
-
-		auto* device = backend.GetNativeDevice();
-		auto* texture = gpu.Resource();
-		auto regionDesc = texture->GetDesc();
-		regionDesc.Width = desc.region.width;
-		regionDesc.Height = desc.region.height;
-
-		// Calculate the footprint of the readback buffer
-		// for the specified texture region.
-		device->GetCopyableFootprints(
-			&regionDesc,
-			0,
-			1,
-			0,
-			&request.footprint,
-			nullptr,
-			nullptr,
-			&request.transferBytes);
-
-		if (request.transferBytes == 0 || request.transferBytes > request.reservedBytes)
-		{
-			request.state = ReadbackState::Failed;
-			request.error = detail::Fail("Readback source texture region is invalid or exceeds reserved buffer size.");
-
-			continue;
-		}
-
-		// Create a readback buffer in the readback heap for the specified transfer size.
-		D3D12_HEAP_PROPERTIES heap{};
-		heap.Type = D3D12_HEAP_TYPE_READBACK;
-
-		D3D12_RESOURCE_DESC bufferDesc{};
-		bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		bufferDesc.Width = request.transferBytes;
-		bufferDesc.Height = 1;
-		bufferDesc.DepthOrArraySize = 1;
-		bufferDesc.MipLevels = 1;
-		bufferDesc.SampleDesc.Count = 1;
-		bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-		const HRESULT created = device->CreateCommittedResource(
-			&heap,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(request.readbackBuffer.GetAddressOf()));
-
-		if (FAILED(created))
-		{
-			const HRESULT deviceStatus = device->GetDeviceRemovedReason();
-
-			if (FAILED(deviceStatus))
+			if (!source ||
+				!source->gpuData ||
+				source->revision != desc.expectedSourceRevision)
 			{
-				Result failure = backend::MakeApiFailure("Readback buffer device removal", deviceStatus);
-				failure.failureKind = FailureKind::DeviceLost;
-				return failure;
+				request.state = ReadbackState::Failed;
+				request.error = detail::Fail("Readback source texture is invalid or has changed since request.");
+				return {};
 			}
-			
-			request.state = ReadbackState::Failed;
-			request.error = backend::MakeApiFailure("CreateCommittedResource(readback)", created);
-			
-			continue;
-		}
 
-		// Register the source texture in the render graph for readback.
-		graph::GraphTextureHandle graphSource;
-		Result result = bindings.ImportRenderTarget(*source, "ReadbackSource", graphSource);
+			bool validTiming = source->gpuData->contentsValid;
 
-		if (!result.IsSuccess())
-		{
-			return  result;
-		}
+			// After rendering readback timing requires that the source
+			// texture is used as a render target in the planned passes.
+			if (timing == ReadbackTiming::AfterRendering)
+			{
+				validTiming =
+					std::any_of(
+						passes.begin(), passes.end(),
+						[&](const PlannedPass& pass)
+						{
+							const auto* target = std::get_if<RenderTargetTextureHandle>(&pass.renderView.output);
 
-		// Create a render pass in the graph to perform the texture readback.
-		graph::RenderPassBuilder builder;
-		result = builder.SetName("TextureReadback");
+							// Render target is same as required and any pass uses it's color buffer.
+							return target && *target == desc.sourceTexture && pass.colorLoad.has_value();
+						});
+			}
 
-		if (result.IsSuccess())
-		{
-			result = builder.CopyTextureSource(graphSource);
-		}
+			if (!validTiming)
+			{
+				request.state = ReadbackState::Failed;
+				request.error = detail::Fail("Readback request timing is invalid for the source texture.");
+				return {};
+			}
 
-		if (result.IsSuccess())
-		{
-			// Execution lambda for the readback pass that copies the specified
-			// region from the source texture to the readback buffer.
-			result = builder.SetExecute(
-				[this, texture, &request](graph::RenderPassContext&)->Result
+			// Prepare the buffer as a destination for the GPU to copy the texture data into.
+			Result result = backend.PrepareTextureReadback(request.transfer);
+
+			if (!result.IsSuccess())
+			{
+				if (result.failureKind != FailureKind::General)
 				{
-					// Set up the source copy location for the texture.
-					D3D12_TEXTURE_COPY_LOCATION from{};
-					from.pResource = texture;
-					from.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-					
-					// Set up the destination copy location for the readback buffer.
-					D3D12_TEXTURE_COPY_LOCATION to{};
-					to.pResource = request.readbackBuffer.Get();
-					to.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-					to.PlacedFootprint = request.footprint;
-					
-					// Set up the source region to copy from the texture.
-					const auto& region = request.description.region;
-					D3D12_BOX box{};
-					box.left = region.x;
-					box.top = region.y;
-					box.right = region.x + region.width;
-					box.bottom = region.y + region.height;
-					box.back = 1;
-					
-					// Add the copy command to the command list to copy the
-					// specified region from the texture to the readback buffer.
-					auto& commands = backend.GetFrameCommandContext();
-					commands.GetNativeCommandList()->CopyTextureRegion(&to, 0, 0, 0, &from, &box);
-					
-					return {};
-				});
-		}
+					return result;
+				}
 
-		std::optional<graph::RenderPass> pass;
+				request.state = ReadbackState::Failed;
+				request.error = std::move(result);
+				return {};
+			}
 
-		// Build the readback pass.
-		if (result.IsSuccess())
-		{
-			result = std::move(builder).Build(pass);
-		}
+			// Register the source texture with the render graph to be used in the readback pass.
+			graph::GraphTextureHandle graphSource;
+			result = bindings.ImportRenderTarget(*source, "ReadbackSource", graphSource);
 
-		// Add the readback pass to the render graph.
-		if (result.IsSuccess())
-		{
-			result = graph.AddPass(std::move(*pass));
-		}
+			if (!result.IsSuccess())
+			{
+				return result;
+			}
 
-		if (!result.IsSuccess())
-		{
+			// Prepare the builder to create a render pass
+			// that will copy the texture data to the readback buffer.
+			graph::RenderPassBuilder builder;
+			result = builder.SetName("TextureReadback");
+
+			if (result.IsSuccess())
+			{
+				// Declare that the source texture is used
+				// as a copy source in this render pass.
+				result = builder.CopyTextureSource(graphSource);
+			}
+
+			if (result.IsSuccess())
+			{
+				result = builder.SetExecute(
+					[graphSource, &transfer = request.transfer]
+					(graph::RenderPassContext& context)
+					{
+						// Record the copy commands.
+						return context.RecordTextureReadback(graphSource, transfer);
+					});
+			}
+
+			std::optional<graph::RenderPass> pass;
+
+			if (result.IsSuccess())
+			{
+				result = std::move(builder).Build(pass);
+			}
+
+			if (result.IsSuccess())
+			{
+				result = graph.AddPass(std::move(*pass));
+			}
+
 			return result;
-		}
-	}
+		};
 
-	return {};
+	// Iterate over all pending readback requests and add a render pass for each one.
+	return drawResources->Readbacks().ForEachPending(timing, addReadbackPass);
 }
-
-void Renderer::impl::CompleteReadbacks()
-{
-	for (auto& entry : readbacks)
-	{
-		if (!entry || entry->state != ReadbackState::Pending || !entry->readbackBuffer)
-		{
-			continue;
-		}
-
-		auto& request = *entry;
-
-		// Prepare the CPU data buffer to receive the readback pixels.
-		auto& data = request.data;
-		data.pixels.resize(data.rowPitch * data.height);
-
-		// Map the readback buffer to access its contents on the CPU.
-		void* mapped = nullptr;
-		D3D12_RANGE readRange{};
-		readRange.End = static_cast<SIZE_T>(request.transferBytes);
-		const HRESULT mappedResult = request.readbackBuffer->Map(0, &readRange, &mapped);
-
-		if (FAILED(mappedResult))
-		{
-			data.pixels.clear();
-			request.error = backend::MakeApiFailure("Readback buffer Map", mappedResult);
-			request.state = ReadbackState::Failed;
-
-			continue;
-		}
-
-		// Copy the readback pixels from the mapped buffer to the CPU data buffer.
-		const auto* rows = static_cast<const std::byte*>(mapped) + request.footprint.Offset;
-
-		for (std::size_t row = 0; row < data.height; ++row)
-		{
-			std::memcpy(
-				data.pixels.data() + row * data.rowPitch,
-				rows + row * request.footprint.Footprint.RowPitch,
-				data.rowPitch);
-		}
-
-		// Unmap the readback buffer and mark the readback request as ready.
-		D3D12_RANGE noWrites{};
-		request.readbackBuffer->Unmap(0, &noWrites);
-		request.state = ReadbackState::Ready;
-	}
-}
-
-void Renderer::impl::FailPendingReadbacks(const Result& failure)
-{
-	// Fail all pending readback requests with the provided failure result.
-	for (auto& entry : readbacks)
-	{
-		if (entry && entry->state == ReadbackState::Pending)
-		{
-			entry->state = ReadbackState::Failed;
-			entry->error.succeeded = false;
-			entry->error.failureKind = failure.failureKind;
-		}
-	}
-}
-
-Result Renderer::impl::ReleaseReadback(ReadbackHandle handle)
-{
-	if (readbackSlots->RequestDestroy(handle) != detail::ResourceHandleValidationResult::Success)
-	{
-		return detail::Fail("ReleaseReadback: invalid handle.");
-	}
-
-	readbacks[handle.slotIndex].reset();
-
-	if (readbackSlots->ReleaseSlotAfterResourceDestruction(handle) != detail::ResourceHandleValidationResult::Success)
-	{
-		std::terminate(); // This should never happen; indicates a serious internal error.
-	}
-
-	return {};
-}
-
 
 namespace
 {
@@ -1757,87 +1556,17 @@ ReadbackRequestResult Renderer::RequestTextureReadback(const TextureReadbackDesc
 		[&]() -> ReadbackRequestResult
 		{
 			auto& state = *m_pImpl;
-			Result available = state.CheckPublicCall();
 
-			if (!available.IsSuccess())
+			ReadbackRequestResult result;
+			result.status = state.CheckPublicCall();
+
+			if (!result.status.IsSuccess())
 			{
-				return { std::move(available),{} };
+				return result;
 			}
 
-			// Query the target texture's metadata.
-			RenderTargetTextureInfo info;
-			Result queried = state.drawResources->QueryRenderTargetTextureInfo(desc.sourceTexture, info);
-		
-			if (!queried.IsSuccess())
-			{
-				return { std::move(queried),{} };
-			}
-
-			// Validate the request instructions.
-			const bool validTiming =
-				desc.timing == ReadbackTiming::BeforeRendering ||
-				desc.timing == ReadbackTiming::AfterRendering;
-			const bool matchRevision = desc.expectedSourceRevision == info.revision;
-			const bool validRegion = ContainsRegion(info.width, info.height, desc.region);
-		
-			if (!validTiming || !matchRevision || !validRegion)
-			{
-				return { detail::Fail("RequestTextureReadback: invalid timing, revision, or region."),{} };
-			}
-
-			// Calculate the required memory for the readback request.
-			const std::size_t bytePerPixels = info.format == TextureFormat::RGBA16_Float ? 8 : 4;
-			const std::size_t rowBytes = desc.region.width * bytePerPixels;
-			const std::size_t alignment = 256;
-			const std::size_t paddedRowBytes = (rowBytes + alignment - 1) / alignment * alignment;
-			const std::uint64_t reservationSize = static_cast<std::uint64_t>(rowBytes + paddedRowBytes) * desc.region.height;
-
-			std::size_t requestCount = 0;
-			std::size_t reservedBytes = 0;
-
-			// Check the current readback requests to ensure we don't exceed limits.
-			for (const auto& request : state.readbacks)
-			{
-				if (request)
-				{
-					requestCount++;
-					reservedBytes += request->reservedBytes;
-				}
-			} 
-
-			if (requestCount >= MaxReadbackRequests || reservedBytes + reservationSize > MaxReadbackBytes)
-			{
-				return { detail::Fail("RequestTextureReadback: exceeded maximum readback requests or bytes."),{} };
-			}
-
-			// Allocate a new readback slot and register the request.
-			const auto index = state.readbackSlots->FindRegistrationSlotIndex();
-			
-			if (index >= state.readbacks.size())
-			{
-				state.readbacks.resize(index + 1);
-			}
-
-			// Register the readback request and return the handle.
-			auto registration = state.readbackSlots->Register();
-
-			if (!registration.status.IsSuccess())
-			{
-				return { std::move(registration.status),{} };
-			}
-
-			// Store the readback request details in the allocated slot.
-			auto& request = state.readbacks[index].emplace();
-			request.description = desc;
-			request.reservedBytes = static_cast<std::size_t>(reservationSize);
-			request.data.format = info.format;
-			request.data.width = desc.region.width;
-			request.data.height = desc.region.height;
-			request.data.rowPitch = rowBytes;
-
-			return { {}, registration.handle };
+			return state.drawResources->RequestTextureReadback(state.backend, desc);
 		});
-
 }
 
 ReadbackPollResult Renderer::TryTakeTextureReadback(ReadbackHandle handle, TextureReadbackData& output)
@@ -1847,41 +1576,13 @@ ReadbackPollResult Renderer::TryTakeTextureReadback(ReadbackHandle handle, Textu
 
 	if (!available.IsSuccess())
 	{
-		return { ReadbackState::Failed, std::move(available) };
+		ReadbackPollResult result;
+		result.state = ReadbackState::Failed;
+		result.error = std::move(available);
+		return result;
 	}
 
-	// Validate the readback handle to ensure it is valid for new use.
-	if (state.readbackSlots->ValidateForNewUse(handle) != detail::ResourceHandleValidationResult::Success)
-	{
-		return { ReadbackState::Failed, detail::Fail("TryTakeTextureReadback: invalid handle.") };
-	}
-
-	auto& request = *state.readbacks[handle.slotIndex];
-
-	if (request.state == ReadbackState::Ready)
-	{
-		// Move the readback data to the output and release the readback slot.
-		// Request is consumed and will be removed from the readback list (not reusable).
-		output = std::move(request.data);
-		Result  released = state.ReleaseReadback(handle);
-
-		if (!released.IsSuccess())
-		{
-			return { ReadbackState::Failed, std::move(released) };
-		}
-
-		return { ReadbackState::Ready,{} };
-	}
-
-	// Provides a failure message.
-	if (request.state == ReadbackState::Failed && request.error.message.empty())
-	{
-		Result failure = request.error;
-		failure.message = "TryTakeTextureReadback: readback failed: " + failure.message;
-		return { ReadbackState::Failed, std::move(failure) };
-	}
-
-	return { request.state,request.error };
+	return state.drawResources->Readbacks().Take(handle, output);
 }
 
 Result Renderer::ReleaseTextureReadback(ReadbackHandle handle)
@@ -1894,7 +1595,7 @@ Result Renderer::ReleaseTextureReadback(ReadbackHandle handle)
 		return available;
 	}
 
-	return state.ReleaseReadback(handle);
+	return state.drawResources->Readbacks().Release(handle);
 }
 
 

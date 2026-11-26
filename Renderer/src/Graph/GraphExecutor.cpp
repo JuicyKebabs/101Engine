@@ -560,10 +560,10 @@ Result GraphExecutor::Execute()
 			passName = source.Description().name;
 
 			const auto fail = [&](Result status) -> Result
-			{
-				status.message = "GraphExecutor Pass '" + passName + "': " + status.message;
-				return status;
-			};
+				{
+					status.message = "GraphExecutor Pass '" + passName + "': " + status.message;
+					return status;
+				};
 
 			// Record the state transitions for this pass.
 			result = RecordTransitions(compiled.transitions);
@@ -589,7 +589,8 @@ Result GraphExecutor::Execute()
 				const auto* desc = m_graph.FindTexture(extent);
 
 				D3D12_CPU_DESCRIPTOR_HANDLE dsv =
-					compiled.depth ? FindBinding(compiled.depth->texture)->dsv : D3D12_CPU_DESCRIPTOR_HANDLE{};
+					compiled.depth ? FindBinding(compiled.depth->texture)->dsv
+					: D3D12_CPU_DESCRIPTOR_HANDLE{};
 
 				// Prepare the output of this pass and set it as the current render target.
 				result = commands.SetRasterOutput(rtvs, desc->width, desc->height, dsv);
@@ -626,8 +627,16 @@ Result GraphExecutor::Execute()
 				}
 			}
 
+			const GraphTextureBinding* copySource = nullptr;
+
+			if (compiled.uses.size() == 1 &&
+				compiled.uses.front().use.usage == TextureUsage::CopySource)
+			{
+				copySource = FindBinding(compiled.uses.front().texture);
+			}
+
 			// Execute the callback for this pass with the render pass context.
-			RenderPassContext context(m_graph, compiled, &commands);
+			RenderPassContext context(m_graph, compiled, &commands, copySource);
 			result = source.m_execute(context);
 
 			if (!context.m_status.IsSuccess())

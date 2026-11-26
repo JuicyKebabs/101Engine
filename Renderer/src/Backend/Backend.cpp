@@ -71,9 +71,7 @@ Result Backend::Initialize(const RendererConfiguration& configuration)
 	}
 
 	// Initialize frame resources
-	const Result frameResult = m_frameResources.Initialize(&m_device,
-                                                           1024 * 1024, // 1 MB for constants
-                                                           1024);       // 1024 descriptors
+	const Result frameResult =m_frameResources.Initialize(&m_device, 1024 * 1024, 1024);
 
 	if (!frameResult.IsSuccess())
 	{

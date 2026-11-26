@@ -1,4 +1,5 @@
 #include "RenderPassContext.h"
+#include "GraphTextureBinding.h"
 #include "DrawCommand.h"
 #include "Backend/CommandContext.h"
 
@@ -105,6 +106,24 @@ Result RenderPassContext::RecordDrawCommands(std::span<const rendering::DrawComm
 	}
 
 	return {};
+}
+
+Result RenderPassContext::RecordTextureReadback(
+	GraphTextureHandle texture,
+	const backend::TextureReadbackTransfer& transfer)
+{
+	if (!m_status.IsSuccess())
+	{
+		return m_status;
+	}
+
+	if (!m_commands || !m_copySource || m_copySource->handle != texture)
+	{
+		return Reject("RecordTextureReadback: Context has no TextureReadback recorder or source texture mismatch.");
+	}
+
+	m_status = m_commands->RecordTextureReadback(m_copySource->Resource(), transfer);
+	return m_status;
 }
 
 } // namespace rendering::graph

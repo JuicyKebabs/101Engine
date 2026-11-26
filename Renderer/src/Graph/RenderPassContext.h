@@ -2,6 +2,7 @@
 
 #include "RenderGraph.h"
 #include <span>
+
 namespace rendering
 {
 class DrawCommand;
@@ -9,6 +10,7 @@ class DrawCommand;
 namespace rendering::backend
 {
 class CommandContext;
+class TextureReadbackTransfer;
 }
 
 //---------------------------------------------------------------------------------------------------------------
@@ -20,6 +22,8 @@ class CommandContext;
 
 namespace rendering::graph
 {
+
+struct GraphTextureBinding;
 
 struct PassTextureInfo
 {
@@ -50,19 +54,22 @@ public:
 	Result GetTextureInfo(GraphTextureHandle texture, TextureUse intendedUse, PassTextureInfo& output);
 
 	Result RecordDrawCommands(std::span<const rendering::DrawCommand> commands);
+	Result RecordTextureReadback(GraphTextureHandle texture, const backend::TextureReadbackTransfer& transfer);
 
 private:
 	RenderPassContext(
 		const RenderGraph& graph,
 		const CompiledPass& pass,
-		backend::CommandContext* commands = nullptr) noexcept
-		: m_graph(graph), m_pass(pass), m_commands(commands)
+		backend::CommandContext* commands,
+		const GraphTextureBinding* copySource) noexcept
+		: m_graph(graph), m_pass(pass), m_commands(commands), m_copySource(copySource)
 	{
 	}
 
 	const RenderGraph& m_graph;
 	const CompiledPass& m_pass;
 	backend::CommandContext* m_commands = nullptr;
+	const GraphTextureBinding* m_copySource = nullptr;
 
 	Result m_status;
 

@@ -7,6 +7,7 @@
 #include "Resource/GeometryRegistry.h"
 #include "Resource/TextureRegistry.h"
 #include "Resource/RenderTargetTextureRegistry.h"
+#include "Resource/TextureReadbackRegistry.h"
 #include "Resource/VersionedRegistry.h"
 #include "Resource/BufferRegistry.h"
 #include "Backend/Backend.h"
@@ -101,6 +102,7 @@ public:
 		m_geometryResources(owner),
 		m_textureResources(owner),
 		m_renderTargetResources(owner),
+		m_readbackResources(owner),
 		m_shaderResources(owner),
 		m_pipelineResources(owner),
 		m_materialResources(owner),
@@ -114,14 +116,25 @@ public:
 
 	Result RegisterBuiltinShader(const char* source, ShaderStage stage, ShaderHandle& handle);
 
+	//------------------------------------------------------
+	// Resource registration.
+	//------------------------------------------------------
 	ResourceRegistrationResult<GeometryHandle> Register(const GeometryDesc& desc);
 	ResourceRegistrationResult<TextureHandle> Register(const TextureDesc& desc);
 	ResourceRegistrationResult<ShaderHandle> Register(const ShaderDesc& desc);
 	ResourceRegistrationResult<PipelineHandle> Register(const PipelineDesc& desc);
 	ResourceRegistrationResult<MaterialHandle> Register(const MaterialDesc& desc);
 
+	//------------------------------------------------------
+	// Resource update.
+	//------------------------------------------------------
+	Result Update(GeometryHandle handle, const GeometryDesc& desc) { return m_geometryResources.Update(handle, desc); }
+	Result Update(TextureHandle handle, const TextureDesc& desc) { return m_textureResources.Update(handle, desc); }
 	Result UpdateMaterial(MaterialHandle handle, const MaterialDesc& desc);
 
+	//------------------------------------------------------
+	// Structured buffer management.
+	//------------------------------------------------------
 	ResourceRegistrationResult<BufferHandle> CreateStructuredBuffer(backend::Backend& backend, const StructuredBufferDesc& desc)
 	{
 		return m_bufferResources.CreateStructuredBuffer(backend, desc);
@@ -132,6 +145,11 @@ public:
 		return m_bufferResources.UpdateStructuredBuffer(backend, handle, data);
 	}
 
+	Result ValidateStructuredBuffers(const MaterialDesc& material, const ShaderMetadata& layout);
+
+	//------------------------------------------------------
+	// Resource resolution and input validation.
+	//------------------------------------------------------
 	Result ResolveDrawInputs(
 		const RenderObject& object,
 		std::size_t objectIndex,
@@ -155,8 +173,9 @@ public:
 		const ShaderResourceBinding& requirement,
 		SampledTexture& sampled);
 
-	Result ValidateStructuredBuffers(const MaterialDesc& material, const ShaderMetadata& layout);
-
+	//------------------------------------------------------
+	// Command preparation.
+	//------------------------------------------------------
 	Result PrepareCommands(
 		FrameDrawContext& drawContext,
 		const PassRecordingInputs& pass,
@@ -164,6 +183,9 @@ public:
 		const graph::OutputLayout& output,
 		std::vector<DrawCommand>& commands);
 
+	//------------------------------------------------------
+	// Resource content accessors.
+	//------------------------------------------------------
 	GeometryContent* FindContent(GeometryHandle handle) { return m_geometryResources.FindRegisteredContent(handle); }
 	TextureContent* FindContent(TextureHandle handle) { return m_textureResources.FindRegisteredContent(handle); }
 	RenderTargetTextureContent* FindContent(RenderTargetTextureHandle handle) { return m_renderTargetResources.FindForNewUse(handle); }
@@ -171,6 +193,9 @@ public:
 	PipelineContent* FindContent(PipelineHandle handle) { return m_pipelineResources.FindForNewUse(handle); }
 	MaterialContent* FindContent(MaterialHandle handle) { return m_materialResources.FindForNewUse(handle); }
 
+	//------------------------------------------------------
+	// Resource destruction.
+	//------------------------------------------------------
 	Result Destroy(GeometryHandle handle) { return m_geometryResources.Destroy(handle); }
 	Result Destroy(TextureHandle handle) { return m_textureResources.Destroy(handle); }
 	Result Destroy(RenderTargetTextureHandle handle) { return m_renderTargetResources.Destroy(handle); }
@@ -179,34 +204,58 @@ public:
 	Result Destroy(MaterialHandle handle) { return m_materialResources.Destroy(handle); }
 	Result Destroy(BufferHandle handle) { return m_bufferResources.Destroy(handle); }
 
-	Result Update(GeometryHandle handle, const GeometryDesc& desc) { return m_geometryResources.Update(handle, desc); }
-	Result Update(TextureHandle handle, const TextureDesc& desc) { return m_textureResources.Update(handle, desc); }
-
+	//------------------------------------------------------
+	// Resource lifecycle management.
+	//------------------------------------------------------
 	void CollectgeometryDestroyed() { m_geometryResources.CollectDestroyed(); }
 	void CollectTextureDestroyed() { m_textureResources.CollectDestroyed(); }
 
+	//------------------------------------------------------
+	// Resource data accessors.
+	//------------------------------------------------------
+	Result GetGeometryData(GeometryHandle handle, GeometryData& output) const { return m_geometryResources.GetData(handle, output); }
+
+	//------------------------------------------------------
+	// Resource preparation and residency management.
+	//------------------------------------------------------
 	bool MarkPrepared(GeometryHandle handle, GeometryContent& content) { return m_geometryResources.MarkPrepared(handle, content); }
 	bool MarkPrepared(TextureHandle handle, TextureContent& content) { return m_textureResources.MarkPrepared(handle, content); }
 	bool MarkPreparationFailed(GeometryHandle handle, GeometryContent& content) { return m_geometryResources.MarkPreparationFailed(handle, content); }
 	bool MarkPreparationFailed(TextureHandle handle, TextureContent& content) { return m_textureResources.MarkPreparationFailed(handle, content); }
 
-	Result GetGeometryData(GeometryHandle handle, GeometryData& output) const { return m_geometryResources.GetData(handle, output); }
-
-	// Wrappers for RenderTargetTextureRegistry.
+	//------------------------------------------------------
+	// RenderTargetTexture management.
+	//------------------------------------------------------
 	ResourceRegistrationResult<RenderTargetTextureHandle> CreateRenderTargetTexture(ID3D12Device* device, const RenderTargetTextureDesc& description) { return m_renderTargetResources.Create(device, description); }
 	Result ResizeRenderTargetTexture(ID3D12Device* device, RenderTargetTextureHandle handle, std::uint32_t width, std::uint32_t height) { return m_renderTargetResources.Resize(device, handle, width, height); }
 	Result QueryRenderTargetTextureInfo(RenderTargetTextureHandle handle, RenderTargetTextureInfo& output) const { return m_renderTargetResources.QueryInfo(handle, output); }
 	
+	//------------------------------------------------------
+	// Logging and diagnostics.
+	//------------------------------------------------------
 	std::string DescribeTextureUnavailable(TextureHandle handle) const { return m_textureResources.DescribeUnavailable(handle); }
 	std::string DescribeRenderTargetTextureUnavailable(RenderTargetTextureHandle handle) const { return m_renderTargetResources.DescribeUnavailable(handle); }
+
+	//------------------------------------------------------
+	// Texture readback operations
+	//------------------------------------------------------
+	ReadbackRequestResult RequestTextureReadback(backend::Backend& backend, const TextureReadbackDesc& desc)
+	{
+		return m_readbackResources.Register(backend, m_renderTargetResources, desc);
+	}
+
+	TextureReadbackRegistry& Readbacks() noexcept { return m_readbackResources; }
 
 private:
 	GeometryRegistry m_geometryResources;
 	TextureRegistry m_textureResources;
 	RenderTargetTextureRegistry m_renderTargetResources;
+	TextureReadbackRegistry m_readbackResources;
+
 	VersionedRegistry<ShaderHandle, ShaderContent> m_shaderResources;
 	VersionedRegistry<PipelineHandle, PipelineContent> m_pipelineResources;
 	VersionedRegistry<MaterialHandle, MaterialContent> m_materialResources;
+
 	BufferRegistry m_bufferResources;
 
 private:
