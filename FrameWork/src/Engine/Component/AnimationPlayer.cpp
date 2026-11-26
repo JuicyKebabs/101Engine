@@ -314,6 +314,16 @@ void AnimationPlayer::RestartCurrentClip()
 	}
 }
 
+std::string  AnimationPlayer::GetCurrentClipName() const
+{
+	if (m_playback)
+	{
+		return m_clipSlots[m_playback->slotIndex].alias;
+	}
+
+	return {};
+}
+
 bool AnimationPlayer::SetPlaybackSpeed(float speed)
 {
 	if (!std::isfinite(speed) || speed < 0.0f)

@@ -9,6 +9,7 @@ struct GameCodeHotReloadConfig
 	std::string compilerFlags;
 	std::string objectDirectory;
 	std::string frameworkLibrary;
+	std::string rendererLibrary;
 	std::string stagedDll;
 	std::string stagedLibrary;
 };

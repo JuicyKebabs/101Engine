@@ -26,6 +26,7 @@ public:
 	bool AddClip(std::string alias, const Guid& clipGuid);
 	bool SwitchClip(std::string_view alias, float blendSeconds = 0.0f);
 	void RestartCurrentClip();
+	std::string GetCurrentClipName() const;
 
 	void SetIsPlaying(bool isPlaying) { m_isPlaying = isPlaying; }
 	bool IsPlaying() const { return m_isPlaying; }

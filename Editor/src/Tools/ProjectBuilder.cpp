@@ -183,6 +183,8 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 	const auto gameCodeRoot = fs::path(projectRoot) / "Game" / "GameCode";
 	std::string gameCodeDir = "Game\\GameCode";
 	std::string frameworkInc = "Framework\\src";
+	std::string rendererInc = "Renderer\\include";
+	std::string rendererAssetsInc = "RendererAssets\\include";
 	std::string thirdPartyInc = "third_party";
 	std::string directXInc = thirdPartyInc + "\\DirectX\\d3dx12";
 	std::string directXTexInc = thirdPartyInc + "\\DirectX\\DirectXTex\\include";
@@ -194,6 +196,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 	const auto scriptConfig = ResolveGameCodeHotReloadConfig(".", config);
 	const std::string& objDir = scriptConfig->objectDirectory;
 	const std::string& frameworkLib = scriptConfig->frameworkLibrary;
+	const std::string& rendererLib = scriptConfig->rendererLibrary;
 	const std::string& outputDll = scriptConfig->stagedDll;
 	const std::string& outputLib = scriptConfig->stagedLibrary;
 	std::string logPath = "hotreload_compile.log";
@@ -265,6 +268,8 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 
 		bat << " /I\"" << gameCodeDir << "\"";
 		bat << " /I\"" << frameworkInc << "\"";
+		bat << " /I\"" << rendererInc << "\"";
+		bat << " /I\"" << rendererAssetsInc << "\"";
 		bat << " /I\"" << thirdPartyInc << "\"";
 		bat << " /I\"" << directXInc << "\"";
 		bat << " /I\"" << directXTexInc << "\"";
@@ -291,6 +296,7 @@ bool ProjectBuilder::BuildGameCodeForHotReload(const std::string& config)
 		bat << " /OUT:\"" << outputDll << "\"";
 		bat << " /IMPLIB:\"" << outputLib << "\"";
 		bat << " \"" << frameworkLib << "\"";
+		bat << " \"" << rendererLib << "\"";
 
 		for (const auto& src : sources)
 		{

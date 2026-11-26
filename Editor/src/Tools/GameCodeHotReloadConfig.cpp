@@ -24,6 +24,7 @@ std::optional<GameCodeHotReloadConfig> ResolveGameCodeHotReloadConfig(
 
 	result.objectDirectory = (build / "GameCode_hotreload" / configuration / "obj").string();
 	result.frameworkLibrary = (libraries / "101Framework.lib").string();
+	result.rendererLibrary = (libraries / "101Renderer.lib").string();
 	result.stagedDll = (output / "GameCode.staged.dll").string();
 	result.stagedLibrary = (libraries / "GameCode.staged.lib").string();
 	return result;

@@ -32,6 +32,8 @@ int main()
 		"Debug uses the debug MSVC STL ABI");
 	Check(SamePath(debug->frameworkLibrary, root / "build/lib/Debug/101Framework.lib"),
 		"Debug links the Debug Framework import library");
+	Check(SamePath(debug->rendererLibrary, root / "build/lib/Debug/101Renderer.lib"),
+		"Debug links the Debug Renderer import library");
 	Check(SamePath(debug->stagedDll, root / "build/bin/Debug/GameCode.staged.dll"),
 		"Debug stages the DLL in the Debug output directory");
 
@@ -43,6 +45,8 @@ int main()
 		"Release uses the release MSVC STL ABI");
 	Check(SamePath(release->frameworkLibrary, root / "build/lib/Release/101Framework.lib"),
 		"Release links the Release Framework import library");
+	Check(SamePath(release->rendererLibrary, root / "build/lib/Release/101Renderer.lib"),
+		"Release links the Release Renderer import library");
 	Check(SamePath(release->stagedDll, root / "build/bin/Release/GameCode.staged.dll"),
 		"Release stages the DLL in the Release output directory");
 	Check(debug->objectDirectory != release->objectDirectory,
