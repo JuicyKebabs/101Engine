@@ -7,6 +7,7 @@ add_library(101Renderer SHARED
     src/Backend/CommandContext.cpp
     src/Backend/DescriptorHeap.cpp
     src/Backend/SwapChain.cpp
+    src/Backend/TextureReadbackTransfer.cpp
     src/Math/Math.cpp
     src/Resource/GeometryCpuData.cpp
     src/Resource/TextureCpuData.cpp
@@ -34,6 +35,7 @@ add_library(101Renderer SHARED
     src/Backend/PipelineGpu.cpp
     src/Backend/StructuredBufferGpuData.cpp
     src/Resource/BufferRegistry.cpp
+    src/Resource/TextureReadbackRegistry.cpp
 )
 
 # ディレクトリのインクルード

@@ -20,6 +20,7 @@ enum class BufferMemory
 {
 	Default,
 	Upload,
+	Readback
 };
 
 class Buffer
@@ -44,15 +45,8 @@ public:
 	// Writes data at exact location by offset.
 	Result WriteAt(std::uint64_t offset, std::span<const std::byte> data);
 
-	ID3D12Resource* GetNativeResource() const noexcept
-	{
-		return m_resource.Get();
-	}
-
-	std::uint64_t GetSize() const noexcept
-	{
-		return m_size;
-	}
+	ID3D12Resource* GetNativeResource() const noexcept { return m_resource.Get(); }
+	std::uint64_t GetSize() const noexcept { return m_size; }
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;

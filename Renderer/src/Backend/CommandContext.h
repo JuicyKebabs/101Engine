@@ -1,7 +1,3 @@
-// Native command-list operations consume validated Renderer-owned input values.
-// A View establishes its viewport; each Draw establishes its scissor.
-// These are different rasterizer states and must not leak across Views or Objects.
-
 #pragma once
 
 #include "Renderer/Result.h"
@@ -22,6 +18,8 @@ namespace rendering { struct Viewport; }
 
 namespace rendering::backend
 {
+
+class TextureReadbackTransfer;
 
 class CommandContext
 {
@@ -61,7 +59,12 @@ public:
 
 	Result ClearDepth(D3D12_CPU_DESCRIPTOR_HANDLE depth, float value);
 
+	// Records a draw call with the specified draw packet.
 	Result RecordDraw(const DrawPacket& packet);
+
+	// Records a texture readback operation.
+	// The caller must ensure the transfer is valid and the source resource is in COPY_SOURCE state.
+	Result RecordTextureReadback(ID3D12Resource* source, const TextureReadbackTransfer& transfer);
 
 	// Records a clear of the entire RTV.
 	// The referenced subresources must already be in RENDER_TARGET state.
@@ -85,23 +88,9 @@ public:
 		ID3D12Resource* source,
 		const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout);
 
-	[[nodiscard]]
-	bool IsClosed() const noexcept
-	{
-		return m_state == State::Closed;
-	}
-
-	[[nodiscard]]
-	bool IsRecording() const noexcept
-	{
-		return m_state == State::Recording;
-	}
-
-	[[nodiscard]]
-	ID3D12GraphicsCommandList* GetNativeCommandList() const noexcept
-	{
-		return m_commandList.Get();
-	}
+	[[nodiscard]] bool IsClosed() const noexcept { return m_state == State::Closed; }
+	[[nodiscard]] bool IsRecording() const noexcept { return m_state == State::Recording; }
+	[[nodiscard]] ID3D12GraphicsCommandList* GetNativeCommandList() const noexcept { return m_commandList.Get(); }
 
 private:
 	enum class State

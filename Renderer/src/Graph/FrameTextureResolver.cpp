@@ -65,7 +65,7 @@ Result QueryBinding(
 		}
 
 		auto& gpu = *(*content)->gpuData;
-		output.resource = gpu.Resource();
+		output.resource = gpu.GetNativeResource();
 		output.rtv = gpu.Rtv();
 		output.srv = gpu.Srv();
 		output.dsv = {};

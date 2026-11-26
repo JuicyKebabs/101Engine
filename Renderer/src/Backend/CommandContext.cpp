@@ -1,7 +1,3 @@
-// Record native state only while the command list is in its recording window.
-// Viewport coordinates are validated against the current output extent, not a cached Window size.
-// This file does not decide Engine Canvas coordinates, DPI semantics or Sky ownership.
-
 #include "CommandContext.h"
 #include "Renderer/FrameRenderData.h"
 #include "Failure.h"

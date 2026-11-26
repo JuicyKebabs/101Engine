@@ -210,7 +210,7 @@ Result FrameResourceBindings::ImportRenderTarget(
 	const std::string& name,
 	GraphTextureHandle& texture)
 {
-	if (!content.gpuData || !content.gpuData->Resource())
+	if (!content.gpuData || !content.gpuData->GetNativeResource())
 	{
 		return detail::Fail("FrameResourceBindings: RenderTargetTexture is unavailable.");
 	}
@@ -218,7 +218,7 @@ Result FrameResourceBindings::ImportRenderTarget(
 	auto& gpu = *content.gpuData;
 
 	GraphTextureBinding binding;
-	binding.resource = gpu.Resource();
+	binding.resource = gpu.GetNativeResource();
 	binding.rtv = gpu.Rtv();
 	binding.srv = gpu.Srv();
 	binding.viewFormat = gpu.viewFormat;
@@ -251,7 +251,7 @@ Result FrameResourceBindings::FindImportedRenderTarget(
 		return detail::Fail("FrameResourceBindings: resource is unavailable.");
 	}
 
-	const auto* existing = m_executor.FindPhysicalBinding(content.gpuData->Resource());
+	const auto* existing = m_executor.FindPhysicalBinding(content.gpuData->GetNativeResource());
 
 	if (!existing)
 	{

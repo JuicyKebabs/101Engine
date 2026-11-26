@@ -1,7 +1,3 @@
-// Owns GPU execution and the existing linear per-frame allocation window.
-// Output replacement and capacity growth are legal only outside active or uncertain GPU use.
-// The Renderer remains responsible for public sequencing and resource registries.
-
 #pragma once
 
 #include "Renderer/RendererConfiguration.h"
@@ -20,6 +16,7 @@
 #include <array>
 #include <memory>
 #include <cstdint>
+#include <span>
 
 //-----------------------------------------------------------------------------------------
 // Backend class
@@ -27,8 +24,13 @@
 // Whole DirectX 12 functions are encapsulated in this class.
 //-----------------------------------------------------------------------------------------
 
+namespace rendering { struct PixelRect; }
+
 namespace rendering::backend
 {
+
+class RenderTargetTextureGpuData;
+class TextureReadbackTransfer;
 
 class Backend
 {
@@ -41,21 +43,18 @@ public:
 		return m_device.GetNativeDevice();
 	}
 
-	//-------------------------------
+	//---------------------------------------------------------------
 	// Command related operations
-	//-------------------------------
+	//---------------------------------------------------------------
 	Result BeginFrameCommands();
 	QueueSubmissionResult SubmitFrameCommands();
 	Result WaitForFrameCompletion();
 	[[nodiscard]]
-	CommandContext& GetFrameCommandContext() noexcept
-	{
-		return m_graphicsContext;
-	}
+	CommandContext& GetFrameCommandContext() noexcept { return m_graphicsContext; }
 
-	//------------------------------
+	//---------------------------------------------------------------
 	// Window output management
-	//------------------------------
+	//---------------------------------------------------------------
 
 	// Create the swapchain and reserve the handle for the given Win32 window output description.
 	WindowOutputCreationResult CreateWindowOutput(const Win32WindowOutputDesc& outputDesc);
@@ -76,29 +75,36 @@ public:
 	[[nodiscard]]
 	bool IsWindowOutputValid(WindowOutputHandle handle) const noexcept;
 
-	//-------------------------------
+	//---------------------------------------------------------------
 	// Frame resource management
-	//-------------------------------
+	//---------------------------------------------------------------
 	Result EnsureFrameCapacity(UINT constantBytes, UINT descriptorCount);
 	Result BeginFrameResources();
 	Result EndFrameResources();
 
-	[[nodiscard]] bool HasPendingFrameResources() const noexcept
-	{
-		return m_frameActive;
-	}
+	[[nodiscard]] bool HasPendingFrameResources() const noexcept { return m_frameActive; }
 
 	Result AllocateConstants(std::span<const std::byte> data, ConstantAllocation& output);
 	Result CopyFrameDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE source, D3D12_GPU_DESCRIPTOR_HANDLE& output);
 
-	[[nodiscard]] ID3D12DescriptorHeap* GetFrameDescriptorHeap() const noexcept
-	{
-		return m_frameResources.GetDescriptorHeap();
-	}
+	[[nodiscard]] ID3D12DescriptorHeap* GetFrameDescriptorHeap() const noexcept { return m_frameResources.GetDescriptorHeap(); }
 
-	//-------------------------------
+	//---------------------------------------------------------------
+	// Texture readback operations
+	//---------------------------------------------------------------
+	Result PlanTextureReadback(
+		const RenderTargetTextureGpuData& source,
+		const PixelRect& region,
+		TextureReadbackTransfer& transfer) const;
+
+	Result PrepareTextureReadback(TextureReadbackTransfer& transfer);
+
+	// The caller must first confirm completion of the recorded texture copy.
+	Result ReadTextureReadback(TextureReadbackTransfer& transfer, std::span<std::byte> destination);
+
+	//--------------------------------------------------------------
 	// Resource uploading
-	//-------------------------------
+	//--------------------------------------------------------------
 
 	// Resource upload related functions. Only one upload batch is supported for now.
 	[[nodiscard]] Result CollectUploads();
@@ -142,10 +148,9 @@ private:
 
 	// Frame resources are used for per-frame allocations and descriptor management.
 	FrameResources m_frameResources;
-	bool m_frameActive = false;              // If a frame is currently active and has not been finalized.
-	bool m_frameCommandsNeedDiscard = false; // If the frame still has unsubmitted commands.
-	bool m_frameCompletionUnknown =
-		false; // If it's unable to confirm GPU completion for the frame (Don't allow refreshing).
+	bool m_frameActive = false;					// If a frame is currently active and has not been finalized.
+	bool m_frameCommandsNeedDiscard = false;	// If the frame still has unsubmitted commands.
+	bool m_frameCompletionUnknown = false;		// If it's unable to confirm GPU completion for the frame (Don't allow refreshing).
 	std::uint64_t m_frameFence = 0;
 
 	// Only one window output is supported for now.

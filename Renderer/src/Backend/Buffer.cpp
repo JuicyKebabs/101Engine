@@ -19,15 +19,32 @@ Result Buffer::Initialize(ID3D12Device* device, std::uint64_t size, BufferMemory
 		return { false, "Buffer requires a device and a positive size." };
 	}
 
-	if (memory != BufferMemory::Default && memory != BufferMemory::Upload)
+	D3D12_HEAP_PROPERTIES props{};
+	D3D12_RESOURCE_STATES initialState;
+
+	// Decide the type and initial state of the buffer
+	// based on the specified memory type.
+	switch (memory)
 	{
-		return { false, "Unsupported buffer memory type." };
+	case rendering::backend::BufferMemory::Default:
+		props.Type = D3D12_HEAP_TYPE_DEFAULT;
+		initialState = D3D12_RESOURCE_STATE_COMMON;
+		break;
+
+	case rendering::backend::BufferMemory::Upload:
+		props.Type = D3D12_HEAP_TYPE_UPLOAD;
+		initialState = D3D12_RESOURCE_STATE_GENERIC_READ;
+		break;
+
+	case rendering::backend::BufferMemory::Readback:
+		props.Type = D3D12_HEAP_TYPE_READBACK;
+		initialState = D3D12_RESOURCE_STATE_COPY_DEST;
+		break;
+
+	default:
+		return  { false, "Buffer : requires a valid memory type." };
 	}
 
-	const bool upload = memory == BufferMemory::Upload;
-
-	D3D12_HEAP_PROPERTIES props{};
-	props.Type = upload ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
 	props.CreationNodeMask = 1;
 	props.VisibleNodeMask = 1;
 
@@ -42,8 +59,6 @@ Result Buffer::Initialize(ID3D12Device* device, std::uint64_t size, BufferMemory
 	desc.SampleDesc.Quality = 0;
 	desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-	const auto initialState = upload ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
 
 	// Create the resource for temporal buffer.
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource;
